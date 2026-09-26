@@ -19,7 +19,7 @@ import 'connected_apps_screen.dart';
 
 /// 登入裝置清單 provider（GET /account/sessions）。
 final accountSessionsProvider = FutureProvider<AccountSessionsPage>((ref) {
-  return ref.watch(tripRepositoryProvider).fetchAccountSessions();
+  return ref.watch(accountRepositoryProvider).fetchAccountSessions();
 });
 
 /// 登入裝置管理頁。
@@ -90,10 +90,11 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
     await showAppAlert(
       context,
       key: const ValueKey('revoke-other-sessions-blocked-dialog'),
-      title: '需要重新驗證才能登出其他裝置',
+      title: '目前無法一次登出其他裝置',
       message:
-          '目前缺少可綁定伺服器操作的重新驗證機制，因此不會送出批次登出要求。'
-          '你仍可返回裝置清單，逐一登出不再使用的裝置。',
+          '目前無法驗證身分以一次登出其他裝置。'
+          '請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。',
+      actionLabel: '返回裝置清單',
     );
   }
 
@@ -103,7 +104,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
       _mutationError = null;
     });
     try {
-      await ref.read(tripRepositoryProvider).revokeAccountSession(sid);
+      await ref.read(accountRepositoryProvider).revokeAccountSession(sid);
       if (!mounted) return '登出裝置失敗，請稍後再試';
       ref.invalidate(accountSessionsProvider);
       showAppNotice(context, '已登出該裝置');
@@ -125,12 +126,12 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showAppConfirm(
+    final shouldLogout = await showAppDestructiveConfirm(
       context,
+      source: TpDestructiveConfirmSource.direct,
       title: '登出帳號',
       message: '確定要登出嗎？',
       confirmLabel: '登出',
-      isDestructive: true,
     );
     if (shouldLogout && mounted) {
       await ref.read(authStateProvider.notifier).logout();
@@ -472,12 +473,12 @@ class _SessionDetailsState extends State<_SessionDetails> {
 
   Future<void> _confirmRevoke() async {
     final sessionName = widget.session.uaSummary ?? '此裝置';
-    final confirmed = await showAppConfirm(
+    final confirmed = await showAppDestructiveConfirm(
       context,
+      source: TpDestructiveConfirmSource.direct,
       title: '登出 $sessionName？',
       message: '這會立即移除此裝置的登入狀態，之後必須重新登入。這項操作無法復原。',
       confirmLabel: '登出',
-      isDestructive: true,
     );
     if (!confirmed || !mounted) return;
     setState(() {

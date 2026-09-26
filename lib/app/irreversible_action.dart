@@ -90,7 +90,7 @@ Future<void> confirmAndDelete(
   required String title,
   required String message,
   required Future<void> Function() delete,
-  required VoidCallback onSuccess,
+  VoidCallback? onSuccess,
 }) {
   return confirmAndRunIrreversibleAction(
     context,

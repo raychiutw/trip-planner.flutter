@@ -4,10 +4,10 @@ library;
 import 'package:dio/dio.dart';
 
 import '../models/user.dart';
-import '../models/oauth.dart';
 import '../models/public_config.dart';
 import 'api_client.dart';
 import 'api_error.dart';
+import 'cache_read_policy.dart';
 import 'session_store.dart';
 
 class SignupJoinedTrip {
@@ -104,10 +104,6 @@ class AuthRepository {
     );
 
     final statusCode = loginResponse.statusCode ?? 0;
-    if (statusCode < 200 || statusCode >= 300) {
-      throw ApiError.fromResponse(statusCode, loginResponse.data);
-    }
-
     final sessionToken = _sessionTokenFrom(loginResponse.headers);
     if (sessionToken == null || sessionToken.isEmpty) {
       throw ApiError(
@@ -144,16 +140,6 @@ class AuthRepository {
     );
 
     final statusCode = signupResponse.statusCode ?? 0;
-    if (statusCode < 200 || statusCode >= 300) {
-      throw ApiError.fromResponse(
-        statusCode,
-        signupResponse.data,
-        retryAfterSeconds: int.tryParse(
-          signupResponse.headers.value('retry-after') ?? '',
-        ),
-      );
-    }
-
     final sessionToken = _sessionTokenFrom(signupResponse.headers);
     if (sessionToken == null || sessionToken.isEmpty) {
       throw ApiError(
@@ -169,11 +155,7 @@ class AuthRepository {
 
   /// GET /account：刪除前顯示會受影響的行程與共編者。
   Future<AccountDeletionPreview> fetchAccountDeletionPreview() async {
-    final body = await _client.get(
-      '/account',
-      writeCache: false,
-      fallbackToCache: false,
-    );
+    final body = await _client.get('/account', policy: CacheReadPolicy.noStore);
     return AccountDeletionPreview.fromJson(body as Map<String, dynamic>);
   }
 
@@ -256,25 +238,11 @@ class AuthRepository {
     }
   }
 
-  /// GET /oauth/client-info；只回傳後端驗證過的應用程式名稱。
-  Future<String?> fetchOAuthClientName(String clientId) async {
-    final body = await _client.get(
-      '/oauth/client-info',
-      query: {'client_id': clientId.trim()},
-      writeCache: false,
-      fallbackToCache: false,
-    );
-    if (body is! Map) return null;
-    final name = body['app_name']?.toString().trim();
-    return name == null || name.isEmpty ? null : name;
-  }
-
   /// GET /account/ai-authorization。
   Future<bool> fetchAiAuthorization() async {
     final body = await _client.get(
       '/account/ai-authorization',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     return body is Map && body['authorized'] == true;
   }
@@ -283,21 +251,6 @@ class AuthRepository {
   Future<bool> authorizeAi() async {
     final body = await _client.post('/account/ai-authorization');
     return body is Map && body['authorized'] == true;
-  }
-
-  /// POST /oauth/consent；後端以 302 Location 表示後續 authorize/deny 目的地。
-  Future<OAuthConsentResult> submitOAuthConsent(
-    OAuthConsentRequest request, {
-    required String decision,
-  }) async {
-    final response = await _client.postForRedirect(
-      '/oauth/consent',
-      body: request.toBody(decision),
-    );
-    return OAuthConsentResult(
-      statusCode: response.statusCode,
-      redirectLocation: response.location,
-    );
   }
 
   String? _sessionTokenFrom(Headers headers) {

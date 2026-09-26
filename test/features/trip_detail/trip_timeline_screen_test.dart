@@ -568,6 +568,13 @@ void main() {
     expect(_sharedDayNum(tester), 1);
   });
 
+  testWidgets('查詢日期優先於停留點深連結', (tester) async {
+    await _pumpTimeline(tester, initialDayNum: 1, initialEntryId: 22);
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 1);
+  });
+
   testWidgets('切換行程後不殘留前一個行程的共用選取日', (tester) async {
     await _pumpTimeline(
       tester,
@@ -1954,6 +1961,14 @@ void main() {
     await tester.ensureVisible(setMaster);
     await tester.pumpAndSettle();
     await tester.tap(setMaster);
+    // 確認期間該列顯示忙碌 spinner(永遠在轉),不能 pumpAndSettle。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    // 與 POI 畫面同一套政策:設為正選一律先確認。
+    expect(find.text('設為正選？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '設為正選'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
     verify(
@@ -2559,19 +2574,6 @@ void main() {
     await tester.tap(addBtn);
     await tester.pumpAndSettle();
     expect(find.text('entry-add-search-1'), findsOneWidget);
-  });
-
-  group('computeReorderUpdates', () {
-    test('移到末位（onReorderItem 已調整索引）+ 重編連續 sort_order', () {
-      final updates = computeReorderUpdates([11, 12, 13], 0, 2);
-      expect(updates.map((u) => u.id).toList(), [12, 13, 11]);
-      expect(updates.map((u) => u.sortOrder).toList(), [0, 1, 2]);
-      expect(updates.every((u) => u.dayId == null), isTrue);
-    });
-    test('末位移到首位', () {
-      final updates = computeReorderUpdates([11, 12, 13], 2, 0);
-      expect(updates.map((u) => u.id).toList(), [13, 11, 12]);
-    });
   });
 
   testWidgets('每個 entry 有拖曳 handle', (tester) async {

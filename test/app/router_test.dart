@@ -3,18 +3,23 @@
 /// 2. 已登入在 /login → redirect 到 /trips
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/account_repository.dart';
+import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
 import 'package:tripline/features/auth/login_screen.dart';
-import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
@@ -35,9 +40,12 @@ import 'package:tripline/features/trip_detail/entry_action_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
-import 'package:tripline/features/trip_detail/trip_map_screen.dart';
+import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
+import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
+import 'package:tripline/features/trip_detail/trip_pdf_service.dart';
+import 'package:tripline/features/trip_detail/trip_print_data.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
@@ -53,6 +61,7 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
+import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
@@ -69,11 +78,27 @@ class _FakeAuthNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => _fixedUser;
 }
 
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
 class _MockTripRepository extends Mock implements TripRepository {}
+
+class _MockAccountRepository extends Mock implements AccountRepository {}
 
 class _MockCollabRepository extends Mock implements CollabRepository {}
 
 class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
+
+class _MockRequestsRepository extends Mock implements RequestsRepository {}
+
+class _RecordingPrintActions implements TripPrintActions {
+  final printed = <TripPrintData>[];
+
+  @override
+  Future<void> print(TripPrintData data) async => printed.add(data);
+
+  @override
+  Future<void> sharePdf(TripPrintData data) async {}
+}
 
 const _loggedInUser = UserInfo(
   id: 'user-1',
@@ -88,8 +113,14 @@ ProviderContainer _buildContainer({
   required UserInfo? currentUser,
   List<TripSummary>? trips,
   List<TripDay>? days,
+  AuthRepository? authRepository,
+  RequestsRepository? requestsRepository,
+  TripPrintActions? printActions,
+  bool resolveAuthFromRepository = false,
+  bool disableAutomaticRetry = false,
 }) {
   final mockTripRepository = _MockTripRepository();
+  final mockAccountRepository = _MockAccountRepository();
   final mockCollabRepository = _MockCollabRepository();
   final mockFavoritesRepository = _MockFavoritesRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
@@ -159,9 +190,18 @@ ProviderContainer _buildContainer({
   ).thenAnswer((_) async => const []);
 
   final container = ProviderContainer(
+    retry: disableAutomaticRetry ? (_, _) => null : null,
     overrides: [
-      authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
+      if (authRepository != null)
+        authRepositoryProvider.overrideWithValue(authRepository),
+      if (!resolveAuthFromRepository)
+        authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
+      if (requestsRepository != null)
+        requestsRepositoryProvider.overrideWithValue(requestsRepository),
+      if (printActions != null)
+        tripPrintActionsProvider.overrideWithValue(printActions),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
+      accountRepositoryProvider.overrideWithValue(mockAccountRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
       tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
@@ -172,6 +212,387 @@ ProviderContainer _buildContainer({
 }
 
 void main() {
+  testWidgets('舊路徑經 GoRouter 到達行程與停留點畫面', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+
+    router.go('/admin');
+    await tester.pumpAndSettle();
+    expect(find.byType(TripsListScreen), findsOneWidget);
+
+    router.go('/trip/trip-1/stop/11/map');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TripMapScreen>(find.byType(TripMapScreen)).initialEntryId,
+      11,
+    );
+
+    router.go('/trip/trip-1/stop/11/edit');
+    await tester.pumpAndSettle();
+    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
+  });
+
+  testWidgets('無效停留點 deep link 顯示可返回畫面且不讀取停留點', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final repository = container.read(tripRepositoryProvider);
+    for (final id in [
+      'nope',
+      '',
+      '0',
+      '-1',
+      '9223372036854775808',
+      '0x10',
+      '%20',
+      '1.5',
+    ]) {
+      for (final paths in [
+        ['/trips/trip-1/entries/$id/edit', '/trip/trip-1/stop/$id/edit'],
+        ['/trips/trip-1/entries/$id/copy', '/trip/trip-1/stop/$id/copy'],
+        ['/trips/trip-1/entries/$id/move', '/trip/trip-1/stop/$id/move'],
+        ['/trips/trip-1/entries/$id/pois', '/trip/trip-1/stop/$id/change-poi'],
+      ]) {
+        for (final path in paths) {
+          container.read(appRouterProvider).go(path);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: path);
+          expect(find.text('無法開啟連結'), findsOneWidget, reason: path);
+          verifyNever(
+            () => repository.watchEntry(
+              tripId: any(named: 'tripId'),
+              entryId: any(named: 'entryId'),
+            ),
+          );
+        }
+      }
+    }
+    await tester.tap(find.text('返回行程列表'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripsListScreen), findsOneWidget);
+  });
+
+  testWidgets('有效停留點 ID 原值傳入 canonical 與 alias 畫面', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    for (final prefix in ['/trips/trip-1/entries', '/trip/trip-1/stop']) {
+      for (final action in ['edit', 'copy', 'move', 'pois']) {
+        final suffix = prefix.startsWith('/trip/') && action == 'pois'
+            ? 'change-poi'
+            : action;
+        router.go('$prefix/11/$suffix');
+        await tester.pumpAndSettle();
+        final int entryId;
+        if (action == 'edit') {
+          entryId = tester
+              .widget<EntryEditRouteScreen>(find.byType(EntryEditRouteScreen))
+              .entryId;
+        } else if (action == 'pois') {
+          entryId = tester
+              .widget<EntryPoiScreen>(find.byType(EntryPoiScreen))
+              .entryId;
+        } else {
+          entryId = tester
+              .widget<EntryActionRouteScreen>(
+                find.byType(EntryActionRouteScreen),
+              )
+              .entryId;
+        }
+        expect(entryId, 11);
+        expect(find.text('無法開啟連結'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+    }
+    router.go('/trips/trip-1/entries/9223372036854775807/edit');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<EntryEditRouteScreen>(find.byType(EntryEditRouteScreen))
+          .entryId,
+      9223372036854775807,
+    );
+  });
+
+  testWidgets('重設新 token 隔離舊請求與成功狀態', (tester) async {
+    final auth = _MockAuthRepository();
+    final pending = Completer<String?>();
+    when(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).thenAnswer((_) => pending.future);
+    when(
+      () => auth.resetPassword(token: 'new-token', password: 'new-password'),
+    ).thenAnswer((_) async => null);
+    final container = _buildContainer(currentUser: null, authRepository: auth);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/password/reset?token=old-token');
+    await tester.pumpAndSettle();
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    final submit = find.byKey(const ValueKey('reset-password-submit-button'));
+    await tester.tap(submit);
+    await tester.pump();
+    verify(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).called(1);
+    router.go('/auth/password/reset?token=new-token');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('更新中…'), findsNothing);
+    final field = find.byKey(const ValueKey('reset-password-field'));
+    expect(field, findsOneWidget);
+    await tester.enterText(field, 'new-password');
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(of: field, matching: find.byType(EditableText)),
+          )
+          .focusNode
+          .hasFocus,
+      isTrue,
+    );
+    tester.testTextInput.log.clear();
+
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reset-password-success')), findsNothing);
+    expect(find.text('new-password'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      isEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('reset-password-confirm-field')),
+      'new-password',
+    );
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('reset-password-success')),
+      findsOneWidget,
+    );
+    verify(
+      () => auth.resetPassword(token: 'new-token', password: 'new-password'),
+    ).called(1);
+    router.go('/auth/password/reset?token=third-token');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reset-password-success')), findsNothing);
+    expect(field, findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.descendant(of: field, matching: find.byType(TextField)),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('驗證中的舊 token 回應不污染新連結', (tester) async {
+    final auth = _MockAuthRepository();
+    final pending = Completer<bool>();
+    when(() => auth.verifyEmail('old-token')).thenAnswer((_) => pending.future);
+    when(() => auth.verifyEmail('new-token')).thenAnswer((_) async => true);
+    final container = _buildContainer(currentUser: null, authRepository: auth);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/verify-email?token=old-token');
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const ValueKey('verify-email-confirm-button'));
+    await tester.tap(submit);
+    await tester.pump();
+    verify(() => auth.verifyEmail('old-token')).called(1);
+    router.go('/auth/verify-email?token=new-token');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('確認信箱驗證'), findsOneWidget);
+    expect(find.text('驗證中…'), findsNothing);
+    expect(submit, findsOneWidget);
+
+    pending.complete(true);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('verify-email-success')), findsNothing);
+    expect(find.byKey(const ValueKey('verify-email-error')), findsNothing);
+    expect(submit, findsOneWidget);
+    verifyNever(() => auth.verifyEmail('new-token'));
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    verify(() => auth.verifyEmail('new-token')).called(1);
+    expect(find.byKey(const ValueKey('verify-email-success')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('新的重設連結不保留舊 token 錯誤與密碼', (tester) async {
+    final auth = _MockAuthRepository();
+    when(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).thenThrow(
+      const ApiError(
+        status: 400,
+        code: 'RESET_TOKEN_INVALID',
+        message: 'invalid',
+      ),
+    );
+    final container = _buildContainer(currentUser: null, authRepository: auth);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/password/reset?token=old-token');
+    await tester.pumpAndSettle();
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    await tester.tap(
+      find.byKey(const ValueKey('reset-password-submit-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('重設連結無效或已過期'), findsOneWidget);
+    expect(find.text('重新申請'), findsOneWidget);
+
+    router.go('/auth/password/reset?token=new-token');
+    await tester.pumpAndSettle();
+    expect(find.text('重設連結無效或已過期'), findsNothing);
+    expect(find.text('重新申請'), findsNothing);
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byKey(ValueKey(key)),
+                matching: find.byType(TextField),
+              ),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+    }
+    verify(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).called(1);
+    verifyNever(
+      () => auth.resetPassword(
+        token: 'new-token',
+        password: any(named: 'password'),
+      ),
+    );
+  });
+
+  for (final user in [null, _loggedInUser]) {
+    testWidgets('驗證重新開始依登入狀態前往有效目的地：${user?.id ?? "未登入"}', (tester) async {
+      final container = _buildContainer(currentUser: user);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TriplineApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final router = container.read(appRouterProvider);
+      router.go('/auth/verify-email');
+      await tester.pumpAndSettle();
+      expect(find.byType(VerifyEmailScreen), findsOneWidget);
+      await tester.tap(find.text('重新開始'));
+      await tester.pumpAndSettle();
+      expect(find.byType(VerifyEmailScreen), findsNothing);
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        user == null ? '/login' : '/trips',
+      );
+      expect(
+        find.byType(user == null ? LoginScreen : TripsListScreen),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('開啟新的驗證連結會離開舊 token 的失效狀態', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/verify-email');
+    await tester.pumpAndSettle();
+    expect(find.text('重新開始'), findsOneWidget);
+    router.go('/auth/verify-email?token=new-token');
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('verify-email-confirm-button')),
+      findsOneWidget,
+    );
+    expect(find.text('重新開始'), findsNothing);
+  });
+
   testWidgets('未登入時 redirect 到 /welcome', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
@@ -354,6 +775,69 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
+  testWidgets('公開分享可列印，登入後返回同一連結並複製行程', (tester) async {
+    final auth = _MockAuthRepository();
+    final printActions = _RecordingPrintActions();
+    when(auth.currentUser).thenAnswer((_) async => null);
+    when(
+      () => auth.login(email: 'traveler@example.com', password: 'secret'),
+    ).thenAnswer((_) async => _loggedInUser);
+    final container = _buildContainer(
+      currentUser: null,
+      authRepository: auth,
+      resolveAuthFromRepository: true,
+      printActions: printActions,
+    );
+    addTearDown(container.dispose);
+    final repository = container.read(accountRepositoryProvider);
+    when(
+      () => repository.clonePublicTripShare('public-token'),
+    ).thenAnswer((_) async => 'copied-trip');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/s/public-token');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(printActions.printed, hasLength(1));
+    expect(printActions.printed.single.displayTitle, 'public-trip');
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+      router.state.uri.queryParameters['redirect_after'],
+      '/s/public-token',
+    );
+    verifyNever(() => repository.clonePublicTripShare(any()));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password-field')),
+      'secret',
+    );
+    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/s/public-token');
+    expect(find.byType(PublicShareScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+    verify(() => repository.clonePublicTripShare('public-token')).called(1);
+    expect(router.state.uri.path, '/trips/copied-trip');
+  });
+
   testWidgets('未登入可進入邀請確認頁 /invite?token', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
@@ -371,6 +855,75 @@ void main() {
 
     expect(find.byType(InviteScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('邀請登入後接受並從 Account 返回受邀行程', (tester) async {
+    final auth = _MockAuthRepository();
+    when(auth.currentUser).thenAnswer((_) async => null);
+    when(
+      () => auth.login(email: 'traveler@example.com', password: 'secret'),
+    ).thenAnswer((_) async => _loggedInUser);
+    final container = _buildContainer(
+      currentUser: null,
+      authRepository: auth,
+      resolveAuthFromRepository: true,
+    );
+    addTearDown(container.dispose);
+    final collab = container.read(collabRepositoryProvider);
+    when(() => collab.acceptInvitation('raw-token')).thenAnswer(
+      (_) async =>
+          const InvitationAcceptResult(tripId: 'trip-1', tripTitle: '沖繩家庭旅行'),
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/invite?token=raw-token');
+    await tester.pumpAndSettle();
+    expect(find.byType(InviteScreen), findsOneWidget);
+    verify(() => collab.fetchInvitation('raw-token')).called(1);
+
+    await tester.tap(find.byKey(const ValueKey('invite-login')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+      router.state.uri.queryParameters['redirect_after'],
+      '/invite?token=raw-token',
+    );
+    verifyNever(() => collab.acceptInvitation(any()));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password-field')),
+      'secret',
+    );
+    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.toString(), '/invite?token=raw-token');
+    expect(find.byKey(const ValueKey('invite-accept')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('invite-accept')));
+    await tester.pumpAndSettle();
+    verify(() => collab.acceptInvitation('raw-token')).called(1);
+    expect(router.state.uri.path, '/trips/trip-1');
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountScreen), findsNothing);
+    expect(router.state.uri.path, '/trips/trip-1');
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
   });
 
   testWidgets('cold-start public deep links do not show a fake Back', (
@@ -444,7 +997,7 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('未登入可進入 OAuth consent shell route', (tester) async {
+  testWidgets('OAuth 同意連結只提示回原瀏覽器，不顯示授權參數', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
 
@@ -462,33 +1015,16 @@ void main() {
           '/oauth/consent?client_id=tp_alpha'
           '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
           '&scope=openid%20email'
-          '&state=abc123'
+          '&state=secret-state'
           '&response_type=code',
         );
     await tester.pumpAndSettle();
 
-    expect(find.byType(OAuthConsentScreen), findsOneWidget);
+    expect(find.text('請返回原本的瀏覽器，從該處重新完成授權。'), findsOneWidget);
+    expect(find.text('返回行程列表'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
-
-    final first = tester.widget<OAuthConsentScreen>(
-      find.byType(OAuthConsentScreen),
-    );
-    container
-        .read(appRouterProvider)
-        .go(
-          '/oauth/consent?client_id=tp_beta'
-          '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
-          '&scope=openid'
-          '&state=next'
-          '&response_type=code',
-        );
-    await tester.pumpAndSettle();
-
-    final second = tester.widget<OAuthConsentScreen>(
-      find.byType(OAuthConsentScreen),
-    );
-    expect(second.request.clientId, 'tp_beta');
-    expect(second.key, isNot(first.key));
+    expect(find.textContaining('secret-state'), findsNothing);
+    expect(find.textContaining('app.example.com'), findsNothing);
   });
 
   testWidgets('已登入可進入 /trips/:tripId/print', (tester) async {
@@ -507,43 +1043,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripPrintScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可使用 admin/manage legacy redirects', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/admin');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
-
-    container.read(appRouterProvider).go('/admin/');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
-
-    container.read(appRouterProvider).go('/manage');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(ChatScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    container.read(appRouterProvider).go('/manage/');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(ChatScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -661,10 +1160,15 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('已登入可從 stop map web alias 聚焦地圖 entry', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
+  testWidgets('舊行程 map alias 保留行程與 Day 及停留點並選中 root 地圖', (tester) async {
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      days: const [
+        TripDay(id: 1, dayNum: 1, version: 0),
+        TripDay(id: 2, dayNum: 2, version: 0),
+      ],
+    );
     addTearDown(container.dispose);
-
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -672,35 +1176,31 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/map');
+    final router = container.read(appRouterProvider);
+    router.go('/trip/trip-1/map?day=2&entry=11');
     await tester.pumpAndSettle();
-
-    final screen = tester.widget<TripMapScreen>(find.byType(TripMapScreen));
-    expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可從 stop web alias 聚焦 timeline entry', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/map?day=2&entry=11&tripId=trip-1',
     );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11');
-    await tester.pumpAndSettle();
-
-    final screen = tester.widget<TripTimelineScreen>(
-      find.byType(TripTimelineScreen),
+    final screen = tester.widget<GlobalMapScreen>(find.byType(GlobalMapScreen));
+    expect(screen.initialTripId, 'trip-1');
+    expect(screen.initialDayNum, 2);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-map-day-selector')),
+          )
+          .value,
+      2,
     );
     expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
+    expect(
+      tester
+          .widget<AppleRootTabBar>(find.byType(AppleRootTabBar))
+          .selectedIndex,
+      2,
+    );
   });
 
   testWidgets('已登入可使用 /trips selected/focus query deep link', (tester) async {
@@ -727,31 +1227,6 @@ void main() {
       find.byType(TripTimelineScreen),
     );
     expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可進入 entry edit/change-poi web aliases', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/edit');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/change-poi');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryPoiScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -817,32 +1292,6 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('收藏'), findsWidgets);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可進入 entry copy/move web aliases', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/copy');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('複製停留點'), findsOneWidget);
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/move');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('移到其他 Day'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -923,6 +1372,104 @@ void main() {
     }
   });
 
+  testWidgets('Account 儲存後認證刷新失敗仍保留新草稿，重試與關閉返回原聊天', (tester) async {
+    final auth = _MockAuthRepository();
+    final requests = _MockRequestsRepository();
+    when(auth.currentUser).thenAnswer((_) async => _loggedInUser);
+    when(auth.fetchAiAuthorization).thenAnswer((_) async => true);
+    when(
+      () => requests.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      authRepository: auth,
+      requestsRepository: requests,
+      resolveAuthFromRepository: true,
+      // 此測試驗證最終 error 的導航與草稿；自動 retry 不屬於此 seam。
+      disableAutomaticRetry: true,
+    );
+    addTearDown(container.dispose);
+    final pending = Completer<UserInfo>();
+    final repository = container.read(accountRepositoryProvider);
+    when(
+      () => repository.updateProfile(displayName: 'A'),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/chat');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '原聊天草稿');
+    router.go('/settings/profile?account_origin=%2Fchat');
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/chat?account=profile&account_origin=%2Fchat',
+    );
+    final field = find.byKey(const ValueKey('profile-display-name'));
+    await tester.enterText(field, 'A');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('profile-save')));
+    await tester.pump();
+    await tester.enterText(field, 'B');
+    when(auth.currentUser).thenThrow(Exception('refresh offline'));
+    pending.complete(
+      const UserInfo(
+        id: 'user-1',
+        email: 'traveler@example.com',
+        displayName: 'A',
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.text('無法載入個人資料'), findsOneWidget);
+    expect(find.text('B'), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/chat?account=profile&account_origin=%2Fchat',
+    );
+    verify(() => repository.updateProfile(displayName: 'A')).called(1);
+    verify(auth.currentUser).called(2);
+    when(auth.currentUser).thenAnswer(
+      (_) async => const UserInfo(
+        id: 'user-1',
+        email: 'traveler@example.com',
+        displayName: 'A',
+      ),
+    );
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    verify(auth.currentUser).called(1);
+    expect(find.text('無法載入個人資料'), findsNothing);
+    expect(find.text('B'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('捨棄'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileEditScreen), findsNothing);
+    expect(find.byType(AccountScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.toString(), '/chat');
+    expect(find.text('原聊天草稿'), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('帳號安全與開發者 deep link 依序返回 Account 再關閉至原 branch', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -943,7 +1490,7 @@ void main() {
       ('/account/connected-apps', ConnectedAppsScreen),
       ('/settings/developer-apps', DeveloperAppsScreen),
     ]) {
-      router.go(target.$1);
+      router.go('${target.$1}?account_origin=%2Ffavorites');
       await tester.pumpAndSettle();
 
       expect(find.byType(target.$2), findsOneWidget);
@@ -973,7 +1520,7 @@ void main() {
     final router = container.read(appRouterProvider);
     router.go('/favorites');
     await tester.pumpAndSettle();
-    router.go('/settings/developer-apps/new');
+    router.go('/settings/developer-apps/new?account_origin=%2Ffavorites');
     await tester.pumpAndSettle();
 
     expect(find.byType(DeveloperAppNewScreen), findsOneWidget);
@@ -1018,7 +1565,7 @@ void main() {
           '保留中的聊天草稿',
         );
       }
-      router.go('/account');
+      router.go('/account?account_origin=${Uri.encodeComponent(origin)}');
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -1028,7 +1575,7 @@ void main() {
       expect(find.byKey(const ValueKey('root-tab-帳號')), findsNothing);
       expect(
         router.routerDelegate.currentConfiguration.uri.toString(),
-        '$origin?account=root',
+        '$origin?account=root&account_origin=${Uri.encodeComponent(origin)}',
       );
 
       tester
@@ -1321,6 +1868,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
     await tester.pumpAndSettle();
+    expect(container.read(selectedDayProvider).dayNumFor('trip-1'), 1);
     await tester.tapAt(tester.getCenter(find.bySemanticsLabel('行程')));
     await tester.pumpAndSettle();
 
@@ -1436,12 +1984,12 @@ void main() {
     for (final alias in ['/account/appearance', '/settings/appearance']) {
       router.go('/trips');
       await tester.pumpAndSettle();
-      router.go(alias);
+      router.go('$alias?account_origin=%2Ftrips');
       await tester.pumpAndSettle();
 
       expect(
         router.routerDelegate.currentConfiguration.uri.toString(),
-        '/trips?account=appearance',
+        '/trips?account=appearance&account_origin=%2Ftrips',
       );
       expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
       expect(find.byType(AppearanceScreen), findsOneWidget);

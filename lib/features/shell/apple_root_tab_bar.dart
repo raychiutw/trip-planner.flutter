@@ -63,86 +63,19 @@ class AppleRootTabBar extends StatelessWidget {
   }
 
   Widget _buildBar(BuildContext context) {
-    final theme = Theme.of(context);
-    // 是不是在媒體背景上,由 root shell 依目前分支宣告,這裡只讀。
-    final onMedia = TpMediaBackdropScope.of(context);
-    final glassSettings = tpNavigationGlassSettings(
-      context,
-      recipe: onMedia
-          ? TpNavigationGlassRecipe.platformView
-          : TpNavigationGlassRecipe.regular,
+    final tabBar = TpNavigationGlassTabBar(
+      inline: inline,
+      selectedIndex: selectedIndex,
+      onSelected: _select,
+      tabs: [
+        for (final destination in _destinations)
+          GlassTab(
+            icon: Icon(destination.icon),
+            label: destination.label,
+            semanticLabel: destination.label,
+          ),
+      ],
     );
-    final foreground = tpBarForeground(context, onMedia: onMedia);
-    // ADR-0004：中性選取表面，品牌 tint 只用於字符與標籤。
-    final selectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
-      color: theme.colorScheme.primary,
-      fontWeight: FontWeight.w700,
-      fontSize: TpRootTabGeometry.labelFontSize,
-      height: TpRootTabGeometry.labelLineHeight,
-    );
-    final unselectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
-      color: foreground,
-      fontWeight: FontWeight.w500,
-      fontSize: TpRootTabGeometry.labelFontSize,
-      height: TpRootTabGeometry.labelLineHeight,
-    );
-    final indicatorSettings = tpResolveGlassSettings(
-      context,
-      glassSettings,
-      opaqueColor: theme.colorScheme.surfaceContainerHigh,
-    );
-    final tabs = [
-      for (final destination in _destinations)
-        GlassTab(
-          icon: Icon(destination.icon),
-          label: destination.label,
-          semanticLabel: destination.label,
-        ),
-    ];
-    final tabBar = inline
-        ? GlassTabBar.inline(
-            tabs: tabs,
-            selectedIndex: selectedIndex,
-            onTabSelected: _select,
-            barHeight: TpRootTabGeometry.barHeight(context),
-            barBorderRadius: 32,
-            iconSize: TpRootTabGeometry.iconSize,
-            iconLabelSpacing: TpRootTabGeometry.iconLabelSpacing,
-            horizontalPadding: 0,
-            verticalPadding: 0,
-            settings: glassSettings,
-            selectedIconColor: theme.colorScheme.primary,
-            selectedLabelColor: theme.colorScheme.primary,
-            unselectedIconColor: foreground,
-            unselectedLabelColor: foreground,
-            selectedLabelStyle: selectedLabelStyle,
-            unselectedLabelStyle: unselectedLabelStyle,
-            indicatorColor: theme.colorScheme.surfaceContainerHigh,
-            indicatorSettings: indicatorSettings,
-            quality: tpGlassQuality(context),
-            platformViewBackdrop: onMedia,
-          )
-        : GlassTabBar.bottom(
-            iconSize: TpRootTabGeometry.iconSize,
-            iconLabelSpacing: TpRootTabGeometry.iconLabelSpacing,
-            barHeight: TpRootTabGeometry.barHeight(context),
-            tabs: tabs,
-            selectedIndex: selectedIndex,
-            onTabSelected: _select,
-            horizontalPadding: 0,
-            verticalPadding: 0,
-            settings: glassSettings,
-            selectedIconColor: theme.colorScheme.primary,
-            selectedLabelColor: theme.colorScheme.primary,
-            unselectedIconColor: foreground,
-            unselectedLabelColor: foreground,
-            selectedLabelStyle: selectedLabelStyle,
-            unselectedLabelStyle: unselectedLabelStyle,
-            indicatorColor: theme.colorScheme.surfaceContainerHigh,
-            indicatorSettings: indicatorSettings,
-            quality: tpGlassQuality(context),
-            platformViewBackdrop: onMedia,
-          );
     // 1.4.1 的 tab 內容把 onTap 傳成 null，鍵盤與讀屏啟用沒有回呼。
     // 只補可穿透指標的無障礙區域；點選與拖曳仍由底下的套件處理。
     return Stack(

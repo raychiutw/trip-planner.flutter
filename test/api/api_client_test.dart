@@ -62,6 +62,21 @@ ResponseBody htmlBlockResponseBody() => ResponseBody.fromString(
   },
 );
 
+class _RefreshingSource implements BearerTokenSource {
+  String _token = 'old';
+  int refreshCalls = 0;
+
+  @override
+  Future<String?> accessToken() async => _token;
+
+  @override
+  Future<bool> refresh() async {
+    refreshCalls++;
+    _token = 'new';
+    return true;
+  }
+}
+
 void main() {
   late Dio dio;
   late DioAdapter dioAdapter;
@@ -456,6 +471,43 @@ void main() {
   });
 
   group('streaming GET', () {
+    test('Bearer 401 更新 token 後重新開啟事件串流一次', () async {
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          jsonEncode({
+            'error': {'code': 'AUTH_REQUIRED', 'message': 'login'},
+          }),
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        ),
+        ResponseBody.fromString(
+          'data: {"status":"completed"}\n\n',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/event-stream'],
+          },
+        ),
+      ]);
+      final source = _RefreshingSource();
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+        bearerSource: source,
+      );
+
+      final text = await client.getTextStream('/requests/7/events').join();
+
+      expect(text, 'data: {"status":"completed"}\n\n');
+      expect(source.refreshCalls, 1);
+      expect(adapter.recordedRequests, hasLength(2));
+      expect(
+        adapter.recordedRequests.last.headers['Authorization'],
+        'Bearer new',
+      );
+    });
+
     test('getTextStream 帶 Cookie/Accept，並解出文字 chunk', () async {
       await sessionStore.write('token123');
       final adapter = SequencedResponseAdapter([
@@ -527,64 +579,6 @@ void main() {
         ),
       );
       expect(adapter.recordedRequests, hasLength(2));
-    });
-  });
-
-  group('redirect response', () {
-    test('postForRedirect 不跟隨 302，並回傳 Location', () async {
-      await sessionStore.write('token123');
-      dioAdapter.onPost(
-        '/oauth/consent',
-        (server) => server.reply(
-          302,
-          '',
-          headers: {
-            'location': [
-              '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
-            ],
-          },
-        ),
-        data: {'client_id': 'tp_alpha', 'decision': 'allow'},
-      );
-
-      final response = await apiClient.postForRedirect(
-        '/oauth/consent',
-        body: {'client_id': 'tp_alpha', 'decision': 'allow'},
-      );
-
-      expect(response.statusCode, 302);
-      expect(
-        response.location,
-        '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
-      );
-      expect(recordedRequests.single.followRedirects, isFalse);
-      expect(
-        recordedRequests.single.headers['Cookie'],
-        'tripline_session=token123',
-      );
-      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
-    });
-
-    test('postForRedirect 遇 200 text/html 不 retry，直接丟指定 ApiError', () async {
-      final adapter = SequencedResponseAdapter([htmlBlockResponseBody()]);
-      final client = ApiClient(
-        sessionStore: sessionStore,
-        dio: Dio()..httpClientAdapter = adapter,
-      );
-
-      await expectLater(
-        client.postForRedirect('/oauth/consent'),
-        throwsA(
-          isA<ApiError>()
-              .having((error) => error.status, 'status', 200)
-              .having(
-                (error) => error.code,
-                'code',
-                'SYS_UPSTREAM_UNAVAILABLE',
-              ),
-        ),
-      );
-      expect(adapter.recordedRequests, hasLength(1));
     });
   });
 }

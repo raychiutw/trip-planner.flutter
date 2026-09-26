@@ -1,4 +1,5 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tripline/features/map/map_adapter.dart';
@@ -37,7 +38,10 @@ void main() {
           ));
           await tester.enterText(finder, text);
         },
-        capture: (name) async => scenes.add(name),
+        capture: (name) async {
+          scenes.add(name);
+          _expectNavigationForeground(tester, name);
+        },
         log: logLines.add,
       );
 
@@ -54,6 +58,9 @@ void main() {
         'light/map-day-1',
         'light/map-account-sheet',
         'light/map-trip-picker',
+        'light/notes-after-map',
+        'light/account-after-notes',
+        'light/map-after-notes',
         'light/chat-composer',
         'light/chat-composer-draft',
         'light/chat-draft-after-account-close',
@@ -68,6 +75,9 @@ void main() {
         'dark/trip-card-menu',
         'dark/account-sheet',
         'dark/map',
+        'dark/notes-after-map',
+        'dark/account-after-notes',
+        'dark/map-after-notes',
         'dark/chat-composer',
         'dark+increased-contrast/trip-card-menu',
         'dark+increased-contrast/map',
@@ -204,4 +214,51 @@ void main() {
       expect(evidence.isCurrentCanvasReady(tester), isFalse);
     },
   );
+}
+
+/// 從真畫面讀最終文字色，確認跨 route 與 sheet 後沒有殘留媒體前景。
+void _expectNavigationForeground(WidgetTester tester, String scene) {
+  final name = scene.split('/').last;
+  final onMedia =
+      name == 'map' || name == 'map-day-1' || name == 'map-after-notes';
+  final Finder title;
+  if (onMedia || name == 'trips-list' || name.startsWith('timeline-')) {
+    title = find
+        .descendant(
+          of: find.byKey(const ValueKey('tp-root-header-title')),
+          matching: find.byType(Text),
+        )
+        .first;
+  } else if (name == 'notes-after-map') {
+    title = find.text('行程筆記');
+  } else if (name.contains('account-sheet') || name == 'account-after-notes') {
+    title = find.text('帳號').first;
+  } else {
+    return;
+  }
+  expect(title, findsOneWidget, reason: scene);
+  final scheme = Theme.of(tester.element(title)).colorScheme;
+  final opaque =
+      scene.contains('+increased-contrast') ||
+      scene.contains('+reduce-transparency');
+  expect(
+    tester.renderObject<RenderParagraph>(title).text.style?.color,
+    onMedia && !opaque ? Colors.white : scheme.onSurface,
+    reason: '$scene 的最終標題前景',
+  );
+  if (onMedia ||
+      name == 'trips-list' ||
+      name == 'timeline-after-account-close') {
+    final label = find
+        .descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.text('聊天'),
+        )
+        .first;
+    expect(
+      tester.renderObject<RenderParagraph>(label).text.style?.color,
+      onMedia && !opaque ? Colors.white : scheme.onSurface,
+      reason: '$scene 的未選 root tab 前景',
+    );
+  }
 }

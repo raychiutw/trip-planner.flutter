@@ -318,7 +318,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     SwipeToDelete(
                       dismissKey: ValueKey('favorite-dismiss-${favorite.id}'),
                       actionLabel: '刪除',
-                      onDelete: () => _removeFavorite(context, ref, favorite),
+                      onDelete: () => _removeFavorite(
+                        context,
+                        ref,
+                        favorite,
+                        source: TpDestructiveConfirmSource.direct,
+                      ),
                       child: Stack(
                         children: [
                           PoiFavoriteCard(
@@ -330,8 +335,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                             onSelectedChanged: _deletingSelected
                                 ? null
                                 : (_) => _toggleFavoriteSelection(favorite.id),
-                            onRemove: () =>
-                                _removeFavorite(context, ref, favorite),
+                            onRemove: () => _removeFavorite(
+                              context,
+                              ref,
+                              favorite,
+                              source: TpDestructiveConfirmSource.direct,
+                            ),
                             onLongPress: _favoriteMenuControllerFor(
                               favorite,
                             ).open,
@@ -493,7 +502,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       case _FavoriteContextAction.select:
         _toggleFavoriteSelection(favorite.id);
       case _FavoriteContextAction.remove:
-        await _removeFavorite(context, ref, favorite);
+        await _removeFavorite(
+          context,
+          ref,
+          favorite,
+          source: TpDestructiveConfirmSource.menu,
+        );
     }
   }
 
@@ -544,13 +558,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     _confirmingSelected = true;
     _pendingFavoriteIds.addAll(ids);
     try {
-      final confirmed = await showAppConfirm(
+      final confirmed = await showAppDestructiveConfirm(
         context,
+        source: TpDestructiveConfirmSource.direct,
         title: '刪除 ${ids.length} 個收藏？',
         message: '將刪除${names.join('、')}。刪除後無法復原。',
         confirmLabel: '刪除',
         cancelLabel: '保留',
-        isDestructive: true,
       );
       if (!confirmed || !mounted) return;
 
@@ -610,17 +624,18 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   Future<void> _removeFavorite(
     BuildContext context,
     WidgetRef ref,
-    PoiFavorite favorite,
-  ) async {
+    PoiFavorite favorite, {
+    required TpDestructiveConfirmSource source,
+  }) async {
     if (!_pendingFavoriteIds.add(favorite.id)) return;
     try {
-      final confirmed = await showAppConfirm(
+      final confirmed = await showAppDestructiveConfirm(
         context,
+        source: source,
         title: '刪除「${favorite.displayName}」？',
         message: '將從收藏移除「${favorite.displayName}」。刪除後無法復原。',
         confirmLabel: '刪除',
         cancelLabel: '保留',
-        isDestructive: true,
       );
       if (!confirmed || !context.mounted) return;
 
@@ -640,7 +655,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       showAppError(
         context,
         '無法刪除「${favorite.displayName}」，收藏仍保留。',
-        onRetry: () => unawaited(_removeFavorite(context, ref, favorite)),
+        onRetry: () => unawaited(
+          _removeFavorite(
+            context,
+            ref,
+            favorite,
+            source: TpDestructiveConfirmSource.direct,
+          ),
+        ),
       );
     } finally {
       _pendingFavoriteIds.remove(favorite.id);
@@ -883,17 +905,24 @@ class _FavoritesSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s1),
-      child: Row(
-        children: [
-          Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
-          const SizedBox(width: TpSpacing.s3),
-          Text(
-            '$count 個地點',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Semantics(
+        key: const ValueKey('favorites-result-summary'),
+        container: true,
+        liveRegion: true,
+        label: '$title，$count 個地點',
+        excludeSemantics: true,
+        child: Row(
+          children: [
+            Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+            const SizedBox(width: TpSpacing.s3),
+            Text(
+              '$count 個地點',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -995,12 +1024,19 @@ class _PaginationControls extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
           ),
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$start-$end / $total'),
-                Text('第 $page / $totalPages 頁'),
-              ],
+            child: Semantics(
+              key: const ValueKey('favorites-page-summary'),
+              container: true,
+              liveRegion: true,
+              label: '第 $page / $totalPages 頁，顯示第 $start 至 $end 個',
+              excludeSemantics: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$start-$end / $total'),
+                  Text('第 $page / $totalPages 頁'),
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -1029,7 +1065,14 @@ class _NoSearchResult extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('目前的篩選沒有符合的收藏', style: theme.textTheme.titleMedium),
+            Semantics(
+              key: const ValueKey('favorites-result-summary'),
+              container: true,
+              liveRegion: true,
+              label: '搜尋結果，0 個地點，目前的篩選沒有符合的收藏',
+              excludeSemantics: true,
+              child: Text('目前的篩選沒有符合的收藏', style: theme.textTheme.titleMedium),
+            ),
             const SizedBox(height: TpSpacing.s3),
             TextButton(
               key: const ValueKey('favorites-search-no-match-clear'),

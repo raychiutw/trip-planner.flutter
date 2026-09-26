@@ -8,7 +8,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
-import 'reorder_helpers.dart';
+import 'entry_mutations.dart';
 import 'trip_providers.dart';
 
 /// Web 相容的停留點跨日操作。
@@ -53,6 +53,15 @@ class _EntryActionRouteScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(tripDaysProvider(widget.tripId), (_, next) {
+      if (next.hasValue &&
+          !next.isLoading &&
+          !next.hasError &&
+          _targetDayId != null &&
+          !_validTarget(next.requireValue, _targetDayId!)) {
+        setState(() => _targetDayId = null);
+      }
+    });
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     final days = daysAsync.value ?? const <TripDay>[];
     return AppUnsavedChangesGuard(
@@ -66,29 +75,51 @@ class _EntryActionRouteScreenState
           onCancel: _dismissController.requestPop,
           primaryActionLabel: widget.action.submitLabel,
           primaryActionKey: const ValueKey('entry-action-submit'),
-          primaryActionEnabled: _targetDayId != null && !_submitting,
+          primaryActionEnabled:
+              _targetDayId != null &&
+              _validTarget(days, _targetDayId!) &&
+              !_submitting,
           onPrimaryAction: () => _submit(days),
         ),
-        body: daysAsync.when(
-          loading: () => const AppListLoadingSkeleton(
-            key: ValueKey('entry-action-loading'),
-            itemCount: 3,
-          ),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s6),
-              child: Text('載入失敗：$error', textAlign: TextAlign.center),
-            ),
-          ),
-          data: (days) => _body(context, days),
-        ),
+        body: daysAsync.hasValue
+            ? _body(context, days, loadFailed: daysAsync.hasError)
+            : daysAsync.when(
+                loading: () => const AppListLoadingSkeleton(
+                  key: ValueKey('entry-action-loading'),
+                  itemCount: 3,
+                ),
+                error: (error, _) => Center(child: _loadError()),
+                data: (days) => _body(context, days),
+              ),
       ),
     );
   }
 
-  Widget _body(BuildContext context, List<TripDay> days) {
+  Widget _loadError() => Padding(
+    padding: const EdgeInsets.all(TpSpacing.s4),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          liveRegion: true,
+          child: const Text('無法載入日期，請稍後再試', textAlign: TextAlign.center),
+        ),
+        TextButton(
+          onPressed: () =>
+              ref.read(tripDaysRetryProvider(widget.tripId)).retry(),
+          child: const Text('重試'),
+        ),
+      ],
+    ),
+  );
+
+  Widget _body(
+    BuildContext context,
+    List<TripDay> days, {
+    bool loadFailed = false,
+  }) {
     final theme = Theme.of(context);
-    if (days.isEmpty) {
+    if (days.isEmpty && !loadFailed) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(TpSpacing.s6),
@@ -105,9 +136,13 @@ class _EntryActionRouteScreenState
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
+        if (loadFailed) _loadError(),
         Text('選擇目標日期', style: theme.textTheme.titleMedium),
         const SizedBox(height: TpSpacing.s3),
-        for (final day in days) _dayTile(context, day),
+        if (days.length == 1) const Text('目前行程只有一天，無法使用'),
+        for (final day in days)
+          if (!day.timeline.any((entry) => entry.id == widget.entryId))
+            _dayTile(context, day),
         if (_submitting) ...[
           const SizedBox(height: TpSpacing.s2),
           Semantics(
@@ -167,9 +202,19 @@ class _EntryActionRouteScreenState
     );
   }
 
+  bool _validTarget(List<TripDay> days, int targetDayId) => days.any(
+    (day) =>
+        day.id == targetDayId &&
+        !day.timeline.any((entry) => entry.id == widget.entryId),
+  );
+
   Future<void> _submit(List<TripDay> days) async {
     final targetDayId = _targetDayId;
-    if (targetDayId == null) return;
+    if (_submitting ||
+        targetDayId == null ||
+        !_validTarget(days, targetDayId)) {
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -185,33 +230,17 @@ class _EntryActionRouteScreenState
             targetDayId: targetDayId,
           );
         case EntryRouteAction.move:
-          final sourceDay = days
-              .where(
-                (day) =>
-                    day.timeline.any((entry) => entry.id == widget.entryId),
-              )
-              .firstOrNull;
-          if (sourceDay == null) {
-            throw Exception('Entry is not present in the current itinerary');
-          }
-          final sourceIndex = sourceDay.timeline.indexWhere(
-            (entry) => entry.id == widget.entryId,
-          );
-          final targetEntries = days
-              .where((day) => day.id == targetDayId)
-              .firstOrNull
-              ?.timeline;
-          if (targetEntries == null) {
-            throw Exception('Target day is not present in the itinerary');
-          }
-          final plan = planEntryReorder(
-            {for (final day in days) day.id: day.timeline},
-            sourceDayId: sourceDay.id,
-            sourceIndex: sourceIndex,
+          final snapshot = {for (final day in days) day.id: day.timeline};
+          final outcome = planEntryReorder(
+            snapshot,
+            entryId: widget.entryId,
             targetDayId: targetDayId,
-            targetIndex: targetEntries.length,
-            idOf: (entry) => entry.id,
+            targetPosition: snapshot[targetDayId]?.length ?? 0,
           );
+          if (outcome is EntryReorderRejected) {
+            throw Exception('停留點位置已變動：${outcome.reason.name}');
+          }
+          final plan = (outcome as EntryReorderPlanned).plan;
           await repo.reorderEntries(
             tripId: widget.tripId,
             updates: plan.updates,

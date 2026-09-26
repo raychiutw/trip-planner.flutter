@@ -425,6 +425,79 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
+    testWidgets('大量地區與大字時可捲到底部，取消後保留原篩選', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const regions = ['沖繩', '京都', '大阪', '東京', '釜山', '首爾', '台北', '其他'];
+      final favorites = [
+        for (var i = 0; i < regions.length; i++)
+          PoiFavorite(
+            id: i + 1,
+            userId: 'u-1',
+            poiId: 500 + i,
+            favoritedAt: '2026-06-01T10:00:00Z',
+            poiName: '地點 ${regions[i]}',
+            poiAddress: regions[i],
+            poiType: 'attraction',
+          ),
+      ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(favorites)),
+          ],
+          child: buildApp(textScaler: const TextScaler.linear(2)),
+        ),
+      );
+      await tester.pump();
+
+      await _openFavoritesFilter(tester);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('favorites-filter-reset')),
+        250,
+        scrollable: find.descendant(
+          of: find.byType(ListView).last,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-filter-reset')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-filter-apply')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('favorites-region-東京')),
+      );
+      await tester.tap(find.byKey(const ValueKey('favorites-region-東京')));
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
+      expect(find.text('已篩選：東京'), findsOneWidget);
+      expect(find.text('地點 東京'), findsOneWidget);
+
+      await _openFavoritesFilter(tester);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('favorites-region-京都')),
+      );
+      await tester.tap(find.byKey(const ValueKey('favorites-region-京都')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取消').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('捨棄'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('已篩選：東京'), findsOneWidget);
+      expect(find.text('地點 東京'), findsOneWidget);
+      expect(find.text('地點 京都'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('empty → 還沒有收藏 hero', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -490,6 +563,14 @@ void main() {
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除「美麗海水族館」？'), findsOneWidget);
       expect(find.text('將從收藏移除「美麗海水族館」。刪除後無法復原。'), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoDialogAction>(
+              find.widgetWithText(CupertinoDialogAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
       await tester.tap(find.text('保留'));
       await tester.pumpAndSettle();
 
@@ -867,17 +948,45 @@ void main() {
 
       expect(find.text('刪除「美麗海水族館」？'), findsOneWidget);
       expect(find.text('將從收藏移除「美麗海水族館」。刪除後無法復原。'), findsOneWidget);
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CupertinoAlertDialog),
-          matching: find.text('刪除'),
-        ),
-      );
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
       await tester.pumpAndSettle();
 
       verify(() => mockRepo.deleteFavorite(7)).called(1);
       expect(find.byKey(const ValueKey('favorite-card-7')), findsNothing);
       expect(find.text('復原'), findsNothing);
+    });
+
+    testWidgets('手機收藏選單刪除會顯示破壞性確認', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final repository = MockFavoritesRepository();
+      when(
+        repository.watchFavorites,
+      ).thenAnswer((_) => Stream.value(_favorites));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const ValueKey('favorite-card-7')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoActionSheet), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoActionSheetAction>(
+              find.widgetWithText(CupertinoActionSheetAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
     });
 
     testWidgets('長按選單取消刪除不會呼叫 API', (tester) async {
@@ -923,12 +1032,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('刪除'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CupertinoAlertDialog),
-          matching: find.text('刪除'),
-        ),
-      );
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
@@ -1081,6 +1185,14 @@ void main() {
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除 2 個收藏？'), findsOneWidget);
       expect(find.text('將刪除「美麗海水族館」、「暖暮拉麵」。刪除後無法復原。'), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoDialogAction>(
+              find.widgetWithText(CupertinoDialogAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
 
       await tester.tap(
         find.descendant(
@@ -1244,6 +1356,126 @@ void main() {
 
       expect(secondAttempts, 2);
       expect(find.byKey(const ValueKey('favorite-card-8')), findsNothing);
+    });
+
+    testWidgets('分頁清單篩選後以讀屏即時宣告結果數', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              favoritesProvider.overrideWith(
+                (ref) => Stream.value(_manyFavorites()),
+              ),
+            ],
+            child: buildApp(),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('200 個地點'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const ValueKey('favorites-search-input')),
+          '收藏地點 200',
+        );
+        await tester.pump();
+
+        final resultCount = find.text('1 個地點');
+        expect(resultCount, findsOneWidget);
+        expect(
+          tester.getSemantics(resultCount).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('favorites-search-input')),
+          '',
+        );
+        await tester.pump();
+        expect(find.text('200 個地點'), findsOneWidget);
+        expect(
+          tester
+              .getSemantics(
+                find.byKey(const ValueKey('favorites-result-summary')),
+              )
+              .label,
+          contains('200 個地點'),
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('換頁時由分頁控制宣告目前頁碼與範圍', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              favoritesProvider.overrideWith(
+                (ref) => Stream.value(_manyFavorites()),
+              ),
+            ],
+            child: buildApp(),
+          ),
+        );
+        await tester.pump();
+
+        final pagination = find.byKey(const ValueKey('favorites-pagination'));
+        final scrollView = find.byType(CustomScrollView);
+        for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+          await tester.drag(scrollView, const Offset(0, -500));
+          await tester.pump();
+        }
+        final summary = find.byKey(const ValueKey('favorites-page-summary'));
+        expect(tester.getSemantics(summary).label, contains('第 1 / 9 頁'));
+        await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
+        await tester.pump();
+
+        expect(tester.getSemantics(summary).label, contains('第 2 / 9 頁'));
+        expect(tester.getSemantics(summary).label, contains('顯示第 25 至 48 個'));
+        expect(tester.getSemantics(summary).label, isNot(contains('個地點')));
+        expect(
+          tester.getSemantics(summary).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('篩選零筆時宣告結果數並保留清除操作', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              favoritesProvider.overrideWith(
+                (ref) => Stream.value(_manyFavorites()),
+              ),
+            ],
+            child: buildApp(),
+          ),
+        );
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const ValueKey('favorites-search-input')),
+          '不存在的收藏',
+        );
+        await tester.pump();
+
+        final summary = find.byKey(const ValueKey('favorites-result-summary'));
+        expect(tester.getSemantics(summary).label, contains('0 個地點'));
+        expect(
+          tester.getSemantics(summary).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+        expect(
+          find.byKey(const ValueKey('favorites-search-no-match-clear')),
+          findsOneWidget,
+        );
+      } finally {
+        semantics.dispose();
+      }
     });
 
     testWidgets('收藏達 200 筆時分頁，每頁 24 筆且篩選重置頁碼', (tester) async {

@@ -12,6 +12,7 @@ import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/stream_retry_coordinator.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
@@ -146,9 +147,16 @@ enum _TripsToolbarAction {
   startDateAsc,
 }
 
+final Provider<StreamRetryCoordinator> myTripsRetryProvider = Provider((ref) {
+  final retry = StreamRetryCoordinator(() => ref.invalidate(myTripsProvider));
+  ref.onDispose(retry.dispose);
+  return retry;
+});
+
 /// `GET /my-trips` 清單（SWR:stale→fresh;刪除後 invalidate refresh）。
 final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
-  return ref.watch(tripRepositoryProvider).watchMyTrips();
+  final repository = ref.watch(tripRepositoryProvider);
+  return ref.read(myTripsRetryProvider).track(repository.watchMyTrips);
 });
 
 /// 行程清單（4-tab「行程」分頁）：inline 頁首「我的行程」+ 搜尋框 + 分段篩選
@@ -476,13 +484,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       final file = await ref.read(tripImportFilePickerProvider).pick();
       if (!mounted || file == null) return;
       if (file.length > _maxTripImportBytes) {
-        _showActionMessage('檔案過大（上限 512KB）');
+        _showImportError('檔案過大（上限 512KB）');
         return;
       }
 
       final decodedJson = jsonDecode(file.content);
       if (decodedJson is! Map || decodedJson['schemaVersion'] != 1) {
-        _showActionMessage('不支援的匯出格式（需 schemaVersion 1）');
+        _showImportError('不支援的匯出格式（需 schemaVersion 1）');
         return;
       }
 
@@ -496,13 +504,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       context.go('/trips/$tripId');
     } on FormatException {
       if (!mounted) return;
-      _showActionMessage('不是有效的 JSON 檔');
+      _showImportError('不是有效的 JSON 檔');
     } on ApiError catch (error) {
       if (!mounted) return;
-      _showActionMessage(error.detail ?? error.message);
+      _showImportError(error.detail ?? error.message);
     } on Exception {
       if (!mounted) return;
-      _showActionMessage('匯入失敗，請稍後再試');
+      _showImportError('匯入失敗，請稍後再試');
     } finally {
       if (mounted) {
         setState(() => _isImporting = false);
@@ -524,7 +532,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       _showActionMessage(saved ? '匯出成功' : '已取消匯出');
     } on Exception {
       if (!mounted) return;
-      _showActionMessage('匯出失敗，請稍後再試');
+      showAppError(
+        context,
+        '匯出失敗，請稍後再試',
+        onRetry: () => unawaited(_exportTripToJson(trip)),
+      );
     } finally {
       if (mounted) {
         setState(() => _exportingTripId = null);
@@ -534,6 +546,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 
   void _showActionMessage(String message) {
     showAppNotice(context, message);
+  }
+
+  void _showImportError(String message) {
+    showAppError(
+      context,
+      message,
+      onRetry: () => unawaited(_importTripFromJson()),
+    );
   }
 
   Widget _buildNoResults(ThemeData theme) {
@@ -570,7 +590,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             ignoring: isDeleting,
             child: SwipeToDelete(
               dismissKey: ValueKey('trip-dismiss-${trip.tripId}'),
-              onDelete: () => _confirmAndDeleteTrip(context, trip),
+              onDelete: () => _confirmAndDeleteTrip(
+                context,
+                trip,
+                source: TpDestructiveConfirmSource.direct,
+              ),
               child: Stack(
                 children: [
                   TripCard(
@@ -688,24 +712,29 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       case _TripListAction.exportJson:
         await _exportTripToJson(trip);
       case _TripListAction.delete:
-        await _confirmAndDeleteTrip(context, trip);
+        await _confirmAndDeleteTrip(
+          context,
+          trip,
+          source: TpDestructiveConfirmSource.menu,
+        );
     }
   }
 
-  /// AlertDialog 二次確認 → deleteTrip → invalidate refresh。
+  /// 依觸發來源確認刪除 → deleteTrip → invalidate refresh。
   Future<void> _confirmAndDeleteTrip(
     BuildContext context,
-    TripSummary trip,
-  ) async {
+    TripSummary trip, {
+    required TpDestructiveConfirmSource source,
+  }) async {
     if (_deletingTripIds.contains(trip.tripId)) return;
-    final confirmedDelete = await showAppConfirm(
+    final confirmedDelete = await showAppDestructiveConfirm(
       context,
+      source: source,
       title: '刪除行程',
       message:
           '確定要刪除「${trip.displayTitle}」嗎？'
           '這會刪除其中所有行程日與景點。此動作無法復原。',
       confirmLabel: '刪除',
-      isDestructive: true,
     );
     if (!confirmedDelete || !context.mounted) return;
     await _deleteTrip(context, trip);

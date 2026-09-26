@@ -4,6 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/user.dart';
+import 'account_repository.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
@@ -47,6 +48,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
     client: ref.watch(apiClientProvider),
     sessionStore: ref.watch(sessionStoreProvider),
   ),
+);
+
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(client: ref.watch(apiClientProvider)),
 );
 
 final tripRepositoryProvider = Provider<TripRepository>(
@@ -133,6 +138,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await _enforceCacheOwner(user);
       return user;
     });
+  }
+
+  /// PATCH /account/profile；畫面離開後仍由認證 owner 刷新帳號資料。
+  Future<UserInfo> updateProfile({required String displayName}) async {
+    final user = await ref
+        .read(accountRepositoryProvider)
+        .updateProfile(displayName: displayName);
+    if (ref.mounted) ref.invalidateSelf();
+    return user;
   }
 
   Future<void> logout() async {

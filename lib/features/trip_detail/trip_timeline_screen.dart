@@ -31,8 +31,9 @@ import '../trips/collab/collab_screen.dart';
 import '../trips/edit/edit_trip_screen.dart';
 import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
-import 'reorder_helpers.dart';
 import 'selected_day_provider.dart';
+import 'trip_days_lookup.dart';
+import 'entry_mutations.dart';
 import 'trip_providers.dart';
 import 'trip_notes_screen.dart';
 import 'trip_print_screen.dart';
@@ -81,14 +82,15 @@ class TripTimelineScreen extends ConsumerStatefulWidget {
 
 class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   int? _activeDayNum;
+  int? _bodyStartDayNum;
+  SelectedDay? _lastObservedShared;
+  TripDaysIndex? _lastIndex;
   String? _editingTripId;
-
-  bool _wasActiveBranch = true;
 
   @override
   void initState() {
     super.initState();
-    _resolveActiveDayNum();
+    _lastObservedShared = ref.read(selectedDayProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(
@@ -102,8 +104,12 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   void didUpdateWidget(covariant TripTimelineScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tripId != widget.tripId ||
-        oldWidget.initialDayNum != widget.initialDayNum) {
-      _resolveActiveDayNum();
+        oldWidget.initialDayNum != widget.initialDayNum ||
+        oldWidget.initialEntryId != widget.initialEntryId) {
+      _activeDayNum = null;
+      _bodyStartDayNum = null;
+      _lastIndex = null;
+      _lastObservedShared = ref.read(selectedDayProvider);
     }
     if (oldWidget.tripId != widget.tripId) {
       _editingTripId = null;
@@ -117,21 +123,10 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     }
   }
 
-  /// 路由查詢參數優先；缺席時才由共用選取日供值。
-  void _resolveActiveDayNum() {
-    _activeDayNum =
-        widget.initialDayNum ??
-        ref.read(selectedDayProvider).dayNumFor(widget.tripId);
-  }
-
-  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
-  /// 背景分支雖然被 riverpod 暫停訂閱，仍會在「emit 落在切到背景的同一批」時以
-  /// 背景身分重建一次並處理到新的 days —— 那一格會把畫面內部的退位寫進共用狀態。
   void _publishSelectedDay(int dayNum) {
-    if (!TickerMode.valuesOf(context).enabled) return;
-    ref
-        .read(selectedDayProvider.notifier)
-        .select(tripId: widget.tripId, dayNum: dayNum);
+    final selection = SelectedTripDay(tripId: widget.tripId, dayNum: dayNum);
+    if (TickerMode.valuesOf(context).enabled) _lastObservedShared = selection;
+    ref.read(selectedDayProvider.notifier).publish(context, selection);
   }
 
   void _openActionSheet(Widget screen) {
@@ -170,18 +165,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       AsyncData(:final value) => value,
       _ => const <TripSummary>[],
     };
-    // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
-    // 重建，才接得住其他 tab 期間變動的共用選取日（保活的分支子樹本身不重建）。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
-    // 時間軸沒有「全部」：前景看到的第幾天必定已寫進共用狀態，所以切回前景時
-    // 無條件接手即可，不必（也無從測出）再比對「共用值有沒有被別人改過」。
-    if (isActiveBranch && !_wasActiveBranch) {
-      final sharedDayNum = ref
-          .read(selectedDayProvider)
-          .dayNumFor(widget.tripId);
-      if (sharedDayNum != null) _activeDayNum = sharedDayNum;
-    }
-    _wasActiveBranch = isActiveBranch;
+    final shared = ref.watch(selectedDayProvider);
     final selectedAsync = isActiveBranch
         ? ref.watch(currentTripIdProvider)
         : ref.read(currentTripIdProvider);
@@ -207,22 +192,36 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
         .firstOrNull;
     final isEditing = _editingTripId == tripId;
     final tripAsync = ref.watch(tripDetailProvider(tripId));
-    final daysAsync = ref.watch(tripDaysProvider(tripId));
+    final daysAsync = ref.watch(tripDaysIndexProvider(tripId));
+    final index = switch (daysAsync) {
+      AsyncData(:final value) => value,
+      _ => _lastIndex,
+    };
+    if (index != null) {
+      _lastIndex = index;
+      _activeDayNum ??= ref
+          .read(selectedDayProvider.notifier)
+          .resolveInitial(
+            tripId: tripId,
+            index: index,
+            routeDayNum: widget.initialDayNum,
+            entryId: widget.initialEntryId,
+          )
+          .dayNumFor(tripId);
+      _bodyStartDayNum ??= _activeDayNum;
+      if (isActiveBranch && shared != _lastObservedShared) {
+        _lastObservedShared = shared;
+        final sharedDayNum = shared.dayNumFor(tripId);
+        if (sharedDayNum != null &&
+            index.days.any((day) => day.dayNum == sharedDayNum)) {
+          _activeDayNum = sharedDayNum;
+          _bodyStartDayNum = sharedDayNum;
+        }
+      }
+    }
     final trip = tripAsync.value;
-    final detailTitle = trip?.title?.trim();
-    final detailName = trip?.name.trim();
-    final summaryTitle = currentTrip?.title?.trim();
-    final summaryName = currentTrip?.name.trim();
-    final tripTitle = detailTitle?.isNotEmpty ?? false
-        ? detailTitle!
-        : summaryTitle?.isNotEmpty ?? false
-        ? summaryTitle!
-        : detailName?.isNotEmpty ?? false
-        ? detailName!
-        : summaryName?.isNotEmpty ?? false
-        ? summaryName!
-        : '行程';
-    final fallbackDayNum = daysAsync.value?.firstOrNull?.dayNum;
+    final tripTitle = tripDisplayTitle(detail: trip, summary: currentTrip);
+    final fallbackDayNum = index?.days.firstOrNull?.dayNum;
 
     return TpRootScaffold(
       header: TpRootHeaderConfig(
@@ -322,19 +321,20 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
         ],
       ),
       body: daysAsync.when(
-        data: (days) => days.isEmpty
+        data: (index) => index.days.isEmpty
             ? initiallyBelowHeader(const _EmptyTimeline())
             : _TimelineBody(
-                days: days,
+                index: index,
                 tripId: tripId,
                 initialEntryId: tripId == widget.tripId
                     ? widget.initialEntryId
                     : null,
-                initialDayNum: _activeDayNum ?? widget.initialDayNum,
+                initialDayNum: _bodyStartDayNum,
                 isEditing: isEditing,
                 onStartEditing: () => setState(() => _editingTripId = tripId),
                 onActiveDayChanged: (dayNum) {
                   _activeDayNum = dayNum;
+                  _bodyStartDayNum = dayNum;
                   _publishSelectedDay(dayNum);
                 },
               ),
@@ -357,7 +357,7 @@ typedef _EntriesSnapshot = Map<int, List<TimelineEntry>>;
 /// 日程主體：固定 DAY selector + 單一逐日 Sliver 捲動。
 class _TimelineBody extends ConsumerStatefulWidget {
   const _TimelineBody({
-    required this.days,
+    required this.index,
     required this.tripId,
     this.initialEntryId,
     this.initialDayNum,
@@ -366,7 +366,8 @@ class _TimelineBody extends ConsumerStatefulWidget {
     required this.onActiveDayChanged,
   });
 
-  final List<TripDay> days;
+  final TripDaysIndex index;
+  List<TripDay> get days => index.days;
   final String tripId;
   final int? initialEntryId;
   final int? initialDayNum;
@@ -444,7 +445,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       _rebuildKeys();
       final previousActiveDayNum = _activeDayNum;
       final initialDayNum = _initialDayNum();
-      if (initialDayNum != null) {
+      if ((entryFocusChanged || dayFocusChanged) && initialDayNum != null) {
         _activeDayNum = initialDayNum;
       } else if (!widget.days.any((day) => day.dayNum == _activeDayNum)) {
         _activeDayNum = widget.days.isEmpty ? 1 : widget.days.first.dayNum;
@@ -511,49 +512,29 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   Future<void> _reorderEntry(
     _EntryDragData data,
     int targetDayId,
-    int targetIndex,
-  ) async {
+    int targetPosition, {
+    bool checkSourceIndex = false,
+  }) async {
     if (_reorderSubmitting) return;
     final tripId = widget.tripId;
     final days = widget.days;
     final repository = ref.read(tripRepositoryProvider);
     final before = _snapshotEntries();
-    EntryReorderPlan<TimelineEntry> plan;
-    try {
-      if (!before.containsKey(targetDayId)) {
-        throw StateError('target Day no longer exists');
-      }
-      int? currentSourceDayId;
-      var currentSourceIndex = -1;
-      for (final day in before.entries) {
-        final index = day.value.indexWhere(
-          (entry) => entry.id == data.entry.id,
-        );
-        if (index >= 0) {
-          currentSourceDayId = day.key;
-          currentSourceIndex = index;
-          break;
-        }
-      }
-      if (currentSourceDayId == null) {
-        throw StateError('entry no longer exists');
-      }
-      if (currentSourceDayId != data.sourceDayId) {
-        throw StateError('entry moved to another Day');
-      }
-      plan = planEntryReorder<TimelineEntry>(
-        before,
-        sourceDayId: currentSourceDayId,
-        sourceIndex: currentSourceIndex,
-        targetDayId: targetDayId,
-        targetIndex: targetIndex,
-        idOf: (entry) => entry.id,
-      );
-    } on Object {
-      if (mounted) {
-        showAppError(context, '行程內容已更新，請重新操作');
-      }
-      return;
+    final outcome = planEntryReorder(
+      before,
+      entryId: data.entry.id,
+      expectedSourceDayId: data.sourceDayId,
+      expectedSourceIndex: checkSourceIndex ? data.sourceIndex : null,
+      targetDayId: targetDayId,
+      targetPosition: targetPosition,
+    );
+    final EntryReorderPlan plan;
+    switch (outcome) {
+      case EntryReorderRejected():
+        if (mounted) showAppError(context, '行程內容已更新，請重新操作');
+        return;
+      case EntryReorderPlanned(plan: final planned):
+        plan = planned;
     }
     final after = plan.entriesByDayId;
     if (_sameEntryOrder(before, after)) return;
@@ -562,26 +543,20 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       _visibleEntriesByDayId = after;
       _reorderSubmitting = true;
     });
+    // notifier 活在 container 上;await 之後畫面可能已 unmount,那時不能再碰 ref。
+    final mutations = ref.read(entryMutationsProvider(tripId).notifier);
     try {
       await repository.reorderEntries(tripId: tripId, updates: plan.updates);
-      final dayNums = [
-        for (final day in days)
-          if (affected.contains(day.id)) day.dayNum,
-      ];
-      for (final dayNum in dayNums) {
-        try {
-          await repository.recomputeTravel(tripId: tripId, day: '$dayNum');
-        } on Exception {
-          // 排序已完成；交通資料會在下一次刷新自行補齊。
-        }
-      }
-      if (mounted) {
-        ref.invalidate(tripDaysProvider(tripId));
-        ref.invalidate(tripSegmentsProvider(tripId));
-      }
+      await mutations.record(
+        EntryMutation.reordered,
+        dayNums: [
+          for (final day in days)
+            if (affected.contains(day.id)) day.dayNum,
+        ],
+      );
     } on Exception {
+      mutations.refreshAfter({TripChange.days});
       if (mounted) {
-        ref.invalidate(tripDaysProvider(tripId));
         if (widget.tripId == tripId) {
           _restoreEntries(before);
           showAppError(context, '排序失敗，已還原原本順序');
@@ -651,7 +626,9 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
                     targetDayId: targetDayId,
                   );
               if (!mounted) return true;
-              ref.invalidate(tripDaysProvider(tripId));
+              await ref
+                  .read(entryMutationsProvider(tripId).notifier)
+                  .record(EntryMutation.copied);
               dismissalLocked.value = false;
               if (sheetContext.mounted) select(targetDayId);
               return true;
@@ -675,28 +652,20 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   ) async {
     if (!_settingMasterEntryIds.add(entry.id)) return;
     final tripId = widget.tripId;
-    final repository = ref.read(tripRepositoryProvider);
     setState(() {});
     try {
-      await repository.setEntryMaster(
-        tripId: tripId,
-        entryId: entry.id,
-        poiId: alternate.poiId,
-        entryPoisVersion: entry.entryPoisVersion,
-      );
-      try {
-        await repository.recomputeTravel(tripId: tripId, day: '$dayNum');
-      } on Exception {
-        // 正選已更新；交通資料可稍後重算。
-      }
-      if (mounted) {
-        ref.invalidate(tripDaysProvider(tripId));
-        ref.invalidate(tripSegmentsProvider(tripId));
-      }
-    } on Exception {
-      if (mounted && widget.tripId == tripId) {
-        showAppError(context, '設為正選失敗，請重新載入後再試');
-      }
+      await ref
+          .read(entryMutationsProvider(tripId).notifier)
+          .setMaster(
+            context,
+            entry: entry,
+            alternate: alternate,
+            sameDayEntries: _visibleEntriesByDayId.values.firstWhere(
+              (entries) => entries.any((e) => e.id == entry.id),
+              orElse: () => const <TimelineEntry>[],
+            ),
+            dayNum: dayNum,
+          );
     } finally {
       _settingMasterEntryIds.remove(entry.id);
       if (mounted && widget.tripId == tripId) setState(() {});
@@ -747,29 +716,28 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   }
 
   int? _initialDayNum() {
-    final entryId = widget.initialEntryId;
-    if (entryId != null) {
-      for (final day in widget.days) {
-        if (day.timeline.any((entry) => entry.id == entryId)) {
-          return day.dayNum;
-        }
-      }
-    }
     final dayNum = widget.initialDayNum;
     if (dayNum != null && widget.days.any((day) => day.dayNum == dayNum)) {
       return dayNum;
     }
-    return null;
+    final entryId = widget.initialEntryId;
+    return entryId == null ? null : widget.index.dayNumContaining(entryId);
   }
 
   void _scheduleInitialFocusScroll() {
     final entryId = widget.initialEntryId;
-    final dayNum = entryId == null ? widget.initialDayNum : null;
-    if (entryId == null && dayNum == null) return;
+    final routeDayNum = widget.initialDayNum;
+    final dayNum =
+        routeDayNum != null &&
+            widget.days.any((day) => day.dayNum == routeDayNum)
+        ? routeDayNum
+        : null;
+    final focusEntryId = dayNum == null ? entryId : null;
+    if (focusEntryId == null && dayNum == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final targetContext = entryId != null
-          ? _entryKeys[entryId]?.currentContext
+      final targetContext = focusEntryId != null
+          ? _entryKeys[focusEntryId]?.currentContext
           : _daySectionKeys[dayNum]?.currentContext;
       if (targetContext == null) return;
       final renderObject = targetContext.findRenderObject();
@@ -1008,22 +976,6 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-/// 單日 entry reorder 的 batch updates（同天,dayId 留 null）。共用 [reorderedSortOrders]。
-List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
-  List<int> entryIds,
-  int oldIndex,
-  int newIndex,
-) {
-  return [
-    for (final u in reorderedSortOrders(entryIds, oldIndex, newIndex))
-      (id: u.id, sortOrder: u.sortOrder, dayId: null),
-  ];
-}
-
-// ponytail: process-local auto recompute UI state; move to repo helper if retries need persistence.
-final _requestedTravelGapRecomputes = <String>{};
-final _stalledTravelRecomputeScopes = <String>{};
-
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -1065,8 +1017,9 @@ class _DaySection extends ConsumerWidget {
   final Future<void> Function(
     _EntryDragData data,
     int targetDayId,
-    int targetIndex,
-  )
+    int targetPosition, {
+    bool checkSourceIndex,
+  })
   onReorder;
   final Future<void> Function(_EntryDragData data) onMoveToDay;
   final Future<void> Function(TimelineEntry entry, int sourceDayId) onCopyToDay;
@@ -1086,61 +1039,30 @@ class _DaySection extends ConsumerWidget {
     TimelineEntry entry, {
     required TpDestructiveConfirmSource source,
   }) {
+    final repository = ref.read(tripRepositoryProvider);
+    final mutations = ref.read(entryMutationsProvider(tripId).notifier);
     return confirmAndDelete(
       context,
       source: source,
       title: '刪除停留點',
       message: '刪除「${entry.title}」後，相關交通時間將重新計算。此動作無法復原。',
       delete: () async {
-        await ref
-            .read(tripRepositoryProvider)
-            .deleteEntry(tripId: tripId, entryId: entry.id);
-        try {
-          await _recomputeAndRefresh(ref);
-        } on Object {
-          // DELETE 已成功，交通重算屬於次要修復，不可因此允許再次刪除。
-        }
+        await repository.deleteEntry(tripId: tripId, entryId: entry.id);
+        await mutations.record(EntryMutation.deleted, dayNum: day.dayNum);
       },
-      onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
     );
   }
 
-  /// reorder 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
-  Future<void> _recomputeAndRefresh(WidgetRef ref) async {
-    await _recomputeDay(ref, day.dayNum);
-  }
-
-  Future<void> _recomputeDay(
-    WidgetRef ref,
-    int dayNum, {
-    bool auto = false,
-  }) async {
-    // 這裡的 ref 屬於 _DaySection 的 element。unmount 之後碰它會擲 StateError,
-    // 而 StateError 不是 Exception 子類 —— 下面的 `on Exception` 攔不到,會一路
-    // 逃成未捕捉例外把 App 打掛。auto 路徑由 build() 以 unawaited 觸發,和使用者
-    // 離開頁面天然競速,所以每次碰 ref 前都要確認還活著。
-    // (`ref.context.mounted` 正是 riverpod 內部 _assertNotDisposed 的同一條件。)
-    if (!ref.context.mounted) return;
-    final scope = '$tripId:$dayNum';
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .recomputeTravel(tripId: tripId, day: '$dayNum');
-      // scope 記錄是 module-level state,unmount 後仍要更新 —— 該日之後重新
-      // mount 時要看到正確的「待更新」狀態。只有碰 ref 需要守衛。
-      _stalledTravelRecomputeScopes.remove(scope);
-      if (!ref.context.mounted) return;
-      ref.invalidate(tripDaysProvider(tripId));
-      ref.invalidate(tripSegmentsProvider(tripId));
-    } on Exception {
-      if (auto) {
-        _stalledTravelRecomputeScopes.add(scope);
-        if (!ref.context.mounted) return;
-        ref.invalidate(tripSegmentsProvider(tripId));
-      }
-      // 交通重算失敗忽略
-    }
-  }
+  /// Drop target 的縫隙索引只在此轉為「移動後的位置」。
+  Future<void> _acceptDrop(_EntryDragData data, int targetDayId, int slot) =>
+      onReorder(
+        data,
+        targetDayId,
+        targetDayId == data.sourceDayId && slot > data.sourceIndex
+            ? slot - 1
+            : slot,
+        checkSourceIndex: true,
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1164,7 +1086,7 @@ class _DaySection extends ConsumerWidget {
             _EntryDropTarget(
               targetDayId: day.id,
               targetIndex: index,
-              onAccept: onReorder,
+              onAccept: _acceptDrop,
             ),
             _buildEntryRow(context, ref, index, segments, segmentsReady),
           ],
@@ -1172,7 +1094,7 @@ class _DaySection extends ConsumerWidget {
             targetDayId: day.id,
             targetIndex: timeline.length,
             empty: timeline.isEmpty,
-            onAccept: onReorder,
+            onAccept: _acceptDrop,
           ),
         ] else
           for (var index = 0; index < timeline.length; index++)
@@ -1259,6 +1181,7 @@ class _DaySection extends ConsumerWidget {
                         ),
                         day.id,
                         index - 1,
+                        checkSourceIndex: true,
                       ),
                     ),
               onMoveDown: index == timeline.length - 1
@@ -1271,7 +1194,8 @@ class _DaySection extends ConsumerWidget {
                           entry: entry,
                         ),
                         day.id,
-                        index + 2,
+                        index + 1,
+                        checkSourceIndex: true,
                       ),
                     ),
               onMoveToDay: dayCount > 1
@@ -1330,9 +1254,10 @@ class _DaySection extends ConsumerWidget {
                 travel: travel,
                 segmentsReady: segmentsReady,
                 missingCoords: _missingTravelCoords(previous, entry),
-                recomputeStalled: _stalledTravelRecomputeScopes.contains(
-                  '$tripId:${day.dayNum}',
-                ),
+                recomputeStalled: ref
+                    .watch(entryMutationsProvider(tripId))
+                    .stalledDays
+                    .contains(day.dayNum),
               ),
             ),
           row,
@@ -1468,10 +1393,9 @@ class _DaySection extends ConsumerWidget {
     }
     if (gapIds.isEmpty) return;
 
-    final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
-    if (!_requestedTravelGapRecomputes.add(key)) return;
-    _stalledTravelRecomputeScopes.remove('$tripId:${day.dayNum}');
-    unawaited(_recomputeDay(ref, day.dayNum, auto: true));
+    ref
+        .read(entryMutationsProvider(tripId).notifier)
+        .requestGapRecompute(dayNum: day.dayNum, gapKey: gapIds.join('|'));
   }
 }
 

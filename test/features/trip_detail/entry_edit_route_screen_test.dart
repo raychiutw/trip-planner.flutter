@@ -100,6 +100,53 @@ Widget _buildApp(
 }
 
 void main() {
+  testWidgets('初載失敗顯示易懂訊息，重試後恢復停留點編輯', (tester) async {
+    final repository = _MockTripRepository();
+    final router = _buildRouter();
+    addTearDown(router.dispose);
+    var canLoad = false;
+    when(() => repository.watchEntry(tripId: 'trip-1', entryId: 11)).thenAnswer(
+      (_) => canLoad
+          ? Stream.value(_entry)
+          : Stream.error(
+              const ApiError(
+                status: 503,
+                code: 'SYS_TEMPORARY',
+                message: 'upstream unavailable',
+              ),
+            ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('目前無法載入停留點，請稍後重試。'), findsOneWidget);
+    expect(find.textContaining('ApiError'), findsNothing);
+    expect(find.textContaining('upstream unavailable'), findsNothing);
+    expect(find.byKey(const ValueKey('entry-edit-desc')), findsNothing);
+
+    canLoad = true;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TextField, '世界遺產'), findsOneWidget);
+    expect(find.text('目前無法載入停留點，請稍後重試。'), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-desc')),
+      '恢復後繼續編輯',
+    );
+    expect(find.widgetWithText(TextField, '恢復後繼續編輯'), findsOneWidget);
+  });
+
   testWidgets('跨行程共用相同 entry id 時不沿用前一行程草稿', (tester) async {
     final repository = _MockTripRepository();
     final firstEntries = StreamController<TimelineEntry>.broadcast();
@@ -280,6 +327,10 @@ void main() {
     expect(find.widgetWithText(TextField, '世界遺產'), findsOneWidget);
 
     entries.add(_updatedEntry);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '更新後的說明'), findsOneWidget);
+
+    entries.add(_entry);
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, '更新後的說明'), findsOneWidget);
 

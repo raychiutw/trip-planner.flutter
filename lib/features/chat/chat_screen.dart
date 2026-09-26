@@ -21,8 +21,8 @@ import '../../ui/tp_root_scaffold.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
+import '../requests/request_lifecycle.dart';
 import 'ai_consent_sheet.dart';
-import '../../models/trip_request.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
@@ -59,6 +59,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _drafts = <String, String>{};
   bool? _speechAvailable;
   bool _speechPurposeAccepted = false;
+  bool _retryingTrips = false;
 
   @override
   void initState() {
@@ -96,6 +97,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _consumePrefill() {
     if (_pendingPrefill == null || !mounted) return;
     setState(() => _pendingPrefill = null);
+  }
+
+  Future<void> _retryTrips() async {
+    if (_retryingTrips) return;
+    setState(() => _retryingTrips = true);
+    try {
+      await ref.read(myTripsRetryProvider).retry();
+    } finally {
+      if (mounted) setState(() => _retryingTrips = false);
+    }
   }
 
   void _setSpeechAvailable(bool? value) {
@@ -166,11 +177,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: const [],
       ),
       body: tripsAsync.when(
+        // 自動重試仍保留錯誤出口；已有清單時讓對話與草稿繼續留在原處。
+        skipLoadingOnReload: tripsAsync.retrying,
+        skipError: trips.isNotEmpty,
         loading: () => initiallyBelowHeader(
           const Center(child: CircularProgressIndicator.adaptive()),
         ),
         error: (e, _) => initiallyBelowHeader(
-          const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+          Semantics(
+            liveRegion: true,
+            label: _retryingTrips ? '行程清單重試中…' : null,
+            child: _CenteredHint(
+              title: '載入失敗',
+              body: '無法取得行程清單,請稍後再試。',
+              onRetry: _retryTrips,
+              retryInProgress: _retryingTrips,
+            ),
+          ),
         ),
         data: (trips) {
           if (trips.isEmpty) {
@@ -205,6 +228,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             speechPurposeAccepted: _speechPurposeAccepted,
             onSpeechAvailableChanged: _setSpeechAvailable,
             onSpeechPurposeAccepted: _acceptSpeechPurpose,
+            onTripsRetry: tripsAsync.hasError ? _retryTrips : null,
+            tripsRetryInProgress: _retryingTrips,
           );
         },
       ),
@@ -224,6 +249,8 @@ class _ChatBody extends ConsumerStatefulWidget {
     required this.onSpeechAvailableChanged,
     required this.onSpeechPurposeAccepted,
     this.initialPrefill,
+    this.onTripsRetry,
+    this.tripsRetryInProgress = false,
   });
 
   final String tripId;
@@ -234,6 +261,8 @@ class _ChatBody extends ConsumerStatefulWidget {
   final bool speechPurposeAccepted;
   final ValueChanged<bool?> onSpeechAvailableChanged;
   final VoidCallback onSpeechPurposeAccepted;
+  final VoidCallback? onTripsRetry;
+  final bool tripsRetryInProgress;
 
   @override
   ConsumerState<_ChatBody> createState() => _ChatBodyState();
@@ -255,10 +284,6 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   bool? _aiAuthorized;
   bool _sendInProgress = false;
   double _composerHeight = 0;
-
-  /// 使用者按過「停止等待」但伺服器沒確認的那幾筆。伺服器那邊還是 processing,
-  /// 靠這個把畫面推進到終結態 —— 後端的兜底機制之後會自己追上。
-  final _locallyStopped = <int>{};
 
   /// 目前是否停在最新那一端;同時決定箭頭要不要出現,以及重拉的邊緣觸發。
   bool _atLatest = true;
@@ -284,10 +309,12 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     super.didUpdateWidget(oldWidget);
     final prefill = widget.initialPrefill;
     if (prefill == null || prefill == oldWidget.initialPrefill) return;
-    _input.value = TextEditingValue(
-      text: prefill,
-      selection: TextSelection.collapsed(offset: prefill.length),
-    );
+    if (prefill != _input.text) {
+      _input.value = TextEditingValue(
+        text: prefill,
+        selection: TextSelection.collapsed(offset: prefill.length),
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.onInitialPrefillConsumed();
     });
@@ -330,24 +357,13 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     setState(() => _atLatest = atLatest);
   }
 
-  /// 停止等待 —— **不中止 AI**(後端 `raychiutw/trip-planner` 的 `docs/adr/0007`:不追殺 worker)。
-  ///
-  /// 標不掉也照樣把畫面換成終結態(與 web 一致),但**文案不能假裝成功** ——
-  /// 伺服器沒確認就是沒確認,後端另有兜底機制會補上。
+  /// 停止等待只讓畫面脫身，工單 lifecycle 不會中止 AI。
   Future<void> _stopWaiting(int id) async {
-    var confirmed = true;
-    try {
-      await ref.read(requestsRepositoryProvider).stopWaiting(id);
-    } on Object {
-      confirmed = false;
-    }
-    if (!mounted) return;
-    // 標不掉的時候伺服器那筆**沒有變**,重抓只會拿回同一個 processing ——
-    // 所以本地先記下來,否則畫面會留在「思考中…」,使用者等於沒有出口。
-    setState(() => _locallyStopped.add(id));
-    await ref.read(chatControllerProvider(widget.tripId).notifier).reload();
+    final confirmed = await ref
+        .read(requestLifecycleProvider(id).notifier)
+        .stopWaiting();
     if (!mounted || confirmed) return;
-    showAppError(context, '已停止等待，但伺服器沒有確認。它可能仍在處理。');
+    showAppError(context, kStopWaitingUnconfirmedMessage);
   }
 
   /// 回到最新訊息那一端(reverse list 底部 = offset 0);重拉由 [_onScroll] 接手。
@@ -446,19 +462,11 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
       AsyncData(:final value) => value,
       _ => null,
     };
-    // 伺服器沒確認的停止,在這裡推進到終結態 —— row 本身還是 processing。
-    final msgs = _locallyStopped.isEmpty
-        ? state.messages
-        : [
-            for (final r in state.requests)
-              ...rowToMessages(
-                _locallyStopped.contains(r.id) && !r.status.isTerminal
-                    ? r.asLocallyStopped()
-                    : r,
-              ),
-          ];
+    final msgs = state.messages;
     final hasBanner =
-        state.authExpired || (state.error != null && msgs.isNotEmpty);
+        widget.onTripsRetry != null ||
+        state.authExpired ||
+        (state.error != null && msgs.isNotEmpty);
     final contentTop = hasBanner
         ? TpSpacing.s4
         : TpRootGeometry.initialContentTop(context);
@@ -484,6 +492,16 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
               children: [
                 if (hasBanner)
                   SizedBox(height: TpRootGeometry.initialContentTop(context)),
+                if (widget.onTripsRetry != null)
+                  Semantics(
+                    liveRegion: true,
+                    label: widget.tripsRetryInProgress ? '行程清單重試中…' : null,
+                    child: _Banner(
+                      text: '無法取得行程清單,請稍後再試。',
+                      onRetry: widget.onTripsRetry,
+                      retryInProgress: widget.tripsRetryInProgress,
+                    ),
+                  ),
                 if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
                 // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
                 if (state.error != null && msgs.isNotEmpty)
@@ -1094,6 +1112,7 @@ class _CenteredHint extends StatelessWidget {
     required this.title,
     required this.body,
     this.onRetry,
+    this.retryInProgress = false,
     this.actionLabel,
     this.onAction,
   });
@@ -1101,6 +1120,7 @@ class _CenteredHint extends StatelessWidget {
   final String title;
   final String body;
   final VoidCallback? onRetry;
+  final bool retryInProgress;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -1126,8 +1146,8 @@ class _CenteredHint extends StatelessWidget {
               const SizedBox(height: TpSpacing.s4),
               FilledButton(
                 key: const ValueKey('chat-retry'),
-                onPressed: onRetry,
-                child: const Text('重試'),
+                onPressed: retryInProgress ? null : onRetry,
+                child: Text(retryInProgress ? '重試中…' : '重試'),
               ),
             ] else if (onAction != null && actionLabel != null) ...[
               const SizedBox(height: TpSpacing.s4),
@@ -1142,9 +1162,15 @@ class _CenteredHint extends StatelessWidget {
 
 /// 頂端橫幅(authExpired / error)。
 class _Banner extends StatelessWidget {
-  const _Banner({required this.text});
+  const _Banner({
+    required this.text,
+    this.onRetry,
+    this.retryInProgress = false,
+  });
 
   final String text;
+  final VoidCallback? onRetry;
+  final bool retryInProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -1167,6 +1193,13 @@ class _Banner extends StatelessWidget {
                 style: TextStyle(color: scheme.onErrorContainer),
               ),
             ),
+            if (onRetry != null)
+              Flexible(
+                child: TextButton(
+                  onPressed: retryInProgress ? null : onRetry,
+                  child: Text(retryInProgress ? '重試中…' : '重試'),
+                ),
+              ),
           ],
         ),
       ),

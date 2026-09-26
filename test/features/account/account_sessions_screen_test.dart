@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/models/oauth.dart';
@@ -13,7 +13,7 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
-class MockTripRepository extends Mock implements TripRepository {}
+class MockAccountRepository extends Mock implements AccountRepository {}
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -34,7 +34,7 @@ class _FakeAuthNotifier extends AuthNotifier {
 }
 
 void main() {
-  late MockTripRepository mockTripRepository;
+  late MockAccountRepository mockAccountRepository;
   late MockAuthRepository mockAuthRepository;
   late List<void> logoutCalls;
 
@@ -63,7 +63,7 @@ void main() {
   Future<ProviderContainer> pumpScreen(WidgetTester tester) async {
     final container = ProviderContainer(
       overrides: [
-        tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        accountRepositoryProvider.overrideWithValue(mockAccountRepository),
         authRepositoryProvider.overrideWithValue(mockAuthRepository),
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),
@@ -86,26 +86,26 @@ void main() {
   }
 
   setUp(() {
-    mockTripRepository = MockTripRepository();
+    mockAccountRepository = MockAccountRepository();
     mockAuthRepository = MockAuthRepository();
     logoutCalls = <void>[];
     when(
       mockAuthRepository.fetchAiAuthorization,
     ).thenAnswer((_) async => false);
-    when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
+    when(() => mockAccountRepository.fetchAccountSessions()).thenAnswer(
       (_) async => const AccountSessionsPage(
         currentSid: 'sid-current',
         sessions: [currentSession, phoneSession],
       ),
     );
     when(
-      () => mockTripRepository.revokeAccountSession(any()),
+      () => mockAccountRepository.revokeAccountSession(any()),
     ).thenAnswer((_) async {});
     when(
-      () => mockTripRepository.revokeOtherAccountSessions(),
+      () => mockAccountRepository.revokeOtherAccountSessions(),
     ).thenAnswer((_) async => 1);
     when(
-      () => mockTripRepository.fetchConnectedApps(),
+      () => mockAccountRepository.fetchConnectedApps(),
     ).thenAnswer((_) async => const <ConnectedApp>[]);
   });
 
@@ -150,7 +150,7 @@ void main() {
     var closeCalls = 0;
     final container = ProviderContainer(
       overrides: [
-        tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        accountRepositoryProvider.overrideWithValue(mockAccountRepository),
         authRepositoryProvider.overrideWithValue(mockAuthRepository),
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),
@@ -214,13 +214,13 @@ void main() {
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
-    verifyNever(() => mockTripRepository.revokeAccountSession(any()));
+    verifyNever(() => mockAccountRepository.revokeAccountSession(any()));
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
     await tester.pumpAndSettle();
 
     verify(
-      () => mockTripRepository.revokeAccountSession('sid-phone'),
+      () => mockAccountRepository.revokeAccountSession('sid-phone'),
     ).called(1);
     expect(find.text('已登出該裝置'), findsOneWidget);
     expect(find.byKey(const ValueKey('account-session-details')), findsNothing);
@@ -228,7 +228,7 @@ void main() {
 
   testWidgets('登出裝置失敗會保留詳情、錯誤與可重試的 44pt 操作', (tester) async {
     when(
-      () => mockTripRepository.revokeAccountSession('sid-phone'),
+      () => mockAccountRepository.revokeAccountSession('sid-phone'),
     ).thenThrow(Exception('offline'));
     await pumpScreen(tester);
 
@@ -253,7 +253,20 @@ void main() {
     expect(tester.widget<FilledButton>(revokeFinder).onPressed, isNotNull);
   });
 
-  testWidgets('登出其他裝置缺少 server-bound reauth 時安全阻擋且不呼叫 API', (tester) async {
+  testWidgets('批次登出受限時說明逐一登出路徑，確認後失敗仍可重試', (tester) async {
+    var attempts = 0;
+    when(
+      () => mockAccountRepository.revokeAccountSession('sid-phone'),
+    ).thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) throw Exception('offline');
+    });
+    when(() => mockAccountRepository.fetchAccountSessions()).thenAnswer(
+      (_) async => AccountSessionsPage(
+        currentSid: 'sid-current',
+        sessions: [currentSession, if (attempts < 2) phoneSession],
+      ),
+    );
     await pumpScreen(tester);
 
     await tester.tap(find.byKey(const Key('account-sessions-revoke-others')));
@@ -263,10 +276,45 @@ void main() {
       find.byKey(const ValueKey('revoke-other-sessions-blocked-dialog')),
       findsOneWidget,
     );
-    expect(find.text('需要重新驗證才能登出其他裝置'), findsOneWidget);
-    expect(find.textContaining('缺少可綁定伺服器操作'), findsOneWidget);
-    expect(find.textContaining('逐一登出'), findsOneWidget);
-    verifyNever(() => mockTripRepository.revokeOtherAccountSessions());
+    expect(find.text('目前無法一次登出其他裝置'), findsOneWidget);
+    expect(
+      find.text('目前無法驗證身分以一次登出其他裝置。請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('伺服器'), findsNothing);
+    expect(find.textContaining('綁定'), findsNothing);
+    verifyNever(() => mockAccountRepository.revokeOtherAccountSessions());
+    verifyNever(() => mockAccountRepository.revokeAccountSession(any()));
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '返回裝置清單'));
+    await tester.pumpAndSettle();
+    expect(find.text('目前裝置'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登出此裝置'));
+    await tester.pumpAndSettle();
+    expect(find.text('登出 Safari on iPhone？'), findsOneWidget);
+    verifyNever(() => mockAccountRepository.revokeAccountSession(any()));
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
+    await tester.pumpAndSettle();
+    expect(find.text('登出裝置失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('Safari on iPhone'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, '重試'));
+    await tester.pumpAndSettle();
+    expect(find.text('登出 Safari on iPhone？'), findsOneWidget);
+    expect(attempts, 1);
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
+    await tester.pumpAndSettle();
+    expect(find.text('已登出該裝置'), findsOneWidget);
+    expect(find.text('Safari on iPhone'), findsNothing);
+    expect(find.text('目前裝置'), findsOneWidget);
+    expect(attempts, 2);
+    verifyNever(() => mockAccountRepository.revokeOtherAccountSessions());
+    verifyNever(
+      () => mockAccountRepository.revokeAccountSession('sid-current'),
+    );
   });
 
   testWidgets('顯示帳號 email、OAuth 提醒與頁尾登出', (tester) async {

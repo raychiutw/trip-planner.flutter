@@ -7,16 +7,16 @@ import 'package:mocktail/mocktail.dart';
 import 'dart:async';
 import 'dart:ui' show SemanticsAction;
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
-class MockTripRepository extends Mock implements TripRepository {}
+class MockAccountRepository extends Mock implements AccountRepository {}
 
 void main() {
-  late MockTripRepository mockTripRepository;
+  late MockAccountRepository mockAccountRepository;
 
   const developerApp = DeveloperApp(
     clientId: 'tp_dev',
@@ -31,15 +31,15 @@ void main() {
   );
 
   setUp(() {
-    mockTripRepository = MockTripRepository();
+    mockAccountRepository = MockAccountRepository();
     when(
-      () => mockTripRepository.fetchDeveloperApps(),
+      () => mockAccountRepository.fetchDeveloperApps(),
     ).thenAnswer((_) async => const [developerApp]);
     when(
-      () => mockTripRepository.fetchDeveloperApp('tp_dev'),
+      () => mockAccountRepository.fetchDeveloperApp('tp_dev'),
     ).thenAnswer((_) async => developerApp);
     when(
-      () => mockTripRepository.createDeveloperApp(
+      () => mockAccountRepository.createDeveloperApp(
         appName: any(named: 'appName'),
         clientType: any(named: 'clientType'),
         redirectUris: any(named: 'redirectUris'),
@@ -58,7 +58,7 @@ void main() {
       ),
     );
     when(
-      () => mockTripRepository.updateDeveloperApp(
+      () => mockAccountRepository.updateDeveloperApp(
         clientId: any(named: 'clientId'),
         appName: any(named: 'appName'),
         appDescription: any(named: 'appDescription'),
@@ -70,7 +70,7 @@ void main() {
       ),
     ).thenAnswer((_) async => developerApp);
     when(
-      () => mockTripRepository.suspendDeveloperApp(any()),
+      () => mockAccountRepository.suspendDeveloperApp(any()),
     ).thenAnswer((_) async => 'tp_dev');
   });
 
@@ -79,7 +79,7 @@ void main() {
       ProviderScope(
         retry: (retryCount, error) => null,
         overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -102,7 +102,7 @@ void main() {
       ProviderScope(
         retry: (retryCount, error) => null,
         overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -135,6 +135,61 @@ void main() {
     expect(find.byKey(const Key('developer-apps-new')), findsOneWidget);
   });
 
+  testWidgets('長應用名稱在窄螢幕大字級仍可辨識編輯入口', (tester) async {
+    final semantics = tester.ensureSemantics();
+    const longName = '跨地區行程整合與資料同步測試應用程式';
+    const longApp = DeveloperApp(
+      clientId: 'tp_long_app',
+      clientType: 'confidential',
+      appName: longName,
+      redirectUris: ['https://example.com/oauth/callback'],
+      allowedScopes: [
+        'openid',
+        'profile',
+        'email',
+        'trips:read',
+        'trips:write',
+      ],
+      status: 'pending_review',
+      createdAt: '2026-07-08T10:00:00Z',
+      updatedAt: '2026-07-08T10:00:00Z',
+    );
+    when(
+      () => mockAccountRepository.fetchDeveloperApps(),
+    ).thenAnswer((_) async => const [longApp]);
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: const DeveloperAppsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(const Key('developer-app-row-tp_long_app'));
+    expect(row, findsOneWidget);
+    final data = tester.getSemantics(row);
+    expect(data.label, contains(longName));
+    expect(data.getSemanticsData().hint, contains('編輯'));
+    expect(data.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
   testWidgets('點選 developer app 會在同一個 Navigation Stack 開啟編輯表單', (tester) async {
     await pumpList(tester);
 
@@ -157,7 +212,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     final fetchCompleter = Completer<DeveloperApp>();
     when(
-      () => mockTripRepository.fetchDeveloperApp('tp_dev'),
+      () => mockAccountRepository.fetchDeveloperApp('tp_dev'),
     ).thenAnswer((_) => fetchCompleter.future);
     await pumpList(tester);
 
@@ -192,7 +247,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     final updateCompleter = Completer<DeveloperApp>();
     when(
-      () => mockTripRepository.updateDeveloperApp(
+      () => mockAccountRepository.updateDeveloperApp(
         clientId: any(named: 'clientId'),
         appName: any(named: 'appName'),
         appDescription: any(named: 'appDescription'),
@@ -229,7 +284,7 @@ void main() {
       isTrue,
     );
     verify(
-      () => mockTripRepository.updateDeveloperApp(
+      () => mockAccountRepository.updateDeveloperApp(
         clientId: 'tp_dev',
         appName: 'Renamed App',
         appDescription: null,
@@ -263,10 +318,10 @@ void main() {
   testWidgets('更新後在同一個 ProviderScope 重新開啟會取得最新 detail', (tester) async {
     var detailApp = developerApp;
     when(
-      () => mockTripRepository.fetchDeveloperApp('tp_dev'),
+      () => mockAccountRepository.fetchDeveloperApp('tp_dev'),
     ).thenAnswer((_) async => detailApp);
     when(
-      () => mockTripRepository.updateDeveloperApp(
+      () => mockAccountRepository.updateDeveloperApp(
         clientId: any(named: 'clientId'),
         appName: any(named: 'appName'),
         appDescription: any(named: 'appDescription'),
@@ -310,13 +365,13 @@ void main() {
       'Renamed App',
     );
     verify(
-      () => mockTripRepository.fetchDeveloperApp('tp_dev'),
+      () => mockAccountRepository.fetchDeveloperApp('tp_dev'),
     ).called(greaterThanOrEqualTo(2));
   });
 
   testWidgets('編輯 app 失敗會保留輸入與留在原頁重試', (tester) async {
     when(
-      () => mockTripRepository.updateDeveloperApp(
+      () => mockAccountRepository.updateDeveloperApp(
         clientId: any(named: 'clientId'),
         appName: any(named: 'appName'),
         appDescription: any(named: 'appDescription'),
@@ -346,7 +401,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     final deleteCompleter = Completer<String>();
     when(
-      () => mockTripRepository.suspendDeveloperApp('tp_dev'),
+      () => mockAccountRepository.suspendDeveloperApp('tp_dev'),
     ).thenAnswer((_) => deleteCompleter.future);
     await pumpEditForm(tester);
 
@@ -358,13 +413,21 @@ void main() {
 
     expect(find.text('刪除 Dev App？'), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
-    verifyNever(() => mockTripRepository.suspendDeveloperApp(any()));
+    verifyNever(() => mockAccountRepository.suspendDeveloperApp(any()));
+    expect(
+      tester
+          .widget<CupertinoDialogAction>(
+            find.widgetWithText(CupertinoDialogAction, '刪除'),
+          )
+          .isDestructiveAction,
+      isTrue,
+    );
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    verify(() => mockTripRepository.suspendDeveloperApp('tp_dev')).called(1);
+    verify(() => mockAccountRepository.suspendDeveloperApp('tp_dev')).called(1);
     expect(
       find.byKey(const Key('developer-app-operation-progress')),
       findsOneWidget,
@@ -394,13 +457,13 @@ void main() {
 
   testWidgets('刪除後在同一個 ProviderScope 重新開啟不會重現舊 detail', (tester) async {
     var deleted = false;
-    when(() => mockTripRepository.fetchDeveloperApp('tp_dev')).thenAnswer((
+    when(() => mockAccountRepository.fetchDeveloperApp('tp_dev')).thenAnswer((
       _,
     ) async {
       if (deleted) throw Exception('not found');
       return developerApp;
     });
-    when(() => mockTripRepository.suspendDeveloperApp('tp_dev')).thenAnswer((
+    when(() => mockAccountRepository.suspendDeveloperApp('tp_dev')).thenAnswer((
       _,
     ) async {
       deleted = true;
@@ -418,13 +481,13 @@ void main() {
     expect(find.byKey(const Key('developer-app-name')), findsNothing);
     expect(find.text('無法載入應用程式'), findsOneWidget);
     verify(
-      () => mockTripRepository.fetchDeveloperApp('tp_dev'),
+      () => mockAccountRepository.fetchDeveloperApp('tp_dev'),
     ).called(greaterThanOrEqualTo(2));
   });
 
   testWidgets('刪除 developer app 失敗會保留應用、頁面與重試操作', (tester) async {
     when(
-      () => mockTripRepository.suspendDeveloperApp('tp_dev'),
+      () => mockAccountRepository.suspendDeveloperApp('tp_dev'),
     ).thenThrow(Exception('offline'));
     await pumpEditForm(tester);
 
@@ -520,7 +583,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     final createCompleter = Completer<CreatedDeveloperApp>();
     when(
-      () => mockTripRepository.createDeveloperApp(
+      () => mockAccountRepository.createDeveloperApp(
         appName: any(named: 'appName'),
         clientType: any(named: 'clientType'),
         redirectUris: any(named: 'redirectUris'),
@@ -592,7 +655,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(
-      () => mockTripRepository.createDeveloperApp(
+      () => mockAccountRepository.createDeveloperApp(
         appName: 'New App',
         clientType: 'public',
         redirectUris: const ['https://new.example.com/callback'],
@@ -646,7 +709,7 @@ void main() {
     });
 
     when(
-      () => mockTripRepository.createDeveloperApp(
+      () => mockAccountRepository.createDeveloperApp(
         appName: any(named: 'appName'),
         clientType: any(named: 'clientType'),
         redirectUris: any(named: 'redirectUris'),
@@ -725,7 +788,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),

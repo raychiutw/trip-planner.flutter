@@ -237,6 +237,36 @@ void main() {
       expect(notes.pretripNotes, isEmpty);
       expect(notes.emergencyContacts, isEmpty);
     });
+
+    test('依區域與 id 找到五種筆記的最新版編輯欄位', () {
+      const notes = TripNotes(
+        flights: [TripFlight(id: 1, sortOrder: 0, version: 2, airline: '航班')],
+        lodgings: [TripLodging(id: 2, sortOrder: 0, version: 3, name: '住宿')],
+        reservations: [
+          TripReservation(id: 3, sortOrder: 0, version: 4, title: '預訂'),
+        ],
+        pretripNotes: [
+          TripPretripNote(id: 4, sortOrder: 0, version: 5, title: '行前'),
+        ],
+        emergencyContacts: [
+          TripEmergencyContact(id: 5, sortOrder: 0, version: 6, name: '聯絡'),
+        ],
+      );
+
+      expect(notes.editableRow(NoteSection.flights, 1)?.version, 2);
+      expect(
+        notes.editableRow(NoteSection.flights, 1)?.fields['airline'],
+        '航班',
+      );
+      expect(notes.editableRow(NoteSection.lodgings, 2)?.fields['name'], '住宿');
+      expect(
+        notes.editableRow(NoteSection.reservations, 3)?.fields['title'],
+        '預訂',
+      );
+      expect(notes.editableRow(NoteSection.pretrip, 4)?.fields['title'], '行前');
+      expect(notes.editableRow(NoteSection.emergency, 5)?.fields['name'], '聯絡');
+      expect(notes.editableRow(NoteSection.emergency, 1), isNull);
+    });
   });
 
   group('toEditFields（edit 預填用,snake_case key）', () {

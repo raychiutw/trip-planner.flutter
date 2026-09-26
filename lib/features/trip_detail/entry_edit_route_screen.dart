@@ -4,10 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_error.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
-import '../../models/entry.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'trip_providers.dart';
@@ -32,7 +30,6 @@ class EntryEditRouteScreen extends ConsumerStatefulWidget {
 class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
   final _dismissController = AppUnsavedChangesController();
   AppSheetFormController _formController = AppSheetFormController();
-  TimelineEntry? _lastEntry;
 
   @override
   void didUpdateWidget(covariant EntryEditRouteScreen oldWidget) {
@@ -42,7 +39,6 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
       return;
     }
     final previousController = _formController;
-    _lastEntry = null;
     _formController = AppSheetFormController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       previousController.dispose();
@@ -79,11 +75,15 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
     final entryAsync = ref.watch(
       entryDetailProvider((tripId: widget.tripId, entryId: widget.entryId)),
     );
-    final latestEntry = entryAsync.value;
-    if (latestEntry != null) _lastEntry = latestEntry;
-    final visibleEntry = latestEntry ?? _lastEntry;
-    final refreshError = entryAsync.error;
-    final entryDeleted = refreshError is ApiError && refreshError.status == 404;
+    final source = ref.watch(
+      entryEditSourceProvider((
+        tripId: widget.tripId,
+        entryId: widget.entryId,
+        seedVersion: 0,
+      )),
+    );
+    final visibleEntry = source.fresher;
+    final entryDeleted = source.deleted;
     return AnimatedBuilder(
       animation: _formController,
       builder: (context, _) => AppUnsavedChangesGuard(
@@ -112,7 +112,13 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('載入失敗：$error', textAlign: TextAlign.center),
+                          Semantics(
+                            liveRegion: true,
+                            child: const Text(
+                              '目前無法載入停留點，請稍後重試。',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                           const SizedBox(height: TpSpacing.s3),
                           TextButton(
                             onPressed: _retryEntry,
@@ -136,7 +142,6 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
                         tripId: widget.tripId,
                         args: EntryEditExisting(visibleEntry),
                         formController: _formController,
-                        refreshError: refreshError,
                       ),
                     ),
                   ],

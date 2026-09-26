@@ -140,107 +140,6 @@ class CreatedDeveloperApp {
   String get statusLabel => oauthClientStatusLabel(status);
 }
 
-/// `/oauth/consent` query payload and submit body.
-class OAuthConsentRequest {
-  const OAuthConsentRequest({
-    required this.clientId,
-    required this.redirectUri,
-    required this.scope,
-    required this.state,
-    required this.responseType,
-    this.codeChallenge,
-    this.codeChallengeMethod,
-  });
-
-  final String clientId;
-  final String redirectUri;
-  final String scope;
-  final String state;
-  final String responseType;
-  final String? codeChallenge;
-  final String? codeChallengeMethod;
-
-  factory OAuthConsentRequest.fromUri(Uri uri) {
-    final query = uri.queryParameters;
-    return OAuthConsentRequest(
-      clientId: query['client_id']?.trim() ?? '',
-      redirectUri: query['redirect_uri']?.trim() ?? '',
-      scope: query['scope']?.trim() ?? '',
-      state: query['state']?.trim() ?? '',
-      responseType: query['response_type']?.trim() ?? '',
-      codeChallenge: _trimmedOrNull(query['code_challenge']),
-      codeChallengeMethod: _trimmedOrNull(query['code_challenge_method']),
-    );
-  }
-
-  List<String> get requestedScopes => scope
-      .split(RegExp(r'\s+'))
-      .map((value) => value.trim())
-      .where((value) => value.isNotEmpty)
-      .toList();
-
-  bool get hasPlausibleRedirectUri {
-    final parsed = Uri.tryParse(redirectUri);
-    return parsed != null &&
-        parsed.hasScheme &&
-        (parsed.scheme == 'https' || parsed.scheme == 'http') &&
-        (parsed.host.isNotEmpty || parsed.hasAuthority);
-  }
-
-  bool get isComplete =>
-      clientId.isNotEmpty &&
-      redirectUri.isNotEmpty &&
-      responseType.isNotEmpty &&
-      hasPlausibleRedirectUri;
-
-  Map<String, dynamic> toBody(String decision) {
-    return {
-      'client_id': clientId,
-      'redirect_uri': redirectUri,
-      'scope': scope,
-      'state': state,
-      'response_type': responseType,
-      'code_challenge': ?codeChallenge,
-      'code_challenge_method': ?codeChallengeMethod,
-      'decision': decision,
-    };
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is OAuthConsentRequest &&
-        other.clientId == clientId &&
-        other.redirectUri == redirectUri &&
-        other.scope == scope &&
-        other.state == state &&
-        other.responseType == responseType &&
-        other.codeChallenge == codeChallenge &&
-        other.codeChallengeMethod == codeChallengeMethod;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    clientId,
-    redirectUri,
-    scope,
-    state,
-    responseType,
-    codeChallenge,
-    codeChallengeMethod,
-  );
-}
-
-/// Redirect-style OAuth consent submit result.
-class OAuthConsentResult {
-  const OAuthConsentResult({
-    required this.statusCode,
-    required this.redirectLocation,
-  });
-
-  final int statusCode;
-  final String? redirectLocation;
-}
-
 /// Self-service developer apps may only request these user scopes.
 const List<String> kDeveloperAllowedScopes = [
   'openid',
@@ -308,12 +207,6 @@ List<dynamic> _decodeJsonList(String value) {
     return const <dynamic>[];
   }
   return const <dynamic>[];
-}
-
-String? _trimmedOrNull(String? value) {
-  final trimmed = value?.trim();
-  if (trimmed == null || trimmed.isEmpty) return null;
-  return trimmed;
 }
 
 String? _nullableString(Object? value) {

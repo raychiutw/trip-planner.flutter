@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -98,6 +99,7 @@ Future<void> _pump(
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
   _MockFavoritesRepository? favoritesRepo,
+  TimelineEntry entry = _entry,
   List<TripDay> tripDays = const <TripDay>[],
   ReservationUrlLauncher reservationUrlLauncher = launchReservationUrl,
 }) async {
@@ -108,7 +110,7 @@ Future<void> _pump(
         entryDetailProvider((
           tripId: 't1',
           entryId: 11,
-        )).overrideWith((ref) => Stream.value(_entry)),
+        )).overrideWith((ref) => Stream.value(entry)),
         tripDaysProvider('t1').overrideWith((ref) => Stream.value(tripDays)),
         if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
         if (favoritesRepo != null)
@@ -151,6 +153,20 @@ void main() {
     expect(find.byKey(const ValueKey('add-alternate')), findsOneWidget);
   });
 
+  testWidgets('單獨讀取正選 POI 名稱時可辨識正選角色', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await _pump(tester, _MockTripRepository());
+
+      expect(
+        tester.getSemantics(find.text('首里城公園')).label,
+        '正選地點，首里城公園\n景點  ·  ★ 4.4\n世界遺產',
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('訂位資訊有連結時可外開 reservationUrl', (tester) async {
     final opened = <Uri>[];
     await _pump(
@@ -174,6 +190,88 @@ void main() {
     expect(opened.single.toString(), 'https://book.example/abc');
   });
 
+  testWidgets('窄版最大字級仍可開啟完整長訂位連結', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+
+    const url =
+        'https://book.example/reservations/very-long-reference-'
+        '0123456789abcdefghijklmnopqrstuvwxyz0123456789';
+    final opened = <Uri>[];
+    await _pump(
+      tester,
+      _MockTripRepository(),
+      entry: const TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        title: '首里城',
+        version: 2,
+        master: EntryPoiInfo(poiId: 501, name: '首里城公園'),
+        alternates: [
+          EntryPoiInfo(
+            poiId: 502,
+            name: '玉陵',
+            reservation: '已訂位 18:00，確認碼 ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            reservationUrl: url,
+          ),
+        ],
+      ),
+      reservationUrlLauncher: (value) async => opened.add(value),
+    );
+
+    final link = find.byKey(const ValueKey('poi-reservation-link-502'));
+    await tester.scrollUntilVisible(link, 300);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(link);
+    await tester.pump();
+    expect(opened.single.toString(), url);
+    final setMaster = find.byKey(const ValueKey('alt-setmaster-502'));
+    await tester.ensureVisible(setMaster);
+    await tester.pumpAndSettle();
+    await tester.tap(setMaster);
+    await tester.pumpAndSettle();
+    expect(find.text('設為正選？'), findsOneWidget);
+  });
+
+  testWidgets('訂位連結外開失敗持續顯示易懂錯誤且可重新開啟', (tester) async {
+    final opened = <Uri>[];
+    await _pump(
+      tester,
+      _MockTripRepository(),
+      reservationUrlLauncher: (url) async {
+        opened.add(url);
+        if (opened.length == 1) throw Exception('platform launch failed');
+      },
+    );
+
+    final link = find.byKey(const ValueKey('poi-reservation-link-502'));
+    await tester.tap(link);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.text('無法開啟訂位連結'), findsOneWidget);
+    expect(find.textContaining('platform launch failed'), findsNothing);
+    expect(find.text('玉陵'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(TextButton, '關閉'));
+    await tester.pumpAndSettle();
+    await tester.tap(link);
+    await tester.pumpAndSettle();
+
+    expect(opened, [
+      Uri.parse('https://book.example/abc'),
+      Uri.parse('https://book.example/abc'),
+    ]);
+    expect(find.text('無法開啟訂位連結'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('設為正選 → 確認後 setEntryMaster(poiId, entryPoisVersion)', (
     tester,
   ) async {
@@ -187,9 +285,18 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     when(
-      () => repo.recomputeTravel(tripId: any(named: 'tripId')),
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
     ).thenAnswer((_) async {});
-    await _pump(tester, repo);
+    await _pump(
+      tester,
+      repo,
+      tripDays: const [
+        TripDay(id: 1, dayNum: 1, version: 1, timeline: [_entry]),
+      ],
+    );
 
     await tester.tap(find.byKey(const ValueKey('alt-setmaster-502')));
     await tester.pumpAndSettle();
@@ -216,7 +323,7 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
-    verify(() => repo.recomputeTravel(tripId: 't1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1', day: '1')).called(1);
   });
 
   testWidgets('設為正選跨區域時顯示距離警示', (tester) async {
@@ -417,6 +524,71 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('備選下移並重新載入後維持同一 POI 的語意節點', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final repo = _MockTripRepository();
+      var currentEntry = _entry;
+      when(
+        () => repo.watchEntry(tripId: 't1', entryId: 11),
+      ).thenAnswer((_) => Stream.value(currentEntry));
+      when(
+        () => repo.reorderEntryAlternates(
+          tripId: 't1',
+          entryId: 11,
+          order: [503, 502],
+          entryPoisVersion: '4',
+        ),
+      ).thenAnswer((_) async {
+        currentEntry = TimelineEntry(
+          id: 11,
+          sortOrder: 0,
+          title: '首里城',
+          version: 2,
+          entryPoisVersion: '5',
+          master: _entry.master,
+          alternates: [_entry.alternates[1], _entry.alternates[0]],
+        );
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(repo),
+            tripDaysProvider('t1').overrideWith((ref) => Stream.value([])),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const EntryPoiScreen(tripId: 't1', entryId: 11),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final nameNodeId = tester.getSemantics(find.text('玉陵')).id;
+      final up = find.byKey(const ValueKey('alt-move-up-502'));
+      final upNodeId = tester.getSemantics(up).id;
+
+      await tester.tap(find.byKey(const ValueKey('alt-move-down-502')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.text('玉陵')).dy,
+        greaterThan(tester.getTopLeft(find.text('識名園')).dy),
+      );
+      expect(tester.getSemantics(find.text('玉陵')).label, contains('備選地點，玉陵'));
+      expect(tester.getSemantics(find.text('玉陵')).id, nameNodeId);
+      expect(tester.getSemantics(up).id, upNodeId);
+      expect(
+        tester
+            .getSemantics(up)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('編輯資訊 → 改備註 → 儲存呼叫 updateEntryPoi', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -446,6 +618,70 @@ void main() {
         note: '記得拍照',
         poiType: 'attraction',
         reservation: any(named: 'reservation'),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('窄版最大字級與鍵盤下長備註及訂位資訊仍可編輯並送出', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    addTearDown(() => tester.view.viewInsets = FakeViewPadding.zero);
+
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateEntryPoi(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        reservation: any(named: 'reservation'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pump(tester, repo);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('poi-edit-master')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: '編輯 sheet 初始版面');
+    const note = '訂位備註包含多位旅伴與特殊需求，請櫃檯保留靠窗座位並確認抵達時間。';
+    const reservation =
+        'https://booking.example.com/reservations/very-long-booking-reference-1234567890';
+    await tester.enterText(find.byKey(const ValueKey('poi-note')), note);
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-reservation')),
+      reservation,
+    );
+    tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    for (final key in [
+      'poi-note',
+      'poi-type-attraction',
+      'poi-reservation',
+      'poi-save',
+    ]) {
+      await tester.ensureVisible(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey(key)).hitTestable(), findsOneWidget);
+    }
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-save')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateEntryPoi(
+        tripId: 't1',
+        entryId: 11,
+        poiId: 501,
+        note: note,
+        poiType: 'attraction',
+        reservation: reservation,
       ),
     ).called(1);
   });

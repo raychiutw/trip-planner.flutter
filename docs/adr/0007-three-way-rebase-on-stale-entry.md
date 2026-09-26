@@ -11,14 +11,14 @@ status: accepted
 
 決定:flush 撞到 `STALE_ENTRY` 時,重抓 server 現況、與「離線寫入當下的值」(`base`)做三方比對,
 沒有真衝突就換上新 `version` 自動重送,只有「同一個欄位離線與 server 都改了」才停下來問人
-(`lib/api/api_client.dart:469`~`:497` 的分支、`:542` 的 `_tryRebase`)。為此
+(`lib/api/cache/offline_sync_engine.dart` 的 `flushQueue` 與 `_tryRebase`)。為此
 `QueuedMutation` 多帶一個 `base`(`lib/api/cache/cache_store.dart:41`),真衝突則寫進一個
 獨立且持久化的衝突區(`lib/api/cache/cache_store.dart:154`~`:157`)等使用者二選一。
 
 之所以做得起來,是因為後端 PATCH 是 diff-only:只送有改的欄位。離線沒碰的欄位不送就自然保留
 server 的值,所以「合併」實際上退化成「只挑出使用者真的改過的欄位重送」
-(`lib/api/cache/rebase_merge.dart:28` 的 `dirtyFields` + `lib/api/api_client.dart:685` 的
-`_rebasedBody`),不需要真的把兩個版本組成一份新資料。
+(`lib/api/cache/rebase_merge.dart` 的 `dirtyFields` + `lib/api/cache/flush_policy.dart` 的
+`rebasedBody`),不需要真的把兩個版本組成一份新資料。
 
 ## Considered Options
 
@@ -43,7 +43,7 @@ list。使用者看得到的只有一個數字:哪一筆、改了什麼、原本
 很容易被後人「順手補完」。**這是刻意的。** 通用 merge 沒有能力決定合併結果:同一次比對裡,
 停留點的 `title` 是字串、`startTime` 是時間、筆記的 `fields` 可能是數字,每一種欄位「離線改了、
 server 也改了」時該怎麼辦,是欄位語意的問題,不是比對演算法的問題。真正決定重送什麼的是呼叫端
-`_rebasedBody`(`lib/api/api_client.dart:685`):它知道 body 是 snake_case、知道
+`rebasedBody`(`lib/api/cache/flush_policy.dart`):它知道 body 是 snake_case、知道
 `expectedVersion` 要換新值、知道沒被改過的欄位要整個不送好讓 server 的值留著。把這些搬進
 `rebaseMerge` 只會讓一個能獨立測的純函式長出 API 形狀的知識。它的職責就是回答「哪些欄位不能
 自動決定」,能自動決定的部分由呼叫端依語意處理。
@@ -69,10 +69,10 @@ StreamProvider(`lib/features/offline/offline_sync.dart:25`),舊的記憶體版�
 - 舊佇列項沒有 `base` 欄位,讀回來是 `null`,行為降級成 last-write-wins。這是刻意讓升級不崩,
   代價是升級當下還在佇列裡的那幾筆拿不到三方保護。
 - 衝突解決有兩顆鈕,但只有一顆會失敗:「保留你的」要重送(可能又離線、又撞 409,
-  `lib/api/api_client.dart:977`),「用對方的」純本機移除(`:1007`)。UI 不能假設兩者對稱 ——
+  `lib/api/cache/offline_sync_engine.dart`),「用對方的」純本機移除(同檔)。UI 不能假設兩者對稱 ——
   重送沒成功就不准移除衝突記錄,否則會製造第二次遺失。
 - rebase 要重抓的是整包(`/trips/:id/days?all=1` 或 `/trips/:id/notes`),且刻意不寫快取
-  (`lib/api/api_client.dart:632`),避免用 server 真相蓋掉同一份快取上其他還沒同步的樂觀 patch。
+  (`lib/api/cache/offline_sync_engine.dart`),避免用 server 真相蓋掉同一份快取上其他還沒同步的樂觀 patch。
   重抓在同一輪 flush 內以 cacheKey 去重,同一個行程的多筆衝突只打一次。
-- server 回來的 row 沒有 `version` 時不重送,改當衝突上報(`lib/api/api_client.dart:569`)——
+- server 回來的 row 沒有 `version` 時不重送,改當衝突上報(`lib/api/cache/offline_sync_engine.dart`)——
   帶著舊 `expectedVersion` 重送會永遠 409,變成 flush 每次都做一樣的事的 livelock。

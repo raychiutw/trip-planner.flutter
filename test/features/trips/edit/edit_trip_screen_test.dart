@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/poi_repository.dart';
+import 'package:tripline/api/cache_read_policy.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/adaptive.dart';
@@ -70,7 +71,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => _days);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => _days);
     when(
       () => tripRepo.updateTrip(
@@ -202,6 +206,255 @@ void main() {
     expect(find.text('開啟編輯'), findsOneWidget);
   });
 
+  testWidgets('儲存先前標題成功後保留較新輸入並留在編輯畫面', (tester) async {
+    final pending = Completer<void>();
+    when(
+      () => tripRepo.updateTrip('okinawa', title: '送出的標題'),
+    ).thenAnswer((_) => pending.future);
+
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '送出的標題');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+    verify(() => tripRepo.updateTrip('okinawa', title: '送出的標題')).called(1);
+
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '後來的標題');
+    await tester.pump();
+    pending.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    expect(find.text('後來的標題'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+  });
+
+  testWidgets('儲存期間改回原標題，第二次儲存仍送出相對成功內容的差異', (tester) async {
+    final pending = Completer<void>();
+    when(
+      () => tripRepo.updateTrip('okinawa', title: '已送出的標題'),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '已送出的標題');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+    verify(() => tripRepo.updateTrip('okinawa', title: '已送出的標題')).called(1);
+
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '原標題');
+    await tester.pump();
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    expect(find.text('原標題'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pumpAndSettle();
+    verify(() => tripRepo.updateTrip('okinawa', title: '原標題')).called(1);
+    expect(find.byType(EditTripScreen), findsNothing);
+    expect(find.text('開啟編輯'), findsOneWidget);
+  });
+
+  testWidgets('儲存進度可見且不重複送出，失敗保留草稿並可再次儲存', (tester) async {
+    final pending = Completer<void>();
+    var requests = 0;
+    when(() => tripRepo.updateTrip('okinawa', title: '保留這個標題')).thenAnswer((_) {
+      requests++;
+      return requests == 1 ? pending.future : Future<void>.value();
+    });
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '保留這個標題');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+
+    expect(find.text('儲存中…'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+    expect(requests, 1);
+
+    pending.completeError(Exception('暫時無法連線'));
+    await tester.pumpAndSettle();
+    expect(find.text('儲存中…'), findsNothing);
+    expect(find.text('保留這個標題'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('儲存失敗,請稍後再試'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('儲存失敗,請稍後再試'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pumpAndSettle();
+
+    expect(requests, 2);
+    expect(find.byType(EditTripScreen), findsNothing);
+    expect(find.text('開啟編輯'), findsOneWidget);
+  });
+
+  testWidgets('欄位儲存失敗後仍顯示 Day 操作的失敗原因', (tester) async {
+    when(
+      () => tripRepo.updateTrip('okinawa', title: '保留的欄位草稿'),
+    ).thenThrow(Exception('metadata failed'));
+    when(
+      () => tripRepo.createDay(tripId: 'okinawa', position: 'end'),
+    ).thenThrow(Exception('day failed'));
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '保留的欄位草稿');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-add-day-end')),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('edit-add-day-end')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('儲存失敗,請稍後再試'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('儲存失敗,請稍後再試'), findsOneWidget);
+    expect(find.text('新增天數失敗,請稍後再試'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-title')),
+      -150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('保留的欄位草稿'), findsOneWidget);
+    verify(() => tripRepo.updateTrip('okinawa', title: '保留的欄位草稿')).called(1);
+    verify(
+      () => tripRepo.createDay(tripId: 'okinawa', position: 'end'),
+    ).called(1);
+  });
+
+  testWidgets('全螢幕編輯開啟鍵盤時儲存進度仍可見', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    final pending = Completer<void>();
+    when(
+      () => tripRepo.updateTrip('okinawa', title: '鍵盤中的草稿'),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '鍵盤中的草稿');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+
+    expect(tester.getBottomRight(find.text('儲存中…')).dy, lessThanOrEqualTo(544));
+    await tester.pumpWidget(const SizedBox());
+    pending.complete();
+    await tester.pump();
+  });
+
+  testWidgets('儲存成功後排程關閉前的新輸入仍保留在編輯畫面', (tester) async {
+    final pending = Completer<void>();
+    when(
+      () => tripRepo.updateTrip('okinawa', title: '已送出的標題'),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '已送出的標題');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+
+    pending.complete();
+    // 先完成成功回應的 microtask，但還不執行排程關閉的 frame。
+    await tester.idle();
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(text: '成功回應後的新標題'),
+    );
+    await tester.idle();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    expect(find.text('成功回應後的新標題'), findsOneWidget);
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+  });
+
+  testWidgets('描述語言發布送出精確差異，後續清空描述仍可儲存', (tester) async {
+    final pending = Completer<void>();
+    when(
+      () => tripRepo.updateTrip(
+        'okinawa',
+        description: '新描述',
+        lang: 'en',
+        published: 0,
+      ),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    final description = find.byKey(const ValueKey('edit-desc'));
+    await tester.scrollUntilVisible(
+      description,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(description, '新描述');
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-lang')),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('edit-lang')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English').last);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-published')),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('edit-published')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+    verify(
+      () => tripRepo.updateTrip(
+        'okinawa',
+        description: '新描述',
+        lang: 'en',
+        published: 0,
+      ),
+    ).called(1);
+    await tester.scrollUntilVisible(
+      description,
+      -150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(description, '');
+    await tester.pump();
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pumpAndSettle();
+    verify(() => tripRepo.updateTrip('okinawa', description: '')).called(1);
+    expect(find.byType(EditTripScreen), findsNothing);
+  });
+
   testWidgets('移除目的地 + 儲存 → updateTrip(destinations)', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -211,16 +464,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('edit-save')));
     await tester.pumpAndSettle();
 
-    verify(
-      () => tripRepo.updateTrip(
-        'okinawa',
-        title: any(named: 'title'),
-        description: any(named: 'description'),
-        lang: any(named: 'lang'),
-        published: any(named: 'published'),
-        destinations: any(named: 'destinations'),
-      ),
-    ).called(1);
+    verify(() => tripRepo.updateTrip('okinawa', destinations: [])).called(1);
   });
 
   testWidgets('平移出發日期 → shiftDays 並更新日期摘要', (tester) async {
@@ -273,6 +517,85 @@ void main() {
     expect(find.text('出發日期已變更'), findsOneWidget);
   });
 
+  testWidgets('說明 Day 即時生效且取消欄位草稿不還原已新增的 Day', (tester) async {
+    var summaries = _days;
+    const addedDay = TripDay(
+      id: 13,
+      dayNum: 3,
+      date: '2026-04-25',
+      dayOfWeek: '六',
+      version: 1,
+    );
+    when(
+      () => tripRepo.fetchDaySummaries(any()),
+    ).thenAnswer((_) async => summaries);
+    when(
+      () => tripRepo.createDay(tripId: 'okinawa', position: 'end'),
+    ).thenAnswer((_) async {
+      summaries = [...summaries, addedDay];
+      return addedDay;
+    });
+
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    expect(find.text('標題、目的地、描述、語言與發布狀態需按「儲存」才會生效。'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '不儲存的標題');
+    await tester.pump();
+    final immediateNotice = find.text('日期平移與天數新增、刪除會立即生效，取消不會還原。');
+    await tester.scrollUntilVisible(
+      immediateNotice,
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(immediateNotice, findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-add-day-end')),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('edit-add-day-end')));
+    await tester.pumpAndSettle();
+    verify(
+      () => tripRepo.createDay(tripId: 'okinawa', position: 'end'),
+    ).called(1);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '捨棄'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditTripScreen), findsNothing);
+    verifyNever(
+      () => tripRepo.updateTrip(
+        any(),
+        name: any(named: 'name'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        published: any(named: 'published'),
+        dataSource: any(named: 'dataSource'),
+        lang: any(named: 'lang'),
+        destinations: any(named: 'destinations'),
+      ),
+    );
+    verifyNever(
+      () => tripRepo.deleteDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+      ),
+    );
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    expect(find.text('原標題'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('2026-04-25（六）'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('2026-04-25（六）'), findsOneWidget);
+  });
+
   testWidgets('新增/刪除天數 → createDay/deleteDay 並刷新摘要', (tester) async {
     var summaries = _days;
     const addedDay = TripDay(
@@ -287,7 +610,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.createDay(
@@ -467,6 +793,14 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      tester
+          .widget<CupertinoDialogAction>(
+            find.widgetWithText(CupertinoDialogAction, '刪除'),
+          )
+          .isDestructiveAction,
+      isTrue,
+    );
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
@@ -522,7 +856,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.deleteDay(
@@ -625,7 +962,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.deleteDay(
@@ -694,7 +1034,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.createDay(
@@ -757,7 +1100,10 @@ void main() {
       return fetchCount == 1 ? [..._days, dayToDelete] : _days;
     });
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async {
       fetchCount++;
       return fetchCount == 1 ? [..._days, dayToDelete] : _days;
@@ -802,7 +1148,10 @@ void main() {
       return _days;
     });
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async {
       fetchCount++;
       if (fetchCount == 1) return [..._days, dayToDelete];
@@ -861,7 +1210,10 @@ void main() {
       return _days;
     });
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async {
       fetchCount++;
       if (fetchCount == 1) return [..._days, dayToDelete];

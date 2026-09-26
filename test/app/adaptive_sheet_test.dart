@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
@@ -9,6 +11,87 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  testWidgets('表單 Escape 與語意取消都先確認未儲存草稿', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+    final form = AppSheetFormController();
+    addTearDown(form.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppFormSheet(
+              context,
+              title: '編輯',
+              submitLabel: '儲存',
+              controller: form,
+              builder: (_) => TextField(
+                onChanged: (_) => form.update(dirty: true, canSubmit: true),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '保留草稿');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(find.text('保留草稿'), findsOneWidget);
+
+    final cancel = find.widgetWithText(TextButton, '取消');
+    final node = tester.getSemantics(cancel);
+    tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+      node.id,
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('regular 帳號 sheet 的 Escape 仍先確認子頁草稿', (tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final guard = AppUnsavedChangesController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (_) => AppUnsavedChangesGuard(
+                controller: guard,
+                hasChanges: true,
+                child: const Scaffold(body: Text('尚未儲存的草稿')),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('尚未儲存的草稿'), findsOneWidget);
+  });
+
   for (final reduced in [false, true]) {
     testWidgets('表單慢拖放手後${reduced ? '直接停穩' : '保留吸附動畫'}', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
@@ -523,6 +606,8 @@ void main() {
       await tester.tapAt(const Offset(10, 20));
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       await tester.timedDragFrom(
         Offset(original.center.dx, original.top + 10),

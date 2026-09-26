@@ -324,6 +324,32 @@ class TripNotes {
   final List<TripPretripNote> pretripNotes;
   final List<TripEmergencyContact> emergencyContacts;
 
+  ({int version, Map<String, dynamic> fields})? editableRow(
+    NoteSection section,
+    int rowId,
+  ) {
+    for (final row in switch (section) {
+      NoteSection.flights => flights.map(
+        (row) => (row.id, row.version, row.toEditFields()),
+      ),
+      NoteSection.lodgings => lodgings.map(
+        (row) => (row.id, row.version, row.toEditFields()),
+      ),
+      NoteSection.reservations => reservations.map(
+        (row) => (row.id, row.version, row.toEditFields()),
+      ),
+      NoteSection.pretrip => pretripNotes.map(
+        (row) => (row.id, row.version, row.toEditFields()),
+      ),
+      NoteSection.emergency => emergencyContacts.map(
+        (row) => (row.id, row.version, row.toEditFields()),
+      ),
+    }) {
+      if (row.$1 == rowId) return (version: row.$2, fields: row.$3);
+    }
+    return null;
+  }
+
   factory TripNotes.fromJson(Map<String, dynamic> json) {
     return TripNotes(
       flights: (json['flights'] as List<dynamic>? ?? [])

@@ -46,9 +46,6 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
   'lib/features/auth/login_screen.dart': {
     'LoginScreen': _HeaderContract.authException,
   },
-  'lib/features/auth/oauth_consent_screen.dart': {
-    'OAuthConsentScreen': _HeaderContract.authException,
-  },
   'lib/features/auth/welcome_screen.dart': {
     'WelcomeScreen': _HeaderContract.authException,
   },
@@ -68,6 +65,10 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
   },
   'lib/features/map/global_map_screen.dart': {
     'GlobalMapScreen': _HeaderContract.root,
+  },
+  // 路由解析失敗時也可在未登入狀態顯示，不帶帳號入口。
+  'lib/features/shell/invalid_link_screen.dart': {
+    'InvalidLinkScreen': _HeaderContract.publicException,
   },
   'lib/features/share/public_share_screen.dart': {
     'PublicShareScreen': _HeaderContract.publicException,

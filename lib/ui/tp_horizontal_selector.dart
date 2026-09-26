@@ -5,7 +5,6 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 
@@ -111,93 +110,66 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       widget.options.every((option) => !option.isAction),
       'TpHorizontalSelector only accepts selection options.',
     );
-    final scheme = Theme.of(context).colorScheme;
-    final onMedia = TpMediaBackdropScope.of(context);
     final height = TpHorizontalSelector.preferredHeight(context);
     _controller.reduceMotion = MediaQuery.disableAnimationsOf(context);
     if (widget.options.isEmpty) return SizedBox(height: height);
     final selectedIndex = widget.options.indexWhere(
       (option) => option.value == widget.value,
     );
-    final opaque =
-        MediaQuery.highContrastOf(context) ||
-        AppAccessibilityScope.reduceTransparencyOf(context);
     return Listener(
       onPointerDown: (_) => _focusNode.requestFocus(),
       child: Focus(
         focusNode: _focusNode,
         onKeyEvent: _handleKeyEvent,
-        child: TpGlassEdge(
-          borderRadius: height / 2,
-          child: GlassSegmentedControl.scrollable(
-            segments: [
-              for (final option in widget.options)
-                GlassSegment(
-                  id: option.value,
-                  semanticLabel: option.semanticsLabel ?? option.label,
-                  // 公開 icon 插槽保留水平內容、操作 key 與最小觸控高度。
-                  // 自然尺寸、水平拖曳、切換選取與選取底皆由套件提供。
-                  // 套件不回呼目前項目；只補再次點選，不參與水平拖曳。
-                  icon: GestureDetector(
-                    excludeFromSemantics: true,
-                    onTap: option.value == widget.value
-                        ? () => widget.onSelected(option.value)
+        child: TpNavigationGlassSelector(
+          segments: [
+            for (final option in widget.options)
+              GlassSegment(
+                id: option.value,
+                semanticLabel: option.semanticsLabel ?? option.label,
+                // 公開 icon 插槽保留水平內容、操作 key 與最小觸控高度。
+                // 自然尺寸、水平拖曳、切換選取與選取底皆由套件提供。
+                // 套件不回呼目前項目；只補再次點選，不參與水平拖曳。
+                icon: GestureDetector(
+                  excludeFromSemantics: true,
+                  onTap: option.value == widget.value
+                      ? () => widget.onSelected(option.value)
+                      : null,
+                  child: Semantics(
+                    key: option.key,
+                    // selected 與 label 唯一由套件提供，避免重複 flag 分裂節點。
+                    // 具名 action 可合併到原節點，不覆蓋套件的普通 tap。
+                    customSemanticsActions: option.value == widget.value
+                        ? {
+                            const CustomSemanticsAction(
+                              label: '重新選取目前範圍',
+                            ): () =>
+                                widget.onSelected(option.value),
+                          }
                         : null,
-                    child: Semantics(
-                      key: option.key,
-                      // selected 與 label 唯一由套件提供，避免重複 flag 分裂節點。
-                      // 具名 action 可合併到原節點，不覆蓋套件的普通 tap。
-                      customSemanticsActions: option.value == widget.value
-                          ? {
-                              const CustomSemanticsAction(
-                                label: '重新選取目前範圍',
-                              ): () =>
-                                  widget.onSelected(option.value),
-                            }
-                          : null,
-                      child: ExcludeSemantics(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minWidth: TpSpacing.tapMin,
-                              minHeight: height - 4,
-                            ),
-                            child: _OptionContent(
-                              option: option,
-                              color: option.value == widget.value
-                                  ? scheme.primary
-                                  : onMedia
-                                  ? scheme.onSurface.withValues(alpha: 1)
-                                  : scheme.onSurfaceVariant,
-                            ),
+                    child: ExcludeSemantics(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: TpSpacing.tapMin,
+                            minHeight: height - 4,
                           ),
+                          child: _OptionContent(option: option),
                         ),
                       ),
                     ),
                   ),
                 ),
-            ],
-            selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
-            onSegmentSelected: (index) {
-              _focusNode.requestFocus();
-              widget.onSelected(widget.options[index].value);
-            },
-            labelPadding: EdgeInsets.zero,
-            height: height,
-            scrollController: _controller,
-            selectionAlignment: SegmentSelectionAlignment.center,
-            dragBehavior: SegmentDragBehavior.scroll,
-            indicatorColor: scheme.surfaceContainerHigh,
-            backgroundColor: onMedia
-                ? tpMediaControlBackground(context)
-                : opaque
-                ? scheme.surfaceContainerLow
-                : null,
-            settings: tpNavigationGlassSettings(context),
-            quality: tpGlassQuality(context),
-            useOwnLayer: true,
-          ),
+              ),
+          ],
+          selectedIndex: selectedIndex,
+          onSelected: (index) {
+            _focusNode.requestFocus();
+            widget.onSelected(widget.options[index].value);
+          },
+          height: height,
+          scrollController: _controller,
         ),
       ),
     );
@@ -205,10 +177,9 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
 }
 
 class _OptionContent<T> extends StatelessWidget {
-  const _OptionContent({required this.option, required this.color});
+  const _OptionContent({required this.option});
 
   final TpScopeOption<T> option;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -217,11 +188,7 @@ class _OptionContent<T> extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (option.icon != null) ...[
-          Icon(
-            option.icon,
-            size: _TpHorizontalSelectorState._iconSize,
-            color: color,
-          ),
+          Icon(option.icon, size: _TpHorizontalSelectorState._iconSize),
           const SizedBox(width: TpSpacing.s1),
         ],
         if (option.indicatorColor != null) ...[
@@ -239,7 +206,9 @@ class _OptionContent<T> extends StatelessWidget {
           option.label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: _labelStyle(context)?.copyWith(color: color),
+          style: _labelStyle(
+            context,
+          )?.copyWith(color: IconTheme.of(context).color),
         ),
       ],
     );

@@ -44,15 +44,15 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### Provider 鏈
 
-`sessionStoreProvider`（`lib/api/providers.dart:22`）／`cacheStoreProvider`（同檔 `:31`）→ `apiClientProvider`（`:33`）→ `authRepositoryProvider`（`:45`）／`tripRepositoryProvider`（`:52`）／其餘 repository（`:56-74`）→ `authStateProvider`（`:156`，全 app 認證 SoT）→ `appRouterProvider`（`lib/app/router.dart:44`，經 `refreshListenable` 橋接 authState 變化，`lib/app/router.dart:52,58`）。
+`sessionStoreProvider`／`cacheStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`／其餘 repository；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`（經 `refreshListenable` 橋接 authState 變化）。
 
 - 測試 override 鏈上任一節點即可替換全部下游。**優先 override 最靠近被測畫面的那一節**：測 screen override repository provider，不要 override `apiClientProvider` 再去 mock HTTP。
 - production code 不得為了「方便測試」新增 provider。既有節點已足夠當 seam。
 
 ### 行程詳情 family
 
-- `trip`／`days`／`notes`／`entry`／`segments` 一律用 **`StreamProvider.family`**，不是 `FutureProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24,33,43`）。
-  > 修正：早期 `AGENTS.md` 曾寫成 `FutureProvider.family`，那是過期敘述。改 `StreamProvider` 是為了 SWR 兩段式發射（stale → fresh，見同檔 `:10-12` 註解），改回 `FutureProvider` 會直接砍掉離線 stale 那一段。測試對應寫法是 `Stream.error(...)` / `Stream.value(...)`（`test/features/favorites/favorites_screen_test.dart:449-452`）。
+- `trip`／`days`／`notes`／`entry`／`segments` 一律用 **`StreamProvider.family`**，不是 `FutureProvider.family`（`lib/features/trip_detail/trip_providers.dart:16,32,49,57,125`）。
+  > 修正：早期 `AGENTS.md` 曾寫成 `FutureProvider.family`，那是過期敘述。改 `StreamProvider` 是為了 SWR 兩段式發射（stale → fresh，見同檔 `:11-13` 註解），改回 `FutureProvider` 會直接砍掉離線 stale 那一段。測試對應寫法是 `Stream.error(...)` / `Stream.value(...)`（`test/features/favorites/favorites_screen_test.dart:449-452`）。
 - timeline／map／notes 三畫面 watch **同一個 family 實例**共用 fetch：`trip_timeline_screen.dart:209-210`、`trip_map_screen.dart:129`、`trip_notes_screen.dart:141`。新畫面要行程資料時 watch 既有 family，**不得自行呼叫 `tripRepository.fetch*` 重打 API**。
 - 寫入後刷新一律 `ref.invalidate(tripXxxProvider(tripId))`，不是重呼叫 repository（範例：`lib/features/chat/chat_controller.dart:319-321`、`lib/features/trips/edit/edit_trip_controller.dart:244-245`）。
 
@@ -65,20 +65,20 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### 測試 seam 寫法
 
 - **overrides 一律以 list literal inline 傳入 `ProviderScope`**：`overrides: [xxxProvider.overrideWithValue(mock)]`。flutter_riverpod 3.x 未匯出 `Override` 型別，不得宣告 `List<Override> overrides = ...` 抽成變數。實測全 repo 零 `List<Override>` / `<Override>[`。
-- **測 provider error state 必須關掉自動重試**：`ProviderScope(retry: (retryCount, error) => null, overrides: [...], child: ...)`。少了它，error 態會被自動重試蓋掉而 flake。
-  範例：`test/features/trips/collab/collab_screen_test.dart:34`、`test/features/favorites/favorites_screen_test.dart:446`、`test/features/trip_detail/trip_timeline_screen_test.dart:294`（全 repo 現有 17 處）。
+- **只驗證靜態 provider error 呈現時，關掉自動重試**：`ProviderScope(retry: (retryCount, error) => null, overrides: [...], child: ...)`。少了它，error 態會被自動重試蓋掉而 flake。驗證自動重試或手動／自動重試互動時，保留被測的 retry 政策，以可控制的來源事件及讀取次數驗證行為。
+  範例：`test/features/trips/collab/collab_screen_test.dart:34`、`test/features/favorites/favorites_screen_test.dart:446`、`test/features/trip_detail/trip_timeline_screen_test.dart:294`。
 - 只 override 到 repository 層，`api/` 測試用 `http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 
 ## API 層規範
 
 ### ApiClient 是唯一出口
 
-- 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `postForResponse` / `postForRedirect` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Cookie／Bearer／Origin、錯誤轉換、重試與快取。
+- 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `postForResponse` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Cookie／Bearer／Origin、錯誤轉換、重試與快取。
 - 只有需要 Dio 原生 request options 的 OAuth PKCE 流程可取 `client.dio`；需要讀 response headers（例如登入解 `set-cookie`）用 `postForResponse`（`lib/api/api_client.dart:106`），不是 raw dio。
 
 ### 認證 header：兩種模式互斥
 
-`_authHeadersFor()`（`lib/api/api_client.dart:946-968`）依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
+`_authHeadersFor()`（`lib/api/api_client.dart:508-529`）依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
 
 - **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。
 - **cookie 模式**（無 token）：`sessionStore` 有值才帶 `Cookie: tripline_session=<token>`；且方法非 `GET`／`HEAD` 時必帶 `Origin: <origin>` —— 缺這個 header 的 mutation 後端回 403。
@@ -93,19 +93,20 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 重試：三條分支共用「同參數重送一次」
 
-`_send()` 的三種重送共用同一個 `retry()`（`lib/api/api_client.dart:795-806`），每條都靠 `isRetryAttempt` 限制**最多一次**：
+`_send()` 與 `_getTextStream()` 共用 `lib/api/retry_policy.dart` 的 `decideRetry()` 純決策，由 `isRetryAttempt` 限制**最多一次**：
 
-1. **429** — 僅 `GET`／`HEAD`（`lib/api/api_client.dart:794`、`:807-815`）。讀 `Retry-After` 等待後重送一次。
-2. **edge block page** — 2xx（非 204）但 `Content-Type` 含 `text/html` 視為 CDN 攔截頁（`lib/api/api_client.dart:723-733`），重試條件與 429 完全相同（同一個 `if`，`:807`）。重送後仍是 block page → 丟 `ApiError(code: 'SYS_UPSTREAM_UNAVAILABLE')`，`status` 是原本那個 2xx（`lib/api/api_client.dart:735-739`、`:827-829`）。
-3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：`POST`／`PATCH`／`DELETE` 一樣會被重送一次（`lib/api/api_client.dart:816-823`）。`refresh()` 回 false → 直接丟 `ApiError(401)`（`test/api/api_client_bearer_test.dart:87`）。
+1. **429** — 僅 `GET`／`HEAD`。讀 `Retry-After` 等待後重送一次。
+2. **edge block page** — 2xx（非 204）但 `Content-Type` 含 `text/html` 視為 CDN 攔截頁（`ApiClient._isEdgeBlockPage`），重試條件與 429 相同。重送後仍是 block page → 丟 `ApiError(code: 'SYS_UPSTREAM_UNAVAILABLE')`，`status` 是原本那個 2xx。
+3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：一般 `POST`／`PATCH`／`DELETE` 一樣會被重送一次。`refresh()` 回 false → 直接丟 `ApiError(401)`。
 
-- SSE 串流版 `_getTextStream()` 走同一組規則（`lib/api/api_client.dart:884-911`），改重試邏輯要兩處一起改。
+- SSE 串流版 `_getTextStream()` 走同一份決策；遇 429／攔截頁要先釋放回應串流再等待。改決策時驗證一般請求與 SSE 兩個站點。
+- 登入／註冊的 `postForResponse` 是 raw 帳密 POST，不自動重送憑證；`ApiClient` 統一將 429 轉 `ApiError` 並保留 `Retry-After`，將攔截頁轉 `SYS_UPSTREAM_UNAVAILABLE`。
 - 429／edge block **不重送 mutation**（`test/api/api_client_test.dart:228`、`:358`）；Bearer 401 refresh 則會。「mutation 絕不 retry」是錯的說法，不要寫進註解或文件。
-- 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列（`lib/api/api_client.dart:265-275`），重連後由 `flushQueue` 依序重送。
-- `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/api_client.dart:702-721`）。
+- 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列，重連後由 `OfflineSyncEngine.flushQueue` 依序重送（`lib/api/cache/offline_sync_engine.dart`）。
+- `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/retry_policy.dart`）。
 - 動到任何一條重試分支，同一個 PR 必須改 `test/api/api_client_test.dart` 或 `test/api/api_client_bearer_test.dart`。
 
-> **注意常見誤述**:「429 只 retry GET 一次;mutation 絕不 retry」是錯的說法,曾出現在多份舊文件裡。它漏了 edge block page 與 Bearer 401 兩條分支,且與 `lib/api/api_client.dart:816-823` 矛盾。看到這句話出現在註解或 PR 描述裡,以本節為準。
+> **注意常見誤述**：「429 只 retry GET 一次；mutation 絕不 retry」漏了 edge block page 與 Bearer 401。看到這句話出現在註解或 PR 描述裡，以本節為準。
 
 ### 錯誤與空 body
 
@@ -117,7 +118,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   3. 都不符 → `code = 'HTTP_<status>'`、`message = 'HTTP <status>'`
 - `detail` 一律截斷到 200 字（`lib/api/api_error.dart:64-67`）。原始 body 保留在 `payload`，`409` 的 `conflictWith` 等結構化資訊從 `payload` 取（`lib/api/api_error.dart:21-22`）。
 - 204 與空 body（`null` 或空字串）一律回 `null`（`lib/api/api_client.dart:830-861`）。呼叫端回傳型別寫 `Future<void>` 或自行判 null，不得無條件 `as Map<String, dynamic>`。
-- GET 遇連線層失敗（離線／逾時）且有本機快取時回快取而不丟（`lib/api/api_client.dart:777-789`）。因此「拿到資料」不代表這次連上了網 —— 需要保證新鮮度的 GET 要傳 `fallbackToCache: false`（例：`lib/api/trip_repository.dart:194-199`）。
+- GET 遇連線層失敗（離線／逾時）且有本機快取時回快取而不丟。因此「拿到資料」不代表這次連上了網。讀取政策由 `CacheReadPolicy` 成套表達：`cached` 可回退並寫入快取，`networkOnly` 只接受網路回應但成功後更新快取，`noStore` 不讀不寫。待確認的 Day 刪除摘要用 `networkOnly`；工單、授權與衝突恢復等不宜留存的讀取用 `noStore`。不得再以 `fallbackToCache`／`writeCache` 兩個 bool 組合政策。
 
 ### repository 方法
 
@@ -153,7 +154,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   - `parseRequestStatus` 未知 → `processing`（`lib/models/trip_request.dart:7-12`），工單續 poll。
   - `parseNoteGenerationType` 未知 → `null`（`lib/models/note_section.dart:15-20`）。
 - 衍生欄位可以在 `fromJson` 內算，但 fallback 鏈要寫成註解可讀：停留點 `title` = `displayTitle` → 正選 POI 名稱 → `（未選擇景點）`（`lib/models/entry.dart:136-139`）。
-- **帶 `version` 的 model 走 OCC**：PATCH 必帶 `expectedVersion`（`lib/api/trip_repository.dart:623-636`）；409 `STALE_ENTRY` 時重抓 server 真相再套用，離線佇列的三方 rebase 走 `_tryRebase`（`lib/api/api_client.dart:541-575`），`expectedVersion` 在 rebase 時永遠保留並換成新值（`lib/api/api_client.dart:690-700`）。行程本身無 version，見上方後端契約細節。
+- **帶 `version` 的 model 走 OCC**：PATCH 必帶 `expectedVersion`（`lib/api/trip_repository.dart`）；409 `STALE_ENTRY` 時重抓 server 真相再套用，離線佇列的三方 rebase 走 `OfflineSyncEngine._tryRebase`，`expectedVersion` 由 `rebasedBody` 保留並換成新值（`lib/api/cache/offline_sync_engine.dart`、`lib/api/cache/flush_policy.dart`）。行程本身無 version，見上方後端契約細節。
 - 每個新 model 至少一個 `fromJson` 測試，且必須含 edge case：欄位缺漏、int↔double、0/1 bool。fixture 用後端實際輸出，不要用猜的。
 
 ## 畫面撰寫規範
@@ -164,7 +165,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - 無本地 state 的畫面用 `ConsumerWidget`；有表單、`TextEditingController`、`ScrollController`、動畫或任何 `dispose` 需求的用 `ConsumerStatefulWidget`。目前 `lib/features/` 有 13 個 `ConsumerWidget`、46 個 `ConsumerStatefulWidget`，兩者都是常態，判準是「有沒有需要釋放的物件」，不是畫面大小。
 - 所有 async 資料一律 `ref.watch(xxxProvider).when(data:, error:, loading:)`，三態都要有實體 UI，不得省略任一分支或用 `.value ?? fallback` 繞過。
-- error 態必須提供 retry 入口，且 retry 動作要真的重抓資料。參考 `lib/features/trips/trips_list_screen.dart:452` 的 `_ErrorState(onRetry: () => ref.invalidate(myTripsProvider))`，元件本體在同檔 `:752`。只印錯誤字串沒有按鈕視為違反。
+- error 態必須提供 retry 入口，且 retry 動作要真的重抓資料。參考 `lib/features/trips/trips_list_screen.dart:464` 的 `_ErrorState(onRetry: () => ref.invalidate(myTripsProvider))`，元件本體在同檔 `:782`。只印錯誤字串沒有按鈕視為違反。
 - loading 態用 `AppListLoadingSkeleton`（`lib/app/app_loading_skeleton.dart:6`）保留版型；不得只留空白或在頁面中央放單一 spinner。
 
 ### 取色與視覺階層
@@ -193,7 +194,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 確認框、action sheet、搜尋列、日期／時間選擇、短暫通知一律重用 `lib/app/adaptive.dart`，不得在 feature 內重寫平台判斷。
 - 標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar），不自己建。
 - **以下由 `test/ui/shared_ui_usage_test.dart` 機器強制，Standards 審查不必再看**：`lib/features/**` 不得出現平台 sheet API（`showModalBottomSheet` 等，只有 `lib/app/adaptive.dart` 能碰）、不得出現 `AppBar` 家族、不得讓 `TpRootScrollScaffold` 等已移除符號復活、地圖 SDK 只能從 `lib/features/map/map_canvas_mobile.dart` import。違反會直接紅燈。
-- 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:249`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
+- 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:249`），不得自己組 `showAppConfirm`；`test/app/destructive_confirm_audit_test.dart` 會阻止呼叫端直接設定 `isDestructive: true`。`source` 參數是必填且有語意：
   - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_more_menu.dart`）選單選中，確認走 action sheet
   - `TpDestructiveConfirmSource.direct` —— 左滑刪除、列上按鈕這類直接觸發，確認走 alert
   - 同一個動作同時掛在選單與左滑上時，`source` 由呼叫端各自傳，不得在 helper 內寫死（`lib/app/irreversible_action.dart:12`）
@@ -214,9 +215,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 路由與測試
 
-- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下（`lib/app/router.dart:354`）。**複數 `/trips/:tripId` 才是真正建畫面的路由**,單數 `/trip/:tripId`（`:182`）只是 web 時代留下的 alias,`redirect` 到複數版（`_tripAlias`,`:507`）—— 子頁一律加在複數路徑下，新增子頁照 `entries/new`（`:393`）、`notes`（`:369`）的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。
+- 掛正式路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下。**複數 `/trips/:tripId` 才是真正建畫面的路由**；單數 `/trip/:tripId` 是 web 時代留下的 alias，由 `lib/app/legacy_aliases.dart` 的資料表轉向複數版。地圖 alias 由 `rootMapAlias` 導到 root `/map`，保留 trip／day／entry，不建立行程地圖子頁。一般行程子頁一律加在複數路徑下；path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。新增 web alias 時更新資料表及其純函式測試。
 - shell 外的整頁（無 root tab bar）加在 `routes` 頂層、`StatefulShellRoute` 之外。
-- 未登入時 shell 內的頁自動被 redirect 到 **`/welcome`**（`lib/app/router.dart:72-74`，經 `_welcomeLocationWithRedirect`），不是 `/login`。原始請求路徑會保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進 `_publicShellOutsideRoutes`（`lib/app/router.dart:495`），否則同樣被踢到 `/welcome`。
+- 未登入時 shell 內的頁由 `lib/app/auth_redirect_policy.dart` 的 `authRedirect` 導到 **`/welcome`**，不是 `/login`。原始請求路徑保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進同檔的 `publicShellOutsideRoutes`，否則同樣會導到 `/welcome`。
 - widget test 必須 override `authStateProvider`，否則啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗，畫面一進來就被視為未登入。
 - 每個 screen 檔頭加 `///` library doc 說明畫面職責，格式照 `lib/app/router.dart:1-2`。
 
@@ -242,7 +243,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 選單面板（`GlassMenu.settings`）一律用 `tpMenuGlassSettings`，不得直接改用 `tpNavigationGlassSettings`。選單保留 blur 24 與獨立不透明容器降級；依 `DESIGN.md` §16.2 的參考圖決策，深色共用導覽玻璃底色，淺色保留白色 72%，不得在 feature 額外加白膜。
 - `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:241`、`:262`、`:282`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
 - 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:121`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
-  `TpBarForeground` 靠 `IconTheme`／`DefaultTextStyle` 往下傳，但 theme 的 `textTheme` 每個字階都自帶 `onSurface`：玻璃上的 `Text` 一旦指定 `textTheme.xxx` 作 style，就會蓋掉媒體前景（#319 淺色地圖標題黑字）。要用字階就明確帶回 bar 前景（`IconTheme.of(context).color`，`lib/features/trips/trip_title_button.dart`）。行程標題仍是目前行程資訊，單一行程停用的只是切換，不可讓它的資訊前景跟著按鈕停用態降淡；一般停用動作照常降階。可讀性回歸檢查最終渲染的文字色，不只讀 widget 或按鈕 style（現行手法是讀 `RenderParagraph` 的有效 style，`test/ui/tp_map_controls_legibility_test.dart`）。
+  導覽玻璃語意組裝靠 `IconTheme`／`DefaultTextStyle` 往下傳前景，但 theme 的 `textTheme` 每個字階都自帶 `onSurface`：玻璃上的 `Text` 一旦指定 `textTheme.xxx` 作 style，就會蓋掉媒體前景（#319 淺色地圖標題黑字）。要用字階就明確帶回 bar 前景（`IconTheme.of(context).color`，`lib/features/trips/trip_title_button.dart`）。行程標題仍是目前行程資訊，單一行程停用的只是切換，不可讓它的資訊前景跟著按鈕停用態降淡；一般停用動作照常降階。可讀性回歸檢查最終渲染的文字色，不只讀 widget 或按鈕 style（現行手法是讀 `RenderParagraph` 的有效 style，`test/ui/tp_map_controls_legibility_test.dart`）。
   媒體上的日期選擇器依 ADR-0004 可讀性更正，維持 `tpMediaControlBackground` 的 70% 中性底配不透明 `onSurface`。帳號與定位依後續透明度更正，使用共用 `tpMediaIconGlassSettings` 的 45% 黑色填色配 `tpBarForeground`，圖示須對實際合成背景達 3:1；兩者均保留獨立不透明降級。這些是產品色彩策略，不改其他媒體表面的 35% 暗化或 shader 光學參數。
 - 玻璃只用於功能層：root tab bar、浮動 header、bottom accessory、sheet、選單。內容層一律實色 grouped surface。停留點卡、備選 POI 卡、設定 group 不套 glass。不得 glass 內巢狀 glass。
 
@@ -311,8 +312,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### Provider override
 
 - 資料 provider 是 **`StreamProvider`**，override 要回 `Stream`，不是 `Future`：
-  - `myTripsProvider`（`lib/features/trips/trips_list_screen.dart:149`）→ `myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips))`（用例：`test/features/trips/trips_list_screen_test.dart:150`）。
-  - `tripProvider` / `tripDaysProvider` / `tripNotesProvider` 是 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24`）→ `tripDaysProvider.overrideWith((ref, tripId) => Stream.value(fakeDays))` 一次覆寫所有 key。
+  - `myTripsProvider`（`lib/features/trips/trips_list_screen.dart:157`）→ `myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips))`（用例：`test/features/trips/trips_list_screen_test.dart:150`）。
+  - `tripDetailProvider` / `tripDaysProvider` / `tripNotesProvider` 是 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:16,32,49`）→ `tripDaysProvider.overrideWith((ref, tripId) => Stream.value(fakeDays))` 一次覆寫所有 key。
+- 驗證行程清單或日期重試時，override `tripRepositoryProvider` 並控制 `watchMyTrips()`／`watchDays(tripId)` 的來源串流，保留正式 `myTripsProvider` → `myTripsRetryProvider`、`tripDaysProvider(tripId)` → `tripDaysRetryProvider(tripId)` 追蹤鏈。直接 override 資料 provider 會繞過 `StreamRetryCoordinator.track()`，使重試 Future 無法隨來源 error／done／取消完成；一般只驗證資料呈現的測試仍可直接 override 資料 provider。
 - flutter_riverpod 3.x 未匯出 `Override` 型別 —— overrides 直接在 `ProviderScope` / `ProviderContainer` 建構處以 list literal 傳入，不要宣告 `List<Override>` 變數。
 - 需要登入狀態的畫面：override `authStateProvider`，用一個 `extends AuthNotifier` 且只覆寫 `build()` 的假 notifier：
 
@@ -366,9 +368,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 完成定義：`flutter analyze --no-fatal-infos` 零 error/warning + `flutter test`（跑整個 `test/`）全綠。`patrol_test/` 不在 `flutter test` 預設範圍，由 `mobile-e2e.yml` 另跑。
 
 > **注意三則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
-> 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
+> 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripDetailProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
 > 2. 「測試完全不碰 `SecureSessionStore`」—— 實際上 `test/api/providers_test.dart:50` 有一支型別斷言測試合法引用它，規則收斂為「不呼叫其方法」。
-> 3. 來源文件都寫「三層鏡像」。實際 `test/` 有 12 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
+> 3. 來源文件都寫「三層鏡像」。實際 `test/` 有 13 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
 
 ## 測試不可假綠
 

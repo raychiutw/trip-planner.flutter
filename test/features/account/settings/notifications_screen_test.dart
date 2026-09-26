@@ -4,14 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/app/notification_permission.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 
-class _MockTripRepository extends Mock implements TripRepository {}
+class _MockAccountRepository extends Mock implements AccountRepository {}
 
 class _FakeNotificationPermissionService
     implements NotificationPermissionService {
@@ -46,7 +46,7 @@ class _FakeNotificationPermissionService
 }
 
 void main() {
-  late _MockTripRepository mockTripRepository;
+  late _MockAccountRepository mockAccountRepository;
   late _FakeNotificationPermissionService permissionService;
   late AccountNotificationPreferences prefs;
 
@@ -58,7 +58,7 @@ void main() {
       ProviderScope(
         retry: (retryCount, error) => null,
         overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
           notificationPermissionServiceProvider.overrideWithValue(
             permissionService,
           ),
@@ -77,7 +77,7 @@ void main() {
   }
 
   setUp(() {
-    mockTripRepository = _MockTripRepository();
+    mockAccountRepository = _MockAccountRepository();
     permissionService = _FakeNotificationPermissionService();
     prefs = const AccountNotificationPreferences(
       tripUpdates: true,
@@ -86,10 +86,10 @@ void main() {
       updatedAt: '2026-07-09T00:00:00Z',
     );
     when(
-      () => mockTripRepository.fetchAccountNotificationPreferences(),
+      () => mockAccountRepository.fetchAccountNotificationPreferences(),
     ).thenAnswer((_) async => prefs);
     when(
-      () => mockTripRepository.updateAccountNotificationPreferences(
+      () => mockAccountRepository.updateAccountNotificationPreferences(
         tripUpdates: any(named: 'tripUpdates'),
         invitations: any(named: 'invitations'),
         system: any(named: 'system'),
@@ -117,6 +117,7 @@ void main() {
     expect(find.text('行程更新通知'), findsOneWidget);
     expect(find.text('旅伴邀請'), findsOneWidget);
     expect(find.text('系統通知'), findsOneWidget);
+    expect(find.text('這些選項是通知偏好；手機系統若關閉 Tripline 通知，仍不會收到通知。'), findsOneWidget);
     expect(find.byType(TpSettingsGroup), findsOneWidget);
     expect(find.byType(Card), findsNothing);
 
@@ -153,7 +154,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(
-      () => mockTripRepository.updateAccountNotificationPreferences(
+      () => mockAccountRepository.updateAccountNotificationPreferences(
         invitations: true,
       ),
     ).called(1);
@@ -180,7 +181,7 @@ void main() {
     expect(find.text('允許 Tripline 傳送通知？'), findsOneWidget);
     expect(permissionService.requestCalls, 0);
     verifyNever(
-      () => mockTripRepository.updateAccountNotificationPreferences(
+      () => mockAccountRepository.updateAccountNotificationPreferences(
         invitations: true,
       ),
     );
@@ -190,7 +191,7 @@ void main() {
 
     expect(permissionService.requestCalls, 1);
     verify(
-      () => mockTripRepository.updateAccountNotificationPreferences(
+      () => mockAccountRepository.updateAccountNotificationPreferences(
         invitations: true,
       ),
     ).called(1);
@@ -211,7 +212,7 @@ void main() {
     expect(permissionService.requestCalls, 1);
     expect(find.text('通知權限尚未開啟'), findsOneWidget);
     verifyNever(
-      () => mockTripRepository.updateAccountNotificationPreferences(
+      () => mockAccountRepository.updateAccountNotificationPreferences(
         invitations: true,
       ),
     );
@@ -270,7 +271,7 @@ void main() {
     expect(permissionService.statusCalls, 1);
     expect(permissionService.requestCalls, 0);
     verify(
-      () => mockTripRepository.updateAccountNotificationPreferences(
+      () => mockAccountRepository.updateAccountNotificationPreferences(
         tripUpdates: false,
       ),
     ).called(1);
@@ -278,7 +279,7 @@ void main() {
 
   testWidgets('載入失敗顯示 persistent retry panel', (tester) async {
     when(
-      () => mockTripRepository.fetchAccountNotificationPreferences(),
+      () => mockAccountRepository.fetchAccountNotificationPreferences(),
     ).thenThrow(Exception('boom'));
 
     await pumpScreen(tester);

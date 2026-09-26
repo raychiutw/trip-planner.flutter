@@ -253,6 +253,30 @@ void main() {
     expect(find.text('login /invite?token=raw-token'), findsOneWidget);
   });
 
+  testWidgets('大字級帳號不符時保留兩個信箱資訊並安全切換帳號', (tester) async {
+    await pumpInvite(
+      tester,
+      user: _otherUser,
+      size: const Size(320, 568),
+      textScale: 2,
+    );
+
+    final switchButton = find.byKey(const ValueKey('invite-switch-account'));
+    await tester.ensureVisible(switchButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('traveler@example.com'), findsOneWidget);
+    expect(find.text('other@example.com'), findsOneWidget);
+    expect(find.byKey(const ValueKey('invite-accept')), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(switchButton);
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repo.acceptInvitation(any()));
+    expect(find.text('login /invite?token=raw-token'), findsOneWidget);
+  });
+
   testWidgets('邀請無效時顯示持續錯誤狀態', (tester) async {
     when(() => repo.fetchInvitation(any())).thenThrow(
       const ApiError(

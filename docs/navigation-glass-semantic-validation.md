@@ -1,0 +1,267 @@
+# 導覽玻璃語意組裝驗證
+
+本紀錄對應 [#325](https://github.com/raychiutw/trip-planner.flutter/issues/325)
+的帳號與定位切片 [#327](https://github.com/raychiutw/trip-planner.flutter/issues/327)，
+以及浮動 header／固定 bar 切片 [#328](https://github.com/raychiutw/trip-planner.flutter/issues/328)、
+root tab bar／日期選擇器切片 [#329](https://github.com/raychiutw/trip-planner.flutter/issues/329)，
+及相容入口與跨畫面驗收 [#330](https://github.com/raychiutw/trip-planner.flutter/issues/330)。
+
+## 版本與範圍
+
+- 切片起點：`b9729c171eb1d27a21f7dfc2a98cabf3512824ae`，`0.26.10+41`。
+- 本切片保持版本號，限於 `TpAccountAvatarButton`、`TripMapLocateButton`
+  與共用導覽玻璃的組裝責任，不調整任何光學數值、套件或 shader。
+- 母票開工基準已確認 `flutter analyze` 無問題、完整 widget／unit suite
+  1990 項通過；這些結果只代表起點，不替代本切片的檢查。
+- 基準裝置 run [35953925642](https://github.com/raychiutw/trip-planner.flutter/actions/runs/35953925642)
+  已成功：iOS release／iPhone 14 Pro／iOS 16.6，以及 Android debug／shiba／API 34。
+  此 run 是修改前證據，不能當作本切片的真機材質後驗。
+
+## Interface 與相容性
+
+`TpNavigationGlassButton` 只收 production 角色、內容、動作及忙碌狀態。
+`barButton` 保留帳號的圓形幾何，`floatingControl` 保留定位的既有圓角。
+同一 module 從既有 `TpMediaBackdropScope` 取得媒體情境，成套決定材質、
+quality、前景、提高對比邊界及不透明降級。非媒體帳號入口也由 module
+提供完整前景，不再依賴外層另外包 `TpBarForeground`。
+
+忙碌狀態由 module 顯示進度與不可操作語意，使用既有 `TpGlassSurface`；
+不把整片不透明底交給套件 disabled 淡化。一般停用動作仍保留套件原有呈現。
+定位服務、帳號導覽與 feature provider 都留在原有責任層。
+
+`TpToolbarGlassButton`、`TpGlassSurface`、光學設定函式與媒體 scope 的舊入口
+均保留，供 [#328](https://github.com/raychiutw/trip-planner.flutter/issues/328)
+及 [#329](https://github.com/raychiutw/trip-planner.flutter/issues/329) 逐步接續；
+本切片不遷移浮動 header、固定 bar、root tab bar、日期選擇器或選單。
+
+## Red → green 證據
+
+測試使用真實 App 控制項與既有媒體／無障礙 scope；行程地圖仍只在既有
+`mapBuilder` seam 替換底圖。沒有新增測試專用 provider 或渲染 interface。
+
+- 非媒體前景：新測試讀最終 `RenderParagraph` 色彩，先得到帳號 alpha
+  `0.8667`，未達完整 `onSurface` 的 `1`；改由 module 成套提供後通過。
+  原正式 header 已提供同一前景，因此不改變其既有外觀。
+- 媒體 mutation：暫把共用圖示填色由 `45%` 改為 `70%`，帳號與定位
+  的背景透出均降至 `29.8%`，兩項公開像素測試失敗。還原後兩項通過，
+  透出 `54.9%`，亮底圖示對比 `3.363:1`；明暗主題結果相同。
+- 操作 mutation：暫移除按鈕 callback，鍵盤啟用的呼叫數由預期 `1`
+  變為 `0`，測試失敗。還原後，媒體與非媒體的 Tab／Enter／Space
+  及讀屏 tap 均各派發一次。
+- 聚焦驗證：`tp_map_icon_transparency_test.dart`、
+  `tp_map_controls_legibility_test.dart`、`tp_glass_surface_test.dart`
+  共 37 項通過；包含亮暗背景、提高對比／降低透明度各自生效、定位忙碌
+  不可重入與不透明、44pt、放大字級、帳號導覽及真實地圖畫面組裝。
+- `flutter analyze --no-pub`：No issues found，零 error／warning。
+- 第一輪完整測試為 1991 項通過、1 項失敗，原因是新組裝漏帶帳號既有的
+  `tp-toolbar-glass-button` key。保留該識別後，原帳號回歸案例單點通過；
+  沒有為了讓測試通過而改寫既有入口契約。
+- 修正後完整 `flutter test --no-pub --concurrency 2 --reporter expanded`
+  為 **1992 項全數通過**（15 分 28 秒），包含 HIG 十態與畫面證據集。
+  修正後再跑 `flutter analyze --no-pub`，仍為 No issues found。
+
+## 平台驗證範圍
+
+以上 headless 證據只涵蓋 App 自有填色、前景、幾何、語意與操作。
+Impeller 折射、原生圖磚與玻璃共存、邊緣光、thermal 降級與 raster jank
+不由 headless 結果推論。[#330](https://github.com/raychiutw/trip-planner.flutter/issues/330)
+在所有玻璃切片整合後，記錄當前版本可執行的自動化／模擬器結果與未驗範圍；
+依使用者 2026-09-26 決議，真機檢驗不再是結票條件。
+
+## 浮動 header 與固定 bar（#328）
+
+固定起點為 `250482339d94e2f6f573d5e9e9547a19b84b92ab`。標題膠囊、
+動作群組與 bar button 的語意組裝收進 `tp_glass_surface.dart`，與帳號、
+定位共用同一組媒體／材質／前景／quality／邊界決策。呼叫端保留內容、
+操作與角色；浮動 header 只傳標題組合與留白，不再配對 recipe 和前景。
+固定 bar 繼續由 `GlassAppBar` 量測幾何，sheet 返回與關閉的 tint 保留在
+原有動作內容上，未更動 route host、導覽或關閉保護。
+
+`TpHeaderTitle`、`TpToolbarActionGroup`、`TpToolbarGlassButton` 仍可從
+原 `tp_app_bar.dart` 入口使用。`TpGlassSurface`、原設定函式及媒體 scope
+仍保留，root tab bar 與日期選擇器在下一切片接續。選單仍採獨立
+`tpMenuGlassSettings`，本票沒有改面板、模糊、底色或開關 adapter。
+
+一般 `Text` 標題的公開測試另抓到既有漏接：`headlineSmall` 自帶的
+`onSurface` 蓋掉外層媒體前景，淺色地圖上最終文字變成黑色。現在標題
+字階與語意前景一起由 module 提供；自然寬度、省略與字級維持原契約。
+
+### 本切片 red → green
+
+- 暫時讓原浮動 header 忽略媒體 scope，真行程地圖測試得到
+  `Expected white / Actual black`；還原後明暗主題兩項測試通過。
+- 一般標題測試自然失敗，同樣為 `Expected white / Actual black`。
+  只接回標題字階的語意前景後通過，確認不是 scope 遺失或套件改色。
+- 暫將共用媒體暗化 `35%` 改為 `70%`，真標題與動作群組的背景透出
+  測試得到 `Expected 0.65 +/- 0.02 / Actual 0.298`。還原後通過；
+  明暗主題與提高對比／降低透明度各自檢查最終前景和實際背景像素。
+- 新操作案例透過真浮動 header 與固定 bar，在 `390×844`、`1024×768`
+  及兩倍字級驗證 safe area、44pt、返回／分享／列印／帳號的鍵盤啟用，
+  群組與帳號的讀屏 tap 各派發一次。既有測試持續守住返回路由、sheet
+  tint、選單、長標題與動作自然寬度。
+- 操作 mutation 暫時移除 bar button 回呼，鍵盤走到分享後仍只收到返回，
+  測試為 `Expected 分享 / Actual 返回`；還原後上述操作案例通過。
+- 最終聚焦驗證共 **128 項通過**，涵蓋本票公開語意、固定 bar、浮動
+  header、選單、帶狀遮蔽、帳號／定位與共用材質。
+- `flutter analyze --no-pub`：**No issues found**，零 error／warning／info。
+  首次程序停留在啟動階段，停止該程序後重跑才取得分析；其後移除搬移
+  所留下的兩個多餘 import，再次分析通過。格式與 `git diff --check` 通過。
+- 首次完整測試（並行度 2）在 19 分 31 秒以 1989 項通過、4 項失敗收尾：
+  畫面證據集第一個 landscape 案例超過既有 45 秒時限，後續出現
+  `runAsync` 重入等連鎖失敗。單獨重跑原證據檔，在相同時限下 11 項
+  全數通過；這不能代替完整測試，也不足以判定逾時原因。
+- 第二次完整測試（並行度 1）在 32 分 13 秒以 1993 項通過、2 項失敗
+  收尾：證據集第一個 compact-light 案例超時，另有手動證據驗證案例
+  因執行環境找不到 `jq` 失敗。降低並行度沒有消除逾時；未放寬時限、
+  刪除案例或改動斷言。兩次失敗的畫面、雜湊與測試日誌保留於本機
+  `build/spec-328-*-failure-artifacts` 與 `build/spec-328-*-test.log`。
+- 調查時發現全域 Pub cache 缺少既有 lockfile 所需的套件。以工作樹
+  `build/spec-328-pub-cache` 作程序專用 cache，執行
+  `flutter pub get --enforce-lockfile` 復原；`pubspec.yaml` 與
+  `pubspec.lock` 雜湊不變。另於忽略的 `build/spec-325-tools` 放置經
+  發行檔雜湊核對的 `jq`，只調整測試程序的 `PATH`，沒有更改系統設定。
+  原失敗的 workflow 案例單獨通過，證據檔在原 45 秒時限下 11 項
+  全數通過，並輸出 140 張 PNG。診斷副本將首個 compact-light 流程
+  分段計時，三次均約 21–23 秒通過；先前逾時的根因仍未證實。
+- 環境復原後，以同一份程式碼執行完整
+  `flutter test --no-pub --concurrency 1 --reporter expanded`，
+  **1995 項全數通過**（14 分 49 秒）。執行日誌保留於本機
+  `build/spec-328-full-restored.log`；此結果與前述聚焦測試、分析共同
+  構成本切片的提交前驗證。
+
+這些是 App 自有填色、前景、幾何與操作證據。其餘平台可驗範圍仍依上一節
+交給 #330；舊 run 與 headless 像素不作新 build 的原生地圖證據。
+
+## Root tab bar 與日期選擇器（#329）
+
+固定起點為 `56daeb3e2ec64e039f07fc4213970f39a5248447`。
+`TpNavigationGlassTabBar` 與 `TpNavigationGlassSelector` 將材質、前景、
+選取底與無障礙降級收進同一導覽玻璃 module；呼叫端只提供分頁／日期
+內容、選取與操作。兩者沿用既有光學設定入口，不共用錯誤的角色配方：
+root tab 的媒體暗化仍為 35%，日期仍為 70% 中性底搭配完整 `onSurface`，
+非媒體日期仍用 `onSurfaceVariant`，品牌 tint 只標示選取內容。
+
+root tab 的 inline／bottom 幾何、分支內容及套件 tap／drag 保留。
+原本補足套件缺口的指標穿透鍵盤／讀屏區域、選取後焦點回復仍在
+`AppleRootTabBar`。日期仍保留方向鍵／Enter／Space、焦點、目前 Day
+再次點選與具名讀屏 action；水平拖曳只瀏覽，不派發選取。Reduce Motion
+仍由原 ScrollController adapter 將動畫改為直接定位；未修改 Day 同步模型。
+舊 helper、scope 與其他導覽入口保持相容。
+
+### 本切片 red → green
+
+- 新 root tab 公開像素案例先記錄原行為，再暫時忽略媒體 scope，得到
+  `Expected white / Actual black`；還原後通過，再遷移語意組裝。
+  案例涵蓋 inline／bottom、明暗主題、白黑媒體背景，以及提高對比與
+  降低透明度各自生效；檢查最終文字色與實際背景像素。
+- 日期沿用真實 `TpHorizontalSelector` 的對比案例。暫將中性底從
+  70% 改成 35%，得到 `Expected >= 4.5 / Actual 2.16873306642071`；
+  還原後通過，再將中性底與前景配對收進共用 module。
+- 操作 mutation 暫時移除目前 Day 的 tap callback，既有公開案例得到
+  `Expected 1 / Actual 0`；還原後同一案例通過。它也守住拖曳不回呼、
+  具名讀屏啟用、沒有空白按鈕節點，以及 Enter／Space 再次選取。
+- root tab 與 shell 聚焦驗證 40 項通過；日期、真地圖可讀性與新 root tab
+  案例合計 47 項通過。這些測試直接操作 App 控制項與既有畫面 seam，
+  沒有新增測試專用介面；原始碼守門只檢查呼叫端未重新拼接設定。
+- 最終 12 檔聚焦驗證 **321 項全數通過**（2 分 23 秒），包含完整
+  HIG 十態矩陣、shell、timeline／map、日期操作、帳號／定位與共用玻璃。
+  日誌保留於本機 `build/spec-329-focused-final.log`。
+- 完整 `flutter test --no-pub --concurrency 1 --reporter expanded`
+  為 **1996 項全數通過**（13 分 46 秒），包含畫面證據集的原 11 項案例
+  及 HIG 十態矩陣。畫面案例仍使用原 45 秒時限，沒有跳過測試或放寬
+  斷言；完整日誌保留於本機 `build/spec-329-full-final.log`。格式檢查
+  與 `git diff --check` 通過。這些結果只代表 headless 驗證；#330 的平台
+  驗證不以像素測試或歷史 build 代替。
+
+### 隔離環境診斷
+
+首次 `flutter analyze --no-pub` 在 492.2 秒後回報 18,496 個診斷；實際
+路徑落在工作樹內 `build/spec-328-pub-cache/hosted` 的套件原始碼、測試
+及 example，例如 `win32` 的 `package:checks/checks.dart` 缺失。過程中
+language server 的 CPU 持續增加，未將等待誤判為停止進展，也未終止程序。
+
+保留原始日誌後，將同一份 195 個 hosted 套件的隔離 cache 搬到工作樹外
+專用 Temp 路徑，再以程序專用 helper 更新 `PUB_CACHE`，執行
+`flutter pub get --enforce-lockfile`。`pubspec.yaml` 與 `pubspec.lock`
+雜湊皆不變，生成的 package config 指向新 cache。沒有刪除舊驗證證據、
+改全域環境、放寬測試時限或新增 analyzer 排除規則。
+
+搬移後第二次 analyze 在 162.2 秒收尾，只剩 #328 忽略的計時診斷副本
+`build/spec-328-diagnostics/app_owned_release_flow_artifacts_test.dart`
+一個 `avoid_print` info。再將該診斷資料夾的兩份原件完整搬出工作樹到
+專用 Temp 路徑保存，沒有修改副本內容或正式測試。
+
+第三次 `flutter analyze --no-pub` 為 **No issues found**（23.0 秒），
+零 error／warning／info；結果保留於本機 `build/spec-329-analyze-final.log`。
+
+## 相容入口與跨畫面驗收（#330）
+
+固定起點為 `e014fe3f9a9a77014892773ae51717bf064c5274`，已包含 #328／#329。
+本切片不變更光學值、媒體 scope 的宣告位置、套件、shader 或版本號。
+
+### Production caller 盤點
+
+| 入口 | 決定與仍有責任的呼叫端 |
+|---|---|
+| `TpBarForeground` | production 已零使用，移除 wrapper；帳號可讀性測試改直接建立 `TpAccountAvatarButton`，由語意 module 成套提供前景 |
+| `TpToolbarGlassButton` 的材質、媒體、邊界與圓角參數 | module 外的 production 已零使用；移除公開覆寫，module 內獨立圖示改以私有 constructor 傳入已解析的完整 appearance 與角色圓角 |
+| `TpToolbarGlassButton` 與 `tp_app_bar.dart` re-export | 保留；固定 bar 的返回／關閉／icon、選單觸發鈕、sheet、帳號工作階段及列印仍使用；標題與動作群組也仍有 production caller |
+| `TpGlassSurface` | 保留；聊天 composer／行程資訊、`TpBottomAccessory`、標題膠囊及定位忙碌態仍使用 |
+| `tpNavigationGlassSettings`、`tpResolveGlassSettings`、`tpGlassQuality` | 保留；語意 module、compact／regular sheet 與選單仍使用，不把它們誤認為無用相容層 |
+| `tpMenuGlassSettings`、`TpGlassEdge`／`tpGlassEdgeColor` | 保留選單獨立模糊／底色與提高對比邊界；不改選單 module |
+| `TpMediaBackdropScope` | 保留 shell、行程地圖、總覽地圖狀態覆寫；帶狀遮蔽、accessory 與選單 host 繼續讀同一 scope |
+
+root tab 的鍵盤／讀屏、焦點回復，日期方向鍵、再次選取、具名讀屏 action、
+Reduce Motion scroll controller，選單 root route host／錨點／Back／Esc／去重，
+以及 sheet 的 Navigator、dirty／submitting guard、child identity、旋轉與鍵盤
+adapter 全部保留。移除的只有已由語意 module 承接的組裝入口。
+
+### 公開行為與測試接手
+
+- 既有 shared visual flow 新增明暗兩態的地圖 → 時間軸 → 筆記 → 帳號 →
+  地圖流程。選定的 Day 2 在兩種 sheet 關閉後及返回地圖時仍被讀屏語意
+  標為選取；沿用原地圖實例。筆記 AI 狀態透過既有 repository fixture 固定為
+  沒有工作，這段不送出 AI 生成，也不依賴筆記 controller 的完成狀態。
+- host 端從真畫面的 `RenderParagraph` 讀標題及未選 root tab 前景，驗證
+  一般內容、媒體、sheet 與獨立無障礙情境；不是只比對 settings token。
+- 前景 mutation 暫將媒體白色改黑，流程在 `light/map` 得到
+  `Expected white / Actual black`；還原後通過，再移除舊 wrapper。
+- 操作 mutation 暫移除 toolbar callback，既有「帳號與定位的鍵盤及讀屏
+  啟用各派發一次」得到 `Expected 1 / Actual 0`；還原後通過，再收斂參數。
+- 刪除一個只驗自訂 toolbar settings 的測試。相同降級保證由
+  `tp_map_icon_transparency_test.dart` 的「兩顆控制各自支援不透明降級、44pt、
+  語意與操作」、「定位進行中提高對比或降低透明度仍完全隔離底圖」，以及
+  `tp_navigation_bar_semantics_test.dart` 的真標題／動作群組像素案例接手。
+  `TpGlassSurface` 的自訂設定測試、選單、sheet 與全部操作案例保留。
+
+### 本切片自動化結果
+
+- `flutter analyze --no-pub` 為 **No issues found**（15.8 秒），零
+  error／warning／info，日誌為本機 `build/spec-330-analyze-final.log`。
+- 7 檔聚焦驗證 **170 項全數通過**（1 分 30 秒），涵蓋 HIG 十態、
+  compact／regular、放大字級、visual／release flow、root tab、日期選取、
+  shell 與 sheet 公開操作。日誌為本機 `build/spec-330-focused-final.log`。
+- 完整 `flutter test --no-pub --concurrency 1 --reporter expanded` 為
+  **1995 項全數通過**（16 分 26 秒），日誌為本機
+  `build/spec-330-full-final.log`。相較起點少一項是上述已接手保證的舊
+  toolbar settings 測試；40 場景流程及完整 HIG 矩陣都在本次 suite 中通過。
+  畫面證據集的 11 項案例維持原 45 秒時限，沒有跳過或放寬斷言。
+- 5 個 Dart 檔案格式檢查通過，`git diff --check` 通過。以上是當時工作樹
+  的自動化證據，不能取代新 build 的平台驗證或 Standards／Spec 審查。
+
+### 當前版本的平台證據與限制
+
+使用者已移除真機檢驗；此處不再要求實體裝置、iOS release XCTest 或真機材質
+影片。當前整合分支 `f2371a28952da102b5957b44c14cb911843b67b7` 的
+`flutter analyze --no-pub` 零問題，完整 `flutter test --no-pub` 2251 項通過，
+包含 HIG 十態與跨畫面流程。後續 `23ccf96` 只修改調查文件。
+
+iOS 26.5 模擬器的既有 `integration_test/app_smoke_test.dart` 1 項通過，
+但它使用 fake map canvas；普通 integration runner 的臨時 production canvas
+測試兩次均未收到 `onMapReady`，已移除，不宣稱原生地圖通過。
+[調查與限制](https://github.com/raychiutw/trip-planner.flutter/issues/387#issuecomment-5842315989)
+另有完整紀錄。Android `MediumPhone.arm` 的既有成功 run 只對應基準
+`b9729c1`，不能代替目前分支。`mobile-e2e.yml` 僅於 `master` 啟動，
+後續應以最終合併 SHA 跑可執行的 Android 虛擬裝置矩陣，記錄 SHA、OS、
+runner、明暗、字級、可觀察的操作結果與未驗範圍；商店上傳仍獨立。
+在取得並判讀當前整合版本的證據前，#330 與母票 #325 保持開啟。

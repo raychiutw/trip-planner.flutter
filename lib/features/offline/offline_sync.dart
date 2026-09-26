@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/cache/cache_store.dart';
 import '../../api/providers.dart';
 import '../favorites/favorites_providers.dart';
-import '../trip_detail/trip_providers.dart';
+import '../trip_detail/entry_mutations.dart';
 import '../trips/trips_list_screen.dart';
 
 /// 待同步(離線佇列)筆數;隨佇列變動(入隊/同步/清空)反應式更新,供 banner badge。
@@ -77,11 +77,7 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
         // _send 已 evict 受影響快取;這裡讓讀取 providers 重跑取 server 真相
         //(臨時 id 的樂觀資料換成真實資料)。保守起見 invalidate 行程相關家族 + 清單
         //(family 不帶參數 = 全實例);精準 per-tripId 失效列為後續優化。
-        ref.invalidate(tripDetailProvider);
-        ref.invalidate(tripDaysProvider);
-        ref.invalidate(tripNotesProvider);
-        ref.invalidate(tripSegmentsProvider);
-        ref.invalidate(entryDetailProvider);
+        invalidateTripFamilies(ref);
         ref.invalidate(myTripsProvider);
         ref.invalidate(favoritesProvider);
       }

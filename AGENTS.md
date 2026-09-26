@@ -85,15 +85,15 @@ flutter run                                           # 連 prod API；一律使
 
 ### Provider 鏈（Riverpod 3.x）
 
-`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`tripRepositoryProvider` → `authStateProvider`（全 app 認證 SoT）→ `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
+`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
 
-行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24,33,43`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
+行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:16,32,49,57,125`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
 
 Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 list literal 傳入 `ProviderScope`。
 
 ### 認證與 API 安全規則
 
-認證有 **cookie 與 Bearer 兩種互斥模式**，由 `_authHeadersFor()`（`lib/api/api_client.dart:946-968`）依有無 access token 二選一，repository 與畫面層都不得自己拼這些 header：
+認證有 **cookie 與 Bearer 兩種互斥模式**，由 `_authHeadersFor()`（`lib/api/api_client.dart:508-529`）依有無 access token 二選一，repository 與畫面層都不得自己拼這些 header：
 
 - **cookie 模式**（無 Bearer token）：後端使用瀏覽器導向的 session cookie 與 CSRF Origin allowlist，app 扮演瀏覽器。登入走 `postForResponse`（`lib/api/auth_repository.dart:101`）讀取 `set-cookie`，解析 `tripline_session` 並存入 `flutter_secure_storage`；之後每個 request 帶 `Cookie:`，**且非 `GET`／`HEAD` 的 mutating request 必帶 `Origin:`**，否則回 403。
 - **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。
@@ -106,7 +106,7 @@ Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 li
 每條規則都有對應測試，改動時必須同步測試：
 
 1. 非 2xx → throw `ApiError`（三層 fallback 解析見 `api_error.dart`）。
-2. 三條分支共用「同參數重送一次」的 `retry()`（`lib/api/api_client.dart:795-806`），各自靠 `isRetryAttempt` 限制**最多一次**：①**429** 僅 `GET`／`HEAD`，讀 `Retry-After` 等待後重送（clamp 0–30 秒，缺漏回 1 秒）；②**edge block page**（2xx 非 204 但 `Content-Type` 含 `text/html` 的 CDN 攔截頁）重試條件與 429 完全相同，重送後仍是攔截頁則丟 `SYS_UPSTREAM_UNAVAILABLE`；③**Bearer 401** 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**（`POST`／`PATCH`／`DELETE` 一樣重送）。「mutation 絕不 retry」是錯的說法，只有 429／edge block 不重送 mutation。SSE 串流版 `_getTextStream()`（`lib/api/api_client.dart:884-911`）走同一組規則，改重試邏輯要兩處一起改。
+2. 一般請求與 SSE 串流共用 `retry_policy.dart` 的純決策，靠 `isRetryAttempt` 限制**最多重送一次**：①**429** 僅 `GET`／`HEAD`，讀 `Retry-After` 等待後重送（clamp 0–30 秒，缺漏回 1 秒）；②**edge block page**（2xx 非 204 但 `Content-Type` 含 `text/html` 的 CDN 攔截頁）重試條件與 429 相同，重送後仍是攔截頁則丟 `SYS_UPSTREAM_UNAVAILABLE`；③**Bearer 401** 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**（`POST`／`PATCH`／`DELETE` 一樣重送）。登入／註冊的 `postForResponse` 是帳密 POST，不自動重送；仍統一轉換 429 與攔截頁錯誤。「mutation 絕不 retry」是錯的說法，只有 429／edge block 不重送 mutation。
 3. 204／空 body → `null`。
 4. 路徑參數使用 `Uri.encodeComponent`。
 
@@ -130,7 +130,7 @@ Models 帶 `version` 欄位；後端 PATCH 要傳 `expectedVersion`，收到 409
 - API：`http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 - Screens：widget test + `ProviderScope` override、mocktail mock repository、假 `GoRouter` 作為導航探針。
 
-具體手法（provider override、關掉 error 態自動重試、假綠燈防線）見 `CODING_STANDARDS.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
+具體手法（provider override、依測試目的控制 error 態自動重試、假綠燈防線）見 `CODING_STANDARDS.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
 
 ## Agent skills
 

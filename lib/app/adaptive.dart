@@ -10,6 +10,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/app_theme.dart';
@@ -388,6 +389,7 @@ Future<T?> showAppActionSheet<T>(
 
 class AppSheetFormController extends ChangeNotifier {
   Future<bool> Function()? _submit;
+  Future<void> Function()? _requestSubmit;
   bool _dirty = false;
   bool _canSubmit = false;
   bool _submitting = false;
@@ -418,6 +420,10 @@ class AppSheetFormController extends ChangeNotifier {
       update(submitting: false);
     }
   }
+
+  /// 讓鍵盤提交與 toolbar 按鈕走同一條完成流程。
+  Future<void> requestSubmit() =>
+      _requestSubmit?.call() ?? Future<void>.value();
 }
 
 /// Connects a routed form's explicit Cancel action to the shared dirty guard.
@@ -480,12 +486,12 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
       await _popOrCloseSheet();
       return;
     }
-    final discard = await showAppConfirm(
+    final discard = await showAppDestructiveConfirm(
       context,
+      source: TpDestructiveConfirmSource.direct,
       title: '捨棄未儲存的變更？',
       message: '離開後，本次修改不會保留。',
       confirmLabel: '捨棄',
-      isDestructive: true,
     );
     if (!mounted || !discard) return;
     setState(() => _allowPop = true);
@@ -568,6 +574,20 @@ Future<T?> _showAppSheet<T>({
         ),
   );
 }
+
+Widget _withEscapeDismiss(Widget child, Future<void> Function() onEscape) =>
+    Focus(
+      autofocus: true,
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent ||
+            event.logicalKey != LogicalKeyboardKey.escape) {
+          return KeyEventResult.ignored;
+        }
+        unawaited(onEscape());
+        return KeyEventResult.handled;
+      },
+      child: child,
+    );
 
 class _ThemeAwareAppSheet<T> extends StatefulWidget {
   const _ThemeAwareAppSheet({
@@ -701,40 +721,48 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
             opaqueColor: elevatedSurface,
           )
         : null;
-    return PopScope<T>(
-      canPop: _isClosing,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) unawaited(_handleSystemBack(result));
-      },
-      child: GlassModalSheetScaffold(
-        controller: widget.controller,
-        body: const SizedBox.expand(),
-        sheet: Theme(
-          data: theme.copyWith(colorScheme: elevatedScheme),
-          child: _sheet!,
-        ),
-        initialState: widget.initialState,
-        fullSize: appSheetLargeHeight(context),
-        // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
-        // 永遠視為尚未展開，阻止內容向上捲動。
-        detents: widget.resizable
-            ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
-            : const {GlassSheetDetent.large},
-        settings: settings,
-        expandedColor: elevatedSurface,
-        quality: quality,
-        padding: EdgeInsets.zero,
-        interactionScale: _reduceMotion ? 1 : packageDefaults.interactionScale,
-        stretch: _reduceMotion ? 0 : packageDefaults.stretch,
-        showDragIndicator: widget.resizable,
-        onStateChanged: (state) {
-          if (state == GlassSheetState.hidden) {
-            widget.controller.snapToState(widget.initialState, animate: false);
-            // 拖曳／外點與系統返回共用內層導覽保護；明確 Close 仍關閉整個乾淨 sheet。
-            unawaited(_handleSystemBack());
-          }
+    return _withEscapeDismiss(
+      PopScope<T>(
+        canPop: _isClosing,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) unawaited(_handleSystemBack(result));
         },
+        child: GlassModalSheetScaffold(
+          controller: widget.controller,
+          body: const SizedBox.expand(),
+          sheet: Theme(
+            data: theme.copyWith(colorScheme: elevatedScheme),
+            child: _sheet!,
+          ),
+          initialState: widget.initialState,
+          fullSize: appSheetLargeHeight(context),
+          // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
+          // 永遠視為尚未展開，阻止內容向上捲動。
+          detents: widget.resizable
+              ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
+              : const {GlassSheetDetent.large},
+          settings: settings,
+          expandedColor: elevatedSurface,
+          quality: quality,
+          padding: EdgeInsets.zero,
+          interactionScale: _reduceMotion
+              ? 1
+              : packageDefaults.interactionScale,
+          stretch: _reduceMotion ? 0 : packageDefaults.stretch,
+          showDragIndicator: widget.resizable,
+          onStateChanged: (state) {
+            if (state == GlassSheetState.hidden) {
+              widget.controller.snapToState(
+                widget.initialState,
+                animate: false,
+              );
+              // 拖曳／外點與系統返回共用內層導覽保護；明確 Close 仍關閉整個乾淨 sheet。
+              unawaited(_handleSystemBack());
+            }
+          },
+        ),
       ),
+      _handleSystemBack,
     );
   }
 }
@@ -755,12 +783,12 @@ Future<T?> showAppSelectionSheet<T>(
         : () async {
             if (dismissalLocked?.value ?? false) return false;
             if (!(hasUnsavedChanges?.value ?? false)) return true;
-            return showAppConfirm(
+            return showAppDestructiveConfirm(
               context,
+              source: TpDestructiveConfirmSource.direct,
               title: '捨棄未儲存的變更？',
               message: '離開後，本次修改不會保留。',
               confirmLabel: '捨棄',
-              isDestructive: true,
             );
           },
     builder: (sheetContext, close) => Material(
@@ -885,42 +913,47 @@ class _RegularAppContentSheetState<T>
 
   @override
   Widget build(BuildContext context) {
-    return PopScope<T>(
-      canPop: _closing,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) unawaited(_handleBack(result));
-      },
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(TpSpacing.s4),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
-          child: SizedBox(
-            key: const ValueKey('app-regular-content-sheet'),
-            width: 560,
-            height: 720,
-            child: GlassContainer(
-              useOwnLayer: true,
-              clipBehavior: Clip.antiAlias,
-              settings: tpNavigationGlassSettings(context),
-              quality: tpGlassQuality(context),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  colorScheme: AppTheme.elevated(Theme.of(context).colorScheme),
-                ),
-                child: _AppContentSheet<T>(
-                  title: widget.title,
-                  contentBuilder: widget.contentBuilder,
-                  onClose: _close,
-                  navigatorKey: widget.navigatorKey,
-                  dismissible: widget.dismissible,
+    return _withEscapeDismiss(
+      PopScope<T>(
+        canPop: _closing,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) unawaited(_handleBack(result));
+        },
+        child: Dialog(
+          insetPadding: const EdgeInsets.all(TpSpacing.s4),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+            child: SizedBox(
+              key: const ValueKey('app-regular-content-sheet'),
+              width: 560,
+              height: 720,
+              child: GlassContainer(
+                useOwnLayer: true,
+                clipBehavior: Clip.antiAlias,
+                settings: tpNavigationGlassSettings(context),
+                quality: tpGlassQuality(context),
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: AppTheme.elevated(
+                      Theme.of(context).colorScheme,
+                    ),
+                  ),
+                  child: _AppContentSheet<T>(
+                    title: widget.title,
+                    contentBuilder: widget.contentBuilder,
+                    onClose: _close,
+                    navigatorKey: widget.navigatorKey,
+                    dismissible: widget.dismissible,
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+      _handleBack,
     );
   }
 }
@@ -964,50 +997,53 @@ Future<bool?> showAppFormSheet(
     canDismiss: () async {
       if (controller.isSubmitting) return false;
       if (!controller.isDirty) return true;
-      return showAppConfirm(
+      return showAppDestructiveConfirm(
         context,
+        source: TpDestructiveConfirmSource.direct,
         title: '捨棄未儲存的變更？',
         message: '離開後，本次修改不會保留。',
         confirmLabel: '捨棄',
-        isDestructive: true,
       );
     },
-    builder: (sheetContext, close) => Material(
-      color: Colors.transparent,
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (_, child) => Column(
-          children: [
-            TpSheetHeader(
-              title: title,
-              titleKey: titleKey,
-              leading: TpToolbarTextButton(
-                key: cancelKey,
-                label: '取消',
-                onPressed: controller.isSubmitting
-                    ? null
-                    : () => unawaited(close()),
+    builder: (sheetContext, close) {
+      controller._requestSubmit = () async {
+        if (await controller.submit()) {
+          controller.update(dirty: false);
+          await close(true);
+        }
+      };
+      return Material(
+        color: Colors.transparent,
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (_, child) => Column(
+            children: [
+              TpSheetHeader(
+                title: title,
+                titleKey: titleKey,
+                leading: TpToolbarTextButton(
+                  key: cancelKey,
+                  label: '取消',
+                  onPressed: controller.isSubmitting
+                      ? null
+                      : () => unawaited(close()),
+                ),
+                trailing: TpToolbarTextButton(
+                  key: submitKey,
+                  label: submitLabel,
+                  onPressed: controller.canSubmit
+                      ? controller.requestSubmit
+                      : null,
+                ),
               ),
-              trailing: TpToolbarTextButton(
-                key: submitKey,
-                label: submitLabel,
-                onPressed: controller.canSubmit
-                    ? () async {
-                        if (await controller.submit()) {
-                          controller.update(dirty: false);
-                          await close(true);
-                        }
-                      }
-                    : null,
-              ),
-            ),
-            Expanded(child: child!),
-          ],
+              Expanded(child: child!),
+            ],
+          ),
+          child: builder(sheetContext),
         ),
-        child: builder(sheetContext),
-      ),
-    ),
-  );
+      );
+    },
+  ).whenComplete(() => controller._requestSubmit = null);
 }
 
 class _AppContentSheet<T> extends StatelessWidget {
@@ -1178,6 +1214,9 @@ class _AppSearchFieldState extends State<AppSearchField> {
       key: widget.fieldKey,
       controller: widget.controller,
       placeholder: widget.placeholder,
+      suffixIcon: _SearchClearIcon(
+        semanticLabel: CupertinoLocalizations.of(context).clearButtonLabel,
+      ),
       onChanged: _changed,
       onSubmitted: _submitted,
       autofocus: widget.autofocus,
@@ -1185,6 +1224,21 @@ class _AppSearchFieldState extends State<AppSearchField> {
       backgroundColor: widget.embedded ? Colors.transparent : null,
     );
   }
+}
+
+// SDK 的 suffixIcon 只接受 Icon；擴大原生按鈕的點擊區，保留原生清除與焦點行為。
+class _SearchClearIcon extends Icon {
+  const _SearchClearIcon({required super.semanticLabel})
+    : super(CupertinoIcons.xmark_circle_fill);
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(
+      minWidth: TpSpacing.tapMin,
+      minHeight: TpSpacing.tapMin,
+    ),
+    child: Center(widthFactor: 1, heightFactor: 1, child: super.build(context)),
+  );
 }
 
 /// 顯示頂部滑入橫幅（安全區內、約 2.5 秒後消失）。

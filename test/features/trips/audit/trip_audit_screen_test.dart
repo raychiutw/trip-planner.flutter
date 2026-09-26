@@ -70,6 +70,15 @@ void main() {
     ).thenAnswer((_) async => rows);
   });
 
+  testWidgets('單筆異動仍說明最近最多 50 筆的資料視窗', (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.text('顯示最近最多 50 筆異動'), findsOneWidget);
+    expect(find.text('1 筆'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-audit-row-8')), findsOneWidget);
+    verify(() => repository.fetchAuditLog('trip-1', limit: 50)).called(1);
+  });
+
   testWidgets('顯示 audit log 摘要與 diff 欄位', (tester) async {
     await pumpScreen(tester);
 
@@ -127,6 +136,35 @@ void main() {
 
     expect(find.byKey(const ValueKey('trip-audit-empty')), findsOneWidget);
     expect(find.text('尚無異動紀錄'), findsOneWidget);
+    expect(find.text('顯示最近最多 50 筆異動'), findsOneWidget);
+    expect(find.text('0 筆'), findsOneWidget);
+    verify(() => repository.fetchAuditLog('trip-1', limit: 50)).called(1);
+  });
+
+  testWidgets('剛好 50 筆仍說明最近資料視窗且最後一筆可讀', (tester) async {
+    when(() => repository.fetchAuditLog('trip-1', limit: 50)).thenAnswer(
+      (_) async => [
+        for (var id = 1; id <= 50; id++)
+          TripAuditRow(
+            id: id,
+            tripId: 'trip-1',
+            tableName: 'trip_entries',
+            action: TripAuditAction.update,
+            createdAt: '2026-09-25T10:00:00Z',
+          ),
+      ],
+    );
+
+    await pumpScreen(tester);
+
+    expect(find.text('顯示最近最多 50 筆異動'), findsOneWidget);
+    expect(find.text('50 筆'), findsOneWidget);
+    final lastRow = find.byKey(const ValueKey('trip-audit-row-50'));
+    await tester.ensureVisible(lastRow);
+    await tester.pumpAndSettle();
+    expect(lastRow.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    verify(() => repository.fetchAuditLog('trip-1', limit: 50)).called(1);
   });
 
   testWidgets('載入錯誤持續顯示、live region 且可重試', (tester) async {
@@ -156,6 +194,28 @@ void main() {
 
     expect(find.byKey(const ValueKey('trip-audit-row-8')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-audit-error')), findsNothing);
+  });
+
+  testWidgets('compact 最大字級完整呈現資料視窗並可捲動閱讀紀錄', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await pumpScreen(tester, textScaler: const TextScaler.linear(3.2));
+
+    final disclosure = find.text('顯示最近最多 50 筆異動');
+    await tester.ensureVisible(disclosure);
+    await tester.pumpAndSettle();
+    expect(disclosure.hitTestable(), findsOneWidget);
+    final disclosureRect = tester.getRect(disclosure);
+    expect(disclosureRect.left, greaterThanOrEqualTo(0));
+    expect(disclosureRect.right, lessThanOrEqualTo(320));
+    expect(disclosureRect.top, greaterThanOrEqualTo(0));
+    expect(disclosureRect.bottom, lessThanOrEqualTo(568));
+    await tester.ensureVisible(find.textContaining('首里城 → 首里城公園'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('首里城 → 首里城公園').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('regular dark 與最大文字仍限制內容寬度並保留 Header actions', (tester) async {

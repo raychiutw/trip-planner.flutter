@@ -60,34 +60,8 @@ void main() {
     expect(app.statusLabel, '待審核');
   });
 
-  test('OAuthConsentRequest 從 URI query 還原並產生 submit body', () {
-    final request = OAuthConsentRequest.fromUri(
-      Uri.parse(
-        'https://trip.example/oauth/consent?client_id=tp_alpha'
-        '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
-        '&scope=openid%20email'
-        '&state=abc123'
-        '&response_type=code'
-        '&code_challenge=challenge'
-        '&code_challenge_method=S256',
-      ),
-    );
-
-    expect(request.clientId, 'tp_alpha');
-    expect(request.requestedScopes, ['openid', 'email']);
-    expect(request.hasPlausibleRedirectUri, isTrue);
+  test('OAuth scope 說明保留給已連結與開發者應用', () {
     expect(oauthScopeLabel('email'), '您的電子郵件地址');
     expect(oauthScopeLabel('unknown'), 'unknown');
-
-    expect(request.toBody('allow'), {
-      'client_id': 'tp_alpha',
-      'redirect_uri': 'https://app.example.com/callback',
-      'scope': 'openid email',
-      'state': 'abc123',
-      'response_type': 'code',
-      'code_challenge': 'challenge',
-      'code_challenge_method': 'S256',
-      'decision': 'allow',
-    });
   });
 }

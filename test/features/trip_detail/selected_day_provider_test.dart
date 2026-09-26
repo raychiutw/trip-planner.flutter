@@ -1,9 +1,133 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/trip_detail/selected_day_provider.dart';
+import 'package:tripline/features/trip_detail/trip_days_lookup.dart';
+import 'package:tripline/models/day.dart';
+import 'package:tripline/models/entry.dart';
 
 void main() {
   group('共用選取日', () {
+    testWidgets('背景分支不能覆蓋目前選取日', (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(selectedDayProvider.notifier);
+      controller.select(tripId: 'okinawa', dayNum: 1);
+      late BuildContext branchContext;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: TickerMode(
+              enabled: false,
+              child: Builder(
+                builder: (context) {
+                  branchContext = context;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      controller.publish(
+        branchContext,
+        const SelectedTripDay(tripId: 'okinawa', dayNum: 3),
+      );
+
+      expect(container.read(selectedDayProvider).dayNumFor('okinawa'), 1);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: TickerMode(
+              enabled: true,
+              child: Builder(
+                builder: (context) {
+                  branchContext = context;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      controller.publish(
+        branchContext,
+        const SelectedTripDay(tripId: 'okinawa', dayNum: 3),
+      );
+      expect(container.read(selectedDayProvider).dayNumFor('okinawa'), 3);
+    });
+
+    test('初始選取依查詢日期、停留點、共用值、第一天排序', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(selectedDayProvider.notifier);
+      final index = TripDaysIndex(const [
+        TripDay(id: 1, dayNum: 1, version: 0),
+        TripDay(
+          id: 7,
+          dayNum: 3,
+          version: 0,
+          timeline: [
+            TimelineEntry(id: 22, sortOrder: 0, title: 'b', version: 0),
+          ],
+        ),
+      ]);
+
+      controller.selectAll(tripId: 'okinawa');
+
+      expect(
+        controller.resolveInitial(
+          tripId: 'okinawa',
+          index: index,
+          routeDayNum: 1,
+          entryId: 22,
+          allowAll: true,
+        ),
+        const SelectedTripDay(tripId: 'okinawa', dayNum: 1),
+      );
+      expect(
+        controller.resolveInitial(
+          tripId: 'okinawa',
+          index: index,
+          entryId: 22,
+          allowAll: true,
+        ),
+        const SelectedTripDay(tripId: 'okinawa', dayNum: 3),
+      );
+      expect(
+        controller.resolveInitial(
+          tripId: 'okinawa',
+          index: index,
+          allowAll: true,
+        ),
+        const SelectedAllDays(tripId: 'okinawa'),
+      );
+      expect(
+        controller.resolveInitial(tripId: 'okinawa', index: index),
+        const SelectedTripDay(tripId: 'okinawa', dayNum: 1),
+      );
+    });
+
+    test('全部與未指定是不同狀態，且只屬於目前行程', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final controller = container.read(selectedDayProvider.notifier);
+      expect(container.read(selectedDayProvider), isNull);
+
+      controller.selectAll(tripId: 'okinawa');
+
+      final selected = container.read(selectedDayProvider);
+      expect(selected, isA<SelectedAllDays>());
+      expect(selected.showsAllDaysFor('okinawa'), isTrue);
+      expect(selected.showsAllDaysFor('tokyo'), isFalse);
+      expect(selected.dayNumFor('okinawa'), isNull);
+    });
+
     test('預設沒有選取日', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);

@@ -39,6 +39,7 @@ Future<void> _open(
   TargetPlatform platform = TargetPlatform.android,
   Stream<TimelineEntry>? entryStream,
   bool alwaysUse24HourFormat = false,
+  double textScale = 1,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -56,9 +57,10 @@ Future<void> _open(
       child: MaterialApp(
         theme: AppTheme.light().copyWith(platform: platform),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(alwaysUse24HourFormat: alwaysUse24HourFormat),
+          data: MediaQuery.of(context).copyWith(
+            alwaysUse24HourFormat: alwaysUse24HourFormat,
+            textScaler: TextScaler.linear(textScale),
+          ),
           child: child!,
         ),
         home: Scaffold(
@@ -336,6 +338,66 @@ void main() {
     );
   });
 
+  testWidgets('窄版最大字級仍可捲動清除與選擇時間後儲存', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        expectedVersion: any(named: 'expectedVersion'),
+        description: any(named: 'description'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(tripId: 't1')).thenAnswer((_) async {});
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      textScale: 3.2,
+      alwaysUse24HourFormat: true,
+    );
+    expect(tester.takeException(), isNull);
+    final clear = find.byKey(const ValueKey('entry-edit-start-clear'));
+    await tester.ensureVisible(clear);
+    await tester.tap(clear);
+    await tester.pumpAndSettle();
+    expect(clear, findsNothing);
+    final start = find.byKey(const ValueKey('entry-edit-start'));
+    await tester.ensureVisible(start);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    final picker = find.byType(CupertinoDatePicker);
+    await tester.ensureVisible(picker);
+    tester
+        .widget<CupertinoDatePicker>(picker)
+        .onDateTimeChanged(DateTime(2026, 9, 25, 8, 17));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(start);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    expect(find.text('08:17'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    verify(
+      () => repo.updateEntry(
+        tripId: 't1',
+        entryId: 11,
+        expectedVersion: 2,
+        description: '世界遺產',
+        startTime: '08:17',
+        endTime: '10:00',
+      ),
+    ).called(1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('展開再收合不得把 09:07 靜默量化成 09:05', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -521,6 +583,9 @@ void main() {
 
   testWidgets('新增模式：可帶 POI 分類與座標建立自訂停留點', (tester) async {
     final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(tripId: 't1', day: '2'),
+    ).thenAnswer((_) async {});
     when(
       () => repo.addEntryToDay(
         tripId: any(named: 'tripId'),
@@ -975,6 +1040,129 @@ void main() {
     expect(find.text('無法載入最新版本；你的草稿仍保留。'), findsOneWidget);
     expect(find.widgetWithText(TextField, '重新載入失敗也不能消失的草稿'), findsOneWidget);
     expect(find.text('重試載入'), findsOneWidget);
+  });
+
+  testWidgets('sheet 刷新失敗後重試取得新版，確認後保留草稿儲存', (tester) async {
+    final repo = _MockTripRepository();
+    final freshEntry = Completer<TimelineEntry>();
+    final submittedVersions = <int>[];
+    var loads = 0;
+    when(() => repo.watchEntry(tripId: 't1', entryId: 11)).thenAnswer((_) {
+      loads += 1;
+      if (loads == 1) return Stream.value(_entry);
+      if (loads == 2) {
+        return Stream.error(
+          const ApiError(
+            status: 503,
+            code: 'SYS_TEMPORARY',
+            message: 'offline',
+          ),
+        );
+      }
+      return Stream.fromFuture(freshEntry.future);
+    });
+    when(
+      () => repo.updateEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        expectedVersion: any(named: 'expectedVersion'),
+        description: any(named: 'description'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((invocation) async {
+      submittedVersions.add(
+        invocation.namedArguments[#expectedVersion]! as int,
+      );
+      if (submittedVersions.length == 1) {
+        throw const ApiError(
+          status: 409,
+          code: 'STALE_ENTRY',
+          message: 'stale',
+        );
+      }
+    });
+    when(() => repo.recomputeTravel(tripId: 't1')).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [tripRepositoryProvider.overrideWithValue(repo)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => showEntryEditSheet(
+                  context,
+                  tripId: 't1',
+                  args: const EntryEditExisting(_entry),
+                ),
+                child: const Text('開啟編輯'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-desc')),
+      '重試後仍保留的草稿',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('無法載入最新版本；你的草稿仍保留。'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '重試後仍保留的草稿'), findsOneWidget);
+    expect(submittedVersions, [2]);
+
+    await tester.tap(find.text('重試載入'));
+    await tester.pumpAndSettle();
+    expect(loads, 3, reason: '重試必須經正式 provider 重新要求 repository 載入');
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    expect(submittedVersions, [2], reason: '取得新版前不得再次送出過期 version');
+    expect(find.widgetWithText(TextField, '重試後仍保留的草稿'), findsOneWidget);
+
+    freshEntry.complete(
+      const TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        startTime: '09:00',
+        endTime: '10:00',
+        title: '首里城',
+        description: '協作者的新備註',
+        version: 3,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '重試後仍保留的草稿'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('entry-edit-refresh-error')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('保留你的版本？'), findsOneWidget);
+    expect(submittedVersions, [2], reason: '使用者確認前不得覆蓋協作者的新版');
+    await tester.tap(find.text('保留我的版本'));
+    await tester.pumpAndSettle();
+
+    expect(submittedVersions, [2, 3]);
+    verify(
+      () => repo.updateEntry(
+        tripId: 't1',
+        entryId: 11,
+        expectedVersion: 3,
+        description: '重試後仍保留的草稿',
+        startTime: '09:00',
+        endTime: '10:00',
+      ),
+    ).called(1);
+    expect(find.byKey(const ValueKey('entry-edit-desc')), findsNothing);
+    expect(find.text('開啟編輯'), findsOneWidget);
   });
 
   testWidgets('STALE 重新載入得知停留點已刪除時顯示不同結果', (tester) async {

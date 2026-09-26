@@ -17,6 +17,8 @@
 
 HIG 是設計指引，不是逐像素的認證規格。本文件使用「HIG 必須」代表 Tripline 的內部強制等級，不表示 Apple 原文全部使用 must。
 
+引用歸屬逐節核對見 [2026-09-25 Apple HIG 研究的 #388 核對](docs/research/2026-09-25-apple-hig-review.md)：Apple 建議、商店條款、Tripline 規則、推論與待驗證分開記錄；本文件既有產品 gate 不因來源分類而放寬。
+
 ## 2. 平台與相容基準
 
 - **Tripline 決策**：iOS 與 Android 使用同一套 iOS 26 system-app 視覺與互動，不另外建立 Material 版本。

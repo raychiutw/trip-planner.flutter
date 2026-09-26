@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
-import '../../../app/app_feedback.dart';
 import '../../../models/entry.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
+import '../entry_mutations.dart';
 import '../trip_providers.dart';
 
 /// 開啟交通編輯 bottom sheet。
@@ -87,6 +87,12 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   late bool _noTravel;
   bool _submitting = false;
   bool _dirty = false;
+  TripSegment? _refreshedSegment;
+  int? _staleVersion;
+  String? _errorMessage;
+  bool _waitingForFresh = false;
+  bool _needsConflictConfirmation = false;
+  ProviderSubscription<AsyncValue<List<TripSegment>>>? _segmentSubscription;
 
   @override
   void initState() {
@@ -123,6 +129,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
 
   @override
   void dispose() {
+    _segmentSubscription?.close();
     _min.dispose();
     _other.dispose();
     super.dispose();
@@ -138,7 +145,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   }
 
   bool get _canSubmit {
-    if (_submitting) return false;
+    if (_submitting || _waitingForFresh) return false;
     if (_noTravel) return true;
     if (_methodKey == 'other') {
       final name = _other.text.trim();
@@ -185,15 +192,77 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     Navigator.of(context).pop();
   }
 
+  void _refreshAfterConflict() {
+    setState(() {
+      _waitingForFresh = true;
+      _errorMessage = '交通已被更新。你的修改已保留，正在載入最新設定。';
+    });
+    _syncFormState();
+    _segmentSubscription?.close();
+    _segmentSubscription = ref.listenManual(
+      tripSegmentsProvider(widget.tripId),
+      (_, next) {
+        if (!mounted || !_waitingForFresh) return;
+        if (next.hasError) {
+          setState(() {
+            _errorMessage = '無法載入最新交通設定。你的修改已保留，請重試。';
+          });
+          return;
+        }
+        final segments = next.value;
+        if (next.isLoading || segments == null) return;
+        for (final segment in segments) {
+          if (segment.id != widget.segment?.id ||
+              segment.version <= _staleVersion!) {
+            continue;
+          }
+          setState(() {
+            _refreshedSegment = segment;
+            _waitingForFresh = false;
+            _needsConflictConfirmation = true;
+            _errorMessage = '已載入最新交通設定。你的修改已保留；再次儲存前請確認是否覆蓋對方版本。';
+          });
+          _syncFormState();
+          return;
+        }
+        setState(() {
+          _errorMessage = '無法確認最新交通設定。你的修改已保留，請重試。';
+        });
+      },
+    );
+    ref.invalidate(tripSegmentsProvider(widget.tripId));
+  }
+
   Future<bool> _save() async {
+    if (!_canSubmit) return false;
+    if (_needsConflictConfirmation) {
+      setState(() => _submitting = true);
+      _syncFormState();
+      final overwrite = await showAppDestructiveConfirm(
+        context,
+        source: TpDestructiveConfirmSource.direct,
+        title: '保留你的版本？',
+        message: '協作者也更新了交通設定。繼續會以你目前的交通方式與分鐘數覆蓋對方版本。',
+        confirmLabel: '保留我的版本',
+        cancelLabel: '繼續編輯',
+      );
+      if (!mounted) return false;
+      setState(() => _submitting = false);
+      _syncFormState();
+      if (!overwrite) return false;
+    }
+    final segment = _refreshedSegment ?? widget.segment;
     final min = _min.text.trim().isEmpty ? null : _minuteValue;
     final option = _selected;
     final submode = _methodKey == 'other' ? _other.text.trim() : option.submode;
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
     _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
+    final mutations = ref.read(entryMutationsProvider(widget.tripId).notifier);
     try {
-      final segment = widget.segment;
       if (segment != null) {
         await repo.updateSegment(
           tripId: widget.tripId,
@@ -221,8 +290,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
           noTravel: _noTravel,
         );
       }
-      ref.invalidate(tripDaysProvider(widget.tripId));
-      ref.invalidate(tripSegmentsProvider(widget.tripId));
+      await mutations.record(EntryMutation.segmentChanged);
       if (!mounted) return false;
       HapticFeedback.lightImpact();
       _dirty = false;
@@ -232,22 +300,25 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
       return true;
     } on ApiError catch (error) {
       if (!mounted) return false;
-      if (error.status == 409) {
-        ref.invalidate(tripSegmentsProvider(widget.tripId));
-        showAppError(context, '交通已更新，已重新載入');
+      if (error.status == 409 && segment != null) {
+        _staleVersion = segment.version;
         setState(() => _submitting = false);
-        _syncFormState();
+        _refreshAfterConflict();
         return false;
       }
-      setState(() => _submitting = false);
+      setState(() {
+        _submitting = false;
+        _errorMessage = '更新失敗，請稍後再試';
+      });
       _syncFormState();
-      showAppError(context, '更新失敗，請稍後再試');
       return false;
     } on Exception {
       if (!mounted) return false;
-      setState(() => _submitting = false);
+      setState(() {
+        _submitting = false;
+        _errorMessage = '更新失敗，請稍後再試';
+      });
       _syncFormState();
-      showAppError(context, '更新失敗，請稍後再試');
       return false;
     }
   }
@@ -266,6 +337,39 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
               if (widget.formController == null) ...[
                 Text('交通方式', style: theme.textTheme.titleLarge),
                 const SizedBox(height: TpSpacing.s4),
+              ],
+              if (_errorMessage != null) ...[
+                Semantics(
+                  key: const ValueKey('travel-edit-error'),
+                  liveRegion: true,
+                  child: Container(
+                    padding: const EdgeInsets.all(TpSpacing.s3),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(TpSpacing.s3),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
+                        ),
+                        if (_waitingForFresh)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
+                              onPressed: _refreshAfterConflict,
+                              child: const Text('重試'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s3),
               ],
               Wrap(
                 spacing: TpSpacing.s2,
