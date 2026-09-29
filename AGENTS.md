@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本檔是 Codex 與其他 coding agent 在此 repository 的強制工作契約。**每次開始任何探索、編輯、測試或外部操作前，必須先完整閱讀根目錄 `AGENTS.md`**。
+本檔是 Codex 與其他 coding agent 在此 repository 的工作契約。
 
 本檔依使用者明確要求與 `CLAUDE.md` 並存。兩者各自維護，沒有自動同步機制；改到共同規則時記得兩邊都改。若內容衝突，不得自行挑選，先向使用者指出差異。
 
