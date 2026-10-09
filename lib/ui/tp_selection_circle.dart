@@ -2,6 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'tp_tap_target.dart';
+
+const _iconSize = 24.0;
 
 /// 選取模式的圓形勾選鈕(iOS 清單多選樣式),取代 Material 的 `Checkbox`。
 ///
@@ -24,30 +27,25 @@ class TpSelectionCircle extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final enabled = onChanged != null;
     final color = !enabled
-        ? scheme.onSurface.withAlpha(97)
+        ? scheme.onSurface.withAlpha(TpDisabled.contentAlpha)
         : selected
         ? scheme.primary
         : scheme.onSurfaceVariant;
-    return Semantics(
-      label: semanticLabel,
-      checked: selected,
-      enabled: enabled,
-      excludeSemantics: true,
+    return TpTapTarget(
       onTap: enabled ? () => onChanged!(!selected) : null,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onChanged!(!selected) : null,
-        child: SizedBox.square(
-          dimension: TpSpacing.tapMin,
-          child: Center(
-            child: Icon(
-              selected
-                  ? CupertinoIcons.checkmark_circle_fill
-                  : CupertinoIcons.circle,
-              size: 24,
-              color: color,
-            ),
-          ),
+      checked: selected,
+      label: semanticLabel,
+      minWidth: TpSpacing.tapMin,
+      focusRadius: TpRadius.pill,
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: Icon(
+          selected
+              ? CupertinoIcons.checkmark_circle_fill
+              : CupertinoIcons.circle,
+          size: _iconSize,
+          color: color,
         ),
       ),
     );

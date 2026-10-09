@@ -4,11 +4,16 @@ import 'package:flutter/material.dart';
 import '../app/adaptive.dart';
 import '../theme/tokens.dart';
 import 'tp_action_item.dart';
+import 'tp_tap_target.dart';
+
+const _compactChevronSize = 12.0;
+const _fieldChevronSize = 14.0;
 
 /// 單選欄位,取代 Material 的 `DropdownButton`／`DropdownButtonFormField`。
 ///
 /// 欄位列顯示 [label] 與目前值,點擊開 action sheet(`showAppActionSheet`),選項
 /// 以 [options] 的迭代順序列出,目前值打勾。[onChanged] 為 null 時停用。
+/// [value] 為 null 或不在 [options] 裡時顯示 [placeholder],不留空白。
 class TpPickerField<T extends Object> extends StatelessWidget {
   const TpPickerField({
     super.key,
@@ -18,6 +23,7 @@ class TpPickerField<T extends Object> extends StatelessWidget {
     required this.onChanged,
     this.sheetTitle,
     this.compact = false,
+    this.placeholder = '未選擇',
   });
 
   final String label;
@@ -30,6 +36,9 @@ class TpPickerField<T extends Object> extends StatelessWidget {
 
   /// true 時只畫「目前值 + 上下箭頭」(行內用,不畫標籤與外框);語意仍朗讀 [label]。
   final bool compact;
+
+  /// 沒有可顯示的目前值時的文字。
+  final String placeholder;
 
   Future<void> _open(BuildContext context) async {
     final picked = await showAppActionSheet<T>(
@@ -52,20 +61,15 @@ class TpPickerField<T extends Object> extends StatelessWidget {
     final theme = Theme.of(context);
     final enabled = onChanged != null;
     final current = value == null ? null : options[value];
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: label,
-      value: current,
-      excludeSemantics: true,
+    return TpTapTarget(
       onTap: enabled ? () => _open(context) : null,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => _open(context) : null,
-        child: compact
-            ? _compactRow(theme, enabled, current)
-            : _fieldRow(theme, enabled, current),
-      ),
+      button: true,
+      label: label,
+      value: current ?? placeholder,
+      minWidth: TpSpacing.tapMin,
+      child: compact
+          ? _compactRow(theme, enabled, current)
+          : _fieldRow(theme, enabled, current),
     );
   }
 
@@ -77,15 +81,19 @@ class TpPickerField<T extends Object> extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            current ?? '',
+            current ?? placeholder,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: enabled ? scheme.primary : scheme.onSurface.withAlpha(97),
+              color: !enabled
+                  ? scheme.onSurface.withAlpha(TpDisabled.contentAlpha)
+                  : current == null
+                  ? scheme.onSurfaceVariant
+                  : scheme.primary,
             ),
           ),
           const SizedBox(width: TpSpacing.s1),
           Icon(
             CupertinoIcons.chevron_up_chevron_down,
-            size: 12,
+            size: _compactChevronSize,
             color: scheme.onSurfaceVariant,
           ),
         ],
@@ -111,13 +119,13 @@ class TpPickerField<T extends Object> extends StatelessWidget {
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: enabled
                       ? scheme.onSurface
-                      : scheme.onSurface.withAlpha(97),
+                      : scheme.onSurface.withAlpha(TpDisabled.contentAlpha),
                 ),
               ),
               const SizedBox(width: TpSpacing.s3),
               Expanded(
                 child: Text(
-                  current ?? '',
+                  current ?? placeholder,
                   textAlign: TextAlign.end,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -129,7 +137,7 @@ class TpPickerField<T extends Object> extends StatelessWidget {
               const SizedBox(width: TpSpacing.s2),
               Icon(
                 CupertinoIcons.chevron_up_chevron_down,
-                size: 14,
+                size: _fieldChevronSize,
                 color: scheme.onSurfaceVariant,
               ),
             ],
