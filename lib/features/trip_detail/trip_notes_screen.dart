@@ -1097,15 +1097,27 @@ class _NoteRowCard extends StatelessWidget {
 
 /// 時間/日期文字（tabular figures）。
 class _TimeText extends StatelessWidget {
-  const _TimeText(this.text);
+  const _TimeText(this.values) : formatAsDateTime = true;
 
-  final String text;
+  /// 不是日期時間的短文字（如電話）：照原字串顯示，不嘗試解析。
+  _TimeText.plain(String text) : values = [text], formatAsDateTime = false;
+
+  final bool formatAsDateTime;
+
+  /// 後端原字串（如 `2026-04-01 08:30`）；多個值以「 ~ 」連接（區間）。
+  final List<String> values;
+
+  /// 能解析就走裝置 locale 與 12/24 小時偏好，解析不了才退回原字串。
+  static String _format(BuildContext context, String raw) {
+    final parsed = DateTime.tryParse(raw);
+    return parsed == null ? raw : formatAppDateTime(context, parsed);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Text(
-      text,
+      values.map((v) => formatAsDateTime ? _format(context, v) : v).join(' ~ '),
       style: theme.textTheme.bodyMedium?.copyWith(
         color: theme.colorScheme.onSurfaceVariant,
         fontFeatures: const [FontFeature.tabularFigures()],
@@ -1161,7 +1173,7 @@ class _FlightRow extends StatelessWidget {
         ),
         if (flight.departAt.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
-          _TimeText(flight.departAt),
+          _TimeText([flight.departAt]),
         ],
       ],
     );
@@ -1181,7 +1193,7 @@ class _LodgingRow extends StatelessWidget {
         Text(lodging.name, style: theme.textTheme.titleMedium),
         if (lodging.checkInAt.isNotEmpty || lodging.checkOutAt.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
-          _TimeText('${lodging.checkInAt} ~ ${lodging.checkOutAt}'),
+          _TimeText([lodging.checkInAt, lodging.checkOutAt]),
         ],
         if (lodging.address.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
@@ -1234,7 +1246,7 @@ class _ReservationRow extends StatelessWidget {
         ),
         if (reservation.reservedAt.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
-          _TimeText(reservation.reservedAt),
+          _TimeText([reservation.reservedAt]),
         ],
       ],
     );
@@ -1347,7 +1359,7 @@ class _EmergencyContactRow extends StatelessWidget {
         ),
         if (contact.phone.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
-          _TimeText(contact.phone),
+          _TimeText.plain(contact.phone),
         ],
       ],
     );

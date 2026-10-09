@@ -314,9 +314,8 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   bool _submitting = false;
   String? _error;
 
-  bool get _canSubmit => widget.preview.hasPassword
-      ? _controller.text.isNotEmpty
-      : _controller.text == 'DELETE';
+  // 對話框只在帳號有密碼時開啟（無密碼帳號在上游就被擋下），所以只需密碼非空。
+  bool get _canSubmit => _controller.text.isNotEmpty;
 
   @override
   void initState() {
@@ -382,6 +381,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               obscureText: preview.hasPassword,
               autocorrect: false,
               enableSuggestions: false,
+              autofillHints: const [AutofillHints.password],
               decoration: InputDecoration(
                 labelText: preview.hasPassword ? '目前密碼（重新驗證）' : '輸入 DELETE 確認',
                 errorText: _error,

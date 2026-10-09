@@ -364,6 +364,8 @@ class _DeveloperAppFormScreenState
                                 labelText: '首頁 URL（選填）',
                               ),
                               keyboardType: TextInputType.url,
+                              autocorrect: false,
+                              enableSuggestions: false,
                               textInputAction: TextInputAction.next,
                               onFieldSubmitted: (_) {
                                 _redirectUrisFocusNode.requestFocus();
@@ -419,6 +421,8 @@ class _DeveloperAppFormScreenState
                                 helperText: '每行一個 URI',
                               ),
                               keyboardType: TextInputType.url,
+                              autocorrect: false,
+                              enableSuggestions: false,
                               minLines: 2,
                               maxLines: 4,
                               textInputAction: TextInputAction.done,

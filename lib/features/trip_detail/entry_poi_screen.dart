@@ -830,6 +830,8 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   String? _favoritesError;
   String _customPoiType = 'attraction';
   String? _customError;
+  String? _latError;
+  String? _lngError;
   bool _submitting = false;
   String? _submitError;
   bool _customDirty = false;
@@ -958,8 +960,16 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
     final name = _customNameCtrl.text.trim();
     final lat = double.tryParse(_customLatCtrl.text.trim());
     final lng = double.tryParse(_customLngCtrl.text.trim());
-    if (name.isEmpty || lat == null || lng == null) {
-      setState(() => _customError = '請輸入名稱與有效座標');
+    final latOk = lat != null && lat >= -90 && lat <= 90;
+    final lngOk = lng != null && lng >= -180 && lng <= 180;
+    if (name.isEmpty || !latOk || !lngOk) {
+      setState(() {
+        _customError = name.isEmpty ? '請輸入名稱' : null;
+        _latError = latOk ? null : (lat == null ? '請輸入有效緯度' : '緯度需介於 -90 到 90');
+        _lngError = lngOk
+            ? null
+            : (lng == null ? '請輸入有效經度' : '經度需介於 -180 到 180');
+      });
       return;
     }
     _submitPick(
@@ -1151,14 +1161,18 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                           signed: true,
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: '緯度',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          errorText: _latError,
                         ),
                         onChanged: (_) {
                           _syncCustomDirty();
-                          if (_customError != null) {
-                            setState(() => _customError = null);
+                          if (_customError != null || _latError != null) {
+                            setState(() {
+                              _customError = null;
+                              _latError = null;
+                            });
                           }
                         },
                       ),
@@ -1172,14 +1186,18 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                           signed: true,
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: '經度',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          errorText: _lngError,
                         ),
                         onChanged: (_) {
                           _syncCustomDirty();
-                          if (_customError != null) {
-                            setState(() => _customError = null);
+                          if (_customError != null || _lngError != null) {
+                            setState(() {
+                              _customError = null;
+                              _lngError = null;
+                            });
                           }
                         },
                       ),

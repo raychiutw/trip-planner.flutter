@@ -223,7 +223,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           AutofillHints.email,
                         ],
                         textInputAction: TextInputAction.next,
-                        enabled: !isBusy,
+                        readOnly: isBusy,
                         decoration: const InputDecoration(labelText: 'Email'),
                         validator: (value) =>
                             (value == null || value.trim().isEmpty)
@@ -237,7 +237,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         obscureText: _obscurePassword,
                         autofillHints: const [AutofillHints.password],
                         textInputAction: TextInputAction.done,
-                        enabled: !isBusy,
+                        readOnly: isBusy,
                         onFieldSubmitted: (_) => _submit(),
                         decoration: InputDecoration(
                           labelText: '密碼',

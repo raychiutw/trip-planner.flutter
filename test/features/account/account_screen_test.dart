@@ -511,6 +511,14 @@ void main() {
       const ValueKey('delete-account-confirm-button'),
     );
     expect(tester.widget<FilledButton>(confirmButton).onPressed, isNull);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('delete-account-confirmation-field')),
+          )
+          .autofillHints,
+      contains(AutofillHints.password),
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('delete-account-confirmation-field')),

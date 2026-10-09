@@ -103,11 +103,14 @@ void main() {
     );
     expect(
       tester
-          .widget<TextFormField>(
-            find.byKey(const ValueKey('login-email-field')),
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(const ValueKey('login-email-field')),
+              matching: find.byType(TextField),
+            ),
           )
-          .enabled,
-      isFalse,
+          .readOnly,
+      isTrue,
     );
     expect(
       tester

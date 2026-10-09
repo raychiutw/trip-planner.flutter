@@ -48,6 +48,15 @@ class CreateTripState {
     return tripDayCount(s, e);
   }
 
+  /// 固定日期兩端都填了卻不合法時的原因；其餘情況回 null。
+  String? get dateError {
+    if (dateMode != TripDateMode.fixed) return null;
+    final s = fixedStart;
+    final e = fixedEnd;
+    if (s == null || e == null || isTripDatesValid(s, e)) return null;
+    return tripDayCount(s, e) < 1 ? '結束日期不可早於開始日期' : '行程最多 30 天，請縮短日期範圍';
+  }
+
   bool get canSubmit =>
       destinations.isNotEmpty &&
       destinations.length <= 30 &&

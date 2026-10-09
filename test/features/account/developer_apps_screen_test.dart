@@ -536,6 +536,24 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('URL 欄位關閉自動修正與建議', (tester) async {
+    await pumpForm(tester);
+
+    for (final key in [
+      'developer-app-homepage',
+      'developer-app-redirect-uris',
+    ]) {
+      final editable = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(editable.autocorrect, isFalse, reason: key);
+      expect(editable.enableSuggestions, isFalse, reason: key);
+    }
+  });
+
   testWidgets('軟體鍵盤 Next/Done 依表單順序移動焦點', (tester) async {
     await pumpForm(tester);
 

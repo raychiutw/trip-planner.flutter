@@ -350,6 +350,37 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('送出中欄位改 readOnly 並保留焦點（鍵盤不收起）', (tester) async {
+      final pendingLogin = Completer<UserInfo>();
+      when(
+        () => mockAuthRepository.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) => pendingLogin.future);
+      await pumpLoginScreen(tester);
+
+      await tester.enterText(find.byKey(emailFieldKey), 'ray@example.com');
+      await tester.enterText(find.byKey(passwordFieldKey), 'secret');
+      await tester.tap(find.byKey(submitButtonKey));
+      await tester.pump();
+
+      final passwordField = innerTextFieldOf(tester, passwordFieldKey);
+      expect(passwordField.readOnly, isTrue);
+      expect(passwordField.enabled, isTrue);
+      expect(innerTextFieldOf(tester, emailFieldKey).readOnly, isTrue);
+      final editable = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(passwordFieldKey),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(editable.focusNode.hasFocus, isTrue);
+
+      pendingLogin.complete(loggedInUser);
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('鍵盤 Next 移到密碼，Done 送出既有 login contract', (tester) async {
       when(
         () => mockAuthRepository.login(

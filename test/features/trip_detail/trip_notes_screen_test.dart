@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
+import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -495,13 +496,22 @@ void main() {
     // 航班預設展開（mobile 行為）
     expect(find.text('長榮航空 BR112'), findsOneWidget);
     expect(find.text('TPE → OKA'), findsOneWidget);
-    expect(find.text('2026-04-01 08:30'), findsOneWidget);
+    // 日期時間走 formatAppDateTime（裝置 locale），不顯示後端原字串
+    final context = tester.element(find.byType(Scaffold).first);
+    String fmt(DateTime d) => formatAppDateTime(context, d);
+    expect(find.text(fmt(DateTime(2026, 4, 1, 8, 30))), findsOneWidget);
+    expect(find.text('2026-04-01 08:30'), findsNothing);
 
     // 展開住宿：name、checkInAt~checkOutAt、address
     await tester.tap(find.text('住宿'));
     await tester.pumpAndSettle();
     expect(find.text('那霸海濱飯店'), findsOneWidget);
-    expect(find.text('2026-04-01 15:00 ~ 2026-04-03 10:00'), findsOneWidget);
+    expect(
+      find.text(
+        '${fmt(DateTime(2026, 4, 1, 15))} ~ ${fmt(DateTime(2026, 4, 3, 10))}',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('沖繩縣那霸市西1-2-1'), findsOneWidget);
 
     // 展開預訂：kind chip + title + reservedAt
@@ -514,7 +524,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('餐廳'), findsOneWidget);
     expect(find.text('燒肉乃我那霸 新館'), findsOneWidget);
-    expect(find.text('2026-04-01 19:00'), findsOneWidget);
+    expect(find.text(fmt(DateTime(2026, 4, 1, 19))), findsOneWidget);
   });
 
   testWidgets('展開緊急聯絡：name + kind + phone', (tester) async {

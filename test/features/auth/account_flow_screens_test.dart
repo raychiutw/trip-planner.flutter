@@ -990,6 +990,17 @@ void main() {
       () => mockAuthRepository.requestPasswordReset('traveler@example.com'),
     ).called(1);
 
+    // 送出中改 readOnly 而非 disabled：欄位不失焦，鍵盤才不會收起又彈出
+    await tester.pump();
+    final inner = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('forgot-password-email-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(inner.readOnly, isTrue);
+    expect(inner.enabled, isTrue);
+
     pending.complete(null);
     await tester.pumpAndSettle();
   });

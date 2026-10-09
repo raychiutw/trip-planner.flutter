@@ -64,6 +64,44 @@ void main() {
     registerFallbackValue(<String, dynamic>{});
   });
 
+  group('欄位輸入屬性（keyboard／AutoFill／換行鍵）', () {
+    TextField fieldOf(WidgetTester tester, String key) =>
+        tester.widget<TextField>(find.byKey(ValueKey('note-field-$key')));
+
+    testWidgets('電話：phone 鍵盤 + telephoneNumber AutoFill', (tester) async {
+      await _open(tester, _MockTripRepository(), section: NoteSection.lodgings);
+      final phone = fieldOf(tester, 'phone');
+      expect(phone.keyboardType, TextInputType.phone);
+      expect(phone.autofillHints, contains(AutofillHints.telephoneNumber));
+      expect(phone.textInputAction, TextInputAction.next);
+    });
+
+    testWidgets('緊急聯絡 Email：email 鍵盤、關閉自動修正', (tester) async {
+      await _open(
+        tester,
+        _MockTripRepository(),
+        section: NoteSection.emergency,
+      );
+      final email = fieldOf(tester, 'email');
+      expect(email.keyboardType, TextInputType.emailAddress);
+      expect(email.autofillHints, contains(AutofillHints.email));
+      expect(email.autocorrect, isFalse);
+    });
+
+    for (final (section, key) in [
+      (NoteSection.flights, 'flight_no'),
+      (NoteSection.lodgings, 'booking_no'),
+      (NoteSection.reservations, 'reservation_no'),
+    ]) {
+      testWidgets('$key：全大寫、關閉自動修正', (tester) async {
+        await _open(tester, _MockTripRepository(), section: section);
+        final field = fieldOf(tester, key);
+        expect(field.textCapitalization, TextCapitalization.characters);
+        expect(field.autocorrect, isFalse);
+      });
+    }
+  });
+
   for (final (section, requiredKey, lastKey, latestNotes)
       in <(NoteSection, String, String, TripNotes)>[
         (
