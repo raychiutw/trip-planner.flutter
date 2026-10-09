@@ -306,7 +306,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final completedAt = report?.completedAt ?? report?.createdAt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
