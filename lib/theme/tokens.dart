@@ -69,6 +69,21 @@ abstract final class TpRadius {
   static const md = 8.0;
   static const lg = 12.0;
   static const xl = 16.0;
+
+  /// 膠囊(半徑大於任何高度,等同完全圓角)。
+  static const pill = 999.0;
+}
+
+/// 停用態的共用不透明度,讓各控制項的「變淡」程度一致。
+abstract final class TpDisabled {
+  /// 停用文字／符號的 alpha(約 38%)。
+  static const contentAlpha = 97;
+
+  /// 停用填色的 alpha(約 12%)。
+  static const fillAlpha = 31;
+
+  /// 整個控制項停用時的視覺不透明度。
+  static const controlOpacity = 0.4;
 }
 
 /// 間距 token（4px grid）。

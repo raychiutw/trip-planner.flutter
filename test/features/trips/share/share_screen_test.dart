@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/ui/tp_segmented_control.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/ui/tp_chip.dart';
@@ -844,7 +845,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('share-edit-expiry-7d')));
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(TpSegmentedControl<String>).last,
+            matching: find.text('7 天'),
+          )
+          .last,
+    );
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('share-edit-submit')));
     await tester.pumpAndSettle();

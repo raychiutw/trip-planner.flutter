@@ -1017,10 +1017,6 @@ class _EditShareFormState extends State<_EditShareForm> {
               for (final key in _expiryPresets.keys)
                 key: _expiryLabels[key] ?? key,
             },
-            segmentKeys: {
-              for (final key in _expiryPresets.keys)
-                key: ValueKey('share-edit-expiry-$key'),
-            },
           ),
         ),
         if (_expiryKey == 'custom') ...[

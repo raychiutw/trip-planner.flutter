@@ -26,10 +26,26 @@ class TpProgressBar extends StatefulWidget {
 }
 
 class _TpProgressBarState extends State<TpProgressBar>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   AnimationController? _controller;
 
-  void _syncController(bool animate) {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncController();
+  }
+
+  @override
+  void didUpdateWidget(TpProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncController();
+  }
+
+  /// indeterminate 且未開「減少動態效果」才需要 controller;在生命週期回呼同步,
+  /// 不在 build 內產生副作用。
+  void _syncController() {
+    final animate =
+        widget.value == null && !MediaQuery.disableAnimationsOf(context);
     if (animate) {
       _controller ??= AnimationController(
         vsync: this,
@@ -51,8 +67,6 @@ class _TpProgressBarState extends State<TpProgressBar>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final value = widget.value;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    _syncController(value == null && !reduceMotion);
     final radius = BorderRadius.circular(widget.height / 2);
 
     Widget bar;
