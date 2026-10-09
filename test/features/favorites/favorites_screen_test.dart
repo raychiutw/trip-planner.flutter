@@ -10,6 +10,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/ui/tp_selection_circle.dart';
 import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/app/app_loading_skeleton.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/favorites/poi_favorite_card.dart';
@@ -79,6 +80,26 @@ Future<void> _openFavoritesFilter(WidgetTester tester) async {
 
 void main() {
   group('FavoritesScreen', () {
+    testWidgets('載入中用列表骨架並保留可朗讀標籤,不是單一 spinner', (tester) async {
+      final handle = tester.ensureSemantics();
+      final controller = StreamController<List<PoiFavorite>>();
+      addTearDown(controller.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => controller.stream),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(AppListLoadingSkeleton), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.bySemanticsLabel('正在載入收藏'), findsOneWidget);
+      handle.dispose();
+    });
+
     testWidgets('header 的排序與新增共用一片玻璃，中間只有間距、沒有分隔線', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

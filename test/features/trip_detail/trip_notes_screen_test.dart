@@ -10,6 +10,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/app/app_loading_skeleton.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -1768,6 +1769,41 @@ void main() {
         exclusionId: 3,
       ),
     ).called(1);
+  });
+
+  testWidgets('排除清單載入中用列表骨架,不是單一 spinner', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 2,
+          ),
+        ],
+      ),
+    );
+    final gate = Completer<List<TripNoteExclusion>>();
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: any(named: 'tripId')),
+    ).thenAnswer((_) => gate.future);
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-tips')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(AppListLoadingSkeleton), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.bySemanticsLabel('正在載入'), findsOneWidget);
+    gate.complete(const []);
+    await tester.pump();
   });
 
   testWidgets('窄螢幕大字級仍能分別開啟一般與住宿排除清單', (tester) async {

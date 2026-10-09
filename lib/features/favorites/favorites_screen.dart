@@ -16,7 +16,7 @@ import '../../ui/tp_chip.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
-import '../../ui/tp_state_view.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../ui/swipe_to_delete.dart';
 import '../../ui/tp_settings_group.dart';
 import 'favorites_providers.dart';
@@ -133,10 +133,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 ),
               ),
             ],
-            loading: () => const [
+            loading: () => [
               SliverFillRemaining(
-                hasScrollBody: false,
-                child: TpLoadingIndicator(label: '正在載入收藏'),
+                // 骨架需要有界高度（Column + Expanded），故 hasScrollBody 為 true。
+                child: Semantics(
+                  liveRegion: true,
+                  label: '正在載入收藏',
+                  child: const ExcludeSemantics(child: AppListLoadingSkeleton()),
+                ),
               ),
             ],
           ),
