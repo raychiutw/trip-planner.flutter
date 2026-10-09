@@ -1084,7 +1084,7 @@ void main() {
       findsNothing,
     );
     expect(find.text('首里城'), findsOneWidget);
-    expect(find.textContaining('09:00'), findsOneWidget);
+    expect(find.textContaining('09：00'), findsOneWidget);
 
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
     expect(
@@ -1565,7 +1565,7 @@ void main() {
 
     final card = find.byKey(const ValueKey('entry-card-11'));
     expect(
-      find.descendant(of: card, matching: find.text('09:00–10:30')),
+      find.descendant(of: card, matching: find.text('09：00 - 10：30')),
       findsOneWidget,
     );
     expect(
@@ -1652,14 +1652,14 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-51')),
-        matching: find.text('07:45'),
+        matching: find.text('07：45'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-52')),
-        matching: find.text('08:00'),
+        matching: find.text('08：00'),
       ),
       findsOneWidget,
     );

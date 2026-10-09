@@ -1027,16 +1027,15 @@ void main() {
   ) async {
     await _pumpTimeline(tester);
 
-    // selector 使用精簡 DAY N；內容 eyebrow 保留兩位數 DAY NN。
-    expect(find.text('Day 1'), findsOneWidget);
+    // 一次只顯示一天:selector 的 pill 與內容 eyebrow 共用 dayLabel,各一份。
+    expect(find.text('Day 1'), findsNWidgets(2));
     expect(find.text('Day 2'), findsOneWidget);
-    expect(find.text('Day 1'), findsOneWidget);
     expect(find.text('2026-04-23（四）'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Day 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsNWidgets(2));
     expect(find.text('2026-04-24（五）'), findsOneWidget);
     expect(
       tester
@@ -1614,7 +1613,9 @@ void main() {
       const ValueKey('trip-timeline-view-day-selector'),
     );
     final selectorRect = tester.getRect(selector);
-    final selectedLabelRect = tester.getRect(find.text('Day 1'));
+    final selectedLabelRect = tester.getRect(
+      find.descendant(of: selector, matching: find.text('Day 1')),
+    );
 
     expect(tester.takeException(), isNull);
     expect(selectorRect.height, greaterThan(TpSpacing.tapMin));
@@ -2123,7 +2124,14 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.text('調整順序'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('entry-reorder-'),
+      ),
+      findsNothing,
+    );
     expect(find.text('編輯停留點'), findsNothing);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
   });
