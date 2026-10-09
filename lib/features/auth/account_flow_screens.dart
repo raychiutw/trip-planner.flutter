@@ -130,8 +130,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final invitation = widget.invitationToken;
     return _AuthScaffold(
       title: '建立帳號',
+      backFallback: invitation == null
+          ? '/login'
+          : '/invite?token=${Uri.encodeQueryComponent(invitation)}',
       subtitle: widget.invitationToken == null
           ? '用 Email 加入 Tripline'
           : '建立帳號後加入這趟行程',
@@ -779,11 +783,15 @@ class _AuthScaffold extends StatelessWidget {
     this.primaryActionKey,
     this.onPrimaryAction,
     this.primaryActionEnabled = true,
+    this.backFallback = '/login',
   });
 
   final String title;
   final String subtitle;
   final Widget child;
+
+  /// 返回時沒有可 pop 的 route 才去的位置(例如從邀請頁進來要回邀請頁)。
+  final String backFallback;
   final String? primaryActionLabel;
   final Key? primaryActionKey;
   final VoidCallback? onPrimaryAction;
@@ -797,7 +805,9 @@ class _AuthScaffold extends StatelessWidget {
       appBar: TpAppBar(
         role: TpAppBarRole.publicDetail,
         title: Text(title),
-        onBack: () => context.go('/login'),
+        // 優先 pop 保留原本的 route stack;沒有可 pop 的才走 fallback。
+        onBack: () =>
+            context.canPop() ? context.pop() : context.go(backFallback),
         primaryActionLabel: primaryActionLabel,
         primaryActionKey: primaryActionKey,
         onPrimaryAction: onPrimaryAction,

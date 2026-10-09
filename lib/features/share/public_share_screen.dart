@@ -56,10 +56,16 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
     final shareAsync = ref.watch(publicTripShareProvider(_token));
     final currentUser = ref.watch(authStateProvider).value;
     return Scaffold(
-      appBar: const TpAppBar(
-        role: TpAppBarRole.standalone,
-        title: Text('行程分享'),
-      ),
+      // 已登入者(例如從通知冷啟動進來)需要離開入口:返回(優先 pop,否則回
+      // 首頁)與帳號入口。未登入訪客維持 standalone,沒有可去的 app 內位置。
+      appBar: currentUser == null
+          ? const TpAppBar(role: TpAppBarRole.standalone, title: Text('行程分享'))
+          : TpAppBar(
+              role: TpAppBarRole.detail,
+              title: const Text('行程分享'),
+              onBack: () => context.canPop() ? context.pop() : context.go('/'),
+              accountEntry: const TpAccountAvatarButton(),
+            ),
       body: SafeArea(
         child: shareAsync.when(
           skipLoadingOnRefresh: !shareAsync.hasError,

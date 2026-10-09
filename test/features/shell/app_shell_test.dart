@@ -507,6 +507,53 @@ void main() {
       expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsOneWidget);
     });
 
+    testWidgets('regular width 側欄行程可由鍵盤聚焦並以 Enter 選取', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = buildSplitShellRouter();
+      addTearDown(router.dispose);
+      final trips = [
+        TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩旅行'),
+        TripSummary(tripId: 'trip-2', name: 'tokyo', title: '東京旅行'),
+      ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(trips)),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final item = find.byKey(const ValueKey('trip-sidebar-item-trip-2'));
+      expect(
+        tester
+            .widget<ListTile>(
+              find.descendant(of: item, matching: find.byType(ListTile)),
+            )
+            .onTap,
+        isNotNull,
+      );
+      var focused = false;
+      for (var i = 0; i < 40 && !focused; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final primary = FocusManager.instance.primaryFocus?.context;
+        if (primary == null) continue;
+        focused = _isAncestor(item.evaluate().single, primary);
+      }
+      expect(focused, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/trips/trip-2');
+    });
+
     testWidgets('regular width 行程 detail 使用保留選取的 split view', (tester) async {
       tester.view.physicalSize = const Size(1024, 768);
       tester.view.devicePixelRatio = 1;
@@ -1221,4 +1268,13 @@ class _AdaptiveDetailStateProbeState extends State<_AdaptiveDetailStateProbe> {
     _scrollController.dispose();
     super.dispose();
   }
+}
+
+bool _isAncestor(Element ancestor, BuildContext descendant) {
+  var found = false;
+  descendant.visitAncestorElements((e) {
+    if (e == ancestor) found = true;
+    return !found;
+  });
+  return found;
 }
