@@ -744,6 +744,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('請立即複製 client_secret'), findsOneWidget);
+    expect(find.byTooltip('複製 Client ID'), findsOneWidget);
+    expect(find.byTooltip('複製 Client Secret'), findsOneWidget);
     expect(find.textContaining('不會再顯示'), findsOneWidget);
     expect(
       find.byKey(const Key('developer-app-copy-client-id')),

@@ -195,7 +195,13 @@ class _InviteHero extends StatelessWidget {
               ),
             ),
             const SizedBox(height: TpSpacing.s2),
-            Text(invitation.tripTitle, style: theme.textTheme.headlineSmall),
+            Semantics(
+              header: true,
+              child: Text(
+                invitation.tripTitle,
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
             const SizedBox(height: TpSpacing.s3),
             Text(
               '$inviter 邀請 ${invitation.invitedEmail} 加入此行程。',

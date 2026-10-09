@@ -88,6 +88,21 @@ void main() {
     return router;
   }
 
+  testWidgets('Auth 卡片品牌標題是 VoiceOver header', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    expect(
+      tester
+          .getSemantics(find.text('Tripline'))
+          .getSemanticsData()
+          .flagsCollection
+          .isHeader,
+      isTrue,
+    );
+    handle.dispose();
+  });
+
   testWidgets('註冊欄位提供同組姓名、Email 與新密碼 AutoFill 語意', (tester) async {
     await pumpAuthRoutes(tester, initialLocation: '/signup');
 

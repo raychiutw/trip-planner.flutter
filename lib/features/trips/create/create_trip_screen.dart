@@ -271,6 +271,7 @@ class _FlexibleDate extends StatelessWidget {
             const Spacer(),
             IconButton(
               key: const ValueKey('create-flex-minus'),
+              tooltip: '減少天數',
               onPressed: !ctrl.editingEnabled
                   ? null
                   : () => ctrl.setFlexDayCount(state.flexDayCount - 1),
@@ -283,6 +284,7 @@ class _FlexibleDate extends StatelessWidget {
             ),
             IconButton(
               key: const ValueKey('create-flex-plus'),
+              tooltip: '增加天數',
               onPressed: !ctrl.editingEnabled
                   ? null
                   : () => ctrl.setFlexDayCount(state.flexDayCount + 1),
@@ -324,6 +326,7 @@ class _DayQuotaSection extends StatelessWidget {
             children: [
               Expanded(child: Text(state.destinations[i].name)),
               IconButton(
+                tooltip: '減少${state.destinations[i].name}天數',
                 onPressed: !ctrl.editingEnabled
                     ? null
                     : () => ctrl.setQuota(
@@ -334,6 +337,7 @@ class _DayQuotaSection extends StatelessWidget {
               ),
               Text('${state.destinations[i].dayQuota ?? 1}'),
               IconButton(
+                tooltip: '增加${state.destinations[i].name}天數',
                 onPressed: !ctrl.editingEnabled
                     ? null
                     : () => ctrl.setQuota(

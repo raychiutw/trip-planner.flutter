@@ -872,6 +872,13 @@ void main() {
         isTrue,
         reason: '「⋯」的選取與長按選單結果相同',
       );
+      expect(
+        tester
+            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
+            .semanticLabel,
+        startsWith('選取'),
+        reason: '選取模式 Checkbox 要有名稱',
+      );
       semantics.dispose();
     });
 

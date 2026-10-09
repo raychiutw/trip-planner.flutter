@@ -820,11 +820,14 @@ class _AuthScaffold extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Tripline',
-                    textAlign: TextAlign.center,
-                    style: textTheme.displaySmall?.copyWith(
-                      color: colorScheme.primary,
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      'Tripline',
+                      textAlign: TextAlign.center,
+                      style: textTheme.displaySmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: TpSpacing.s6),

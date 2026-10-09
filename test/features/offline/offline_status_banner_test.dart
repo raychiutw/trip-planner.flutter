@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,6 +85,14 @@ void main() {
     await pump(tester);
     expect(find.byKey(const ValueKey('offline-pending-banner')), findsNothing);
     expect(find.byKey(const ValueKey('offline-conflict-banner')), findsNothing);
+  });
+
+  testWidgets('離線橫幅文字是 liveRegion', (tester) async {
+    final handle = tester.ensureSemantics();
+    await cache.appendMutation(_mut('1'));
+    await pump(tester);
+    expect(tester.isLiveRegionOf(find.text('1 筆變更待同步')), isTrue);
+    handle.dispose();
   });
 
   testWidgets('有待同步 → 顯示筆數 + 立即重試', (tester) async {

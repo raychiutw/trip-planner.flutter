@@ -1,3 +1,4 @@
+import '../../../helpers/semantics_flags.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,6 +70,16 @@ void main() {
   testWidgets('已收藏 = filled heart', (tester) async {
     await pumpCard(tester, isSaved: true);
     expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
+  });
+
+  testWidgets('heart 帶 toggled 語意，收藏狀態不只靠圖示', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final heart = find.byKey(const ValueKey('poi-heart-p1'));
+    await pumpCard(tester, isSaved: false);
+    expect(tester.isToggledOf(heart), isFalse);
+    await pumpCard(tester, isSaved: true);
+    expect(tester.isToggledOf(heart), isTrue);
+    semantics.dispose();
   });
 
   testWidgets('點 heart → onToggleFavorite', (tester) async {

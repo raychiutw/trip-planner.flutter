@@ -83,6 +83,13 @@ void main() {
     );
   }
 
+  testWidgets('純圖示的搜尋與天數 stepper 有 tooltip', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('搜尋地點'), findsOneWidget);
+  });
+
   Future<void> completeBasics(WidgetTester tester) async {
     await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
     await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));

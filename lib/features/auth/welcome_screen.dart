@@ -15,6 +15,7 @@ class WelcomeScreen extends StatelessWidget {
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
+    final inset = MediaQuery.paddingOf(context);
     final toolbarHeight = math.max(
       56.0,
       MediaQuery.textScalerOf(context).scale(20) + 20,
@@ -31,8 +32,11 @@ class WelcomeScreen extends StatelessWidget {
             backgroundColor: theme.colorScheme.surface,
             surfaceTintColor: Colors.transparent,
             scrolledUnderElevation: 0,
-            titleSpacing: 18,
-            title: Text('Tripline', style: theme.textTheme.titleLarge),
+            titleSpacing: 18 + inset.left,
+            title: Semantics(
+              header: true,
+              child: Text('Tripline', style: theme.textTheme.titleLarge),
+            ),
             actions: [
               TextButton(
                 key: const ValueKey('welcome-login-top'),
@@ -44,7 +48,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 child: const Text('登入'),
               ),
-              const SizedBox(width: TpSpacing.s1),
+              SizedBox(width: TpSpacing.s1 + inset.right),
             ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
@@ -126,10 +130,13 @@ class _HeroCopy extends StatelessWidget {
           ),
         ),
         const SizedBox(height: TpSpacing.s3),
-        Text(
-          '行程排壞了，講一句話就好',
-          key: const ValueKey('welcome-headline'),
-          style: theme.textTheme.displaySmall,
+        Semantics(
+          header: true,
+          child: Text(
+            '行程排壞了，講一句話就好',
+            key: const ValueKey('welcome-headline'),
+            style: theme.textTheme.displaySmall,
+          ),
         ),
         const SizedBox(height: TpSpacing.s3),
         ConstrainedBox(
@@ -188,7 +195,10 @@ class _Features extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('出發前你會反覆做的三件事', style: theme.textTheme.headlineSmall),
+          Semantics(
+            header: true,
+            child: Text('出發前你會反覆做的三件事', style: theme.textTheme.headlineSmall),
+          ),
           const SizedBox(height: TpSpacing.s2),
           Text(
             '不是功能清單，是實際會發生的事。',
@@ -307,10 +317,13 @@ class _ClosingCallToAction extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(
-              '行程還在 Google Docs 裡？',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall,
+            Semantics(
+              header: true,
+              child: Text(
+                '行程還在 Google Docs 裡？',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall,
+              ),
             ),
             const SizedBox(height: TpSpacing.s2),
             Text(
@@ -340,6 +353,7 @@ class _Footer extends StatelessWidget {
     final theme = Theme.of(context);
     return SafeArea(
       top: false,
+      // 左右由 SafeArea 讓出橫向 inset。
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(18, TpSpacing.s6, 18, TpSpacing.s8),
@@ -401,8 +415,14 @@ class _PageSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 761;
+    final inset = MediaQuery.paddingOf(context);
+    final base = wide ? desktopPadding : mobilePadding;
+    // 橫向時瀏海／Dynamic Island 會遮側邊，內容邊距要再讓出 safe area。
     return Padding(
-      padding: wide ? desktopPadding : mobilePadding,
+      padding: base.copyWith(
+        left: base.left + inset.left,
+        right: base.right + inset.right,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1160),

@@ -98,6 +98,17 @@ void main() {
     expect(find.byKey(const ValueKey('ai-authorize-btn')), findsOneWidget);
   });
 
+  testWidgets('撤銷鈕語意帶 app 名稱，VoiceOver 分得出對象', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pumpScreen(tester);
+
+    final label = tester
+        .getSemantics(find.byKey(const Key('connected-app-revoke-tp_alpha')))
+        .label;
+    expect(label, contains('撤銷 Alpha App'));
+    semantics.dispose();
+  });
+
   testWidgets('撤銷 app 需確認，確認後呼叫 repository', (tester) async {
     await pumpScreen(tester);
 

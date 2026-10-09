@@ -106,6 +106,21 @@ void main() {
   }
 
   group('渲染', () {
+    testWidgets('品牌標題是 VoiceOver header', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpLoginScreen(tester);
+
+      expect(
+        tester
+            .getSemantics(find.text('Tripline'))
+            .getSemanticsData()
+            .flagsCollection
+            .isHeader,
+        isTrue,
+      );
+      handle.dispose();
+    });
+
     testWidgets('品牌區、email 欄位、密碼欄位、登入按鈕存在', (tester) async {
       await pumpLoginScreen(tester);
 

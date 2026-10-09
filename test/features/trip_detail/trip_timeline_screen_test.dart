@@ -2917,6 +2917,32 @@ void main() {
     expect(find.text('注意事項'), findsNothing);
   });
 
+  testWidgets('travel pill 可點區高度 >= 44 且語意帶編輯交通方式 hint', (tester) async {
+    final handle = tester.ensureSemantics();
+    await _pumpTimeline(
+      tester,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          version: 1,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    final tap = find.byKey(const ValueKey('travel-edit-50'));
+    expect(tester.getSize(tap).height, greaterThanOrEqualTo(44));
+    // 視覺 pill 本身不變高。
+    expect(tester.getSize(find.byType(TravelPill).first).height, lessThan(44));
+    final data = tester.getSemantics(tap).getSemanticsData();
+    expect(data.hint, '編輯交通方式');
+    expect(data.hasAction(SemanticsAction.tap), isTrue);
+    handle.dispose();
+  });
+
   testWidgets('點 travel pill → 大眾運輸填分鐘 → updateSegment', (tester) async {
     final repo = _MockTripRepository();
     when(

@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'dart:async';
 import 'dart:ui' show SemanticsAction;
 
@@ -563,6 +564,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final upTooltip = tester
+          .widget<IconButton>(find.byKey(const ValueKey('alt-move-up-502')))
+          .tooltip;
+      expect(upTooltip, startsWith('上移'));
+      expect(upTooltip, hasLength(greaterThan(2)), reason: '要帶備選地點名稱');
       final nameNodeId = tester.getSemantics(find.text('玉陵')).id;
       final up = find.byKey(const ValueKey('alt-move-up-502'));
       final upNodeId = tester.getSemantics(up).id;
@@ -1053,6 +1059,32 @@ void main() {
     expect(customPoi.name, '秘密觀景台');
     expect(customPoi.lat, 26.2);
     expect(customPoi.lng, 127.6);
+  });
+
+  testWidgets('POI 選擇 sheet 的分段帶 selected 語意，座標錯誤是 liveRegion', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    final search = find.byKey(const ValueKey('poi-picker-tab-search'));
+    final custom = find.byKey(const ValueKey('poi-picker-tab-custom'));
+    expect(tester.isSelectedOf(search), isTrue);
+    expect(tester.isSelectedOf(custom), isFalse);
+
+    await tester.tap(custom);
+    await tester.pumpAndSettle();
+    expect(tester.isSelectedOf(search), isFalse);
+    expect(tester.isSelectedOf(custom), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('poi-picker-custom-submit')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.isLiveRegionOf(find.byKey(const ValueKey('poi-custom-error'))),
+      isTrue,
+    );
+    semantics.dispose();
   });
 
   testWidgets('自訂地點已修改時取消會先確認捨棄', (tester) async {

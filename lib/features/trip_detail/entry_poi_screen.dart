@@ -202,7 +202,7 @@ class EntryPoiScreen extends ConsumerWidget {
                       children: [
                         IconButton(
                           key: ValueKey('alt-move-up-${alt.poiId}'),
-                          tooltip: '上移',
+                          tooltip: '上移${alt.name ?? '備選地點'}',
                           icon: const Icon(Icons.keyboard_arrow_up),
                           onPressed: index == 0
                               ? null
@@ -216,7 +216,7 @@ class EntryPoiScreen extends ConsumerWidget {
                         ),
                         IconButton(
                           key: ValueKey('alt-move-down-${alt.poiId}'),
-                          tooltip: '下移',
+                          tooltip: '下移${alt.name ?? '備選地點'}',
                           icon: const Icon(Icons.keyboard_arrow_down),
                           onPressed: index == entry.alternates.length - 1
                               ? null
@@ -239,7 +239,10 @@ class EntryPoiScreen extends ConsumerWidget {
                         alt,
                         sameDayEntries,
                       ),
-                      child: const Text('設為正選'),
+                      child: Text(
+                        '設為正選',
+                        semanticsLabel: '將${alt.name ?? '備選地點'}設為正選',
+                      ),
                     ),
                   ],
                 ),
@@ -913,17 +916,23 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   }) {
     final selected = _tab == tab;
     return Expanded(
-      child: selected
-          ? FilledButton(
-              key: key,
-              onPressed: () => _selectTab(tab),
-              child: Text(label),
-            )
-          : OutlinedButton(
-              key: key,
-              onPressed: () => _selectTab(tab),
-              child: Text(label),
-            ),
+      // 自製分段以填色區分選取，語意要同步帶 selected。
+      child: MergeSemantics(
+        child: Semantics(
+          selected: selected,
+          child: selected
+              ? FilledButton(
+                  key: key,
+                  onPressed: () => _selectTab(tab),
+                  child: Text(label),
+                )
+              : OutlinedButton(
+                  key: key,
+                  onPressed: () => _selectTab(tab),
+                  child: Text(label),
+                ),
+        ),
+      ),
     );
   }
 
@@ -1188,10 +1197,14 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 ),
                 if (_customError != null) ...[
                   const SizedBox(height: TpSpacing.s2),
-                  Text(
-                    _customError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      _customError!,
+                      key: const ValueKey('poi-custom-error'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 ],
