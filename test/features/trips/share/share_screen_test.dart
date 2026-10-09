@@ -924,7 +924,7 @@ void main() {
     ]) {
       expect(
         tester
-            .widget<FilterChip>(find.byKey(ValueKey('share-section-$s')))
+            .widget<TpChip>(find.byKey(ValueKey('share-section-$s')))
             .selected,
         isFalse,
         reason: s,
