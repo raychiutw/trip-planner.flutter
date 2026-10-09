@@ -104,12 +104,8 @@ class _StubMapRepository implements MapRepository {
   }
 }
 
-/// 前 [failFirst] 次呼叫丟例外，之後回正常幾何。
+/// 第一次呼叫丟例外，之後回正常幾何。
 class _FlakyMapRepository extends _StubMapRepository {
-  _FlakyMapRepository({this.failFirst = 1});
-
-  final int failFirst;
-
   @override
   Future<TripRouteResult> fetchRoute({
     required double fromLat,
@@ -118,7 +114,7 @@ class _FlakyMapRepository extends _StubMapRepository {
     required double toLng,
     cancelToken,
   }) async {
-    if (calls < failFirst) {
+    if (calls < 1) {
       calls++;
       throw StateError('SECRET-route-trace');
     }
