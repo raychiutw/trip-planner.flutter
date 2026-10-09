@@ -36,7 +36,7 @@ class TpStateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
+    final content = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
         child: Padding(
@@ -79,5 +79,26 @@ class TpStateView extends StatelessWidget {
         ),
       ),
     );
+    // 只有 loading 自帶 liveRegion；error／offline 等多由呼叫端包 liveRegion，
+    // 這裡再包會重複朗讀。
+    if (kind != TpStateKind.loading) return content;
+    return Semantics(container: true, liveRegion: true, child: content);
   }
+}
+
+/// 滿版載入圈：帶名稱的 liveRegion，讓 VoiceOver 唸出載入中。
+class TpLoadingIndicator extends StatelessWidget {
+  const TpLoadingIndicator({super.key, this.label = '載入中'});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    label: label,
+    child: const ExcludeSemantics(
+      child: Center(child: CircularProgressIndicator.adaptive()),
+    ),
+  );
 }

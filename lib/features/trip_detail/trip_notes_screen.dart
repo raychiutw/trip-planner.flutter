@@ -19,6 +19,7 @@ import '../../ui/dynamic_type.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/swipe_to_delete.dart';
+import '../../ui/tp_state_view.dart';
 import 'notes/note_edit_sheet.dart';
 import 'notes/note_field_spec.dart';
 import 'notes/notes_ai_controller.dart';
@@ -672,7 +673,7 @@ class _NoteExclusionsListState extends ConsumerState<_NoteExclusionsList> {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.all(TpSpacing.s6),
-            child: Center(child: CircularProgressIndicator.adaptive()),
+            child: TpLoadingIndicator(label: '正在載入'),
           );
         }
         final items = snapshot.data ?? const <TripNoteExclusion>[];

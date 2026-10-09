@@ -266,7 +266,12 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       'Content headers support one direct action; extra actions use More.',
     );
     // 帳號入口在額度計算之後才併入，位置固定在最右側。
-    final headerActions = <Widget>[...pageActions, ?accountEntry];
+    // large sheet 已有自己的關閉鈕且疊在 shell 之上，再放帳號入口會讓帳號面板
+    // 與編輯 sheet 互相疊加，所以 sheet 情境一律忽略 accountEntry。
+    final headerActions = <Widget>[
+      ...pageActions,
+      if (largeSheetScope == null) ?accountEntry,
+    ];
     final barActions = <Widget>[
       ...headerActions,
       if (largeSheetScope != null && role != TpAppBarRole.modalForm)

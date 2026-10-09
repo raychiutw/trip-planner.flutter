@@ -32,6 +32,20 @@ final syncConflictRecordsProvider = StreamProvider<List<ConflictRecord>>((
   }
 });
 
+/// 裝置目前是否有連線型態（只是「可能能上網」的訊號，不是可達性保證）。
+/// 由 [OfflineSyncController.handleNetworkAvailability] 寫入，來源是 app 層
+/// 的 connectivity 串流；尚未收到任何事件時預設為線上，避免誤報離線。
+final deviceOnlineProvider = NotifierProvider<DeviceOnlineNotifier, bool>(
+  DeviceOnlineNotifier.new,
+);
+
+class DeviceOnlineNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void set(bool isOnline) => state = isOnline;
+}
+
 /// 同步控制器:sync() 觸發 flush、更新衝突/筆數、invalidate 讀取以套 server 真相。
 final offlineSyncControllerProvider =
     NotifierProvider<OfflineSyncController, AsyncValue<void>>(
@@ -57,6 +71,7 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
   void handleNetworkAvailability(bool isOnline) {
     final reconnected = _wasOnline == false && isOnline;
     _wasOnline = isOnline;
+    ref.read(deviceOnlineProvider.notifier).set(isOnline);
     if (reconnected) unawaited(sync());
   }
 

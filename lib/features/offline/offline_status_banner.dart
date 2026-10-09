@@ -47,6 +47,17 @@ class OfflineStatusBanner extends ConsumerWidget {
       );
     }
 
+    // 純離線：沒有待同步也沒有衝突時，仍告知目前離線（讀的是快取）。
+    if (!ref.watch(deviceOnlineProvider)) {
+      return _Bar(
+        key: const ValueKey('offline-network-banner'),
+        background: colorScheme.secondaryContainer,
+        foreground: colorScheme.onSecondaryContainer,
+        icon: CupertinoIcons.wifi_slash,
+        text: '目前離線，變更會在連線後同步',
+      );
+    }
+
     return const SizedBox.shrink();
   }
 }

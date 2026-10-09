@@ -876,6 +876,37 @@ void main() {
     expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
   });
 
+  testWidgets('選取的卡片以 tint 粗框標示，未選取卡片維持淡框', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-card-21')));
+    await tester.pumpAndSettle();
+
+    Border borderOf(String id) =>
+        (tester
+                        .widget<DecoratedBox>(
+                          find.byKey(ValueKey('entry-card-$id')),
+                        )
+                        .decoration
+                    as BoxDecoration)
+                .border!
+            as Border;
+    final scheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('entry-card-21'))),
+    ).colorScheme;
+
+    final active = borderOf('21');
+    expect(active.top.color, scheme.primary);
+    expect(active.top.width, greaterThanOrEqualTo(2));
+    // 對照：未選取卡片不使用 tint。
+    final inactive = find.byKey(const ValueKey('entry-card-22'));
+    if (inactive.evaluate().isNotEmpty) {
+      expect(borderOf('22').top.color, isNot(scheme.primary));
+    }
+  });
+
   testWidgets('Google POI 關閉後還原 Day、卡片索引與 marker 聚焦', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(

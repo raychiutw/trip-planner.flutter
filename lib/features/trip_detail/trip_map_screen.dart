@@ -1106,14 +1106,15 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: const BorderRadius.all(Radius.circular(15)),
+              // 選取態用 tint 2pt 框（對比 >= 3:1）；原本只調 onSurface alpha，
+              // 淺色模式下與未選取卡片幾乎無差。
               border: Border.all(
-                color: theme.colorScheme.onSurface.withValues(
-                  alpha: isActive
-                      ? 0.30
-                      : isPreview
-                      ? 0.20
-                      : 0.10,
-                ),
+                width: isActive ? 2 : 1,
+                color: isActive
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(
+                        alpha: isPreview ? 0.20 : 0.10,
+                      ),
               ),
               boxShadow: isPreview
                   ? [
@@ -1126,7 +1127,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                   : null,
             ),
             child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s2),
+              // 選取框多 1pt，內縮同量讓卡片內容不位移。
+              padding: EdgeInsets.all(TpSpacing.s2 - (isActive ? 1 : 0)),
               child: Row(
                 children: [
                   Container(
