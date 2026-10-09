@@ -185,6 +185,18 @@ void main() {
     verifyNever(() => repo.revokeInvite(tripId: 'okinawa', email: 'b@x.com'));
   });
 
+  testWidgets('共編 email 欄位有常駐 label 並關閉自動修正', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(
+      find.byKey(const ValueKey('collab-email')),
+    );
+    expect(field.decoration?.labelText, 'Email');
+    expect(field.autocorrect, isFalse);
+    expect(field.autofillHints, contains(AutofillHints.email));
+  });
+
   testWidgets('新增成員 → 輸入 email + 點新增 → invite', (tester) async {
     when(
       () => repo.invite(

@@ -2,6 +2,8 @@
 /// key 與後端白名單 + model.toEditFields 一致。
 library;
 
+import 'package:flutter/services.dart';
+
 import '../../../models/note_section.dart';
 
 enum NoteFieldType { text, multiline, integer, enumChoice, datetime }
@@ -14,6 +16,10 @@ class NoteFieldSpec {
     this.options = const [],
     this.defaultValue = '',
     this.required = false,
+    this.keyboardType,
+    this.autofillHints,
+    this.capitalization = TextCapitalization.none,
+    this.autocorrect = true,
   });
 
   final String key;
@@ -28,6 +34,18 @@ class NoteFieldSpec {
 
   /// 必填（送出前需非空）。各區標一個主要識別欄位,避免建立全空 row。
   final bool required;
+
+  /// 文字欄位的鍵盤種類（電話、Email）；null 用預設。
+  final TextInputType? keyboardType;
+
+  /// iOS／Android AutoFill 提示。
+  final Iterable<String>? autofillHints;
+
+  /// 編號類欄位（航班、訂位）用全大寫。
+  final TextCapitalization capitalization;
+
+  /// 編號、Email 這類不是自然語言的欄位要關掉自動修正。
+  final bool autocorrect;
 }
 
 const Map<NoteSection, String> noteSectionTitles = {
@@ -56,10 +74,24 @@ const List<(String, String)> _emergencyKinds = [
   ('other', '其他'),
 ];
 
+const _phoneSpec = NoteFieldSpec(
+  'phone',
+  '電話',
+  NoteFieldType.text,
+  keyboardType: TextInputType.phone,
+  autofillHints: [AutofillHints.telephoneNumber],
+);
+
 const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
   NoteSection.flights: [
     NoteFieldSpec('airline', '航空公司', NoteFieldType.text, required: true),
-    NoteFieldSpec('flight_no', '航班編號', NoteFieldType.text),
+    NoteFieldSpec(
+      'flight_no',
+      '航班編號',
+      NoteFieldType.text,
+      capitalization: TextCapitalization.characters,
+      autocorrect: false,
+    ),
     NoteFieldSpec('cabin_class', '艙等', NoteFieldType.text),
     NoteFieldSpec('depart_airport', '出發機場', NoteFieldType.text),
     NoteFieldSpec('arrive_airport', '抵達機場', NoteFieldType.text),
@@ -72,8 +104,14 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
     NoteFieldSpec('address', '地址', NoteFieldType.text),
     NoteFieldSpec('check_in_at', '入住', NoteFieldType.datetime),
     NoteFieldSpec('check_out_at', '退房', NoteFieldType.datetime),
-    NoteFieldSpec('booking_no', '訂房編號', NoteFieldType.text),
-    NoteFieldSpec('phone', '電話', NoteFieldType.text),
+    NoteFieldSpec(
+      'booking_no',
+      '訂房編號',
+      NoteFieldType.text,
+      capitalization: TextCapitalization.characters,
+      autocorrect: false,
+    ),
+    _phoneSpec,
     NoteFieldSpec('note', '備註', NoteFieldType.multiline),
   ],
   NoteSection.reservations: [
@@ -87,8 +125,14 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
     NoteFieldSpec('title', '名稱', NoteFieldType.text, required: true),
     NoteFieldSpec('reserved_at', '預約時間', NoteFieldType.datetime),
     NoteFieldSpec('party_size', '人數', NoteFieldType.integer),
-    NoteFieldSpec('reservation_no', '預約編號', NoteFieldType.text),
-    NoteFieldSpec('phone', '電話', NoteFieldType.text),
+    NoteFieldSpec(
+      'reservation_no',
+      '預約編號',
+      NoteFieldType.text,
+      capitalization: TextCapitalization.characters,
+      autocorrect: false,
+    ),
+    _phoneSpec,
     NoteFieldSpec('note', '備註', NoteFieldType.multiline),
   ],
   NoteSection.pretrip: [
@@ -99,8 +143,15 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
   NoteSection.emergency: [
     NoteFieldSpec('name', '名稱', NoteFieldType.text, required: true),
     NoteFieldSpec('relationship', '關係', NoteFieldType.text),
-    NoteFieldSpec('phone', '電話', NoteFieldType.text),
-    NoteFieldSpec('email', 'Email', NoteFieldType.text),
+    _phoneSpec,
+    NoteFieldSpec(
+      'email',
+      'Email',
+      NoteFieldType.text,
+      keyboardType: TextInputType.emailAddress,
+      autofillHints: [AutofillHints.email],
+      autocorrect: false,
+    ),
     NoteFieldSpec(
       'kind',
       '類型',

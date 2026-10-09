@@ -100,4 +100,27 @@ void main() {
     expect(c.read(createTripControllerProvider).destinations, isEmpty);
     sub2.close();
   });
+
+  group('dateError：固定日期不合法時說明原因', () {
+    CreateTripState fixed(String? s, String? e) => CreateTripState(
+      fixedStart: s,
+      fixedEnd: e,
+      flexYear: 2027,
+      flexMonth: 1,
+    );
+
+    test('未填完或合法 → null', () {
+      expect(fixed(null, null).dateError, isNull);
+      expect(fixed('2027-01-01', null).dateError, isNull);
+      expect(fixed('2027-01-01', '2027-01-30').dateError, isNull);
+    });
+
+    test('結束早於開始', () {
+      expect(fixed('2027-01-05', '2027-01-01').dateError, '結束日期不可早於開始日期');
+    });
+
+    test('超過 30 天', () {
+      expect(fixed('2027-01-01', '2027-02-01').dateError, '行程最多 30 天，請縮短日期範圍');
+    });
+  });
 }

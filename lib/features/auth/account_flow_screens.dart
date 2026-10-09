@@ -160,7 +160,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 autocorrect: false,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 forceErrorText: _emailServerError,
                 onChanged: (_) {
                   if (_emailServerError != null) {
@@ -177,7 +177,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 controller: _displayNameController,
                 autofillHints: const [AutofillHints.name],
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 decoration: const InputDecoration(labelText: '顯示名稱（選填）'),
               ),
               const SizedBox(height: TpSpacing.s4),
@@ -188,7 +188,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 autocorrect: false,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.done,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 forceErrorText: _passwordServerError,
                 onChanged: (_) {
                   if (_passwordServerError != null) {
@@ -459,7 +459,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               autocorrect: false,
               enableSuggestions: false,
               textInputAction: TextInputAction.done,
-              enabled: !_submitting,
+              readOnly: _submitting,
               onFieldSubmitted: (_) => _submit(),
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) =>
@@ -540,7 +540,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   error.code == 'RESET_TOKEN_MISSING');
           _error = _authErrorMessage(error, const {
             'RESET_TOKEN_INVALID': '重設連結無效或已過期',
-            'RESET_TOKEN_MISSING': '重設連結缺少 token',
+            'RESET_TOKEN_MISSING': '重設連結不完整，請重新申請',
           }, '暫時無法處理，請稍後再試');
         });
       }
@@ -605,7 +605,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 autocorrect: false,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 forceErrorText: _passwordServerError,
                 onChanged: (_) {
                   if (_passwordServerError != null) {
@@ -640,7 +640,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 autocorrect: false,
                 obscureText: _obscureConfirm,
                 textInputAction: TextInputAction.done,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 onFieldSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
                   labelText: '再次輸入新密碼',
@@ -872,7 +872,7 @@ class _InlineAuthMessage extends StatelessWidget {
           message,
           style: Theme.of(
             context,
-          ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+          ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface),
         ),
       ),
     );

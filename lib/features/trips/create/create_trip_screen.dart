@@ -189,11 +189,15 @@ class _DateModeSection extends StatelessWidget {
     final first = isStart
         ? now
         : (state.fixedStart != null ? DateTime.parse(state.fixedStart!) : now);
+    // 結束日上限 = 開始日 + 29 天（含頭尾共 30 天），不讓使用者選到「新增」會靜默停用的日期。
+    final lastDate = !isStart && state.fixedStart != null
+        ? DateTime.parse(state.fixedStart!).add(const Duration(days: 29))
+        : now.add(const Duration(days: 730));
     final picked = await showAppDatePicker(
       context,
       initialDate: first,
       firstDate: first,
-      lastDate: now.add(const Duration(days: 730)),
+      lastDate: lastDate,
     );
     if (picked == null) return;
     if (isStart) {
@@ -245,6 +249,20 @@ class _DateModeSection extends StatelessWidget {
           )
         else
           _FlexibleDate(state: state, ctrl: ctrl),
+        if (state.dateError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s2),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                state.dateError!,
+                key: const ValueKey('create-date-error'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

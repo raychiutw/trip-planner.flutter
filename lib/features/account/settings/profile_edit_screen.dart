@@ -30,9 +30,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     super.dispose();
   }
 
+  bool get _canSave {
+    final session = _session;
+    return session != null &&
+        session.canSubmit &&
+        session.draft.trim().isNotEmpty;
+  }
+
   Future<void> _save() async {
     final session = _session;
-    if (session == null) return;
+    if (session == null || !_canSave) return;
     final saved = await session.submit();
     if (!mounted || saved == null) return;
     HapticFeedback.lightImpact();
@@ -59,7 +66,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           onCancel: _dismissController.requestPop,
           primaryActionLabel: '儲存',
           primaryActionKey: const ValueKey('profile-save'),
-          primaryActionEnabled: _session?.canSubmit ?? false,
+          primaryActionEnabled: _canSave,
           onPrimaryAction: _save,
         ),
         body: authState.when(
@@ -134,9 +141,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 initialValue: session.draft,
                 autofocus: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
+                autofillHints: const [AutofillHints.name],
+                decoration: InputDecoration(
                   labelText: '顯示名稱',
                   border: InputBorder.none,
+                  errorText: session.dirty && session.draft.trim().isEmpty
+                      ? '顯示名稱不可空白'
+                      : null,
                 ),
                 onChanged: session.edit,
                 onFieldSubmitted: (_) {

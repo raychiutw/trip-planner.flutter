@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
@@ -372,6 +372,8 @@ class _DeveloperAppFormScreenState
                                 labelText: '首頁 URL（選填）',
                               ),
                               keyboardType: TextInputType.url,
+                              autocorrect: false,
+                              enableSuggestions: false,
                               textInputAction: TextInputAction.next,
                               onFieldSubmitted: (_) {
                                 _redirectUrisFocusNode.requestFocus();
@@ -427,6 +429,8 @@ class _DeveloperAppFormScreenState
                                 helperText: '每行一個 URI',
                               ),
                               keyboardType: TextInputType.url,
+                              autocorrect: false,
+                              enableSuggestions: false,
                               minLines: 2,
                               maxLines: 4,
                               textInputAction: TextInputAction.done,
@@ -702,15 +706,13 @@ class _DeveloperAppFormScreenState
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  String _errorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return _app == null ? '建立應用程式失敗，請稍後再試' : '儲存應用程式失敗，請稍後再試';
-  }
+  String _errorMessage(Object error) => userFacingApiError(
+    error,
+    fallback: _app == null ? '建立應用程式失敗，請稍後再試' : '儲存應用程式失敗，請稍後再試',
+  );
 
-  String _deleteErrorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return '刪除應用程式失敗，請稍後再試';
-  }
+  String _deleteErrorMessage(Object error) =>
+      userFacingApiError(error, fallback: '刪除應用程式失敗，請稍後再試');
 }
 
 class _SecretValueRow extends StatelessWidget {

@@ -1113,6 +1113,49 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('自訂地點座標超出範圍：不送出，錯誤就地顯示在對應欄位', (tester) async {
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-name')),
+      '火星基地',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lat')),
+      '91',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lng')),
+      '181',
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-picker-custom-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('緯度需介於 -90 到 90'), findsOneWidget);
+    expect(find.text('經度需介於 -180 到 180'), findsOneWidget);
+    verifyNever(
+      () => repo.addEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        customPoi: any(named: 'customPoi'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    );
+
+    // 邊界值合法
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lat')),
+      '90',
+    );
+    await tester.pump();
+    expect(find.text('緯度需介於 -90 到 90'), findsNothing);
+  });
+
   testWidgets('加入備選 → 自訂地點 → addEntryAlternate(customPoi)', (tester) async {
     final repo = _MockTripRepository();
     when(

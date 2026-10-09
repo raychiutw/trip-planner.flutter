@@ -990,6 +990,17 @@ void main() {
       () => mockAuthRepository.requestPasswordReset('traveler@example.com'),
     ).called(1);
 
+    // 送出中改 readOnly 而非 disabled：欄位不失焦，鍵盤才不會收起又彈出
+    await tester.pump();
+    final inner = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('forgot-password-email-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(inner.readOnly, isTrue);
+    expect(inner.enabled, isTrue);
+
     pending.complete(null);
     await tester.pumpAndSettle();
   });
@@ -1070,7 +1081,7 @@ void main() {
 
   for (final (code, message) in [
     ('RESET_TOKEN_INVALID', '重設連結無效或已過期'),
-    ('RESET_TOKEN_MISSING', '重設連結缺少 token'),
+    ('RESET_TOKEN_MISSING', '重設連結不完整，請重新申請'),
   ]) {
     testWidgets('$code 保留輸入並可重新申請，不重送也不返回失效頁', (tester) async {
       when(

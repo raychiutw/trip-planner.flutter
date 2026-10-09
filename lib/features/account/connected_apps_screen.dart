@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
@@ -170,10 +170,8 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     }
   }
 
-  String _errorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return '撤銷應用程式失敗，請稍後再試';
-  }
+  String _errorMessage(Object error) =>
+      userFacingApiError(error, fallback: '撤銷應用程式失敗，請稍後再試');
 }
 
 class _ConnectedAppTile extends StatelessWidget {

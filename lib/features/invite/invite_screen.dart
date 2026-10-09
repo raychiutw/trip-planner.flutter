@@ -591,7 +591,7 @@ class _ProblemPanel extends StatelessWidget {
               Text(
                 title,
                 style: theme.textTheme.titleSmall?.copyWith(
-                  color: colors.error,
+                  color: colors.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),

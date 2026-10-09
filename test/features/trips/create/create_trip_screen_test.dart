@@ -93,6 +93,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('結束日期選擇器上限不超過開始日 + 29 天（30 天上限）', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('固定日期'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('create-date-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('create-date-end')));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<CalendarDatePicker>(
+      find.byType(CalendarDatePicker),
+    );
+    expect(picker.lastDate.difference(picker.firstDate).inDays, 29);
+  });
+
   testWidgets('目的地空 → 送出鈕 disabled', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

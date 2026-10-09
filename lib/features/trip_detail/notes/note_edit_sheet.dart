@@ -413,6 +413,12 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         return TextField(
           key: ValueKey('note-field-${spec.key}'),
           controller: _ctrls[spec.key],
+          keyboardType: spec.keyboardType,
+          autofillHints: spec.autofillHints,
+          textCapitalization: spec.capitalization,
+          autocorrect: spec.autocorrect,
+          enableSuggestions: spec.autocorrect,
+          textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             labelText: spec.required ? '${spec.label} *' : spec.label,
           ),

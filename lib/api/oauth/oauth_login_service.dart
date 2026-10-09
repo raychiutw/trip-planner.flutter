@@ -15,8 +15,14 @@ import 'oauth_token_store.dart';
 import 'pkce.dart';
 
 class OAuthLoginException implements Exception {
-  OAuthLoginException(this.message);
+  OAuthLoginException(this.message, {String? userMessage})
+    : userMessage = userMessage ?? 'Tripline 登入失敗，請稍後再試';
+
+  /// 除錯用原文，可能含 client_id、埠號；**不可直接顯示給使用者**。
   final String message;
+
+  /// 給使用者看的繁中訊息。
+  final String userMessage;
   @override
   String toString() => 'OAuthLoginException: $message';
 }
@@ -64,7 +70,7 @@ class OAuthLoginService {
         state: state,
       );
       if (!await launchUrl(authUrl, mode: LaunchMode.externalApplication)) {
-        throw OAuthLoginException('無法開啟瀏覽器');
+        throw OAuthLoginException('無法開啟瀏覽器', userMessage: '無法開啟瀏覽器');
       }
 
       // 只認 state 相符的 callback;忽略 favicon/prefetch/外來雜訊(防 first-request 搶占)。
@@ -72,7 +78,7 @@ class OAuthLoginService {
         _timeout,
         onTimeout: () {
           unawaited(server.close(force: true));
-          throw OAuthLoginException('登入逾時');
+          throw OAuthLoginException('登入逾時', userMessage: '登入逾時，請再試一次');
         },
       );
 
