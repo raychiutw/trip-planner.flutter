@@ -217,12 +217,15 @@ class ShareController extends Notifier<ShareState> {
   }
 
   /// 重新產生分享連結 token;成功後 lastCreated 帶新 URL(只顯示一次)。
-  Future<void> rotate(int shareId) async {
+  ///
+  /// 回傳是否真的重新產生成功:被防重入守衛擋下或失敗都回 false,
+  /// 呼叫端不必再從 state 推斷。
+  Future<bool> rotate(int shareId) async {
     if (state.updatingId != null ||
         state.rotatingId != null ||
         state.revokingId != null ||
         state.deletingId != null) {
-      return;
+      return false;
     }
     state = state.copyWith(
       rotatingId: shareId,
@@ -232,7 +235,7 @@ class ShareController extends Notifier<ShareState> {
     try {
       final rotated = await _repo.rotateShare(tripId, shareId);
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(
         rotatingId: null,
         lastCreated: ShareLink(
@@ -241,9 +244,11 @@ class ShareController extends Notifier<ShareState> {
           url: rotated.url,
         ),
       );
+      return true;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(rotatingId: null, rotateFailedId: shareId);
+      return false;
     }
   }
 

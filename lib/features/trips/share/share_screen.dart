@@ -202,13 +202,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
           progressLabel: '正在重新產生…',
           successMessage: '已重新產生分享連結',
           failureMessage: '重新產生失敗，舊連結仍有效',
-          action: () async {
-            await _ctrl.rotate(share.id);
-            return ref
-                    .read(shareControllerProvider(widget.tripId))
-                    .rotateFailedId !=
-                share.id;
-          },
+          action: () => _ctrl.rotate(share.id),
         );
       case _ShareRowAction.revoke:
         await confirmAndRunIrreversibleAction(
