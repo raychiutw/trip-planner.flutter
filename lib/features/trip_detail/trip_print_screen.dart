@@ -163,16 +163,21 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
       final actions = ref.read(tripPrintActionsProvider);
       switch (action) {
         case _PrintAction.print:
-          await actions.print(data);
+          final printed = await actions.print(data);
           if (!_isCurrent(generation, tripId)) return;
-          _showMessage('已送出列印');
+          // 使用者在列印對話框取消 → 不報成功。
+          if (printed) _showMessage('已送出列印');
           return;
         case _PrintAction.pdf:
-          await actions.sharePdf(data);
+          final shared = await actions.sharePdf(data);
           if (!_isCurrent(generation, tripId)) return;
-          _showMessage('PDF 已建立');
+          if (shared) _showMessage('PDF 已建立');
           return;
       }
+    } on TripPdfOfflineException {
+      if (!_isCurrent(generation, tripId)) return;
+      if (!mounted) return;
+      showAppError(context, '需要網路連線才能下載中文字型，請連線後再試');
     } on Exception {
       if (!_isCurrent(generation, tripId)) return;
       if (!mounted) return;

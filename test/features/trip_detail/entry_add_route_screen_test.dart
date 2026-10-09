@@ -76,6 +76,7 @@ Widget _buildScreen(
   EntryAddMode initialMode = EntryAddMode.custom,
   String? initialRegion,
   bool useRepositoryDays = false,
+  void Function()? onDaysBuild,
 }) {
   when(
     () => repo.recomputeTravel(
@@ -110,7 +111,10 @@ Widget _buildScreen(
       if (favoritesRepo != null)
         favoritesRepositoryProvider.overrideWithValue(favoritesRepo),
       if (!useRepositoryDays)
-        tripDaysProvider('trip-1').overrideWith((ref) => Stream.value(_days)),
+        tripDaysProvider('trip-1').overrideWith((ref) {
+          onDaysBuild?.call();
+          return Stream.value(_days);
+        }),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
@@ -917,6 +921,7 @@ void main() {
     final poiRepo = _MockPoiRepository();
     final submittedTitles = <String>[];
     var marketShouldFail = true;
+    var daysBuilds = 0;
     when(
       () => poiRepo.searchPois(
         q: any(named: 'q'),
@@ -968,7 +973,12 @@ void main() {
       }
     });
     await tester.pumpWidget(
-      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+      _buildScreen(
+        repo,
+        poiRepo: poiRepo,
+        initialMode: EntryAddMode.search,
+        onDaysBuild: () => daysBuilds++,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -989,7 +999,9 @@ void main() {
 
     expect(submittedTitles, ['美麗海水族館', '牧志市場']);
     expect(find.text('已選 1 個'), findsOneWidget);
-    expect(find.text('加入行程失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('已加入 1／2 筆，其餘未加入，請稍後再試'), findsOneWidget);
+    // 部分寫入也要讓時間軸重抓，否則看不到已寫入的項目。
+    expect(daysBuilds, 2);
     expect(
       tester
           .widget<EditableText>(
@@ -1007,6 +1019,69 @@ void main() {
     await tester.pumpAndSettle();
     expect(submittedTitles, ['美麗海水族館', '牧志市場', '牧志市場']);
     expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('多選加入顯示「第 n/m 筆」進度', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    final second = Completer<void>();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        PoiSearchResult(placeId: 'p1', name: '美麗海水族館', category: 'aquarium'),
+        PoiSearchResult(placeId: 'p2', name: '牧志市場', category: 'restaurant'),
+      ],
+    );
+    _stubResolvePlace(poiRepo);
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((invocation) {
+      final title = invocation.namedArguments[#title]! as String;
+      return title == '牧志市場' ? second.future : Future<void>.value();
+    });
+    await tester.pumpWidget(
+      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '沖繩',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p2')));
+    await tester.pump();
+
+    final confirm = find.byKey(const ValueKey('entry-add-confirm'));
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('entry-add-progress')), findsOneWidget);
+    expect(find.text('正在加入第 2／2 筆…'), findsOneWidget);
+
+    second.complete();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('新增停留點地區選單標示目前選取並更新查詢', (tester) async {

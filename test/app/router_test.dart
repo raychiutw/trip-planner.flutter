@@ -94,10 +94,13 @@ class _RecordingPrintActions implements TripPrintActions {
   final printed = <TripPrintData>[];
 
   @override
-  Future<void> print(TripPrintData data) async => printed.add(data);
+  Future<bool> print(TripPrintData data) async {
+    printed.add(data);
+    return true;
+  }
 
   @override
-  Future<void> sharePdf(TripPrintData data) async {}
+  Future<bool> sharePdf(TripPrintData data) async => true;
 }
 
 const _loggedInUser = UserInfo(

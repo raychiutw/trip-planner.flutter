@@ -299,6 +299,24 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
+        if (_submitting) ...[
+          Semantics(
+            key: const ValueKey('add-to-trip-progress'),
+            label: '正在加入行程',
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LinearProgressIndicator(),
+                SizedBox(height: TpSpacing.s2),
+                Text('正在加入行程…'),
+              ],
+            ),
+          ),
+          const SizedBox(height: TpSpacing.s4),
+        ],
         if (tripsError)
           _RetryState(
             title: '無法載入行程清單',

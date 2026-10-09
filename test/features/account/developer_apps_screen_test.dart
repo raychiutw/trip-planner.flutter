@@ -126,6 +126,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('下拉更新會等資料回來才收起轉圈', (tester) async {
+    await pumpList(tester);
+    final pending = Completer<List<DeveloperApp>>();
+    when(
+      () => mockAccountRepository.fetchDeveloperApps(),
+    ).thenAnswer((_) => pending.future);
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, 400));
+    await tester.pump(const Duration(milliseconds: 100));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.byType(RefreshProgressIndicator), findsOneWidget);
+
+    pending.complete(const <DeveloperApp>[]);
+    await tester.pumpAndSettle();
+    expect(find.byType(RefreshProgressIndicator), findsNothing);
+  });
+
   testWidgets('列出 developer apps 並顯示新增入口', (tester) async {
     await pumpList(tester);
 

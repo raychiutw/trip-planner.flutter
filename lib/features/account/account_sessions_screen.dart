@@ -70,6 +70,15 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
           busySessionSid: _busySessionSid,
           mutationError: _mutationError,
           onRetry: () => ref.invalidate(accountSessionsProvider),
+          onRefresh: () async {
+            ref.invalidate(accountSessionsProvider);
+            // 等資料回來才收起轉圈；失敗時由 provider 的 error 狀態呈現。
+            try {
+              await ref.read(accountSessionsProvider.future);
+            } on Object {
+              // 錯誤畫面會接手，這裡只需結束轉圈。
+            }
+          },
           onRevoke: _revokeSession,
           onOpenConnectedApps: () {
             unawaited(
@@ -151,6 +160,7 @@ class _SessionsList extends StatelessWidget {
     required this.busySessionSid,
     required this.mutationError,
     required this.onRetry,
+    required this.onRefresh,
     required this.onRevoke,
     required this.onOpenConnectedApps,
     required this.onLogout,
@@ -161,6 +171,7 @@ class _SessionsList extends StatelessWidget {
   final String? busySessionSid;
   final String? mutationError;
   final VoidCallback onRetry;
+  final Future<void> Function() onRefresh;
   final Future<String?> Function(String sid) onRevoke;
   final VoidCallback onOpenConnectedApps;
   final VoidCallback onLogout;
@@ -168,7 +179,7 @@ class _SessionsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator.adaptive(
-      onRefresh: () async => onRetry(),
+      onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
         physics: const AlwaysScrollableScrollPhysics(),

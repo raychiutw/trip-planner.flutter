@@ -76,6 +76,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   String? _favoritesError;
   final Set<int> _selectedFavoriteIds = <int>{};
   bool _submittingSelected = false;
+  // 批次加入進度：已寫入筆數／總筆數（只在 _submittingSelected 期間有意義）。
+  int _submitDone = 0;
+  int _submitTotal = 0;
   bool _dirty = false;
   late String _region;
   _EntryAddCategory _category = _EntryAddCategory.all;
@@ -219,8 +222,13 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       return;
     }
 
+    final total = _mode == EntryAddMode.search
+        ? selectedPois.length
+        : selectedFavorites.length;
     setState(() {
       _submittingSelected = true;
+      _submitDone = 0;
+      _submitTotal = total;
       _searchError = null;
       _favoritesError = null;
     });
@@ -245,6 +253,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
           setState(() {
             _selectedPlaceIds.remove(poi.placeId);
             _searchPoiTypeOverrides.remove(poi.placeId);
+            _submitDone++;
           });
         }
       } else {
@@ -260,15 +269,26 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             source: 'favorite',
           );
           if (!mounted) return;
-          setState(() => _selectedFavoriteIds.remove(favorite.id));
+          setState(() {
+            _selectedFavoriteIds.remove(favorite.id);
+            _submitDone++;
+          });
         }
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
       context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
     } on Exception {
+      // 部分已寫入：時間軸必須重抓，否則看不到已成功的項目。
+      if (_submitDone > 0) ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
-      setState(() => _setSubmitError('加入行程失敗，請稍後再試'));
+      setState(
+        () => _setSubmitError(
+          _submitDone > 0
+              ? '已加入 $_submitDone／$_submitTotal 筆，其餘未加入，請稍後再試'
+              : '加入行程失敗，請稍後再試',
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _submittingSelected = false);
@@ -428,6 +448,11 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                               ),
                             if (daysAsync.isLoading)
                               const LinearProgressIndicator(),
+                            if (_submittingSelected && _submitTotal > 0)
+                              _BatchProgress(
+                                done: _submitDone,
+                                total: _submitTotal,
+                              ),
                             _DayPicker(
                               days: days,
                               selectedDayNum: dayNum,
@@ -534,6 +559,39 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// 批次加入進度：第 n／m 筆，供 VoiceOver 朗讀。
+class _BatchProgress extends StatelessWidget {
+  const _BatchProgress({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    // 進行中的是「下一筆」，全部寫完前不超過 total。
+    final current = (done + 1).clamp(1, total);
+    final label = '正在加入第 $current／$total 筆…';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+      child: Semantics(
+        key: const ValueKey('entry-add-progress'),
+        label: label,
+        container: true,
+        excludeSemantics: true,
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LinearProgressIndicator(value: done / total),
+            const SizedBox(height: TpSpacing.s2),
+            Text(label),
+          ],
+        ),
+      ),
     );
   }
 }
