@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -714,6 +715,7 @@ void main() {
   });
 
   testWidgets('展開行前須知後可觸發一般 AI 生成並顯示 pending 狀態', (tester) async {
+    final semantics = tester.ensureSemantics();
     final repo = _MockTripRepository();
     final requestsRepo = _MockRequestsRepository();
     when(
@@ -753,6 +755,19 @@ void main() {
     await tester.pump();
     expect(find.byKey(const ValueKey('notes-ai-pending')), findsOneWidget);
     expect(find.textContaining('行前須知'), findsWidgets);
+    expect(
+      tester.isLiveRegionOf(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('notes-ai-pending')),
+              matching: find.byType(Text),
+            )
+            .first,
+      ),
+      isTrue,
+      reason: 'AI 進行中文字要向讀屏宣告',
+    );
+    semantics.dispose();
   });
 
   testWidgets('沒有住宿時住宿 AI 生成保持 disabled 並說明原因', (tester) async {
@@ -1305,6 +1320,7 @@ void main() {
   });
 
   testWidgets('生成完成後重讀狀態,把摘要用中文句子講出來', (tester) async {
+    final semantics = tester.ensureSemantics();
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
     var call = 0;
@@ -1357,10 +1373,23 @@ void main() {
               .first,
         )
         .data!;
+    expect(
+      tester.isLiveRegionOf(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('notes-ai-summary')),
+              matching: find.byType(Text),
+            )
+            .first,
+      ),
+      isTrue,
+      reason: 'AI 完成摘要要向讀屏宣告',
+    );
     expect(summary, contains('2'), reason: '新增 2 則');
     expect(summary, contains('5'), reason: '替換 5 則');
     expect(summary, contains('3'), reason: '保留 3 則人工');
     expect(summary, isNot(contains('抑制 0')), reason: '缺漏或為零的 count 要略過');
+    semantics.dispose();
   });
 
   testWidgets('逾時走既有進度通道抵達,有自己的面板與重試', (tester) async {

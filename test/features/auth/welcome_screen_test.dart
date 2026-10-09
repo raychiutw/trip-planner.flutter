@@ -15,6 +15,7 @@ void main() {
     bool boldText = false,
     bool highContrast = false,
     bool reduceMotion = false,
+    EdgeInsets padding = EdgeInsets.zero,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -34,6 +35,7 @@ void main() {
             boldText: boldText,
             highContrast: highContrast,
             disableAnimations: reduceMotion,
+            padding: padding,
           ),
           child: WelcomeScreen(onLogin: onLogin),
         ),
@@ -41,6 +43,62 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('橫向左右 inset 47 時內容與頂欄不進入遮蔽區', (tester) async {
+    const inset = 47.0;
+    await pumpWelcome(
+      tester,
+      onLogin: () {},
+      size: const Size(844, 390),
+      padding: const EdgeInsets.symmetric(horizontal: inset),
+    );
+
+    for (final key in const [
+      'welcome-headline',
+      'welcome-login-hero',
+      'welcome-login-top',
+    ]) {
+      final rect = tester.getRect(find.byKey(ValueKey(key)));
+      expect(rect.left, greaterThanOrEqualTo(inset), reason: '$key 左側');
+      expect(rect.right, lessThanOrEqualTo(844 - inset), reason: '$key 右側');
+    }
+    final title = tester.getRect(find.text('Tripline'));
+    expect(title.left, greaterThanOrEqualTo(inset));
+
+    final bottom = find.byKey(const ValueKey('welcome-login-bottom'));
+    await tester.scrollUntilVisible(
+      bottom,
+      500,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('welcome-scroll')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final rect = tester.getRect(bottom);
+    expect(rect.left, greaterThanOrEqualTo(inset));
+    expect(rect.right, lessThanOrEqualTo(844 - inset));
+    final footer = tester.getRect(find.text('© 2026 Tripline'));
+    expect(footer.left, greaterThanOrEqualTo(inset));
+  });
+
+  testWidgets('Welcome 主標與段落標題是 VoiceOver header', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpWelcome(tester, onLogin: () {});
+
+    for (final text in ['Tripline', '行程排壞了，講一句話就好', '出發前你會反覆做的三件事']) {
+      expect(
+        tester
+            .getSemantics(find.text(text, findRichText: true).first)
+            .getSemanticsData()
+            .flagsCollection
+            .isHeader,
+        isTrue,
+        reason: text,
+      );
+    }
+    handle.dispose();
+  });
 
   testWidgets('直接顯示主訴求、三項功能與登入 CTA', (tester) async {
     var loginCount = 0;

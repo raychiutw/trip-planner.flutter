@@ -1,3 +1,4 @@
+import '../../../helpers/semantics_flags.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -1406,6 +1407,30 @@ void main() {
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
+  });
+
+  testWidgets('結束早於開始的驗證訊息是 liveRegion', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    await tester.pumpAndSettle();
+
+    final end = find.byKey(const ValueKey('add-to-trip-end'));
+    await tester.ensureVisible(end);
+    await tester.tap(end);
+    await tester.pumpAndSettle();
+    tester
+        .widget<CupertinoDatePicker>(find.byType(CupertinoDatePicker))
+        .onDateTimeChanged(DateTime(2026, 9, 25, 0, 5));
+    await tester.pump();
+    await tester.tap(end);
+    await tester.pumpAndSettle();
+
+    final error = find.byKey(const ValueKey('add-to-trip-time-error'));
+    expect(error, findsOneWidget);
+    expect(tester.isLiveRegionOf(error), isTrue);
+    semantics.dispose();
   });
 
   testWidgets('起訖時間就地展開，兩顆不會同時展開', (tester) async {

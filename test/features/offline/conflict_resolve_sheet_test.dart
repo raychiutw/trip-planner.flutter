@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,7 @@ ConflictRecord _conflict() => ConflictRecord(
 
 void main() {
   testWidgets('取消衝突選擇只捨棄 pending choice，不呼叫解決 API', (tester) async {
+    final semantics = tester.ensureSemantics();
     final cache = InMemoryCacheStore();
     await cache.appendConflict(_conflict());
 
@@ -54,6 +56,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('conflict-keep-theirs-c1')));
     await tester.pump();
+    final theirs = find.byKey(const ValueKey('conflict-keep-theirs-c1'));
+    final ours = find.byKey(const ValueKey('conflict-keep-ours-c1'));
+    expect(tester.isSelectedOf(theirs), isTrue);
+    expect(tester.isSelectedOf(ours), isFalse);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 
@@ -63,5 +69,6 @@ void main() {
 
     expect(find.byKey(const ValueKey('conflict-card-c1')), findsNothing);
     expect(await cache.readConflicts(), hasLength(1));
+    semantics.dispose();
   });
 }

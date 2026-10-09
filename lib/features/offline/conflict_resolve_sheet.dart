@@ -217,29 +217,43 @@ class _ConflictCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                choice == _ConflictChoice.theirs
-                    ? FilledButton(
-                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.theirs),
-                        child: const Text('用對方的'),
-                      )
-                    : OutlinedButton(
-                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.theirs),
-                        child: const Text('用對方的'),
-                      ),
+                MergeSemantics(
+                  child: Semantics(
+                    selected: choice == _ConflictChoice.theirs,
+                    child: choice == _ConflictChoice.theirs
+                        ? FilledButton(
+                            key: ValueKey(
+                              'conflict-keep-theirs-${conflict.id}',
+                            ),
+                            onPressed: () => onSelected(_ConflictChoice.theirs),
+                            child: const Text('用對方的'),
+                          )
+                        : OutlinedButton(
+                            key: ValueKey(
+                              'conflict-keep-theirs-${conflict.id}',
+                            ),
+                            onPressed: () => onSelected(_ConflictChoice.theirs),
+                            child: const Text('用對方的'),
+                          ),
+                  ),
+                ),
                 const SizedBox(width: TpSpacing.s2),
-                choice == _ConflictChoice.ours
-                    ? FilledButton(
-                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.ours),
-                        child: const Text('保留你的'),
-                      )
-                    : OutlinedButton(
-                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.ours),
-                        child: const Text('保留你的'),
-                      ),
+                MergeSemantics(
+                  child: Semantics(
+                    selected: choice == _ConflictChoice.ours,
+                    child: choice == _ConflictChoice.ours
+                        ? FilledButton(
+                            key: ValueKey('conflict-keep-ours-${conflict.id}'),
+                            onPressed: () => onSelected(_ConflictChoice.ours),
+                            child: const Text('保留你的'),
+                          )
+                        : OutlinedButton(
+                            key: ValueKey('conflict-keep-ours-${conflict.id}'),
+                            onPressed: () => onSelected(_ConflictChoice.ours),
+                            child: const Text('保留你的'),
+                          ),
+                  ),
+                ),
               ],
             ),
           ],

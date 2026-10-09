@@ -1924,8 +1924,18 @@ class _TravelRow extends StatelessWidget {
           travel: travel,
         ),
         borderRadius: BorderRadius.circular(TpRadius.md),
-        child: pill,
+        // pill 視覺約 34pt；可點區補到 HIG 最小 44pt，視覺不變。
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            heightFactor: 1,
+            child: pill,
+          ),
+        ),
       );
+      pill = Semantics(hint: '編輯交通方式', child: pill);
     }
 
     return ConstrainedBox(

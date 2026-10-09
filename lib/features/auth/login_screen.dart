@@ -132,11 +132,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Tripline',
-                        textAlign: TextAlign.center,
-                        style: textTheme.displaySmall?.copyWith(
-                          color: colorScheme.onSurface,
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          'Tripline',
+                          textAlign: TextAlign.center,
+                          style: textTheme.displaySmall?.copyWith(
+                            color: colorScheme.onSurface,
+                          ),
                         ),
                       ),
                       const SizedBox(height: TpSpacing.s2),

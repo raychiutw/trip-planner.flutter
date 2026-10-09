@@ -116,6 +116,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
             const SizedBox(width: TpSpacing.s2),
             IconButton.filled(
               key: const ValueKey('dest-poi-search-btn'),
+              tooltip: '搜尋地點',
               onPressed: widget.enabled ? _run : null,
               icon: _searching
                   ? const SizedBox(
@@ -216,6 +217,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                     leading: const Icon(CupertinoIcons.location_solid),
                     title: Text(dests[i].name),
                     trailing: IconButton(
+                      tooltip: '移除${dests[i].name}',
                       icon: const Icon(CupertinoIcons.xmark),
                       onPressed: widget.enabled
                           ? () => widget.onRemove(i)

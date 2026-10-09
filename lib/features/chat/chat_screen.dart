@@ -641,11 +641,7 @@ class _JumpToLatestButton extends StatelessWidget {
         tooltip: '回到最新訊息',
         padding: EdgeInsets.zero,
         onPressed: onPressed,
-        icon: const Icon(
-          CupertinoIcons.chevron_down,
-          size: 20,
-          semanticLabel: '回到最新訊息',
-        ),
+        icon: const Icon(CupertinoIcons.chevron_down, size: 20),
       ),
     ),
   );
@@ -1036,10 +1032,7 @@ class _ComposerState extends ConsumerState<_Composer> {
                               ),
                             ),
                           )
-                        : const Icon(
-                            CupertinoIcons.arrow_up_circle_fill,
-                            semanticLabel: '送出訊息',
-                          ),
+                        : const Icon(CupertinoIcons.arrow_up_circle_fill),
                   )
                 else
                   IconButton(
@@ -1049,7 +1042,6 @@ class _ComposerState extends ConsumerState<_Composer> {
                     color: _listening ? scheme.primary : null,
                     icon: Icon(
                       _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
-                      semanticLabel: _listening ? '停止語音輸入' : '語音輸入',
                     ),
                   ),
               ],
@@ -1191,9 +1183,12 @@ class _Banner extends StatelessWidget {
             ),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
-              child: Text(
-                text,
-                style: TextStyle(color: scheme.onErrorContainer),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  text,
+                  style: TextStyle(color: scheme.onErrorContainer),
+                ),
               ),
             ),
             if (onRetry != null)

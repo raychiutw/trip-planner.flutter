@@ -228,6 +228,21 @@ void main() {
     verifyNever(() => repo.acceptInvitation(any()));
   });
 
+  testWidgets('邀請行程標題是 VoiceOver header', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpInvite(tester);
+
+    expect(
+      tester
+          .getSemantics(find.text('沖繩家庭旅行'))
+          .getSemanticsData()
+          .flagsCollection
+          .isHeader,
+      isTrue,
+    );
+    handle.dispose();
+  });
+
   testWidgets('邀請載入狀態會向 screen reader 宣告', (tester) async {
     final pending = Completer<InvitationDetails>();
     when(() => repo.fetchInvitation(any())).thenAnswer((_) => pending.future);

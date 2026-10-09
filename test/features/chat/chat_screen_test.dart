@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
@@ -279,6 +280,7 @@ void main() {
   });
 
   testWidgets('登入過期 banner 不會被 Root Header 遮住', (tester) async {
+    final semantics = tester.ensureSemantics();
     when(
       () => reqRepo.fetchRequests(
         tripId: any(named: 'tripId'),
@@ -296,11 +298,13 @@ void main() {
 
     final banner = find.text('登入已過期,請重新登入後再試。');
     expect(banner, findsOneWidget);
+    expect(tester.isLiveRegionOf(banner), isTrue);
     final context = tester.element(find.byType(TpRootScaffold));
     expect(
       tester.getTopLeft(banner).dy,
       greaterThanOrEqualTo(TpRootGeometry.initialContentTop(context)),
     );
+    semantics.dispose();
   });
 
   testWidgets('重點聊天 tab 會回到訊息頂端並保留草稿', (tester) async {
@@ -1185,14 +1189,32 @@ void main() {
     );
     expect(micSize.width, greaterThanOrEqualTo(44));
     expect(micSize.height, greaterThanOrEqualTo(44));
-    expect(find.bySemanticsLabel('語音輸入'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('chat-mic-button')))
+          .tooltip,
+      '語音輸入',
+      reason: 'tooltip 是唯一名稱來源，Icon.semanticLabel 不可重複朗讀',
+    );
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('chat-mic-button'))).label,
+      isNot(contains('語音輸入')),
+    );
 
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '最大字級訊息');
     await tester.pump();
     final sendSize = tester.getSize(find.byKey(const ValueKey('chat-send')));
     expect(sendSize.width, greaterThanOrEqualTo(44));
     expect(sendSize.height, greaterThanOrEqualTo(44));
-    expect(find.bySemanticsLabel('送出訊息'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('chat-send'))).tooltip,
+      '送出訊息',
+      reason: 'tooltip 是唯一名稱來源，Icon.semanticLabel 不可重複朗讀',
+    );
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('chat-send'))).label,
+      isNot(contains('送出訊息')),
+    );
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -1897,7 +1919,19 @@ void main() {
       expect(position.pixels, greaterThan(0));
 
       expect(arrow, findsOneWidget);
-      expect(find.bySemanticsLabel('回到最新訊息'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('chat-jump-to-latest')))
+            .tooltip,
+        '回到最新訊息',
+        reason: 'tooltip 是唯一名稱來源，Icon.semanticLabel 不可重複朗讀',
+      );
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('chat-jump-to-latest')))
+            .label,
+        isNot(contains('回到最新訊息')),
+      );
       final arrowRect = tester.getRect(arrow);
       expect(arrowRect.width, greaterThanOrEqualTo(44.0));
       expect(arrowRect.height, greaterThanOrEqualTo(44.0));

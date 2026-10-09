@@ -650,6 +650,7 @@ class _DeveloperAppFormScreenState
           const SizedBox(height: TpSpacing.s1),
           _SecretValueRow(
             value: app.clientId,
+            copyLabel: 'Client ID',
             copyKey: const Key('developer-app-copy-client-id'),
             onCopy: () => unawaited(_copyToClipboard(app.clientId)),
           ),
@@ -659,6 +660,7 @@ class _DeveloperAppFormScreenState
             const SizedBox(height: TpSpacing.s1),
             _SecretValueRow(
               value: app.clientSecret!,
+              copyLabel: 'Client Secret',
               copyKey: const Key('developer-app-copy-client-secret'),
               onCopy: () => unawaited(_copyToClipboard(app.clientSecret!)),
             ),
@@ -718,11 +720,15 @@ class _DeveloperAppFormScreenState
 class _SecretValueRow extends StatelessWidget {
   const _SecretValueRow({
     required this.value,
+    required this.copyLabel,
     required this.copyKey,
     required this.onCopy,
   });
 
   final String value;
+
+  /// 複製鈕的對象名稱（「Client ID」「Client Secret」），VoiceOver 才分得出兩顆。
+  final String copyLabel;
   final Key copyKey;
   final VoidCallback onCopy;
 
@@ -752,7 +758,7 @@ class _SecretValueRow extends StatelessWidget {
             ),
             IconButton(
               key: copyKey,
-              tooltip: '複製',
+              tooltip: '複製 $copyLabel',
               onPressed: onCopy,
               icon: const Icon(Icons.copy_outlined),
             ),

@@ -397,11 +397,15 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
         if (!_timeValid)
           Padding(
             padding: const EdgeInsets.only(top: TpSpacing.s2),
-            child: Text(
-              '結束時間需晚於開始時間',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 11,
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                '結束時間需晚於開始時間',
+                key: const ValueKey('add-to-trip-time-error'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 11,
+                ),
               ),
             ),
           ),

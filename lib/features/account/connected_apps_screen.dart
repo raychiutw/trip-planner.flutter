@@ -233,7 +233,7 @@ class _ConnectedAppTile extends StatelessWidget {
                 dimension: 18,
                 child: CircularProgressIndicator.adaptive(strokeWidth: 2),
               )
-            : const Text('撤銷'),
+            : Text('撤銷', semanticsLabel: '撤銷 ${app.appName}'),
       ),
     );
   }

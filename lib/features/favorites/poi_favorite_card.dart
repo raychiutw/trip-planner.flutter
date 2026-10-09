@@ -69,6 +69,7 @@ class PoiFavoriteCard extends StatelessWidget {
               Checkbox(
                 key: ValueKey('favorite-select-${favorite.id}'),
                 value: selected,
+                semanticLabel: '選取 ${favorite.displayName}',
                 onChanged: (value) => onSelectedChanged!(value ?? false),
               ),
               const SizedBox(width: TpSpacing.s2),
@@ -89,54 +90,56 @@ class PoiFavoriteCard extends StatelessWidget {
             ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _FavoriteHighlightedText(
-                    textKey: ValueKey('favorite-title-${favorite.id}'),
-                    text: favorite.displayName,
-                    matchQuery: matchQuery,
-                    primary: true,
-                    maxLines: 1,
-                  ),
-                  if (favorite.poiAddress != null &&
-                      favorite.poiAddress!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: _FavoriteHighlightedText(
-                        textKey: ValueKey('favorite-address-${favorite.id}'),
-                        text: favorite.poiAddress!,
-                        matchQuery: matchQuery,
-                        maxLines: 1,
-                      ),
+              child: MergeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FavoriteHighlightedText(
+                      textKey: ValueKey('favorite-title-${favorite.id}'),
+                      text: favorite.displayName,
+                      matchQuery: matchQuery,
+                      primary: true,
+                      maxLines: 1,
                     ),
-                  if (favorite.poiRating != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: PoiRatingLabel(rating: favorite.poiRating!),
-                    ),
-                  if (favorite.note != null && favorite.note!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: _FavoriteHighlightedText(
-                        textKey: ValueKey('favorite-note-${favorite.id}'),
-                        text: favorite.note!,
-                        matchQuery: matchQuery,
-                        maxLines: 2,
-                      ),
-                    ),
-                  if (favorite.usages.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: Text(
-                        '用於 ${favorite.usages.length} 個行程',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onPrimaryContainer,
+                    if (favorite.poiAddress != null &&
+                        favorite.poiAddress!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: _FavoriteHighlightedText(
+                          textKey: ValueKey('favorite-address-${favorite.id}'),
+                          text: favorite.poiAddress!,
+                          matchQuery: matchQuery,
+                          maxLines: 1,
                         ),
                       ),
-                    ),
-                ],
+                    if (favorite.poiRating != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: PoiRatingLabel(rating: favorite.poiRating!),
+                      ),
+                    if (favorite.note != null && favorite.note!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: _FavoriteHighlightedText(
+                          textKey: ValueKey('favorite-note-${favorite.id}'),
+                          text: favorite.note!,
+                          matchQuery: matchQuery,
+                          maxLines: 2,
+                        ),
+                      ),
+                    if (favorite.usages.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: Text(
+                          '用於 ${favorite.usages.length} 個行程',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             IconButton(

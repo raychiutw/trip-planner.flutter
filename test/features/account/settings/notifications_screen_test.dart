@@ -1,3 +1,4 @@
+import '../../../helpers/semantics_flags.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -198,6 +199,7 @@ void main() {
   });
 
   testWidgets('通知權限被拒後不重複要求，並提供前往系統設定', (tester) async {
+    final semantics = tester.ensureSemantics();
     permissionService
       ..status = NotificationPermissionStatus.notDetermined
       ..requestResult = NotificationPermissionStatus.denied;
@@ -211,6 +213,7 @@ void main() {
 
     expect(permissionService.requestCalls, 1);
     expect(find.text('通知權限尚未開啟'), findsOneWidget);
+    expect(tester.isLiveRegionOf(find.text('通知權限尚未開啟')), isTrue);
     verifyNever(
       () => mockAccountRepository.updateAccountNotificationPreferences(
         invitations: true,
@@ -225,6 +228,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('notifications-open-settings')));
     await tester.pump();
     expect(permissionService.openSettingsCalls, 1);
+    semantics.dispose();
   });
 
   testWidgets('初次顯示與回到前景會同步系統通知權限', (tester) async {

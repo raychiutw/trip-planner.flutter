@@ -87,11 +87,14 @@ class _Bar extends StatelessWidget {
               Icon(icon, size: 18, color: foreground),
               const SizedBox(width: TpSpacing.s2),
               Expanded(
-                child: Text(
-                  text,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: foreground),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    text,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: foreground),
+                  ),
                 ),
               ),
               if (busy)

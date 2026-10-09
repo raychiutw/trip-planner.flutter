@@ -51,13 +51,20 @@ class PoiSearchCard extends StatelessWidget {
               Positioned(
                 top: 0,
                 right: 0,
-                child: IconButton(
-                  key: ValueKey('poi-heart-${poi.placeId}'),
-                  tooltip: isSaved ? '已收藏 · 點擊取消' : '加入收藏',
-                  onPressed: isSaving ? null : onToggleFavorite,
-                  icon: Icon(
-                    isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                    color: theme.colorScheme.primary,
+                child: MergeSemantics(
+                  child: Semantics(
+                    toggled: isSaved,
+                    child: IconButton(
+                      key: ValueKey('poi-heart-${poi.placeId}'),
+                      tooltip: isSaved ? '已收藏 · 點擊取消' : '加入收藏',
+                      onPressed: isSaving ? null : onToggleFavorite,
+                      icon: Icon(
+                        isSaved
+                            ? CupertinoIcons.heart_fill
+                            : CupertinoIcons.heart,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -76,34 +83,36 @@ class PoiSearchCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(TpSpacing.s3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  categoryLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(poi.name, style: theme.textTheme.titleMedium),
-                if (poi.address != null && poi.address!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      poi.address!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: mutedColor,
-                      ),
+            child: MergeSemantics(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    categoryLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
-                if (poi.rating != null) ...[
-                  const SizedBox(height: TpSpacing.s2),
-                  PoiRatingLabel(rating: poi.rating!),
+                  const SizedBox(height: 2),
+                  Text(poi.name, style: theme.textTheme.titleMedium),
+                  if (poi.address != null && poi.address!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        poi.address!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: mutedColor,
+                        ),
+                      ),
+                    ),
+                  if (poi.rating != null) ...[
+                    const SizedBox(height: TpSpacing.s2),
+                    PoiRatingLabel(rating: poi.rating!),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ],

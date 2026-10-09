@@ -368,23 +368,28 @@ class _NotesAiPendingPanel extends StatelessWidget {
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: colors.primary,
+          ExcludeSemantics(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colors.primary,
+              ),
             ),
           ),
           const SizedBox(width: TpSpacing.s2),
           Icon(stage.icon, size: 16, color: colors.onSecondaryContainer),
           const SizedBox(width: TpSpacing.s2),
           Expanded(
-            child: Text(
-              stage.message(label),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSecondaryContainer,
-                fontWeight: FontWeight.w600,
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                stage.message(label),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSecondaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -458,10 +463,13 @@ class _NotesAiSummaryPanel extends StatelessWidget {
           ),
           const SizedBox(width: TpSpacing.s2),
           Expanded(
-            child: Text(
-              _sentence,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSecondaryContainer,
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                _sentence,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSecondaryContainer,
+                ),
               ),
             ),
           ),
