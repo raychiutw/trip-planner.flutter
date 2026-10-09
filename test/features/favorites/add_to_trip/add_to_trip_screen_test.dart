@@ -1338,6 +1338,40 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('送出期間顯示可朗讀的忙碌指示，完成後消失', (tester) async {
+    final pending = Completer<void>();
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) => pending.future);
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('add-to-trip-progress')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('add-to-trip-progress')), findsOneWidget);
+    expect(find.text('正在加入行程…'), findsOneWidget);
+
+    pending.complete();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('favorite mode：409 → 顯示 ConflictDialog', (tester) async {
     when(
       () => favRepo.addFavoriteToTrip(

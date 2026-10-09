@@ -31,15 +31,22 @@ class MockAccountRepository extends Mock implements AccountRepository {}
 class FakeTripPrintActions implements TripPrintActions {
   final printed = <TripPrintData>[];
   final shared = <TripPrintData>[];
+  bool printResult = true;
+  bool shareResult = true;
+  Object? error;
 
   @override
-  Future<void> print(TripPrintData data) async {
+  Future<bool> print(TripPrintData data) async {
     printed.add(data);
+    if (error != null) throw error!;
+    return printResult;
   }
 
   @override
-  Future<void> sharePdf(TripPrintData data) async {
+  Future<bool> sharePdf(TripPrintData data) async {
     shared.add(data);
+    if (error != null) throw error!;
+    return shareResult;
   }
 }
 
@@ -531,6 +538,19 @@ void main() {
       printActions.printed.single.days.single.timeline.first.title,
       '首里城公園',
     );
+  });
+
+  testWidgets('公開分享：取消列印不顯示成功；離線字型失敗指出需要網路', (tester) async {
+    printActions.printResult = false;
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(find.text('已送出列印'), findsNothing);
+
+    printActions.error = const TripPdfOfflineException();
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('需要網路'), findsOneWidget);
   });
 
   testWidgets('點 PDF 會用公開分享資料分享 PDF', (tester) async {

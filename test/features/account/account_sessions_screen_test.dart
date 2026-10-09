@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,6 +109,30 @@ void main() {
     when(
       () => mockAccountRepository.fetchConnectedApps(),
     ).thenAnswer((_) async => const <ConnectedApp>[]);
+  });
+
+  testWidgets('下拉更新會等資料回來才收起轉圈', (tester) async {
+    await pumpScreen(tester);
+    final pending = Completer<AccountSessionsPage>();
+    when(
+      () => mockAccountRepository.fetchAccountSessions(),
+    ).thenAnswer((_) => pending.future);
+
+    await tester.drag(find.byType(ListView), const Offset(0, 400));
+    await tester.pump(const Duration(milliseconds: 100));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.byType(RefreshProgressIndicator), findsOneWidget);
+
+    pending.complete(
+      const AccountSessionsPage(
+        currentSid: 'sid-current',
+        sessions: [currentSession],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(RefreshProgressIndicator), findsNothing);
   });
 
   testWidgets('裝置列表不直接鋪 destructive action，詳情才顯示登出', (tester) async {

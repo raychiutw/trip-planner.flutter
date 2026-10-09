@@ -74,7 +74,15 @@ class DeveloperAppsScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(developerAppsProvider),
         ),
         data: (apps) => RefreshIndicator.adaptive(
-          onRefresh: () async => ref.invalidate(developerAppsProvider),
+          onRefresh: () async {
+            ref.invalidate(developerAppsProvider);
+            // 等資料回來才收起轉圈；失敗時由 provider 的 error 狀態呈現。
+            try {
+              await ref.read(developerAppsProvider.future);
+            } on Object {
+              // 錯誤畫面會接手，這裡只需結束轉圈。
+            }
+          },
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
             physics: const AlwaysScrollableScrollPhysics(),
