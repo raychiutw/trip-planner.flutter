@@ -19,6 +19,7 @@ import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../requests/request_lifecycle.dart';
@@ -305,7 +306,6 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final completedAt = report?.completedAt ?? report?.createdAt;
     return Column(
@@ -317,26 +317,10 @@ class _Header extends StatelessWidget {
           spacing: TpSpacing.s2,
           runSpacing: TpSpacing.s2,
           children: [
-            Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: Icon(
-                _statusIcon(report?.status),
-                size: 16,
-                color: colorScheme.primary,
-              ),
-              label: Text(_statusLabel(report?.status)),
-            ),
-            Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: const Icon(CupertinoIcons.location, size: 16),
-              label: Text('$entryCount 個停留點'),
-            ),
+            TpChip(label: _statusLabel(report?.status)),
+            TpChip(label: '$entryCount 個停留點'),
             if (completedAt != null)
-              Chip(
-                visualDensity: VisualDensity.compact,
-                avatar: const Icon(CupertinoIcons.clock, size: 16),
-                label: Text(_formatTimestamp(completedAt)),
-              ),
+              TpChip(label: _formatTimestamp(completedAt)),
           ],
         ),
       ],
@@ -397,12 +381,12 @@ class _PoiHealthCard extends StatelessWidget {
               children: [
                 Icon(CupertinoIcons.location, color: colorScheme.primary),
                 const SizedBox(width: TpSpacing.s2),
-                Text('POI 狀態', style: Theme.of(context).textTheme.titleMedium),
+                Text('景點狀態', style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: TpSpacing.s3),
             if (!report.hasIssues)
-              const Text('POI 狀態看起來正常。')
+              const Text('景點狀態看起來正常。')
             else ...[
               Text('已歇業 ${report.closed} · 缺少資料 ${report.missing}'),
               const SizedBox(height: TpSpacing.s3),
@@ -430,9 +414,9 @@ class _PoiHealthCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (item.reason != null)
+                            if (_poiReasonLabel(item) case final reason?)
                               Text(
-                                item.reason!,
+                                reason,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                           ],
@@ -635,10 +619,7 @@ class _FindingCard extends StatelessWidget {
               children: [
                 _SeverityChip(severity: finding.severity),
                 if (finding.dimension != null)
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(_dimensionLabel(finding.dimension!)),
-                  ),
+                  TpChip(label: _dimensionLabel(finding.dimension!)),
               ],
             ),
             const SizedBox(height: TpSpacing.s2),
@@ -698,29 +679,10 @@ class _SeverityChip extends StatelessWidget {
   final TripHealthSeverity severity;
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final (bg, fg) = switch (severity) {
-      TripHealthSeverity.high => (
-        colorScheme.errorContainer,
-        colorScheme.onErrorContainer,
-      ),
-      TripHealthSeverity.medium => (
-        colorScheme.tertiaryContainer,
-        colorScheme.onTertiaryContainer,
-      ),
-      TripHealthSeverity.low => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
-      ),
-    };
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      backgroundColor: bg,
-      labelStyle: TextStyle(color: fg, fontWeight: FontWeight.w700),
-      label: Text(_severityLabel(severity)),
-    );
-  }
+  Widget build(BuildContext context) => TpChip(
+    label: _severityLabel(severity),
+    selected: severity == TripHealthSeverity.high,
+  );
 }
 
 class _StatePanel extends StatelessWidget {
@@ -868,15 +830,6 @@ String _statusLabel(TripHealthStatus? status) {
   };
 }
 
-IconData _statusIcon(TripHealthStatus? status) {
-  if (status == null) return CupertinoIcons.sparkles;
-  return switch (status) {
-    TripHealthStatus.pending => CupertinoIcons.hourglass,
-    TripHealthStatus.completed => CupertinoIcons.check_mark_circled,
-    TripHealthStatus.failed => CupertinoIcons.exclamationmark_circle,
-  };
-}
-
 String _severityLabel(TripHealthSeverity severity) => switch (severity) {
   TripHealthSeverity.high => '高風險',
   TripHealthSeverity.medium => '中風險',
@@ -898,7 +851,7 @@ String _dimensionLabel(TripHealthDimension dimension) => switch (dimension) {
 };
 
 String _entryTargetLabel(TripHealthActionTarget? target) =>
-    target?.entryId != null ? '前往停留點' : '前往 Day ${target?.day ?? ''}';
+    target?.entryId != null ? '前往停留點' : '前往第 ${target?.day ?? ''} 天';
 
 String _formatTimestamp(String value) {
   if (value.length >= 16) {
@@ -914,4 +867,18 @@ String _healthErrorMessage(Object error, String fallback) {
     return fallback;
   }
   return fallback;
+}
+
+/// 後端的 reason 可能是代碼（如 `CLOSED_PERMANENTLY`）；已含中文的原樣顯示，
+/// 已知代碼轉人話，其餘不外洩原始字串。
+String? _poiReasonLabel(TripPoiHealthItem item) {
+  final reason = item.reason;
+  if (reason == null || reason.trim().isEmpty) return null;
+  if (hasCjk(reason)) return reason;
+  return switch (reason.toUpperCase()) {
+    'CLOSED_PERMANENTLY' => '已永久歇業',
+    'CLOSED_TEMPORARILY' => '暫時歇業',
+    'NO_HOURS_DATA' || 'MISSING_HOURS' => '缺少營業資料',
+    _ => item.status == TripPoiHealthStatus.closed ? '店家可能已歇業' : '店家資料不完整',
+  };
 }

@@ -13,6 +13,7 @@ import '../../../app/error_message.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 
@@ -179,13 +180,7 @@ class _Header extends StatelessWidget {
         Wrap(
           spacing: TpSpacing.s2,
           runSpacing: TpSpacing.s2,
-          children: [
-            Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: const Icon(CupertinoIcons.clock, size: 16),
-              label: Text('$count 筆'),
-            ),
-          ],
+          children: [TpChip(label: '$count 筆')],
         ),
         const SizedBox(height: TpSpacing.s2),
         Text('顯示最近最多 $_auditLimit 筆異動', style: textTheme.bodyMedium),
@@ -218,15 +213,11 @@ class _AuditCard extends StatelessWidget {
               runSpacing: TpSpacing.s2,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: _actionBackground(context, row.action),
-                  label: Text(_actionLabel(row.action)),
+                TpChip(
+                  label: _actionLabel(row.action),
+                  selected: row.action != TripAuditAction.unknown,
                 ),
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(_tableLabel(row.tableName)),
-                ),
+                TpChip(label: _tableLabel(row.tableName)),
               ],
             ),
             const SizedBox(height: TpSpacing.s2),
@@ -321,17 +312,6 @@ class _EmptyAudit extends StatelessWidget {
       ),
     );
   }
-}
-
-Color _actionBackground(BuildContext context, TripAuditAction action) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return switch (action) {
-    TripAuditAction.insert => colorScheme.secondaryContainer,
-    TripAuditAction.update => colorScheme.primaryContainer,
-    TripAuditAction.delete => colorScheme.errorContainer,
-    TripAuditAction.error => colorScheme.errorContainer,
-    TripAuditAction.unknown => colorScheme.surfaceContainerHigh,
-  };
 }
 
 String _actionLabel(TripAuditAction action) => switch (action) {

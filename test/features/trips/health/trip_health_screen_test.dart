@@ -195,6 +195,56 @@ void main() {
     expect(find.text('已歇業餐廳'), findsOneWidget);
   });
 
+  testWidgets('用詞人話化:不外洩 POI／Day／原始代碼', (tester) async {
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
+      (_) async => const TripHealthReport(
+        tripId: 'trip-1',
+        userId: 'user-1',
+        status: TripHealthStatus.completed,
+        createdAt: '2026-07-09T10:00:00Z',
+        findings: [
+          TripHealthFinding(
+            severity: TripHealthSeverity.medium,
+            title: '午餐空窗',
+            description: '中午沒有安排餐廳。',
+            actionTarget: TripHealthActionTarget(day: 2),
+          ),
+        ],
+      ),
+    );
+    when(() => repository.fetchPoiHealth('trip-1')).thenAnswer(
+      (_) async => const TripPoiHealthReport(
+        version: 2,
+        closed: 1,
+        missing: 1,
+        items: [
+          TripPoiHealthItem(
+            poiId: 501,
+            poiName: '已歇業餐廳',
+            status: TripPoiHealthStatus.closed,
+            reason: 'CLOSED_PERMANENTLY',
+          ),
+          TripPoiHealthItem(
+            poiId: 502,
+            poiName: '缺資料景點',
+            status: TripPoiHealthStatus.missing,
+            reason: 'NO_HOURS_DATA',
+          ),
+        ],
+      ),
+    );
+
+    await pumpScreen(tester);
+
+    expect(find.text('景點狀態'), findsOneWidget);
+    expect(find.text('前往第 2 天'), findsOneWidget);
+    expect(find.text('已永久歇業'), findsOneWidget);
+    expect(find.text('缺少營業資料'), findsOneWidget);
+    for (final leak in ['POI', 'Day ', 'CLOSED_', 'NO_HOURS', '#', 'system']) {
+      expect(find.textContaining(leak), findsNothing, reason: leak);
+    }
+  });
+
   testWidgets('finding entry target 導向停留點編輯頁', (tester) async {
     when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
       (_) async => const TripHealthReport(
@@ -240,7 +290,7 @@ void main() {
     );
 
     await pumpScreenWithRouter(tester);
-    await tester.tap(find.text('前往 Day 2'));
+    await tester.tap(find.text('前往第 2 天'));
     await tester.pumpAndSettle();
 
     expect(find.text('trip trip-1 day 2'), findsOneWidget);

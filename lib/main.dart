@@ -31,10 +31,29 @@ const kSupportedLocales = [Locale('zh', 'TW')];
 /// App-level retry signal. Widget/integration tests override this with an empty
 /// stream so they never depend on a registered platform plugin.
 final appNetworkAvailabilityProvider = Provider<Stream<bool>>(
-  (ref) => Connectivity().onConnectivityChanged.map(
-    (results) => results.any((result) => result != ConnectivityResult.none),
-  ),
+  (ref) => networkAvailabilityStream(Connectivity()),
 );
+
+/// 先送一次 [Connectivity.checkConnectivity] 的現況，再接後續變化。
+/// `onConnectivityChanged` 不發初始值，冷啟動已離線時橫幅會漏報。
+@visibleForTesting
+Stream<bool> networkAvailabilityStream(Connectivity connectivity) async* {
+  bool online(List<ConnectivityResult> results) =>
+      results.any((result) => result != ConnectivityResult.none);
+  // 先訂閱再查現況，查詢期間的變化緩衝到初始值之後，不會漏掉。
+  final changes = StreamController<bool>();
+  final subscription = connectivity.onConnectivityChanged
+      .map(online)
+      .listen(changes.add);
+  try {
+    yield online(await connectivity.checkConnectivity());
+    yield* changes.stream;
+  } finally {
+    await subscription.cancel();
+    // 沒有 listener 時 close() 的 future 不會完成，故不 await。
+    unawaited(changes.close());
+  }
+}
 
 final _triplineGlassTheme = GlassThemeData(
   light: GlassThemeVariant.light.copyWith(
