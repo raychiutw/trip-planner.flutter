@@ -103,7 +103,7 @@ class InviteController extends Notifier<InviteState> {
     ref.onDispose(() => _disposed = true);
     final token = _token;
     if (token.isEmpty) {
-      return const InviteState(loading: false, error: '邀請連結無效（缺少 token）');
+      return const InviteState(loading: false, error: '邀請連結不完整，請向邀請者重新索取連結。');
     }
     unawaited(Future<void>(() => _load(token)));
     return InviteState(loading: true, token: token);
@@ -176,7 +176,7 @@ bool _sameEmail(String a, String b) {
 String _inviteErrorMessage(ApiError error) {
   return switch (error.code) {
     'AUTH_REQUIRED' => '請先登入後再接受邀請。',
-    'INVITATION_TOKEN_MISSING' => '邀請連結無效（缺少 token）',
+    'INVITATION_TOKEN_MISSING' => '邀請連結不完整，請向邀請者重新索取連結。',
     'INVITATION_INVALID' => '邀請連結無效，請聯絡邀請者重寄。',
     'INVITATION_ACCEPTED' => '此邀請已被接受，請回到行程清單確認。',
     'INVITATION_EXPIRED' => '邀請已過期，請聯絡邀請者重寄。',

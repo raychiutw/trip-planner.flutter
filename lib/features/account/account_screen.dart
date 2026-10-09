@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/auth_repository.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
@@ -142,9 +143,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       if (!mounted) return;
       Navigator.of(context).pop();
       router?.go('/welcome');
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) return;
-      await showAppAlert(context, title: '無法載入刪除資訊', message: '請檢查網路連線後再試一次。');
+      await showAppAlert(
+        context,
+        title: '無法載入刪除資訊',
+        message: error is ApiError
+            ? userFacingApiError(error, fallback: '請稍後再試一次。')
+            : '請檢查網路連線後再試一次。',
+      );
     } finally {
       if (mounted) setState(() => _loadingAccountDeletion = false);
     }

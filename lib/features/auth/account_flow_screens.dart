@@ -540,7 +540,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   error.code == 'RESET_TOKEN_MISSING');
           _error = _authErrorMessage(error, const {
             'RESET_TOKEN_INVALID': '重設連結無效或已過期',
-            'RESET_TOKEN_MISSING': '重設連結缺少 token',
+            'RESET_TOKEN_MISSING': '重設連結不完整，請重新申請',
           }, '暫時無法處理，請稍後再試');
         });
       }
@@ -872,7 +872,7 @@ class _InlineAuthMessage extends StatelessWidget {
           message,
           style: Theme.of(
             context,
-          ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+          ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface),
         ),
       ),
     );

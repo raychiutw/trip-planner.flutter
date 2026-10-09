@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
@@ -507,7 +508,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       _showImportError('不是有效的 JSON 檔');
     } on ApiError catch (error) {
       if (!mounted) return;
-      _showImportError(error.detail ?? error.message);
+      _showImportError(userFacingApiError(error, fallback: '匯入失敗，請稍後再試'));
     } on Exception {
       if (!mounted) return;
       _showImportError('匯入失敗，請稍後再試');

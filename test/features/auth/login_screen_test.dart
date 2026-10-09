@@ -15,6 +15,8 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
+import '../../helpers/contrast.dart';
+
 class MockAuthRepository extends Mock implements AuthRepository {}
 
 void main() {
@@ -469,6 +471,35 @@ void main() {
       final semantics = tester.getSemantics(find.byKey(errorBannerKey));
       expect(semantics.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
     });
+
+    for (final brightness in Brightness.values) {
+      testWidgets('登入錯誤橫幅文字對比 ≥ 4.5:1（${brightness.name}）', (tester) async {
+        when(
+          () => mockAuthRepository.login(
+            email: any(named: 'email'),
+            password: any(named: 'password'),
+          ),
+        ).thenAnswer(
+          (_) async => throw const ApiError(
+            status: 401,
+            code: 'LOGIN_INVALID',
+            message: '帳號或密碼錯誤',
+          ),
+        );
+        await pumpLoginScreen(tester, brightness: brightness);
+        await tester.enterText(find.byKey(emailFieldKey), 'ray@example.com');
+        await tester.enterText(find.byKey(passwordFieldKey), 'wrong');
+        await tester.tap(find.byKey(submitButtonKey));
+        await tester.pumpAndSettle();
+
+        final finder = find.text('帳號或密碼錯誤');
+        final scheme = Theme.of(tester.element(finder)).colorScheme;
+        expect(
+          errorTextContrast(tester.widget<Text>(finder).style?.color, scheme),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+    }
 
     testWidgets('LOGIN_RATE_LIMITED 英文 message：改用繁中人話 fallback', (
       tester,

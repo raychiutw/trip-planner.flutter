@@ -1070,7 +1070,7 @@ void main() {
 
   for (final (code, message) in [
     ('RESET_TOKEN_INVALID', '重設連結無效或已過期'),
-    ('RESET_TOKEN_MISSING', '重設連結缺少 token'),
+    ('RESET_TOKEN_MISSING', '重設連結不完整，請重新申請'),
   ]) {
     testWidgets('$code 保留輸入並可重新申請，不重送也不返回失效頁', (tester) async {
       when(

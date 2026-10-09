@@ -75,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref.read(oauthLoginServiceProvider).login();
       if (mounted) ref.invalidate(authStateProvider);
     } on OAuthLoginException catch (e) {
-      if (mounted) setState(() => _oauthError = e.message);
+      if (mounted) setState(() => _oauthError = e.userMessage);
     } on Exception {
       if (mounted) setState(() => _oauthError = 'Tripline 登入失敗，請稍後再試');
     } finally {
@@ -206,7 +206,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: Text(
                               _loginErrorMessage(authState.error!),
                               style: textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.error,
+                                color: colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -293,7 +293,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               _oauthError!,
                               textAlign: TextAlign.center,
                               style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.error,
+                                color: colorScheme.onSurface,
                               ),
                             ),
                           ),

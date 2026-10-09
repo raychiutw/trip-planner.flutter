@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
@@ -138,10 +138,8 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
     }
   }
 
-  String _errorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return '登出裝置失敗，請稍後再試';
-  }
+  String _errorMessage(Object error) =>
+      userFacingApiError(error, fallback: '登出裝置失敗，請稍後再試');
 }
 
 class _SessionsList extends StatelessWidget {
