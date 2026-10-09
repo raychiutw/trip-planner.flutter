@@ -19,6 +19,7 @@ import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../../ui/tp_compact_time_field.dart';
 import '../../../ui/tp_state_view.dart';
@@ -310,7 +311,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                LinearProgressIndicator(),
+                TpProgressBar(semanticLabel: null),
                 SizedBox(height: TpSpacing.s2),
                 Text('正在加入行程…'),
               ],
@@ -341,7 +342,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           daysAsync.when(
             skipLoadingOnReload: daysAsync.retrying,
             skipError: daysAsync.hasValue,
-            loading: () => const LinearProgressIndicator(),
+            loading: () => const TpProgressBar(),
             error: (e, _) => _RetryState(
               key: ValueKey(tripId),
               title: '無法載入日期',

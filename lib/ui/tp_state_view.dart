@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'tp_filled_button.dart';
 
 enum TpStateKind { loading, empty, noResults, offline, permission, error }
 
@@ -72,7 +73,7 @@ class TpStateView extends StatelessWidget {
               ],
               if (onAction != null) ...[
                 const SizedBox(height: TpSpacing.s5),
-                FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+                TpFilledButton(label: actionLabel!, onPressed: onAction),
               ],
             ],
           ),

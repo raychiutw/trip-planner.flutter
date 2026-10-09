@@ -16,6 +16,7 @@ import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_state_view.dart';
@@ -1085,9 +1086,9 @@ class _EmptyStatePrompts extends StatelessWidget {
               alignment: WrapAlignment.center,
               children: [
                 for (var i = 0; i < _suggestedPrompts.length; i++)
-                  ActionChip(
+                  TpChip(
                     key: ValueKey('chat-suggestion-$i'),
-                    label: Text(_suggestedPrompts[i]),
+                    label: _suggestedPrompts[i],
                     onPressed: sending
                         ? null
                         : () => onSelect(_suggestedPrompts[i]),

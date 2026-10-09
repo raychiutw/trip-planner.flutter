@@ -11,7 +11,9 @@ import 'package:go_router/go_router.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_segmented_control.dart';
 import '../../account/ai_authorize_card.dart';
 import '../trips_list_screen.dart';
 import '../widgets/destination_picker.dart';
@@ -218,15 +220,13 @@ class _DateModeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<TripDateMode>(
-          segments: const [
-            ButtonSegment(value: TripDateMode.fixed, label: Text('固定日期')),
-            ButtonSegment(value: TripDateMode.flexible, label: Text('大概時間')),
-          ],
-          selected: {state.dateMode},
-          onSelectionChanged: !ctrl.editingEnabled
-              ? null
-              : (s) => ctrl.setDateMode(s.first),
+        TpSegmentedControl<TripDateMode>(
+          value: state.dateMode,
+          options: const {
+            TripDateMode.fixed: '固定日期',
+            TripDateMode.flexible: '大概時間',
+          },
+          onChanged: !ctrl.editingEnabled ? null : ctrl.setDateMode,
         ),
         const SizedBox(height: TpSpacing.s3),
         if (state.dateMode == TripDateMode.fixed)
@@ -320,13 +320,13 @@ class _FlexibleDate extends StatelessWidget {
           spacing: TpSpacing.s2,
           children: [
             for (final m in months)
-              ChoiceChip(
-                label: Text('${m.year}/${m.month}'),
+              TpChip(
+                label: '${m.year}/${m.month}',
                 selected:
                     state.flexYear == m.year && state.flexMonth == m.month,
-                onSelected: !ctrl.editingEnabled
+                onPressed: !ctrl.editingEnabled
                     ? null
-                    : (_) => ctrl.setFlexMonth(m.year, m.month),
+                    : () => ctrl.setFlexMonth(m.year, m.month),
               ),
           ],
         ),

@@ -15,6 +15,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_settings_group.dart';
 import 'account_display.dart';
 import 'connected_apps_screen.dart';
 
@@ -160,25 +161,17 @@ class _SessionsList extends StatelessWidget {
           if (sessions.isEmpty)
             const _EmptySessionsState()
           else
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var index = 0; index < sessions.length; index++) ...[
-                    _SessionTile(
-                      session: sessions[index],
-                      isBusy: busySessionSid == sessions[index].sid,
-                      onRevoke: () => onRevoke(sessions[index].sid),
-                    ),
-                    if (index != sessions.length - 1)
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                      ),
-                  ],
-                ],
-              ),
+            TpGroupedSurface(
+              separatorIndent: 0,
+              separatorEndIndent: 0,
+              children: [
+                for (var index = 0; index < sessions.length; index++)
+                  _SessionTile(
+                    session: sessions[index],
+                    isBusy: busySessionSid == sessions[index].sid,
+                    onRevoke: () => onRevoke(sessions[index].sid),
+                  ),
+              ],
             ),
           const SizedBox(height: TpSpacing.s4),
           _SessionsInfoPanel(onOpenConnectedApps: onOpenConnectedApps),
@@ -289,24 +282,25 @@ class _SessionsFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        key: const Key('account-sessions-logout'),
-        leading: Icon(
-          CupertinoIcons.square_arrow_right,
-          size: 20,
-          color: colorScheme.error,
-        ),
-        title: Text(
-          '登出此帳號',
-          style: TextStyle(
+    return TpGroupedSurface(
+      children: [
+        ListTile(
+          key: const Key('account-sessions-logout'),
+          leading: Icon(
+            CupertinoIcons.square_arrow_right,
+            size: 20,
             color: colorScheme.error,
-            fontWeight: FontWeight.w600,
           ),
+          title: Text(
+            '登出此帳號',
+            style: TextStyle(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onTap: onLogout,
         ),
-        onTap: onLogout,
-      ),
+      ],
     );
   }
 }
@@ -525,32 +519,34 @@ class _InlineErrorPanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      child: Card(
+      child: TpGroupedSurface(
         color: colorScheme.errorContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                CupertinoIcons.exclamationmark_circle,
-                color: colorScheme.onErrorContainer,
-              ),
-              const SizedBox(width: TpSpacing.s3),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: colorScheme.onErrorContainer),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: colorScheme.onErrorContainer,
                 ),
-              ),
-              TextButton(
-                key: const Key('account-sessions-retry'),
-                onPressed: onRetry,
-                child: const Text('重試'),
-              ),
-            ],
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('account-sessions-retry'),
+                  onPressed: onRetry,
+                  child: const Text('重試'),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -21,8 +21,10 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../app/irreversible_action.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_segmented_control.dart';
 import 'share_controller.dart';
 
 const _shareSectionOrder = [
@@ -381,14 +383,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             runSpacing: TpSpacing.s1,
                             children: [
                               for (final section in _shareSectionOrder)
-                                FilterChip(
+                                TpChip(
                                   key: ValueKey('share-section-$section'),
-                                  label: Text(
-                                    _shareSectionLabels[section] ?? section,
-                                  ),
+                                  label:
+                                      _shareSectionLabels[section] ?? section,
                                   selected: _sections.contains(section),
-                                  onSelected: (selected) =>
-                                      _toggleSection(section, selected),
+                                  onPressed: () => _toggleSection(
+                                    section,
+                                    !_sections.contains(section),
+                                  ),
                                 ),
                             ],
                           ),
@@ -400,18 +403,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           const SizedBox(height: TpSpacing.s1),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
-                            child: SegmentedButton<String>(
-                              showSelectedIcon: false,
-                              selected: {_expiryKey},
-                              onSelectionChanged: (next) =>
-                                  setState(() => _expiryKey = next.single),
-                              segments: [
+                            child: TpSegmentedControl<String>(
+                              value: _expiryKey,
+                              onChanged: (next) =>
+                                  setState(() => _expiryKey = next),
+                              options: {
                                 for (final key in _expiryPresets.keys)
-                                  ButtonSegment(
-                                    value: key,
-                                    label: Text(_expiryLabels[key] ?? key),
-                                  ),
-                              ],
+                                  key: _expiryLabels[key] ?? key,
+                              },
                             ),
                           ),
                           if (_expiryKey == 'custom') ...[
@@ -991,11 +990,12 @@ class _EditShareFormState extends State<_EditShareForm> {
           runSpacing: TpSpacing.s1,
           children: [
             for (final section in _shareSectionOrder)
-              FilterChip(
+              TpChip(
                 key: ValueKey('share-edit-section-$section'),
-                label: Text(_shareSectionLabels[section] ?? section),
+                label: _shareSectionLabels[section] ?? section,
                 selected: _sections.contains(section),
-                onSelected: (selected) => _toggleSection(section, selected),
+                onPressed: () =>
+                    _toggleSection(section, !_sections.contains(section)),
               ),
           ],
         ),
@@ -1004,26 +1004,23 @@ class _EditShareFormState extends State<_EditShareForm> {
         const SizedBox(height: TpSpacing.s1),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: SegmentedButton<String>(
-            showSelectedIcon: false,
-            selected: {_expiryKey},
-            onSelectionChanged: (next) {
+          child: TpSegmentedControl<String>(
+            value: _expiryKey,
+            onChanged: (next) {
               setState(() {
-                _expiryKey = next.single;
+                _expiryKey = next;
                 _error = null;
               });
               _syncFormState();
             },
-            segments: [
+            options: {
               for (final key in _expiryPresets.keys)
-                ButtonSegment(
-                  value: key,
-                  label: Text(
-                    _expiryLabels[key] ?? key,
-                    key: ValueKey('share-edit-expiry-$key'),
-                  ),
-                ),
-            ],
+                key: _expiryLabels[key] ?? key,
+            },
+            segmentKeys: {
+              for (final key in _expiryPresets.keys)
+                key: ValueKey('share-edit-expiry-$key'),
+            },
           ),
         ),
         if (_expiryKey == 'custom') ...[

@@ -19,6 +19,7 @@ import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../requests/request_lifecycle.dart';
 
@@ -242,7 +243,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
                               key: const ValueKey('trip-health-refreshing'),
                               liveRegion: true,
                               label: '正在更新健檢資料',
-                              child: const LinearProgressIndicator(),
+                              child: const TpProgressBar(semanticLabel: null),
                             ),
                             const SizedBox(height: TpSpacing.s3),
                           ],

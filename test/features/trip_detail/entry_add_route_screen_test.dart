@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_progress_bar.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
@@ -385,7 +387,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(reads, 2);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.byType(TpProgressBar), findsOneWidget);
     expect(find.text('等待日期更新的草稿'), findsOneWidget);
     expect(find.text('Day 2'), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-add-loading')), findsNothing);
@@ -397,7 +399,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(reads, 2);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(TpProgressBar), findsNothing);
     expect(find.text('等待日期更新的草稿'), findsOneWidget);
     expect(find.text('Day 2 · 2026-10-02'), findsOneWidget);
     expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
@@ -634,7 +636,7 @@ void main() {
     await tester.pumpWidget(_buildScreen(repo, initialDayNum: 1));
     await tester.pumpAndSettle();
 
-    expect(find.byType(FilterChip), findsNothing);
+    expect(find.byType(TpChip), findsNothing);
     await tester.tap(find.byKey(const ValueKey('entry-add-day-picker')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-day-2')));
@@ -1293,7 +1295,7 @@ void main() {
     expect(find.text('牧志市場'), findsOneWidget);
     expect(find.text('那霸飯店'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilterChip, '美食'));
+    await tester.tap(find.widgetWithText(TpChip, '美食'));
     await tester.pumpAndSettle();
 
     expect(find.text('牧志市場'), findsOneWidget);
@@ -1611,7 +1613,7 @@ void main() {
     expect(find.text('牧志市場'), findsOneWidget);
     expect(find.text('那霸飯店'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilterChip, '住宿'));
+    await tester.tap(find.widgetWithText(TpChip, '住宿'));
     await tester.pumpAndSettle();
 
     expect(find.text('牧志市場'), findsNothing);

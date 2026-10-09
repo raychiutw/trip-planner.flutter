@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart'
     show CupertinoIcons, CupertinoSearchTextField;
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -347,7 +348,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await completeBasics(tester);
-    await tester.tap(find.widgetWithText(ActionChip, '京都'));
+    await tester.tap(find.widgetWithText(TpChip, '京都'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('create-flex-plus')));
     await tester.pump();
@@ -369,9 +370,7 @@ void main() {
       isFalse,
     );
     expect(
-      tester
-          .widget<ActionChip>(find.widgetWithText(ActionChip, '京都'))
-          .onPressed,
+      tester.widget<TpChip>(find.widgetWithText(TpChip, '京都')).onPressed,
       isNull,
     );
     await tester.tap(find.text('取消'));
@@ -426,7 +425,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await completeBasics(tester);
-    await tester.tap(find.widgetWithText(ActionChip, '京都'));
+    await tester.tap(find.widgetWithText(TpChip, '京都'));
     await tester.pumpAndSettle();
     Future<void> moveFirstAfterSecond(
       String firstName,
@@ -483,7 +482,7 @@ void main() {
     expect(find.byKey(const ValueKey('create-flex-count')), findsNothing);
     expect(
       tester
-          .widget<ActionChip>(find.byKey(const ValueKey('dest-recent-東京')))
+          .widget<TpChip>(find.byKey(const ValueKey('dest-recent-東京')))
           .onPressed,
       isNull,
     );

@@ -10,6 +10,8 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_progress_bar.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/dynamic_type.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -145,7 +147,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   ),
                   if (state.searching) ...[
                     const SizedBox(height: TpSpacing.s1),
-                    const LinearProgressIndicator(minHeight: 2),
+                    const TpProgressBar(height: 2, semanticLabel: '搜尋中'),
                   ],
                 ],
               ),
@@ -206,26 +208,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     required bool selected,
     required VoidCallback onSelected,
   }) {
-    final theme = Theme.of(context);
-    return ChoiceChip(
+    return TpChip(
       key: key,
-      label: Text(count == null ? label : '$label  $count'),
+      label: count == null ? label : '$label  $count',
       selected: selected,
-      showCheckmark: false,
-      backgroundColor: theme.colorScheme.surfaceContainerHigh,
-      selectedColor: theme.colorScheme.primaryContainer,
-      side: BorderSide(
-        color: selected
-            ? theme.colorScheme.primary
-            : theme.colorScheme.outlineVariant,
-      ),
-      labelStyle: theme.textTheme.labelLarge?.copyWith(
-        color: selected
-            ? theme.colorScheme.onPrimaryContainer
-            : theme.colorScheme.onSurface,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-      ),
-      onSelected: (_) => onSelected(),
+      onPressed: onSelected,
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../models/poi_favorite.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_selection_circle.dart';
 import 'poi_rating_label.dart';
 
 /// 收藏 POI 卡片：共用 Tripline accent + rating/note/usages + 刪除入口。
@@ -66,11 +67,11 @@ class PoiFavoriteCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (selectionMode && onSelectedChanged != null) ...[
-              Checkbox(
+              TpSelectionCircle(
                 key: ValueKey('favorite-select-${favorite.id}'),
-                value: selected,
+                selected: selected,
                 semanticLabel: '選取 ${favorite.displayName}',
-                onChanged: (value) => onSelectedChanged!(value ?? false),
+                onChanged: onSelectedChanged,
               ),
               const SizedBox(width: TpSpacing.s2),
             ],

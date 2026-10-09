@@ -290,6 +290,19 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 自訂觸發器(`triggerBuilder`)可以是 chip 等需要 `Material` 的元件;overlay 內的複本由 `TpMoreMenuButton` 固定成頁面觸發器的尺寸並提供透明 `Material`,feature 不必自己包。
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:666`、`lib/features/trips/collab/collab_screen.dart:230`、`lib/features/favorites/favorites_screen.dart:469`)。
 - 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存例外:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off;`travel_pill.dart` 的交通工具圖示〔步行、開車、計程車、公車、火車、電車、飛機、船、單車、路線〕,Cupertino 沒有成套對應,整組維持 Material 以免同一排風格混用)。`test/ui/material_residue_guard_test.dart` 守住已收斂的檔案與例外清單。進度指示器一律 `CircularProgressIndicator.adaptive()`。
+- **Material 控制項改走 Tp 元件**(`lib/ui/`;`test/ui/material_residue_guard_test.dart` 守住全 `lib/` 不得再出現原生版本):
+
+  | 不得使用 | 改用 | 備註 |
+  | --- | --- | --- |
+  | `Checkbox` | `TpSelectionCircle` | 選取模式的圓形勾選,語意 checked,點擊區 44pt |
+  | `FilterChip`／`ChoiceChip`／`ActionChip` | `TpChip` | 選中只靠 tint 填色與邊框,無勾選圖示 |
+  | `SegmentedButton` | `TpSegmentedControl` | 底層 `CupertinoSlidingSegmentedControl`,僅限 2~4 項互斥選項 |
+  | `DropdownButton`／`DropdownButtonFormField` | `TpPickerField` | 點擊開 action sheet,目前值打勾;行內用 `compact: true` |
+  | `LinearProgressIndicator` | `TpProgressBar` | Cupertino 沒有線性進度,以 `colorScheme` 自繪;外層已有標籤或緊鄰文字時 `semanticLabel: null` |
+  | `TpStateView`／衝突解決 sheet 的 `FilledButton` | `TpFilledButton` | 底層 `CupertinoButton`;`tonal: true` 為次要選項 |
+  | 設定／清單類頁面自組 `Card` | `TpGroupedSurface` | 登入裝置、已連結應用、開發者應用三頁已收斂;錯誤面板用 `color: errorContainer` |
+
+  **登記例外(Cupertino 沒有合理對應,不硬換)**:`CheckboxListTile`(分享的「匿名分享」新增與編輯各一、註冊的隱私同意、開發者應用的 scope 勾選,共 4 處)是表單內的獨立 opt-in 選項,不是選取模式;iOS 的對應是 `Switch`,但語意由「勾選同意」變成「開關」,需產品決定,故維持原樣。其餘頁面的 `FilledButton`／`Card` 由 `AppTheme` 的 `filledButtonTheme`／`cardTheme` 統一外觀,尚未逐頁遷移。
 
 ## 測試規範
 

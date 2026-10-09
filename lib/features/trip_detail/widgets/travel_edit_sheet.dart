@@ -8,6 +8,7 @@ import '../../../app/adaptive.dart';
 import '../../../models/entry.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
 
@@ -376,21 +377,21 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
                 runSpacing: TpSpacing.s2,
                 children: [
                   for (final option in travelMethodOptions)
-                    ChoiceChip(
+                    TpChip(
                       key: ValueKey(
                         option.key == 'other'
                             ? 'travel-mode-transit'
                             : 'travel-mode-${option.key}',
                       ),
-                      label: Text(option.label),
+                      label: option.label,
                       selected: !_noTravel && _methodKey == option.key,
-                      onSelected: (_) => _selectMethod(option),
+                      onPressed: () => _selectMethod(option),
                     ),
-                  ChoiceChip(
+                  TpChip(
                     key: const ValueKey('travel-mode-no-travel'),
-                    label: const Text('不需計算路程'),
+                    label: '不需計算路程',
                     selected: _noTravel,
-                    onSelected: (_) {
+                    onPressed: () {
                       _noTravel = true;
                       _markChanged();
                     },

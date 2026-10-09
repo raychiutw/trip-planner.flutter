@@ -14,6 +14,7 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_picker_field.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../widgets/destination_picker.dart';
 import 'edit_trip_controller.dart';
@@ -168,20 +169,12 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     onChanged: ctrl.setDescription,
                   ),
                   const SizedBox(height: TpSpacing.s4),
-                  DropdownButtonFormField<String>(
+                  TpPickerField<String>(
                     key: const ValueKey('edit-lang'),
-                    initialValue: state.lang,
-                    decoration: const InputDecoration(
-                      labelText: '顯示語言',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final e in _langs.entries)
-                        DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) ctrl.setLang(v);
-                    },
+                    label: '顯示語言',
+                    value: state.lang,
+                    options: _langs,
+                    onChanged: ctrl.setLang,
                   ),
                   const SizedBox(height: TpSpacing.s2),
                   SwitchListTile.adaptive(

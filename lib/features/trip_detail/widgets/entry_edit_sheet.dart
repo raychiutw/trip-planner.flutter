@@ -13,6 +13,7 @@ import '../../../app/app_feedback.dart';
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_picker_field.dart';
 import '../../../ui/tp_compact_time_field.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
@@ -551,44 +552,31 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               ),
               if (showDayPicker) ...[
                 const SizedBox(height: TpSpacing.s3),
-                DropdownButtonFormField<int>(
+                TpPickerField<int>(
                   key: const ValueKey('entry-edit-day'),
-                  initialValue: selectedDayNum,
-                  decoration: const InputDecoration(labelText: '日期'),
-                  items: [
+                  label: '日期',
+                  value: selectedDayNum,
+                  options: {
                     for (final day in dayOptions)
-                      DropdownMenuItem(
-                        value: day.dayNum,
-                        child: Text(
-                          dayLabel(day.dayNum, title: day.displayTitle),
-                        ),
-                      ),
-                  ],
+                      day.dayNum: dayLabel(day.dayNum, title: day.displayTitle),
+                  },
                   onChanged: _submitting
                       ? null
                       : (value) {
-                          if (value == null) return;
                           _newDayNum = value;
                           _markChanged();
                         },
                 ),
               ],
               const SizedBox(height: TpSpacing.s3),
-              DropdownButtonFormField<String>(
+              TpPickerField<String>(
                 key: const ValueKey('entry-edit-poi-type'),
-                initialValue: _poiType,
-                decoration: const InputDecoration(labelText: '分類'),
-                items: [
-                  for (final entry in kPoiTypeLabels.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ),
-                ],
+                label: '分類',
+                value: _poiType,
+                options: kPoiTypeLabels,
                 onChanged: _submitting
                     ? null
                     : (value) {
-                        if (value == null) return;
                         _poiType = value;
                         _markChanged();
                       },
