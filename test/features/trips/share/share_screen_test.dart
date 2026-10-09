@@ -228,6 +228,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('請選擇到期日'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('請選擇到期日')).style?.color,
+      Theme.of(tester.element(find.text('請選擇到期日'))).colorScheme.onSurface,
+      reason: '錯誤文字用 onSurface 達 4.5:1，不用紅字',
+    );
     final create = find.byKey(const ValueKey('share-create'));
     await tester.ensureVisible(create);
     expect(tester.widget<FilledButton>(create).onPressed, isNull);

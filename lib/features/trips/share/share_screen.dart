@@ -416,7 +416,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                   '請選擇到期日',
                                   key: const ValueKey('share-expiry-required'),
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.error,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -451,7 +453,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                         style: TextStyle(
                                           color: Theme.of(
                                             context,
-                                          ).colorScheme.error,
+                                          ).colorScheme.onSurface,
                                         ),
                                       ),
                                     ),
@@ -585,7 +587,7 @@ class _RowError extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             ),
           ),
           TextButton(
@@ -1038,7 +1040,9 @@ class _EditShareFormState extends State<_EditShareForm> {
               padding: const EdgeInsets.only(top: TpSpacing.s2),
               child: Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
           ),

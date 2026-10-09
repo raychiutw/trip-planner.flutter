@@ -559,6 +559,12 @@ void main() {
       ),
     ).called(1);
     expect(find.text('密碼不正確，請重新輸入'), findsOneWidget);
+    final errorText = tester.widget<Text>(find.text('密碼不正確，請重新輸入'));
+    expect(
+      errorText.style?.color,
+      Theme.of(tester.element(find.text('密碼不正確，請重新輸入'))).colorScheme.onSurface,
+      reason: '錯誤文字用 onSurface 才能達 4.5:1，不用紅字',
+    );
     expect(find.byKey(const ValueKey('delete-account-dialog')), findsOneWidget);
   });
 

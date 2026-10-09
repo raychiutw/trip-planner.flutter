@@ -452,6 +452,7 @@ class _NotesAiPendingPanel extends StatelessWidget {
   }
 }
 
+/// 完成摘要:用中文句子講「動了什麼」,不是裸露的數字表格。
 class _NotesAiSummaryPanel extends StatelessWidget {
   const _NotesAiSummaryPanel({
     super.key,

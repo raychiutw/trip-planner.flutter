@@ -370,11 +370,11 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
             key: const ValueKey('delete-account-confirmation-field'),
             controller: _controller,
             enabled: !_submitting,
-            obscureText: preview.hasPassword,
+            obscureText: true,
             autocorrect: false,
             enableSuggestions: false,
             autofillHints: const [AutofillHints.password],
-            placeholder: preview.hasPassword ? '目前密碼（重新驗證）' : '輸入 DELETE 確認',
+            placeholder: '目前密碼（重新驗證）',
             onSubmitted: (_) => _delete(),
           ),
           if (_error != null) ...[
@@ -383,7 +383,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               _error!,
               style: TextStyle(
                 fontSize: 13,
-                color: CupertinoColors.destructiveRed.resolveFrom(context),
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],
