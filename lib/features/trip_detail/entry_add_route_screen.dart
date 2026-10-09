@@ -14,6 +14,7 @@ import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_action_item.dart';
 import '../favorites/favorites_providers.dart';
@@ -864,7 +865,7 @@ class _EntryAddCategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: TpSpacing.tapMin,
+      height: scaledTapMin(context),
       child: ListView.separated(
         key: const ValueKey('entry-add-category-list'),
         scrollDirection: Axis.horizontal,

@@ -1214,7 +1214,7 @@ class _DaySection extends ConsumerWidget {
               feedbackWidth:
                   MediaQuery.sizeOf(context).width -
                   TpSpacing.s4 * 2 -
-                  kTimelineRailWidth -
+                  timelineRailWidth(context) -
                   10,
             )
           : _entryMenu(context, ref, entry, index, menuController),
@@ -1633,7 +1633,7 @@ class _EntryDropTarget extends StatelessWidget {
         height: empty ? TpSpacing.tapMin : 12,
         child: AnimatedContainer(
           duration: TpMotion.resolve(context, TpMotion.fast),
-          margin: const EdgeInsets.symmetric(horizontal: kTimelineRailWidth),
+          margin: EdgeInsets.symmetric(horizontal: timelineRailWidth(context)),
           decoration: BoxDecoration(
             color: candidates.isEmpty
                 ? Colors.transparent
@@ -1935,7 +1935,7 @@ class _TravelRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: kTimelineRailWidth,
+              width: timelineRailWidth(context),
               child: Center(child: Container(width: 1, color: railLineColor)),
             ),
             const SizedBox(width: 10),

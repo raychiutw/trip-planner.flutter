@@ -10,6 +10,7 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/dynamic_type.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'explore_controller.dart';
@@ -150,7 +151,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               ),
             ),
             SizedBox(
-              height: TpSpacing.tapMin,
+              height: scaledTapMin(context),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),

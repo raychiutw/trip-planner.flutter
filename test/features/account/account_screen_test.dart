@@ -267,6 +267,26 @@ void main() {
     expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
   });
 
+  testWidgets('帳號頁版本 footer 在 AX 字級可換行,不被單行截斷', (tester) async {
+    await pumpAccountEntry(tester, textScaler: const TextScaler.linear(3));
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+
+    final footer = find.byKey(const ValueKey('account-version-footer'));
+    await tester.scrollUntilVisible(
+      footer,
+      500,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('account-sheet-content')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tester.widget<Text>(footer).maxLines, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Account grouped list 在 200% Dynamic Type 維持可捲動與可辨識語意', (
     tester,
   ) async {

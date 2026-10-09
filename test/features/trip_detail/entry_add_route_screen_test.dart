@@ -76,6 +76,7 @@ Widget _buildScreen(
   EntryAddMode initialMode = EntryAddMode.custom,
   String? initialRegion,
   bool useRepositoryDays = false,
+  TextScaler? textScaler,
 }) {
   when(
     () => repo.recomputeTravel(
@@ -112,7 +113,16 @@ Widget _buildScreen(
       if (!useRepositoryDays)
         tripDaysProvider('trip-1').overrideWith((ref) => Stream.value(_days)),
     ],
-    child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: AppTheme.light(),
+      routerConfig: router,
+      builder: textScaler == null
+          ? null
+          : (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              child: child!,
+            ),
+    ),
   );
 }
 
@@ -130,6 +140,37 @@ void main() {
   setUpAll(
     () => registerFallbackValue(const PoiSearchResult(placeId: 'x', name: 'x')),
   );
+
+  testWidgets('AX 字級篩選 chip 列高度跟著字級放大,不裁切', (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => const []);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        poiRepo: poiRepo,
+        initialMode: EntryAddMode.search,
+        textScaler: const TextScaler.linear(3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = find.byKey(const ValueKey('entry-add-category-list'));
+    expect(tester.getSize(list).height, greaterThanOrEqualTo(44 * 3));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Day 初載失敗顯示友善錯誤，原地重試後取得日期', (tester) async {
     final repo = _MockTripRepository();

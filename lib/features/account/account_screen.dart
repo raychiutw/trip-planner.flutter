@@ -174,7 +174,6 @@ class _VersionFooter extends ConsumerWidget {
         label,
         key: const ValueKey('account-version-footer'),
         textAlign: TextAlign.center,
-        maxLines: 1,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),

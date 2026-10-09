@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -205,6 +206,26 @@ void main() {
 
     expect(login, findsOneWidget);
     expect(tester.getSize(login).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('邀請頁帳號對照列標籤在 AX 字級不被固定寬度擠成多行', (tester) async {
+    await pumpInvite(
+      tester,
+      user: _otherUser,
+      size: const Size(390, 844),
+      textScale: 3,
+    );
+    final label = find.text('目前帳號');
+    await tester.ensureVisible(label);
+    await tester.pumpAndSettle();
+
+    final paragraph = tester.renderObject<RenderParagraph>(label);
+    expect(
+      paragraph.size.height,
+      paragraph.getMinIntrinsicHeight(double.infinity),
+      reason: '標籤應單行顯示',
+    );
     expect(tester.takeException(), isNull);
   });
 

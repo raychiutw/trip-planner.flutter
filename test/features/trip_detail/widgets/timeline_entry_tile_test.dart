@@ -698,7 +698,44 @@ void main() {
       );
       expect(
         tester.getSize(find.byKey(const ValueKey('entry-dot-43'))),
-        const Size(22, 22),
+        const Size(27.5, 27.5),
+        reason: '序號圓點隨 Dynamic Type 等比放大,數字才不會溢出圓外',
+      );
+    });
+
+    testWidgets('AX 字級標題完整換行、序號圓點與 rail 隨字級放大', (tester) async {
+      tester.view.physicalSize = const Size(390, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 45,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '很長但仍需要完整閱讀的景點名稱一二三四五六七八九十',
+        ),
+        number: 12,
+        textScaler: const TextScaler.linear(3),
+      );
+
+      expect(tester.takeException(), isNull);
+      final title = tester.widget<Text>(find.text('很長但仍需要完整閱讀的景點名稱一二三四五六七八九十'));
+      expect(title.maxLines, isNull);
+      expect(title.overflow, isNot(TextOverflow.ellipsis));
+      final dot = tester.getSize(find.byKey(const ValueKey('entry-dot-45')));
+      expect(dot, const Size(66, 66));
+      expect(
+        tester.getSize(find.text('12')).height,
+        lessThanOrEqualTo(dot.height),
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('entry-rail-line-45'))).width,
+        1,
       );
     });
 
