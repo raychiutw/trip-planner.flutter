@@ -416,6 +416,45 @@ void main() {
     );
   });
 
+  testWidgets('氣泡文字（含 AI 回覆）包在 SelectionArea 內，可選取複製', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 1,
+            message: '自己的訊息',
+            reply: 'AI 回覆內容',
+            status: RequestStatus.completed,
+            submittedBy: 'ray@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    for (final text in ['自己的訊息', 'AI 回覆內容']) {
+      expect(
+        find.ancestor(
+          of: find.textContaining(text),
+          matching: find.byType(SelectionArea),
+        ),
+        findsOneWidget,
+        reason: '$text 應可選取',
+      );
+    }
+  });
+
   testWidgets('聊天訊息可捲到 composer 後方，並可拖曳或點外側收鍵盤', (tester) async {
     when(
       () => reqRepo.fetchRequests(
