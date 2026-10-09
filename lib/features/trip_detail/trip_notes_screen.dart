@@ -15,6 +15,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';
 import '../../models/notes.dart';
 import '../../theme/tokens.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/swipe_to_delete.dart';
@@ -233,6 +234,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
               version: f.version,
               editFields: f.toEditFields(),
               display: _FlightRow(f),
+              name: '${f.airline} ${f.flightNo}'.trim(),
             ),
         ],
         NoteSection.lodgings => [
@@ -242,6 +244,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
               version: l.version,
               editFields: l.toEditFields(),
               display: _LodgingRow(l),
+              name: l.name,
             ),
         ],
         NoteSection.reservations => [
@@ -251,6 +254,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
               version: r.version,
               editFields: r.toEditFields(),
               display: _ReservationRow(r),
+              name: r.title,
             ),
         ],
         NoteSection.pretrip => [
@@ -260,6 +264,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
               version: p.version,
               editFields: p.toEditFields(),
               display: _PretripNoteRow(p),
+              name: p.title,
               canReassignToAi: p.canReassignToAi,
             ),
         ],
@@ -270,6 +275,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
               version: c.version,
               editFields: c.toEditFields(),
               display: _EmergencyContactRow(c),
+              name: c.name,
               canReassignToAi: c.canReassignToAi,
             ),
         ],
@@ -300,6 +306,7 @@ class _NoteRowData {
     required this.version,
     required this.editFields,
     required this.display,
+    this.name = '',
     this.canReassignToAi = false,
   });
 
@@ -307,6 +314,9 @@ class _NoteRowData {
   final int version;
   final Map<String, dynamic> editFields;
   final Widget display;
+
+  /// 這筆資料的辨識名稱(航班、住宿名、標題…);刪除確認拿來具名,空字串退回區名。
+  final String name;
 
   /// 原本 AI 產生、目前人工維護 —— 只有這種才給「交還 AI 維護」。
   final bool canReassignToAi;
@@ -358,6 +368,47 @@ class _NotesAiPendingPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final spinner = ExcludeSemantics(
+      child: SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator.adaptive(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+        ),
+      ),
+    );
+    final stageIcon = Icon(
+      stage.icon,
+      size: 16,
+      color: colors.onSecondaryContainer,
+    );
+    final messageText = Semantics(
+      liveRegion: true,
+      child: Text(
+        stage.message(label),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: colors.onSecondaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+    final stopButton = Semantics(
+      button: true,
+      label: '停止等待$label',
+      hint: '停止等待這次生成。AI 若仍在處理，完成後的結果還是會寫進筆記。',
+      excludeSemantics: true,
+      child: TextButton(
+        key: stopKey,
+        onPressed: onStopWaiting,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, TpSpacing.tapMin),
+          padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+          visualDensity: VisualDensity.compact,
+        ),
+        child: const Text('停止等待'),
+      ),
+    );
     return Container(
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
       padding: const EdgeInsets.all(TpSpacing.s3),
@@ -366,56 +417,41 @@ class _NotesAiPendingPanel extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
         border: Border.all(color: colors.outlineVariant),
       ),
-      child: Row(
-        children: [
-          ExcludeSemantics(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator.adaptive(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
-              ),
-            ),
-          ),
-          const SizedBox(width: TpSpacing.s2),
-          Icon(stage.icon, size: 16, color: colors.onSecondaryContainer),
-          const SizedBox(width: TpSpacing.s2),
-          Expanded(
-            child: Semantics(
-              liveRegion: true,
-              child: Text(
-                stage.message(label),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onSecondaryContainer,
-                  fontWeight: FontWeight.w600,
+      child: isLargeTextScale(context)
+          // AX 字級單列塞不下轉圈、圖示、訊息與按鈕:訊息獨佔一列,停止鈕換到下方。
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    spinner,
+                    const SizedBox(width: TpSpacing.s2),
+                    stageIcon,
+                  ],
                 ),
-              ),
+                const SizedBox(height: TpSpacing.s2),
+                messageText,
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: stopButton,
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                spinner,
+                const SizedBox(width: TpSpacing.s2),
+                stageIcon,
+                const SizedBox(width: TpSpacing.s2),
+                Expanded(child: messageText),
+                stopButton,
+              ],
             ),
-          ),
-          Semantics(
-            button: true,
-            label: '停止等待$label',
-            hint: '停止等待這次生成。AI 若仍在處理，完成後的結果還是會寫進筆記。',
-            excludeSemantics: true,
-            child: TextButton(
-              key: stopKey,
-              onPressed: onStopWaiting,
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, TpSpacing.tapMin),
-                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
-                visualDensity: VisualDensity.compact,
-              ),
-              child: const Text('停止等待'),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-/// 完成摘要:用中文句子講「動了什麼」,不是裸露的數字表格。
 class _NotesAiSummaryPanel extends StatelessWidget {
   const _NotesAiSummaryPanel({
     super.key,
@@ -723,13 +759,20 @@ class _NotesSection extends ConsumerWidget {
       ),
   ];
 
-  Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) {
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    int rowId,
+    String name,
+  ) {
     return confirmAndDelete(
       context,
       // 筆記列只有左滑刪除這條路徑，不是選單來源，alert 仍合規。
       source: TpDestructiveConfirmSource.direct,
       title: '刪除筆記',
-      message: '「$title」中的這筆資料會永久刪除，且無法復原。',
+      message: name.trim().isEmpty
+          ? '「$title」中的這筆資料會永久刪除，且無法復原。'
+          : '「${name.trim()}」會永久刪除，且無法復原。',
       delete: () => ref
           .read(tripRepositoryProvider)
           .deleteNote(section, tripId: tripId, rowId: rowId),
@@ -783,6 +826,12 @@ class _NotesSection extends ConsumerWidget {
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
+          expansionAnimationStyle: AnimationStyle(
+            duration: TpMotion.resolve(
+              context,
+              const Duration(milliseconds: 200),
+            ),
+          ),
           shape: const Border(),
           collapsedShape: const Border(),
           iconColor: colors.onSurfaceVariant,
@@ -874,7 +923,7 @@ class _NotesSection extends ConsumerWidget {
                           icon: const Icon(CupertinoIcons.sparkles),
                           label: Text(
                             aiBusyTypes.contains(action.type)
-                                ? '生成中...'
+                                ? '生成中…'
                                 : action.label,
                           ),
                         ),
@@ -920,7 +969,8 @@ class _NotesSection extends ConsumerWidget {
                   tripId: tripId,
                   row: rows[i],
                   index: i,
-                  onDelete: () => _delete(context, ref, rows[i].id),
+                  onDelete: () =>
+                      _delete(context, ref, rows[i].id, rows[i].name),
                   onMoveUp: i == 0
                       ? null
                       : () => _reorder(context, ref, i, i - 1),

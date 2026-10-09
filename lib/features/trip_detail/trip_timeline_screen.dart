@@ -44,6 +44,7 @@ import 'widgets/reorderable_row.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
+import '../../models/display_format.dart';
 
 enum _TripMoreAction {
   editMode,
@@ -574,14 +575,14 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final days = widget.days;
     final targetDayId = await showAppSelectionSheet<int>(
       context,
-      title: '移至其他 Day',
+      title: '移到其他 Day',
       builder: (sheetContext, select) => ListView(
         children: [
           for (final day in days)
             if (day.id != data.sourceDayId)
               ListTile(
                 key: ValueKey('entry-move-to-day-${day.id}'),
-                title: Text('DAY ${day.dayNum}・${day.displayTitle}'),
+                title: Text(dayLabel(day.dayNum, title: day.displayTitle)),
                 onTap: () => select(day.id),
               ),
         ],
@@ -910,7 +911,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
           for (final day in widget.days)
             TpScopeOption(
               value: day.dayNum,
-              label: 'DAY ${day.dayNum}',
+              label: dayLabel(day.dayNum),
               semanticsLabel: '第 ${day.dayNum} 天，共 ${widget.days.length} 天',
               key: ValueKey('day-pill-${day.dayNum}'),
             ),
@@ -1169,7 +1170,7 @@ class _DaySection extends ConsumerWidget {
               ),
               enabled: !reorderSubmitting,
               positionLabel:
-                  'DAY ${day.dayNum}，第 ${index + 1} 項，共 ${timeline.length} 項',
+                  '${dayLabel(day.dayNum)}，第 ${index + 1} 項，共 ${timeline.length} 項',
               onMoveUp: index == 0
                   ? null
                   : () => unawaited(
@@ -1214,7 +1215,7 @@ class _DaySection extends ConsumerWidget {
               feedbackWidth:
                   MediaQuery.sizeOf(context).width -
                   TpSpacing.s4 * 2 -
-                  kTimelineRailWidth -
+                  timelineRailWidth(context) -
                   10,
             )
           : _entryMenu(context, ref, entry, index, menuController),
@@ -1223,7 +1224,7 @@ class _DaySection extends ConsumerWidget {
         ? tile
         : SwipeToDelete(
             dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-            actionLabel: '刪除景點',
+            actionLabel: '刪除停留點',
             onDelete: () => _confirmDelete(
               context,
               ref,
@@ -1277,13 +1278,13 @@ class _DaySection extends ConsumerWidget {
     return TpMoreMenuButton<_EntryMoreAction>(
       key: ValueKey('entry-more-${entry.id}'),
       controller: menuController,
-      tooltip: '景點操作',
+      tooltip: '停留點操作',
       plain: true,
       items: [
         TpActionItem(
           key: ValueKey('entry-reorder-${entry.id}'),
           value: _EntryMoreAction.reorder,
-          label: '重新排序',
+          label: '調整順序',
           icon: CupertinoIcons.line_horizontal_3,
         ),
         TpActionItem(
@@ -1295,23 +1296,23 @@ class _DaySection extends ConsumerWidget {
         TpActionItem(
           key: ValueKey('entry-edit-${entry.id}'),
           value: _EntryMoreAction.edit,
-          label: '編輯景點',
+          label: '編輯停留點',
           icon: CupertinoIcons.pencil,
           dividerBefore: true,
         ),
         TpActionItem(
           key: ValueKey('entry-move-${entry.id}'),
           value: _EntryMoreAction.move,
-          label: '移動到其他天',
-          semanticLabel: canChangeDay ? null : '移動到其他天，目前行程只有一天，無法使用',
+          label: '移到其他 Day',
+          semanticLabel: canChangeDay ? null : '移到其他 Day，目前行程只有一天，無法使用',
           icon: CupertinoIcons.arrow_right_arrow_left,
           enabled: canChangeDay,
         ),
         TpActionItem(
           key: ValueKey('entry-copy-${entry.id}'),
           value: _EntryMoreAction.copy,
-          label: '複製到其他天',
-          semanticLabel: canChangeDay ? null : '複製到其他天，目前行程只有一天，無法使用',
+          label: '複製到其他 Day',
+          semanticLabel: canChangeDay ? null : '複製到其他 Day，目前行程只有一天，無法使用',
           icon: CupertinoIcons.doc_on_doc,
           dividerBefore: true,
           enabled: canChangeDay,
@@ -1319,7 +1320,7 @@ class _DaySection extends ConsumerWidget {
         TpActionItem(
           key: ValueKey('entry-delete-${entry.id}'),
           value: _EntryMoreAction.delete,
-          label: '刪除景點',
+          label: '刪除停留點',
           icon: CupertinoIcons.delete,
           dividerBefore: true,
           role: TpActionRole.destructive,
@@ -1469,7 +1470,7 @@ class _EntryCopyDaySheetState extends State<_EntryCopyDaySheet> {
           ListTile(
             key: ValueKey('entry-copy-to-day-${day.id}'),
             enabled: !_submitting,
-            title: Text('DAY ${day.dayNum}・${day.displayTitle}'),
+            title: Text(dayLabel(day.dayNum, title: day.displayTitle)),
             onTap: _submitting ? null : () => _select(day.id),
           ),
       ],
@@ -1534,7 +1535,7 @@ class _EntryDragHandle extends StatelessWidget {
         if (enabled && onMoveDown != null)
           CustomSemanticsAction(label: '下移'): () => invoke(onMoveDown!),
         if (enabled && onMoveToDay != null)
-          CustomSemanticsAction(label: '移至其他 Day'): () => invoke(onMoveToDay!),
+          CustomSemanticsAction(label: '移到其他 Day'): () => invoke(onMoveToDay!),
       },
       child: const TpInlineEditControlVisual(
         icon: CupertinoIcons.line_horizontal_3,
@@ -1633,7 +1634,7 @@ class _EntryDropTarget extends StatelessWidget {
         height: empty ? TpSpacing.tapMin : 12,
         child: AnimatedContainer(
           duration: TpMotion.resolve(context, TpMotion.fast),
-          margin: const EdgeInsets.symmetric(horizontal: kTimelineRailWidth),
+          margin: EdgeInsets.symmetric(horizontal: timelineRailWidth(context)),
           decoration: BoxDecoration(
             color: candidates.isEmpty
                 ? Colors.transparent
@@ -1655,7 +1656,7 @@ class _EntryDropTarget extends StatelessWidget {
                 )
               : empty
               ? Text(
-                  '拖曳景點到 DAY',
+                  '拖曳停留點到 DAY',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -1772,7 +1773,7 @@ class _AlternateCard extends StatelessWidget {
               Text(
                 alternate.name?.trim().isNotEmpty ?? false
                     ? alternate.name!.trim()
-                    : '未命名景點',
+                    : '未命名停留點',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -1945,7 +1946,7 @@ class _TravelRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: kTimelineRailWidth,
+              width: timelineRailWidth(context),
               child: Center(child: Container(width: 1, color: railLineColor)),
             ),
             const SizedBox(width: 10),

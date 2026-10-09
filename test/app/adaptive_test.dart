@@ -433,7 +433,7 @@ void main() {
         message: '這個分享連結將立即失效，且無法復原。',
       ),
       (
-        name: '長停留點名稱進 message（時間軸刪除景點）',
+        name: '長停留點名稱進 message（時間軸刪除停留點）',
         title: '刪除停留點',
         message: '刪除「$longPoi」後，相關交通時間將重新計算。此動作無法復原。',
       ),

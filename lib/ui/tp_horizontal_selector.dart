@@ -50,7 +50,7 @@ class TpHorizontalSelector<T> extends StatefulWidget {
   /// 選擇器依目前 Dynamic Type 實際行高增高，且永遠保留 44pt 觸控高度。
   static double preferredHeight(BuildContext context) {
     final painter = TextPainter(
-      text: TextSpan(text: 'DAY 00', style: _labelStyle(context)),
+      text: TextSpan(text: 'Day 00', style: _labelStyle(context)),
       textScaler: MediaQuery.textScalerOf(context),
       textDirection: Directionality.of(context),
       maxLines: 1,

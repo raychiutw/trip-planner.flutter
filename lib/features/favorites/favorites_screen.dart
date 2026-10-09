@@ -62,6 +62,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   bool _confirmingSelected = false;
   bool _deletingSelected = false;
   int _page = 1;
+  final ScrollController _scrollController = ScrollController();
   _FavoriteSort _sort = _FavoriteSort.newest;
 
   /// 每張卡一份，讓「⋯」與長按開同一份選單。
@@ -70,6 +71,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -83,6 +85,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         actions: _buildHeaderActions(context),
       ),
       body: TpRootScrollView(
+        controller: _scrollController,
         onRefresh: () => ref.refresh(favoritesProvider.future),
         slivers: [
           SliverToBoxAdapter(
@@ -378,17 +381,19 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 start: (page - 1) * _favoritesPageSize + 1,
                 end: (page - 1) * _favoritesPageSize + visibleFavorites.length,
                 total: filteredFavorites.length,
-                onPrevious: page <= 1
-                    ? null
-                    : () => setState(() => _page = page - 1),
-                onNext: page >= totalPages
-                    ? null
-                    : () => setState(() => _page = page + 1),
+                onPrevious: page <= 1 ? null : () => _goToPage(page - 1),
+                onNext: page >= totalPages ? null : () => _goToPage(page + 1),
               ),
           ]),
         ),
       ),
     ];
+  }
+
+  /// 翻頁後內容整批換掉,視線回到清單頂端才不會停在新一頁的中段。
+  void _goToPage(int page) {
+    setState(() => _page = page);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
   bool get _hasActiveFilters => _typeFilter != 'all' || _regionFilter != 'all';

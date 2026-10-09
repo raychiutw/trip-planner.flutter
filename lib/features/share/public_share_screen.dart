@@ -25,6 +25,7 @@ import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_state_view.dart';
 import '../trip_detail/trip_pdf_service.dart';
 import '../trip_detail/trip_print_data.dart';
+import '../../models/display_format.dart';
 
 /// 公開分享頁資料 provider。
 final publicTripShareProvider = FutureProvider.family<PublicTripShare, String>(
@@ -365,7 +366,7 @@ class _DaySection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('Day ${day.dayNum}', style: theme.textTheme.titleMedium),
+              Text(dayLabel(day.dayNum), style: theme.textTheme.titleMedium),
               if (dateLine.isNotEmpty) ...[
                 const SizedBox(width: TpSpacing.s2),
                 Expanded(
@@ -600,8 +601,9 @@ class _PublicShareFailure extends StatelessWidget {
               message: isInvalidLink
                   ? '這個分享連結不存在、已被關閉或已過期。請向分享者索取新的連結。'
                   : '請確認網路連線後重試。',
-              actionLabel: '重試',
-              onAction: onRetry,
+              // 404 是連結本身失效,原地重試只會再得到 404。
+              actionLabel: isInvalidLink ? null : '重試',
+              onAction: isInvalidLink ? null : onRetry,
             ),
           ),
         ),
@@ -645,7 +647,10 @@ String _timeLine(BuildContext context, TimelineEntry entry) {
   final start = entry.startTime?.trim() ?? '';
   final end = entry.endTime?.trim() ?? '';
   if (start.isNotEmpty && end.isNotEmpty) {
-    return '${_localizedTime(context, start)}–${_localizedTime(context, end)}';
+    return formatTimeRange(
+      _localizedTime(context, start),
+      _localizedTime(context, end),
+    );
   }
   if (entry.time?.trim().isNotEmpty == true) {
     return _localizedTime(context, entry.time!.trim());

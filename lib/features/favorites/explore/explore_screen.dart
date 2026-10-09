@@ -10,6 +10,7 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/dynamic_type.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'explore_controller.dart';
@@ -150,7 +151,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               ),
             ),
             SizedBox(
-              height: TpSpacing.tapMin,
+              height: scaledTapMin(context),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
@@ -163,7 +164,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   if (index == 0) {
                     return _categoryChip(
                       key: const ValueKey('explore-category-all'),
-                      label: '為你推薦',
+                      label: '全部',
                       count: state.results.length,
                       selected: state.category == 'all',
                       onSelected: () => ref
@@ -320,7 +321,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「為你推薦」。',
+              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「全部」。',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
@@ -329,7 +330,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               onPressed: () => ref
                   .read(exploreControllerProvider.notifier)
                   .setCategory('all'),
-              child: const Text('回到為你推薦'),
+              child: const Text('回到全部'),
             ),
           ],
         ),

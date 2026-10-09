@@ -2,10 +2,39 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/features/trip_detail/widgets/reorderable_row.dart';
 import 'package:tripline/ui/swipe_to_delete.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 void main() {
+  testWidgets('系統要求減少動態效果時,排序把手的按壓過場為零', (tester) async {
+    Future<Duration> durationWith({required bool disableAnimations}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(disableAnimations: disableAnimations),
+            child: child!,
+          ),
+          home: const Scaffold(
+            body: TpInlineEditControlVisual(icon: CupertinoIcons.add),
+          ),
+        ),
+      );
+      return tester
+          .widget<AnimatedContainer>(find.byType(AnimatedContainer))
+          .duration;
+    }
+
+    expect(await durationWith(disableAnimations: true), Duration.zero);
+    expect(
+      await durationWith(disableAnimations: false),
+      greaterThan(Duration.zero),
+    );
+  });
+
   testWidgets('SwipeToDelete 左滑只揭露按鈕，點擊才刪除', (tester) async {
     var deleted = 0;
     await tester.pumpWidget(

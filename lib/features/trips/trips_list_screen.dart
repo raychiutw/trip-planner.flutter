@@ -559,10 +559,25 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 
   Widget _buildNoResults(ThemeData theme) {
     return Center(
-      child: Text(
-        '找不到符合的行程',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+      child: Semantics(
+        key: const ValueKey('trips-no-results'),
+        container: true,
+        liveRegion: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '找不到符合的行程',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (_query.trim().isNotEmpty)
+              TextButton(
+                onPressed: _searchController.clear,
+                child: const Text('清除搜尋'),
+              ),
+          ],
         ),
       ),
     );
@@ -734,7 +749,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       title: '刪除行程',
       message:
           '確定要刪除「${trip.displayTitle}」嗎？'
-          '這會刪除其中所有行程日與景點。此動作無法復原。',
+          '這會刪除其中所有行程日與停留點。此動作無法復原。',
       confirmLabel: '刪除',
     );
     if (!confirmedDelete || !context.mounted) return;

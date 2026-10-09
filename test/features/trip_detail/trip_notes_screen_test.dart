@@ -222,6 +222,7 @@ Future<void> _pumpAiScreen(
   })
   mocks, {
   bool stubAiState = true,
+  TextScaler? textScaler,
 }) async {
   await tester.pumpWidget(
     _buildScreen(
@@ -229,6 +230,7 @@ Future<void> _pumpAiScreen(
       repo: mocks.repo,
       requestsRepo: mocks.requestsRepo,
       stubAiState: stubAiState,
+      textScaler: textScaler,
     ),
   );
   await tester.pumpAndSettle();
@@ -256,6 +258,7 @@ Widget _buildScreen(
   Stream<TripNotes> Function(Ref ref, String tripId)? notesBuilder,
   ThemeData? theme,
   TextScaler? textScaler,
+  bool disableAnimations = false,
   bool stubAiState = true,
 }) {
   // ai-state 對絕大多數測試是背景雜訊:預設成功回空,只有專門測隔離的那條
@@ -281,10 +284,13 @@ Widget _buildScreen(
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.light(),
-      builder: textScaler == null
+      builder: textScaler == null && !disableAnimations
           ? null
           : (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              data: MediaQuery.of(context).copyWith(
+                textScaler: textScaler,
+                disableAnimations: disableAnimations,
+              ),
               child: child!,
             ),
       home: const TripNotesScreen(tripId: 'trip-1'),
@@ -629,6 +635,49 @@ void main() {
     verify(
       () => repo.deleteNote(NoteSection.flights, tripId: 'trip-1', rowId: 1),
     ).called(1);
+  });
+
+  testWidgets('系統要求減少動態效果時,筆記區塊展開不跑過場', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), disableAnimations: true),
+    );
+    await tester.pumpAndSettle();
+    final tile = tester.widget<ExpansionTile>(
+      find.descendant(
+        of: find.byKey(const ValueKey('notes-section-flights')),
+        matching: find.byType(ExpansionTile),
+      ),
+    );
+    expect(tile.expansionAnimationStyle?.duration, Duration.zero);
+  });
+
+  testWidgets('刪除筆記的確認對話框具名:顯示該筆內容而非區名', (tester) async {
+    final repo = _MockTripRepository();
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const ValueKey('note-dismiss-flights-1')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey<Object>((
+          'swipe-delete-action',
+          ValueKey('note-dismiss-flights-1'),
+        )),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.textContaining('長榮航空 BR112'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('點「新增航班」→ 開 create sheet', (tester) async {
@@ -1923,6 +1972,26 @@ void main() {
 
     expect(find.bySemanticsLabel('AI 產生'), findsOneWidget);
     semantics.dispose();
+  });
+
+  testWidgets('AI 進行中面板在 AX 字級把停止鈕排到訊息下方,不擠在同一列', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    await _pumpAiScreen(tester, mocks, textScaler: const TextScaler.linear(3));
+    await _startTips(tester);
+
+    final panel = find.byKey(const ValueKey('notes-ai-pending-tips'));
+    final stop = find.byKey(const ValueKey('notes-ai-stop-tips'));
+    expect(panel, findsOneWidget);
+    final message = find.descendant(
+      of: panel,
+      matching: find.textContaining('行前須知'),
+    );
+    expect(
+      tester.getTopLeft(stop).dy,
+      greaterThanOrEqualTo(tester.getBottomLeft(message.first).dy),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('生成中可以停止等待,只停這一種、不連坐另一種', (tester) async {

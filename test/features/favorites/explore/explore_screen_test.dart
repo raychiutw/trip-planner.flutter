@@ -52,6 +52,36 @@ void main() {
     child: MaterialApp(theme: AppTheme.light(), home: const ExploreScreen()),
   );
 
+  testWidgets('AX 字級分類 chip 列高度跟著字級放大,文字不被裁切', (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          poiRepositoryProvider.overrideWithValue(poi),
+          favoritesRepositoryProvider.overrideWithValue(fav),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(3)),
+            child: child!,
+          ),
+          home: const ExploreScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final chip = find.byKey(const ValueKey('explore-category-all'));
+    final row = find.ancestor(of: chip, matching: find.byType(ListView));
+    expect(tester.getSize(row.first).height, greaterThanOrEqualTo(44 * 3));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('地區選單朗讀目前選取並用新地區搜尋', (tester) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(buildApp());

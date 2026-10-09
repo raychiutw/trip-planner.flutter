@@ -1445,7 +1445,7 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '跨畫面草稿');
     await tester.tap(find.text('開啟加入行程'));
     await tester.pumpAndSettle();
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     expect(loads, 1);
 
     initial.addError(Exception('shared failure'));

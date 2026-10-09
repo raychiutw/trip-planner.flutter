@@ -125,6 +125,12 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
                       const SizedBox(height: TpSpacing.s5),
                       ExpansionTile(
                         key: const ValueKey('create-more-needs'),
+                        expansionAnimationStyle: AnimationStyle(
+                          duration: TpMotion.resolve(
+                            context,
+                            const Duration(milliseconds: 200),
+                          ),
+                        ),
                         tilePadding: EdgeInsets.zero,
                         childrenPadding: const EdgeInsets.only(
                           bottom: TpSpacing.s2,

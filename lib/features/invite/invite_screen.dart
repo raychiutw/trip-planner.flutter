@@ -13,6 +13,7 @@ import '../../app/logout_confirm.dart';
 import '../../models/trip_member.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import 'invite_controller.dart';
 
@@ -472,37 +473,40 @@ class _AccountEmailLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final labelText = Text(
+      label,
+      style: theme.textTheme.labelMedium?.copyWith(
+        color: colors.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    final emailText = Text(
+      email,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: colors.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: TpSpacing.s3,
         vertical: TpSpacing.s2,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 68,
-            child: Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-              ),
+      child: isLargeTextScale(context)
+          // AX 字級固定寬度的標籤欄會把標籤擠成多行,改上下堆疊。
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [labelText, emailText],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 68, child: labelText),
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(child: emailText),
+              ],
             ),
-          ),
-          const SizedBox(width: TpSpacing.s3),
-          Expanded(
-            child: Text(
-              email,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -554,7 +558,7 @@ class _PrimaryAction extends StatelessWidget {
                 child: CircularProgressIndicator.adaptive(strokeWidth: 2),
               )
             : const Icon(CupertinoIcons.check_mark_circled),
-        label: Text(accepting ? '接受中...' : '接受邀請'),
+        label: Text(accepting ? '接受中…' : '接受邀請'),
       ),
       InviteAccountStatus.mismatch => FilledButton.icon(
         key: const ValueKey('invite-switch-account'),
@@ -568,7 +572,7 @@ class _PrimaryAction extends StatelessWidget {
           dimension: 18,
           child: CircularProgressIndicator.adaptive(strokeWidth: 2),
         ),
-        label: const Text('確認帳號中...'),
+        label: const Text('確認帳號中…'),
       ),
     };
   }
@@ -635,7 +639,7 @@ class _LoadingView extends StatelessWidget {
             children: [
               const CircularProgressIndicator.adaptive(),
               const SizedBox(height: TpSpacing.s4),
-              Text('載入邀請資料...', style: Theme.of(context).textTheme.bodyLarge),
+              Text('載入邀請資料…', style: Theme.of(context).textTheme.bodyLarge),
             ],
           ),
         ),

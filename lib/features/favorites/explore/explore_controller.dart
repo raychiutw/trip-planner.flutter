@@ -72,7 +72,7 @@ class ExploreState {
     return sorted;
   }
 
-  String get activeCategoryLabel => category == 'all' ? '為你推薦' : category;
+  String get activeCategoryLabel => category == 'all' ? '全部' : category;
 
   /// category client-side filter（精確比對顯示中的 Google 細分類）。
   List<PoiSearchResult> get filteredResults {

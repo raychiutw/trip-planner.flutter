@@ -328,6 +328,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：POI 卡、表單、聊天訊息與設定 row 隨文字增高，不以固定高度裁切。
 - **HIG 必須**：時間、數量與日期需要對齊時可使用 tabular figures。
 - **Tripline 決策**：不使用 Large Title。
+- **Tripline 決策（縮字例外）**：起訖時間（停留點卡與逐日標頭的 `09：30 - 11：00`，D1 定版）維持單行，AX 字級撐破卡片寬度時才以 `FittedBox.scaleDown` 等比縮小。這是全 App 唯一允許的縮字處；其餘一律換行、重排或增高，不得縮字。
 
 ### 16.4 Icons 與 touch target
 

@@ -92,6 +92,17 @@ void main() {
       expect(longPressed, 1);
     });
 
+    testWidgets('AX 字級標題完整換行不被單行省略', (tester) async {
+      const title = '沖繩家族之旅五天四夜美食與海灘全紀錄';
+      await pumpCard(
+        tester,
+        const TripSummary(tripId: 'ax', name: 'ax', title: title),
+        textScaler: const TextScaler.linear(3),
+      );
+      expect(tester.takeException(), isNull);
+      expect(tester.widget<Text>(find.text(title)).maxLines, isNull);
+    });
+
     testWidgets('totalDays 為 null → 不顯示 eyebrow', (tester) async {
       await pumpCard(
         tester,

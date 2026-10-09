@@ -14,6 +14,7 @@ import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_action_item.dart';
 import '../favorites/favorites_providers.dart';
@@ -21,6 +22,7 @@ import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'trip_providers.dart';
 import 'widgets/entry_edit_sheet.dart';
+import '../../models/display_format.dart';
 
 /// 新增停留點頁的初始模式。
 enum EntryAddMode { search, favorites, custom }
@@ -29,7 +31,7 @@ enum _EntryAddCategory { all, attraction, food, hotel, shopping }
 
 const _entryAddRegionOptions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
 const _entryAddCategoryChips = [
-  (_EntryAddCategory.all, '為你推薦'),
+  (_EntryAddCategory.all, '全部'),
   (_EntryAddCategory.attraction, '景點'),
   (_EntryAddCategory.food, '美食'),
   (_EntryAddCategory.hotel, '住宿'),
@@ -922,7 +924,7 @@ class _EntryAddCategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: TpSpacing.tapMin,
+      height: scaledTapMin(context),
       child: ListView.separated(
         key: const ValueKey('entry-add-category-list'),
         scrollDirection: Axis.horizontal,
@@ -996,11 +998,7 @@ class _DayPicker extends StatelessWidget {
   }
 }
 
-String _dayLabel(TripDay day) {
-  final title = day.displayTitle;
-  if (title == 'Day ${day.dayNum}') return 'DAY ${day.dayNum}';
-  return 'DAY ${day.dayNum} · $title';
-}
+String _dayLabel(TripDay day) => dayLabel(day.dayNum, title: day.displayTitle);
 
 String _normaliseRegion(String? region) {
   final trimmed = region?.trim();

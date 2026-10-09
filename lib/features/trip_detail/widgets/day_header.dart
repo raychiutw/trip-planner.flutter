@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/day.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
+import '../../../models/display_format.dart';
 
 /// 計算當日時間範圍字串「HH：MM - HH：MM」（D1 定版）。
 ///
@@ -22,7 +23,7 @@ String? dayTimeRange(TripDay day) {
     }
   }
   if (min == null || max == null) return null;
-  return '${min.replaceFirst(':', '：')} - ${max.replaceFirst(':', '：')}';
+  return formatTimeRange(min, max);
 }
 
 int dayTotalDistanceM(TripDay day, List<TripSegment> segments) {
@@ -43,7 +44,7 @@ int dayTotalDistanceM(TripDay day, List<TripSegment> segments) {
   return total;
 }
 
-/// 逐日 section 標頭：eyebrow「DAY NN」+ 日期主標。
+/// 逐日 section 標頭：eyebrow「Day N」+ 日期主標。
 class DayHeader extends StatelessWidget {
   const DayHeader({super.key, required this.day, this.segments = const []});
 
@@ -69,7 +70,7 @@ class DayHeader extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
-              'DAY ${day.dayNum.toString().padLeft(2, '0')}',
+              dayLabel(day.dayNum),
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -95,7 +96,9 @@ class DayHeader extends StatelessWidget {
           ],
         ),
         const SizedBox(height: TpSpacing.s1),
-        Text(day.displayTitle, style: theme.textTheme.headlineSmall),
+        // 沒有日期時 displayTitle 退回 Day N,與上方 eyebrow 同字,不重複顯示。
+        if (day.displayTitle != dayLabel(day.dayNum))
+          Text(day.displayTitle, style: theme.textTheme.headlineSmall),
         Text(
           summary,
           style: theme.textTheme.bodyMedium?.copyWith(

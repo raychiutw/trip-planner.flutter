@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
@@ -5,8 +7,19 @@ import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
 import 'entry_duration.dart';
+import '../../../models/display_format.dart';
 
 const double kTimelineRailWidth = 32;
+
+/// 序號圓點的基準直徑,隨 Dynamic Type 等比放大。
+const double _kTimelineDotSize = 22;
+
+double _timelineDotSize(BuildContext context) =>
+    MediaQuery.textScalerOf(context).scale(_kTimelineDotSize);
+
+/// rail 欄寬:一般字級維持 [kTimelineRailWidth],圓點放大後再留 4 的邊距。
+double timelineRailWidth(BuildContext context) =>
+    math.max(kTimelineRailWidth, _timelineDotSize(context) + 4);
 
 class TimelineEntryTile extends StatelessWidget {
   const TimelineEntryTile({
@@ -115,7 +128,7 @@ class TimelineEntryTile extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: kTimelineRailWidth,
+                  width: timelineRailWidth(context),
                   child: Center(
                     child: Container(
                       key: ValueKey('entry-rail-gap-${entry.id}'),
@@ -140,7 +153,7 @@ class TimelineEntryTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SizedBox(
-                          width: kTimelineRailWidth,
+                          width: timelineRailWidth(context),
                           child: Center(
                             child: Container(
                               width: 1,
@@ -175,12 +188,8 @@ String _timeLabel(TimelineEntry entry) {
   final start = _resolvedStartTime(entry);
   final end = _resolvedEndTime(entry);
   if (start.isEmpty && end.isEmpty) return '未設定時間';
-  if (start.isEmpty) return _displayTime(end);
-  if (end.isEmpty) return _displayTime(start);
-  return '${_displayTime(start)} - ${_displayTime(end)}';
+  return formatTimeRange(start, end);
 }
-
-String _displayTime(String value) => value.replaceAll(':', '：');
 
 String _resolvedStartTime(TimelineEntry entry) =>
     (entry.startTime ?? entry.time ?? '').trim();
@@ -205,7 +214,7 @@ class _TimelineRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: kTimelineRailWidth,
+      width: timelineRailWidth(context),
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -224,8 +233,8 @@ class _TimelineRail extends StatelessWidget {
           ),
           Container(
             key: ValueKey('entry-dot-$entryId'),
-            width: 22,
-            height: 22,
+            width: _timelineDotSize(context),
+            height: _timelineDotSize(context),
             alignment: Alignment.center,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             child: Text(
@@ -303,8 +312,9 @@ class _EntryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   entry.title,
-                  maxLines: compact ? 1 : 2,
-                  overflow: TextOverflow.ellipsis,
+                  // 排序模式(compact)維持單行;其餘完整換行,不用省略號吃掉名稱。
+                  maxLines: compact ? 1 : null,
+                  overflow: compact ? TextOverflow.ellipsis : null,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     height: 1.25,

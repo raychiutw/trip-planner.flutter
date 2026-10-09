@@ -35,10 +35,10 @@ void main() {
           version: 0,
         ),
       );
-      expect(find.text('DAY 03'), findsOneWidget);
+      expect(find.text('Day 3'), findsOneWidget);
       expect(find.text('2026-06-12（週五）'), findsOneWidget);
       expect(find.text('首里城與國際通'), findsNothing);
-      expect(tester.widget<Text>(find.text('DAY 03')).style?.fontSize, 13);
+      expect(tester.widget<Text>(find.text('Day 3')).style?.fontSize, 13);
       expect(
         tester.widget<Text>(find.text('2026-06-12（週五）')).style?.fontSize,
         20,
@@ -50,7 +50,7 @@ void main() {
       tester,
     ) async {
       await pumpHeader(tester, const TripDay(id: 2, dayNum: 2, version: 0));
-      expect(find.text('DAY 02'), findsOneWidget);
+      expect(find.text('Day 2'), findsOneWidget);
       // 日期缺漏時固定退回 Day N。
       expect(find.text('Day 2'), findsOneWidget);
       expect(find.textContaining('（'), findsNothing);
@@ -203,7 +203,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text('DAY 01'), findsOneWidget);
+      expect(find.text('Day 1'), findsOneWidget);
       final range = tester.widget<Text>(find.text('09：00 - 17：00'));
       expect(range.maxLines, 1);
       expect(range.softWrap, isFalse);

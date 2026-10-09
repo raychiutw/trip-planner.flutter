@@ -335,7 +335,7 @@ void main() {
                 label: '總覽',
                 key: ValueKey('day-overview'),
               ),
-              TpScopeOption(value: 1, label: 'DAY 01', key: ValueKey('day-1')),
+              TpScopeOption(value: 1, label: 'Day 1', key: ValueKey('day-1')),
             ],
             onSelected: (value) => selected = value,
           ),
@@ -350,8 +350,8 @@ void main() {
     );
     expect(find.byKey(const ValueKey('day-overview')), findsOneWidget);
     expect(find.byKey(const ValueKey('day-1')), findsOneWidget);
-    expect(find.text('DAY 01'), findsOneWidget);
-    expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 13);
+    expect(find.text('Day 1'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('Day 1')).style?.fontSize, 13);
     expect(find.byKey(const ValueKey('tp-selector-divider-0')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('day-1')));
     await tester.pump(const Duration(milliseconds: 200));
@@ -375,8 +375,8 @@ void main() {
                 key: const ValueKey('glass-track'),
                 value: 1,
                 options: const [
-                  TpScopeOption(value: 0, label: 'DAY 1'),
-                  TpScopeOption(value: 1, label: 'DAY 2'),
+                  TpScopeOption(value: 0, label: 'Day 1'),
+                  TpScopeOption(value: 1, label: 'Day 2'),
                 ],
                 onSelected: (_) {},
               );
@@ -538,7 +538,7 @@ void main() {
             value: 1,
             options: const [
               TpScopeOption(value: 0, label: '總覽'),
-              TpScopeOption(value: 1, label: 'DAY 1'),
+              TpScopeOption(value: 1, label: 'Day 1'),
             ],
             onSelected: (_) {},
           ),
@@ -556,7 +556,7 @@ void main() {
     );
     // 品牌色只出現在前景；未選取維持中性次要前景。
     expect(
-      tester.widget<Text>(find.text('DAY 1')).style?.color,
+      tester.widget<Text>(find.text('Day 1')).style?.color,
       scheme.primary,
     );
     expect(
@@ -567,7 +567,7 @@ void main() {
 
   testWidgets('日期選擇器長標籤不截斷且 Dynamic Type 只計一次', (tester) async {
     const short = '全';
-    const mid = 'DAY 1';
+    const mid = 'Day 1';
     const long = '2026/07/25（六）';
 
     Future<Map<String, double>> widthsAt(double scale) async {
@@ -665,7 +665,7 @@ void main() {
                   value: 1,
                   options: const [
                     TpScopeOption(value: 0, label: '總覽'),
-                    TpScopeOption(value: 1, label: 'DAY 1'),
+                    TpScopeOption(value: 1, label: 'Day 1'),
                   ],
                   onSelected: (_) {},
                 ),
@@ -706,7 +706,7 @@ void main() {
               TpScopeOption(value: 0, label: '總覽'),
               TpScopeOption(
                 value: 1,
-                label: 'DAY 1',
+                label: 'Day 1',
                 key: ValueKey('reduce-transparency-day-1'),
               ),
             ],
@@ -752,7 +752,7 @@ void main() {
                     value: selected,
                     options: [
                       for (var day = 1; day <= 12; day++)
-                        TpScopeOption(value: day, label: 'DAY $day'),
+                        TpScopeOption(value: day, label: 'Day $day'),
                     ],
                     onSelected: (value) => setState(() => selected = value),
                   );
@@ -764,13 +764,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final first = tester.getTopLeft(find.text('DAY 1')).dx;
+    final first = tester.getTopLeft(find.text('Day 1')).dx;
     update(() => selected = 9);
     await tester.pump();
     final positions = <double>[];
     for (var frame = 0; frame < 40; frame++) {
       await tester.pump(const Duration(milliseconds: 16));
-      positions.add(tester.getTopLeft(find.text('DAY 1')).dx);
+      positions.add(tester.getTopLeft(find.text('Day 1')).dx);
     }
     final last = positions.last;
     expect(last, lessThan(first - 100));
@@ -796,7 +796,7 @@ void main() {
                 for (final day in days)
                   TpScopeOption(
                     value: day,
-                    label: 'DAY $day',
+                    label: 'Day $day',
                     key: ValueKey('reordered-$day'),
                   ),
               ],
@@ -836,7 +836,7 @@ void main() {
                   value: day,
                   label: day == 0
                       ? '總覽'
-                      : 'DAY ${day.toString().padLeft(2, '0')}',
+                      : 'Day ${day.toString().padLeft(2, '0')}',
                   key: ValueKey('long-day-$day'),
                 ),
             ],
@@ -865,7 +865,7 @@ void main() {
             value: 1,
             options: const [
               TpScopeOption(value: -1, label: '行程', isAction: true),
-              TpScopeOption(value: 1, label: 'DAY 1'),
+              TpScopeOption(value: 1, label: 'Day 1'),
             ],
             onSelected: (_) {},
           ),
@@ -893,7 +893,7 @@ void main() {
                 for (var day = 1; day <= 12; day++)
                   TpScopeOption(
                     value: day,
-                    label: 'DAY $day',
+                    label: 'Day $day',
                     key: ValueKey('drag-$day'),
                   ),
               ],
@@ -907,13 +907,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final start = tester.getTopLeft(find.text('DAY 1'));
+    final start = tester.getTopLeft(find.text('Day 1'));
     await tester.drag(
       find.byType(TpHorizontalSelector<int>),
       const Offset(-150, 0),
     );
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(find.text('DAY 1')).dx, lessThan(start.dx));
+    expect(tester.getTopLeft(find.text('Day 1')).dx, lessThan(start.dx));
     expect(calls, 0);
     expect(selected, 1);
     await tester.ensureVisible(find.byKey(const ValueKey('drag-5')));
@@ -939,7 +939,7 @@ void main() {
               for (var day = 1; day <= 12; day++)
                 TpScopeOption(
                   value: day,
-                  label: 'DAY $day',
+                  label: 'Day $day',
                   semanticsLabel: '第 $day 天，共 12 天',
                   key: ValueKey('reselect-$day'),
                 ),
@@ -1011,8 +1011,8 @@ void main() {
             builder: (context, setState) => TpHorizontalSelector<int>(
               value: selected,
               options: const [
-                TpScopeOption(value: 1, label: 'DAY 1'),
-                TpScopeOption(value: 2, label: 'DAY 2'),
+                TpScopeOption(value: 1, label: 'Day 1'),
+                TpScopeOption(value: 2, label: 'Day 2'),
               ],
               onSelected: (value) => setState(() => selected = value),
             ),
@@ -1020,7 +1020,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('DAY 1'));
+    await tester.tap(find.text('Day 1'));
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
@@ -1048,12 +1048,12 @@ void main() {
               options: const [
                 TpScopeOption(
                   value: 1,
-                  label: 'DAY 1',
+                  label: 'Day 1',
                   semanticsLabel: '第 1 天，共 2 天',
                 ),
                 TpScopeOption(
                   value: 2,
-                  label: 'DAY 2',
+                  label: 'Day 2',
                   semanticsLabel: '第 2 天，共 2 天',
                 ),
               ],
@@ -1081,7 +1081,7 @@ void main() {
       ui.Tristate.isTrue,
     );
     expect(
-      tester.widget<Text>(find.text('DAY 2')).style?.color,
+      tester.widget<Text>(find.text('Day 2')).style?.color,
       AppTheme.dark().colorScheme.primary,
     );
     semantics.dispose();

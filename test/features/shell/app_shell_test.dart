@@ -651,7 +651,7 @@ void main() {
       );
       expect(router.state.uri.path, '/trips/trip-2');
       expect(find.text('保留 detail 狀態'), findsOneWidget);
-      expect(find.text('DAY 2'), findsOneWidget);
+      expect(find.text('Day 2'), findsOneWidget);
       final scrollAfterResize = tester
           .state<ScrollableState>(
             find
@@ -1243,7 +1243,7 @@ class _AdaptiveDetailStateProbeState extends State<_AdaptiveDetailStateProbe> {
     return Column(
       children: [
         const Text('TRIPS-DETAIL', key: ValueKey('trip-detail-probe')),
-        Text('DAY $_day'),
+        Text('Day $_day'),
         TextButton(
           key: const ValueKey('trip-detail-next-day'),
           onPressed: () => setState(() => _day++),

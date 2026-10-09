@@ -71,7 +71,7 @@ void main() {
 
     final marker = find.byKey(const ValueKey('map-pin-11'));
     expect(tester.getSize(marker), const Size(44, 44));
-    expect(find.bySemanticsLabel('1. 首里城，DAY 1'), findsOneWidget);
+    expect(find.bySemanticsLabel('1. 首里城，Day 1'), findsOneWidget);
     semantics.dispose();
   });
 

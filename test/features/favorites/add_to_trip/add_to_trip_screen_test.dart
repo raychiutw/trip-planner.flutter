@@ -373,7 +373,7 @@ void main() {
     expect(find.text('重試中…'), findsOneWidget);
     expect(find.text('重試'), findsNothing);
     expect(find.text('東京'), findsOneWidget);
-    expect(find.text('DAY 9 · Day 9'), findsNothing);
+    expect(find.text('Day 9 · Day 9'), findsNothing);
     expect(aReads, 2);
     expect(bReads, 2);
     pendingB.addError(Exception('B 再次失敗'));
@@ -436,7 +436,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('沖繩'), findsWidgets);
-    expect(find.text('DAY 1 · Day 1'), findsWidgets);
+    expect(find.text('Day 1'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
     verify(
@@ -488,7 +488,7 @@ void main() {
     recoveredDays.add(tokyoDays);
     await tester.pumpAndSettle();
     expect(find.text('東京'), findsWidgets);
-    expect(find.text('DAY 2 · Day 2'), findsWidgets);
+    expect(find.text('Day 2'), findsWidgets);
     verify(tripRepo.watchMyTrips).called(1);
     verify(() => tripRepo.watchDays('okinawa')).called(1);
     expect(dayReads, 2);
@@ -552,14 +552,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 2 · Day 2').last);
+    await tester.tap(find.text('Day 2').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('東京').last);
     await tester.pumpAndSettle();
-    expect(find.text('DAY 2 · Day 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
 
     for (final field in ['start', 'end']) {
       final button = find.byKey(ValueKey('add-to-trip-$field'));
@@ -676,7 +676,7 @@ void main() {
       await tester.ensureVisible(dayPicker);
       await tester.tap(dayPicker);
       await tester.pumpAndSettle();
-      final lastDay = find.text('DAY 2 · 2026-09-26');
+      final lastDay = find.text('Day 2 · 2026-09-26');
       await tester.scrollUntilVisible(
         lastDay,
         150,
@@ -730,7 +730,7 @@ void main() {
     expect(find.text('沖繩'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 201));
     await tester.pumpAndSettle();
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     expect(find.text('重試'), findsNothing);
     expect(tripReads, 2);
     expect(dayReads, 2);
@@ -773,8 +773,8 @@ void main() {
     lateDays.add(const [TripDay(id: 99, dayNum: 9, version: 0)]);
     await tester.pumpAndSettle();
     expect(find.text('沖繩'), findsOneWidget);
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
-    expect(find.text('DAY 9 · Day 9'), findsNothing);
+    expect(find.text('Day 1'), findsOneWidget);
+    expect(find.text('Day 9 · Day 9'), findsNothing);
     expect(find.text('無法載入日期'), findsNothing);
     expect(dayReads, 2);
   });
@@ -810,11 +810,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 2 · Day 2'));
+    await tester.tap(find.text('Day 2'));
     await tester.pumpAndSettle();
     updates.add(_days);
     await tester.pumpAndSettle();
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     expect(find.text('尚無日期'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
@@ -862,9 +862,9 @@ void main() {
     await tester.pumpAndSettle();
     updates.add(_days);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 2 · Day 2'));
+    await tester.tap(find.text('Day 2'));
     await tester.pumpAndSettle();
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     expect(find.text('尚無日期'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
@@ -912,12 +912,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 2 · Day 2'));
+    await tester.tap(find.text('Day 2'));
     await tester.pumpAndSettle();
     updates.add(_trips);
     await tester.pumpAndSettle();
     expect(find.text('沖繩'), findsOneWidget);
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
     verify(
@@ -964,7 +964,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 2 · Day 2'));
+    await tester.tap(find.text('Day 2'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
     await tester.pumpAndSettle();
@@ -973,7 +973,7 @@ void main() {
     await tester.tap(find.text('東京').last);
     await tester.pumpAndSettle();
     expect(find.text('沖繩'), findsOneWidget);
-    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
     verify(
@@ -1010,7 +1010,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('DAY 2 · Day 2'));
+      await tester.tap(find.text('Day 2'));
       await tester.pumpAndSettle();
       if (emptyTrips) {
         trips.add(const []);
@@ -1080,7 +1080,7 @@ void main() {
       await tester.tap(find.text('取消').last);
       await tester.pumpAndSettle();
       expect(find.text('沖繩'), findsOneWidget);
-      expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+      expect(find.text('Day 1'), findsOneWidget);
     }
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
@@ -1113,12 +1113,10 @@ void main() {
     for (final field in ['trip', 'day']) {
       await tester.tap(find.byKey(ValueKey('add-to-trip-$field')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.text(field == 'trip' ? '沖繩' : 'DAY 1 · Day 1').last,
-      );
+      await tester.tap(find.text(field == 'trip' ? '沖繩' : 'Day 1').last);
       await tester.pumpAndSettle();
       expect(find.text('沖繩'), findsOneWidget);
-      expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+      expect(find.text('Day 1'), findsOneWidget);
     }
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();

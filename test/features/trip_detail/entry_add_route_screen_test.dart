@@ -77,6 +77,7 @@ Widget _buildScreen(
   String? initialRegion,
   bool useRepositoryDays = false,
   void Function()? onDaysBuild,
+  TextScaler? textScaler,
 }) {
   when(
     () => repo.recomputeTravel(
@@ -116,7 +117,16 @@ Widget _buildScreen(
           return Stream.value(_days);
         }),
     ],
-    child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: AppTheme.light(),
+      routerConfig: router,
+      builder: textScaler == null
+          ? null
+          : (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              child: child!,
+            ),
+    ),
   );
 }
 
@@ -134,6 +144,37 @@ void main() {
   setUpAll(
     () => registerFallbackValue(const PoiSearchResult(placeId: 'x', name: 'x')),
   );
+
+  testWidgets('AX 字級篩選 chip 列高度跟著字級放大,不裁切', (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => const []);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        poiRepo: poiRepo,
+        initialMode: EntryAddMode.search,
+        textScaler: const TextScaler.linear(3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = find.byKey(const ValueKey('entry-add-category-list'));
+    expect(tester.getSize(list).height, greaterThanOrEqualTo(44 * 3));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Day 初載失敗顯示友善錯誤，原地重試後取得日期', (tester) async {
     final repo = _MockTripRepository();
@@ -165,7 +206,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(reads, 2);
-    expect(find.text('DAY 3 · 2026-10-03'), findsOneWidget);
+    expect(find.text('Day 3 · 2026-10-03'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('entry-add-search-field')),
       findsOneWidget,
@@ -199,7 +240,7 @@ void main() {
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
     expect(reads, 2);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -304,7 +345,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(reads, 2);
     expect(find.text('保留自訂草稿'), findsOneWidget);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     await tester.ensureVisible(find.text('收藏'));
     await tester.tap(find.text('收藏'));
     await tester.pumpAndSettle();
@@ -346,7 +387,7 @@ void main() {
     expect(reads, 2);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('等待日期更新的草稿'), findsOneWidget);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-add-loading')), findsNothing);
 
     retry.add(const [
@@ -358,7 +399,7 @@ void main() {
     expect(reads, 2);
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('等待日期更新的草稿'), findsOneWidget);
-    expect(find.text('DAY 2 · 2026-10-02'), findsOneWidget);
+    expect(find.text('Day 2 · 2026-10-02'), findsOneWidget);
     expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -531,7 +572,7 @@ void main() {
     expect(find.text('加入'), findsOneWidget);
     expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.text('搜尋'), findsOneWidget);
     expect(find.text('收藏'), findsOneWidget);
     expect(find.text('搜尋景點'), findsNothing);

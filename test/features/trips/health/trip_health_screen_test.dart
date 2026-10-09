@@ -214,7 +214,7 @@ void main() {
     );
 
     await pumpScreenWithRouter(tester);
-    await tester.tap(find.text('前往景點'));
+    await tester.tap(find.text('前往停留點'));
     await tester.pumpAndSettle();
 
     expect(find.text('edit trip-1 101'), findsOneWidget);
