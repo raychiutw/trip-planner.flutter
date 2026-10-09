@@ -19,6 +19,7 @@ import '../trips_list_screen.dart';
 class EditTripState {
   const EditTripState({
     this.loading = true,
+    this.loadFailed = false,
     this.title = '',
     this.description = '',
     this.lang = 'zh-TW',
@@ -35,6 +36,9 @@ class EditTripState {
   });
 
   final bool loading;
+
+  /// 初始載入失敗:此時沒有可編輯的 baseline,畫面只能顯示錯誤頁與重試。
+  final bool loadFailed;
   final String title;
   final String description;
   final String lang;
@@ -53,6 +57,7 @@ class EditTripState {
 
   EditTripState copyWith({
     bool? loading,
+    bool? loadFailed,
     Object? startDate = _sentinel,
     Object? endDate = _sentinel,
     List<TripDay>? days,
@@ -62,6 +67,7 @@ class EditTripState {
   }) {
     return EditTripState(
       loading: loading ?? this.loading,
+      loadFailed: loadFailed ?? this.loadFailed,
       title: title,
       description: description,
       lang: lang,
@@ -83,6 +89,7 @@ class EditTripState {
     final draft = session.draft;
     return EditTripState(
       loading: loading,
+      loadFailed: loadFailed,
       title: draft.title,
       description: draft.description,
       lang: draft.lang,
@@ -191,6 +198,13 @@ class EditTripController extends Notifier<EditTripState> {
 
   TripRepository get _repo => ref.read(tripRepositoryProvider);
 
+  /// 載入失敗後重試:回到 loading 骨架再跑一次 [_load]。
+  void retryLoad() {
+    if (!state.loadFailed) return;
+    state = const EditTripState(loading: true);
+    unawaited(_load());
+  }
+
   Future<void> _load() async {
     try {
       // 表單種子用一次性 fetch(非 SWR stream),避免依賴會 autoDispose 的
@@ -223,7 +237,7 @@ class EditTripController extends Notifier<EditTripState> {
       )._withSession(session);
     } on Exception {
       if (_disposed) return;
-      state = state.copyWith(loading: false, error: '載入失敗,請稍後再試');
+      state = state.copyWith(loading: false, loadFailed: true);
     }
   }
 
