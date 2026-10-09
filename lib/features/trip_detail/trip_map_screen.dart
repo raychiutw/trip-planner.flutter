@@ -354,6 +354,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   bool _initialFocusApplied = false;
   List<_RouteSegment> _routeSegments = const [];
   bool _loadingRoutes = false;
+  bool _routeLoadFailed = false;
   int _routeLoadGeneration = 0;
 
   @override
@@ -562,6 +563,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         setState(() {
           _routeSegments = const [];
           _loadingRoutes = false;
+          _routeLoadFailed = false;
         });
       }
       return;
@@ -569,7 +571,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     setState(() {
       _routeSegments = const [];
       _loadingRoutes = true;
+      _routeLoadFailed = false;
     });
+    var anyFailed = false;
     final repository = ref.read(mapRepositoryProvider);
     final segments = await Future.wait([
       for (final (index, pair) in pairs.indexed)
@@ -596,6 +600,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             // 單段失敗只略過該段（spec：保留 marker／卡片）。這裡必須攔下 Error
             // 而不只是 Exception —— Future.wait 是 fail-fast，漏出去會讓整趟路線
             // 全滅且 _loadingRoutes 永遠卡在 true。
+            anyFailed = true;
             return null;
           }
         }(),
@@ -604,6 +609,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     setState(() {
       _routeSegments = segments.whereType<_RouteSegment>().toList();
       _loadingRoutes = false;
+      _routeLoadFailed = anyFailed;
     });
   }
 
@@ -832,9 +838,45 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           Positioned(
             left: TpSpacing.s4,
             top: TpRootGeometry.headerBottom(context) + TpSpacing.s3,
-            child: const SizedBox.square(
-              dimension: 24,
-              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+            child: Semantics(
+              label: '路線載入中',
+              liveRegion: true,
+              child: SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (_routeLoadFailed)
+          Positioned(
+            top:
+                TpRootGeometry.headerBottom(context) +
+                TpSpacing.s2 +
+                _daySelectorHeight +
+                TpSpacing.s2,
+            left: TpSpacing.s4,
+            right: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s2,
+            child: Semantics(
+              key: const ValueKey('trip-map-route-error'),
+              liveRegion: true,
+              container: true,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '部分路線無法載入',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    key: const ValueKey('trip-map-route-retry'),
+                    onPressed: () => unawaited(_loadRoutes()),
+                    child: const Text('重試'),
+                  ),
+                ],
+              ),
             ),
           ),
         Positioned(

@@ -42,22 +42,26 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
       dismissalEnabled: !state.saving,
       child: Scaffold(
         appBar: TpAppBar(
-          role: TpAppBarRole.modalForm,
+          role: state.loadFailed
+              ? TpAppBarRole.modalContent
+              : TpAppBarRole.modalForm,
           title: const Text('編輯行程'),
-          onCancel: _dismissController.requestPop,
-          primaryActionLabel: '儲存',
+          onCancel: state.loadFailed ? null : _dismissController.requestPop,
+          primaryActionLabel: state.loadFailed ? null : '儲存',
           primaryActionKey: const ValueKey('edit-save'),
           primaryActionEnabled: ctrl.hasChanges && !state.saving,
-          onPrimaryAction: () async {
-            final saved = await ctrl.save();
-            if (!mounted || saved == null) return;
-            HapticFeedback.lightImpact();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && ctrl.canFinish(saved)) {
-                closeAppRouteOrSheet(context);
-              }
-            });
-          },
+          onPrimaryAction: state.loadFailed
+              ? null
+              : () async {
+                  final saved = await ctrl.save();
+                  if (!mounted || saved == null) return;
+                  HapticFeedback.lightImpact();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && ctrl.canFinish(saved)) {
+                      closeAppRouteOrSheet(context);
+                    }
+                  });
+                },
         ),
         bottomNavigationBar: state.saving
             ? Padding(
@@ -78,6 +82,8 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
             : null,
         body: state.loading
             ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
+            : state.loadFailed
+            ? _LoadError(onRetry: ctrl.retryLoad)
             : ListView(
                 padding: const EdgeInsets.all(TpSpacing.s4),
                 children: [
@@ -640,4 +646,42 @@ String _formatIsoDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '$year-$month-$day';
+}
+
+/// 初始載入失敗:持續可見的錯誤頁與重試,不給可儲存的空表單(儲存會用空清單覆蓋真實資料)。
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s6),
+        child: Semantics(
+          key: const ValueKey('edit-trip-load-error'),
+          liveRegion: true,
+          container: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('無法載入行程', style: theme.textTheme.titleMedium),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                '請檢查網路後再試一次。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s4),
+              FilledButton(onPressed: onRetry, child: const Text('重試')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

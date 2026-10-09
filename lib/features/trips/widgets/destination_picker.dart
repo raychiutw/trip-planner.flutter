@@ -42,6 +42,9 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
   List<DestinationInput> _recentDestinations = const [];
   bool _searching = false;
 
+  /// 搜尋回饋:null 表示沒有要提示的狀態。
+  String? _searchStatus;
+
   @override
   void dispose() {
     _search.dispose();
@@ -52,14 +55,27 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
     if (!widget.enabled) return;
     final q = _search.text.trim();
     if (q.length < 2) return;
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchStatus = null;
+    });
     try {
       final r = await ref
           .read(poiRepositoryProvider)
           .searchPois(q: q, region: '全部地區');
-      if (mounted) setState(() => _results = r);
+      if (mounted) {
+        setState(() {
+          _results = r;
+          _searchStatus = r.isEmpty ? '找不到符合的地點' : null;
+        });
+      }
     } on Exception {
-      if (mounted) setState(() => _results = const []);
+      if (mounted) {
+        setState(() {
+          _results = const [];
+          _searchStatus = '搜尋失敗，請稍後再試';
+        });
+      }
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -72,6 +88,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
     _search.clear();
     setState(() {
       _results = const [];
+      _searchStatus = null;
       _recentDestinations = _pushRecentDestination(
         _recentDestinations,
         destination,
@@ -156,6 +173,21 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
             ],
           ),
         ),
+        if (_searchStatus case final status?)
+          Semantics(
+            key: const ValueKey('dest-search-status'),
+            liveRegion: true,
+            container: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
+              child: Text(
+                status,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         if (_results.isNotEmpty)
           ..._results
               .take(8)

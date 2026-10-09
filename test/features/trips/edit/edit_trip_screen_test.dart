@@ -148,6 +148,34 @@ void main() {
     );
   });
 
+  testWidgets('載入失敗顯示可重試錯誤頁，不渲染表單與儲存鈕，重試成功後出現表單', (tester) async {
+    var calls = 0;
+    when(() => tripRepo.fetchTrip(any())).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('boom-internal');
+      return _trip;
+    });
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('edit-trip-load-error')), findsOneWidget);
+    expect(find.text('無法載入行程'), findsOneWidget);
+    expect(find.textContaining('boom-internal'), findsNothing);
+    expect(find.byKey(const ValueKey('edit-title')), findsNothing);
+    expect(find.byKey(const ValueKey('edit-save')), findsNothing);
+    final live = tester.getSemantics(
+      find.byKey(const ValueKey('edit-trip-load-error')),
+    );
+    expect(live.flagsCollection.isLiveRegion, isTrue);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('edit-trip-load-error')), findsNothing);
+    expect(find.byKey(const ValueKey('edit-title')), findsOneWidget);
+    expect(find.text('原標題'), findsOneWidget);
+  });
+
   testWidgets('改標題後取消會確認捨棄未儲存變更', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

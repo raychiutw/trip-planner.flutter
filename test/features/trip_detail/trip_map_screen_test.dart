@@ -104,6 +104,29 @@ class _StubMapRepository implements MapRepository {
   }
 }
 
+/// 第一次呼叫丟例外，之後回正常幾何。
+class _FlakyMapRepository extends _StubMapRepository {
+  @override
+  Future<TripRouteResult> fetchRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+    cancelToken,
+  }) async {
+    if (calls < 1) {
+      calls++;
+      throw StateError('SECRET-route-trace');
+    }
+    return super.fetchRoute(
+      fromLat: fromLat,
+      fromLng: fromLng,
+      toLat: toLat,
+      toLng: toLng,
+    );
+  }
+}
+
 class _DelayedSecondRouteRepository implements MapRepository {
   final secondRoute = Completer<TripRouteResult>();
   int calls = 0;
@@ -1471,6 +1494,63 @@ void main() {
 
     expect(repository.calls, 1);
     expect(find.byKey(const ValueKey('map-route-day-route-0')), findsOneWidget);
+  });
+
+  testWidgets('路線載入失敗顯示可重試提示，重試成功後提示消失', (tester) async {
+    final repository = _FlakyMapRepository();
+    await tester.pumpWidget(_buildScreen([_dayOne], mapRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('部分路線無法載入'), findsOneWidget);
+    expect(find.textContaining('SECRET-route-trace'), findsNothing);
+    expect(find.byKey(const ValueKey('map-route-day-route-0')), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('trip-map-route-error')))
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-route-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('部分路線無法載入'), findsNothing);
+    expect(find.byKey(const ValueKey('map-route-day-route-0')), findsOneWidget);
+  });
+
+  testWidgets('路線載入圈帶有語意標籤', (tester) async {
+    final repository = _DelayedSecondRouteRepository();
+    final handle = tester.ensureSemantics();
+    final secondDay = TripDay(
+      id: 2,
+      dayNum: 2,
+      version: 1,
+      timeline: [
+        _entry(id: 21, title: '首里城', lat: 26.217, lng: 127.719),
+        _entry(id: 22, title: '國際通', lat: 26.214, lng: 127.688),
+      ],
+    );
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, secondDay], mapRepository: repository),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pump();
+
+    expect(find.bySemanticsLabel('路線載入中'), findsOneWidget);
+    repository.secondRoute.complete(
+      const TripRouteResult(
+        polyline: [
+          TripRoutePoint(lat: 26.217, lng: 127.719),
+          TripRoutePoint(lat: 26.214, lng: 127.688),
+        ],
+        durationSeconds: 600,
+        distanceMeters: 4200,
+      ),
+    );
+    await tester.pumpAndSettle();
+    handle.dispose();
   });
 
   testWidgets('切換 Day 時立即移除前一日 route，再等待新 route', (tester) async {
