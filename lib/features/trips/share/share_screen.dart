@@ -2,6 +2,7 @@
 /// QR code + 複製(raw token 只回一次)。管理限有 write 權限者(否則提示)。
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show listEquals;
@@ -90,10 +91,12 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   DateTime? _customExpiryDate;
   bool _anonymous = false;
   bool _showRevoked = false;
+  final _scroll = ScrollController();
 
   @override
   void dispose() {
     _label.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -102,6 +105,10 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   List<String> get _visibleSections =>
       _shareSectionOrder.where(_sections.contains).toList();
+
+  /// 選「自訂」卻沒選日期 → 不可建立(否則會送出永不過期的公開連結)。
+  bool get _customDateMissing =>
+      _expiryKey == 'custom' && _customExpiryDate == null;
 
   int? get _expiresAt {
     if (_expiryKey == 'custom') {
@@ -211,6 +218,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   }
 
   Future<void> _createShare() async {
+    if (_customDateMissing) return;
     FocusManager.instance.primaryFocus?.unfocus();
     final succeeded = await _ctrl.create(
       _label.text,
@@ -240,6 +248,20 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(shareControllerProvider(widget.tripId));
+    // 建立／重產生成功後,結果卡在清單最上方而觸發鈕在下方:捲回頂端讓
+    // 一次性 token 一定被看見。
+    ref.listen(shareControllerProvider(widget.tripId), (prev, next) {
+      final link = next.lastCreated;
+      if (link != null && link != prev?.lastCreated && _scroll.hasClients) {
+        unawaited(
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          ),
+        );
+      }
+    });
     final activeShares = state.shares.where((s) => !s.isRevoked).toList();
     final revokedShares = state.shares.where((s) => s.isRevoked).toList();
 
@@ -267,6 +289,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 ),
               )
             : ListView(
+                controller: _scroll,
                 padding: const EdgeInsets.all(TpSpacing.s4),
                 children: [
                   if (state.lastCreated != null)
@@ -381,6 +404,19 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                               icon: const Icon(Icons.event_outlined, size: 18),
                               label: Text(_customExpiryLabel(context)),
                             ),
+                            if (_customDateMissing)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: TpSpacing.s1,
+                                ),
+                                child: Text(
+                                  '請選擇到期日',
+                                  key: const ValueKey('share-expiry-required'),
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
                           ],
                           CheckboxListTile(
                             key: const ValueKey('share-anonymous'),
@@ -417,7 +453,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                       ),
                                     ),
                                     TextButton(
-                                      onPressed: _ctrl.retry,
+                                      onPressed: state.createFailed
+                                          ? _createShare
+                                          : _ctrl.retry,
                                       child: const Text('重試'),
                                     ),
                                   ],
@@ -426,7 +464,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             ),
                           FilledButton(
                             key: const ValueKey('share-create'),
-                            onPressed: state.creating ? null : _createShare,
+                            onPressed: state.creating || _customDateMissing
+                                ? null
+                                : _createShare,
                             child: state.creating
                                 ? Semantics(
                                     key: const ValueKey(
@@ -468,7 +508,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       key: ValueKey('share-${s.id}'),
       contentPadding: EdgeInsets.zero,
       title: Text(s.label.isEmpty ? '(無標籤)' : s.label),
-      subtitle: Text('$status · 已被檢視 ${s.viewCount} 次'),
+      subtitle: state.rotateFailedId == s.id
+          ? _RowError(
+              key: ValueKey('share-row-error-${s.id}'),
+              message: '重新產生失敗，請重試',
+              retryKey: ValueKey('share-row-retry-${s.id}'),
+              onRetry: () => _ctrl.rotate(s.id),
+            )
+          : Text('$status · 已被檢視 ${s.viewCount} 次'),
       trailing: TpMoreMenuButton<_ShareRowAction>(
         key: ValueKey('share-actions-${s.id}'),
         tooltip: '分享連結動作',
@@ -512,6 +559,43 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   }
 }
 
+/// 列內就地錯誤:訊息 + 重做該動作的重試鈕。
+class _RowError extends StatelessWidget {
+  const _RowError({
+    super.key,
+    required this.message,
+    required this.retryKey,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Key retryKey;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+          TextButton(
+            key: retryKey,
+            onPressed: onRetry,
+            child: const Text('重試'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CreatedCard extends StatefulWidget {
   const _CreatedCard({
     required this.url,
@@ -533,50 +617,56 @@ class _CreatedCardState extends State<_CreatedCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('連結已建立(只顯示這一次)', style: theme.textTheme.titleSmall),
-            const SizedBox(height: TpSpacing.s2),
-            SelectableText(widget.url, style: theme.textTheme.bodySmall),
-            const SizedBox(height: TpSpacing.s2),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: TpSpacing.s1,
-              runSpacing: TpSpacing.s1,
-              children: [
-                OutlinedButton.icon(
-                  key: const ValueKey('share-qr-toggle'),
-                  onPressed: () => setState(() => _showQr = !_showQr),
-                  icon: Icon(
-                    _showQr ? Icons.visibility_off_outlined : Icons.qr_code_2,
-                    size: 18,
+    return Semantics(
+      key: const ValueKey('share-created-card'),
+      liveRegion: true,
+      container: true,
+      label: '分享連結已建立，連結只顯示這一次',
+      child: Card(
+        color: theme.colorScheme.secondaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('連結已建立(只顯示這一次)', style: theme.textTheme.titleSmall),
+              const SizedBox(height: TpSpacing.s2),
+              SelectableText(widget.url, style: theme.textTheme.bodySmall),
+              const SizedBox(height: TpSpacing.s2),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: TpSpacing.s1,
+                runSpacing: TpSpacing.s1,
+                children: [
+                  OutlinedButton.icon(
+                    key: const ValueKey('share-qr-toggle'),
+                    onPressed: () => setState(() => _showQr = !_showQr),
+                    icon: Icon(
+                      _showQr ? Icons.visibility_off_outlined : Icons.qr_code_2,
+                      size: 18,
+                    ),
+                    label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
                   ),
-                  label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
-                ),
-                OutlinedButton.icon(
-                  key: const ValueKey('share-native'),
-                  onPressed: () => widget.onShare(widget.url),
-                  icon: const Icon(Icons.ios_share_outlined, size: 18),
-                  label: const Text('分享'),
-                ),
-                FilledButton.tonalIcon(
-                  key: const ValueKey('share-copy'),
-                  onPressed: () => widget.onCopy(widget.url),
-                  icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
-                  label: const Text('複製連結'),
-                ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('share-native'),
+                    onPressed: () => widget.onShare(widget.url),
+                    icon: const Icon(Icons.ios_share_outlined, size: 18),
+                    label: const Text('分享'),
+                  ),
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('share-copy'),
+                    onPressed: () => widget.onCopy(widget.url),
+                    icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
+                    label: const Text('複製連結'),
+                  ),
+                ],
+              ),
+              if (_showQr) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Center(child: _ShareQrCode(url: widget.url)),
               ],
-            ),
-            if (_showQr) ...[
-              const SizedBox(height: TpSpacing.s3),
-              Center(child: _ShareQrCode(url: widget.url)),
             ],
-          ],
+          ),
         ),
       ),
     );

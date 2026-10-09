@@ -221,6 +221,146 @@ void main() {
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
   });
 
+  testWidgets('自訂到期日未選日期時建立停用並提示，不呼叫 create', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('請選擇到期日'), findsOneWidget);
+    final create = find.byKey(const ValueKey('share-create'));
+    await tester.ensureVisible(create);
+    expect(tester.widget<FilledButton>(create).onPressed, isNull);
+    await tester.tap(create, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    verifyNever(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        expiresAt: any(named: 'expiresAt'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    );
+  });
+
+  testWidgets('建立成功後捲到結果卡，結果卡為 liveRegion 且在可視範圍', (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(() => repo.fetchShares(any())).thenAnswer(
+      (_) async => [
+        for (var i = 1; i <= 8; i++) TripShare(id: i, label: '連結$i'),
+      ],
+    );
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(id: 99, token: 'tk', url: '/s/tk'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final create = find.byKey(const ValueKey('share-create'));
+    await tester.scrollUntilVisible(
+      create,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(create);
+    await tester.pumpAndSettle();
+
+    final card = find.byKey(const ValueKey('share-created-card'));
+    expect(card, findsOneWidget);
+    final rect = tester.getRect(card);
+    expect(rect.top, greaterThanOrEqualTo(0));
+    expect(rect.bottom, lessThanOrEqualTo(600));
+    expect(tester.widget<Semantics>(card).properties.liveRegion, isTrue);
+  });
+
+  testWidgets('重新產生失敗：錯誤就地顯示於該列，重試重做重新產生', (tester) async {
+    var calls = 0;
+    when(() => repo.rotateShare(any(), any())).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return const RotatedShareLink(token: 'newtok', url: '/s/newtok');
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-error')), findsNothing);
+    final inline = find.descendant(
+      of: find.byKey(const ValueKey('share-1')),
+      matching: find.byKey(const ValueKey('share-row-error-1')),
+    );
+    expect(inline, findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('share-row-retry-1')));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    verify(() => repo.rotateShare('t', 1)).called(2);
+    expect(find.textContaining('/s/newtok'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-row-error-1')), findsNothing);
+  });
+
+  testWidgets('撤銷失敗不在底部建立表單顯示錯誤', (tester) async {
+    when(
+      () => repo.revokeShare(any(), any()),
+    ).thenAnswer((_) async => throw Exception('offline'));
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-revoke-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '撤銷'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-error')), findsNothing);
+    expect(find.text('撤銷失敗，原連結已保留'), findsOneWidget);
+  });
+
+  testWidgets('建立失敗的重試重做建立而非只重載清單', (tester) async {
+    var calls = 0;
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return const ShareLink(id: 5, token: 't5', url: '/s/t5');
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.textContaining('/s/t5'), findsOneWidget);
+  });
+
   testWidgets('建立 → 可展開 QR code', (tester) async {
     when(
       () => repo.createShare(
