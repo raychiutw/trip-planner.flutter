@@ -47,6 +47,7 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
               label: options[key],
               focusRadius: trackRadius,
               child: Center(
+                heightFactor: 1,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
                   child: Text(

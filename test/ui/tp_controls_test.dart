@@ -111,14 +111,25 @@ void main() {
     });
 
     testWidgets('determinate 轉 indeterminate 才開始動畫,轉回即停', (tester) async {
-      Widget bar(double? v) =>
-          _host(SizedBox(width: 200, child: TpProgressBar(value: v)));
-      await tester.pumpWidget(bar(0.5));
+      double? value = 0.5;
+      late StateSetter set;
+      await tester.pumpWidget(
+        _host(
+          StatefulBuilder(
+            builder: (context, setState) {
+              set = setState;
+              return SizedBox(width: 200, child: TpProgressBar(value: value));
+            },
+          ),
+        ),
+      );
       await tester.pump(const Duration(seconds: 1)); // 讓路由轉場先結束
       expect(tester.hasRunningAnimations, isFalse);
-      await tester.pumpWidget(bar(null));
+      set(() => value = null);
+      await tester.pump();
       expect(tester.hasRunningAnimations, isTrue);
-      await tester.pumpWidget(bar(0.5));
+      set(() => value = 0.5);
+      await tester.pump();
       await tester.pump(const Duration(seconds: 1)); // 讓路由轉場先結束
       expect(tester.hasRunningAnimations, isFalse);
     });
@@ -285,7 +296,7 @@ void main() {
       );
       expect(
         tester.getSize(find.byType(TpChip)).height,
-        greaterThanOrEqualTo(44),
+        inInclusiveRange(44, 56),
       );
       await tester.tap(find.text('點我'));
       expect(taps, 1);
@@ -359,11 +370,17 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('每一段高度至少 44', (tester) async {
+    testWidgets('每一段高度至少 44,且整條不會撐滿可用高度', (tester) async {
       await tester.pumpWidget(_host(segmented(onChanged: (_) {})));
-      for (final element in find.byType(TpTapTarget).evaluate()) {
-        expect(element.size!.height, greaterThanOrEqualTo(44));
+      final targets = find.byType(TpTapTarget).evaluate();
+      expect(targets, hasLength(3));
+      for (final element in targets) {
+        expect(element.size!.height, inInclusiveRange(44, 56));
       }
+      expect(
+        tester.getSize(find.byType(TpSegmentedControl<String>)).height,
+        inInclusiveRange(44, 60),
+      );
     });
 
     testWidgets('鍵盤:Tab 聚焦後 Enter／Space 觸發該段回呼', (tester) async {
@@ -384,6 +401,7 @@ void main() {
       Future<double> thumbAfterShortPump({required bool reduce}) async {
         var value = 'a';
         late StateSetter set;
+        await tester.pumpWidget(const SizedBox());
         await tester.pumpWidget(
           _host(
             StatefulBuilder(
@@ -398,6 +416,7 @@ void main() {
             reduceMotion: reduce,
           ),
         );
+        await tester.pumpAndSettle();
         set(() => value = 'c');
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 50));
@@ -457,9 +476,7 @@ void main() {
     });
 
     testWidgets('compact 點擊區寬高至少 44,即使目前值很短', (tester) async {
-      await tester.pumpWidget(
-        _host(field(compact: true, value: null, onChanged: (_) {})),
-      );
+      await tester.pumpWidget(_host(field(compact: true, onChanged: (_) {})));
       final size = tester.getSize(find.byType(TpTapTarget));
       expect(size.width, greaterThanOrEqualTo(44));
       expect(size.height, greaterThanOrEqualTo(44));

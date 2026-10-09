@@ -44,6 +44,7 @@ class TpChip extends StatelessWidget {
       focusRadius: TpRadius.pill,
       child: Align(
         widthFactor: 1,
+        heightFactor: 1,
         child: DecoratedBox(
           key: const ValueKey('tp-chip-surface'),
           decoration: BoxDecoration(
