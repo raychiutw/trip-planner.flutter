@@ -769,15 +769,18 @@ class _MessageBubble extends StatelessWidget {
         ],
       );
     } else if (isAssistant && message.isMarkdown) {
-      content = MarkdownBody(
-        data: message.text,
-        onTapLink: (text, href, title) {
-          final loc = mapReplyLink(href ?? '', tripId);
-          if (loc != null) context.push(loc);
-        },
+      content = SelectionArea(
+        child: MarkdownBody(
+          data: message.text,
+          onTapLink: (text, href, title) {
+            final loc = mapReplyLink(href ?? '', tripId);
+            if (loc != null) context.push(loc);
+          },
+        ),
       );
     } else {
-      content = Text(message.text);
+      // 長按即出系統選取／拷貝選單,AI 回覆與使用者訊息都能複製。
+      content = SelectionArea(child: Text(message.text));
     }
 
     return Padding(
