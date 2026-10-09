@@ -264,31 +264,25 @@ class _TripRegularList extends ConsumerWidget {
           context.go('/trips/${Uri.encodeComponent(trip.tripId)}');
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: selectTrip,
-          child: Semantics(
-            key: ValueKey('trip-sidebar-item-${trip.tripId}'),
-            container: true,
-            selected: selected,
-            button: true,
-            label: displayTitle,
-            onTap: selectTrip,
-            child: ExcludeSemantics(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: ListTile(
-                  selected: selected,
-                  title: Text(displayTitle),
-                  leading: const Icon(CupertinoIcons.briefcase),
-                  trailing: selected
-                      ? Icon(
-                          CupertinoIcons.check_mark,
-                          color: theme.colorScheme.primary,
-                        )
-                      : null,
-                ),
-              ),
+        // ListTile 自帶 button 語意與 focus,外接鍵盤／Full Keyboard Access
+        // 才能聚焦並以 Enter 選取;外層 Semantics 只補 key 與選取狀態。
+        return Semantics(
+          key: ValueKey('trip-sidebar-item-${trip.tripId}'),
+          container: true,
+          selected: selected,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: ListTile(
+              selected: selected,
+              onTap: selectTrip,
+              title: Text(displayTitle),
+              leading: const Icon(CupertinoIcons.briefcase),
+              trailing: selected
+                  ? Icon(
+                      CupertinoIcons.check_mark,
+                      color: theme.colorScheme.primary,
+                    )
+                  : null,
             ),
           ),
         );

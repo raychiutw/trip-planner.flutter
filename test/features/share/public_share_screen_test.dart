@@ -120,6 +120,11 @@ void main() {
               PublicShareScreen(token: state.pathParameters['token']!),
         ),
         GoRoute(
+          path: '/',
+          builder: (context, state) =>
+              const Scaffold(body: Text('app-home-destination')),
+        ),
+        GoRoute(
           path: '/login',
           builder: (context, state) => Scaffold(
             body: Column(
@@ -455,6 +460,26 @@ void main() {
       }
     });
   }
+
+  testWidgets('已登入冷啟動進公開分享頁有返回與帳號入口', (tester) async {
+    await pumpScreen(
+      tester,
+      user: const UserInfo(id: 'user-1', email: 'ray@example.com'),
+    );
+
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('app-home-destination'), findsOneWidget);
+  });
+
+  testWidgets('未登入的公開分享頁不顯示返回與帳號入口', (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+  });
 
   testWidgets('未登入點複製會前往 login', (tester) async {
     await pumpScreen(tester);

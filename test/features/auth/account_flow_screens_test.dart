@@ -63,6 +63,19 @@ void main() {
               const Scaffold(body: Text('login-destination')),
         ),
         GoRoute(
+          path: '/invite',
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'invite-destination:${state.uri.queryParameters['token']}',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) =>
+              const Scaffold(body: Text('home-destination')),
+        ),
+        GoRoute(
           path: '/trips',
           builder: (context, state) => Scaffold(
             body: Text('trips:${state.uri.queryParameters['selected'] ?? ''}'),
@@ -411,6 +424,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('login-destination'), findsOneWidget);
+  });
+
+  testWidgets('帶邀請的 Signup 返回會回到邀請頁而非 Login', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup?invitation=tok-1');
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('invite-destination:tok-1'), findsOneWidget);
+    expect(find.text('login-destination'), findsNothing);
+  });
+
+  testWidgets('Signup 返回優先 pop 既有 route stack', (tester) async {
+    final router = await pumpAuthRoutes(tester, initialLocation: '/home');
+    unawaited(router.push('/signup'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('home-destination'), findsOneWidget);
+    expect(find.text('login-destination'), findsNothing);
   });
 
   testWidgets('Auth 表單在 320pt Accessibility Size 可捲動完成', (tester) async {
