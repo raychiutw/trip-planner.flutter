@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/share_repository.dart';
@@ -166,7 +167,7 @@ void main() {
     );
     expect(
       tester
-          .widget<FilterChip>(
+          .widget<TpChip>(
             find.byKey(const ValueKey('share-section-reservations')),
           )
           .selected,

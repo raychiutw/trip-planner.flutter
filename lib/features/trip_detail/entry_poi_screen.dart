@@ -17,6 +17,9 @@ import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_progress_bar.dart';
+import '../../ui/tp_picker_field.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/swipe_to_delete.dart';
 import '../../ui/tp_app_bar.dart';
 import '../favorites/explore/explore_controller.dart'
@@ -764,13 +767,13 @@ class _PoiInfoFormState extends State<_PoiInfoForm> {
               spacing: TpSpacing.s2,
               children: [
                 for (final e in kPoiTypeLabels.entries)
-                  ChoiceChip(
+                  TpChip(
                     key: ValueKey('poi-type-${e.key}'),
-                    label: Text(e.value),
+                    label: e.value,
                     selected: _type == e.key,
-                    onSelected: _submitting
+                    onPressed: _submitting
                         ? null
-                        : (_) {
+                        : () {
                             setState(() {
                               _type = e.key;
                             });
@@ -791,8 +794,9 @@ class _PoiInfoFormState extends State<_PoiInfoForm> {
               Semantics(
                 liveRegion: true,
                 label: '正在儲存地點資訊',
-                child: const LinearProgressIndicator(
+                child: const TpProgressBar(
                   key: ValueKey('poi-info-progress'),
+                  semanticLabel: null,
                 ),
               ),
             ],
@@ -1052,9 +1056,10 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 Semantics(
                   liveRegion: true,
                   label: '正在儲存地點',
-                  child: const LinearProgressIndicator(
+                  child: const TpProgressBar(
                     key: ValueKey('poi-picker-submit-progress'),
-                    minHeight: 2,
+                    height: 2,
+                    semanticLabel: null,
                   ),
                 ),
                 const SizedBox(height: TpSpacing.s2),
@@ -1083,7 +1088,7 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 ),
                 if (_searching) ...[
                   const SizedBox(height: TpSpacing.s1),
-                  const LinearProgressIndicator(minHeight: 2),
+                  const TpProgressBar(height: 2, semanticLabel: '搜尋中'),
                 ],
                 const SizedBox(height: TpSpacing.s3),
                 if (_searchFailed || (_searchedEmpty && !_searching))
@@ -1205,22 +1210,13 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                   },
                 ),
                 const SizedBox(height: TpSpacing.s2),
-                DropdownButtonFormField<String>(
+                TpPickerField<String>(
                   key: const ValueKey('poi-picker-custom-type'),
-                  initialValue: _customPoiType,
-                  decoration: const InputDecoration(
-                    labelText: '類型',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final entry in kPoiTypeLabels.entries)
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(entry.value),
-                      ),
-                  ],
+                  label: '類型',
+                  value: _customPoiType,
+                  options: kPoiTypeLabels,
                   onChanged: (value) {
-                    setState(() => _customPoiType = value ?? _customPoiType);
+                    setState(() => _customPoiType = value);
                     _syncCustomDirty();
                   },
                 ),

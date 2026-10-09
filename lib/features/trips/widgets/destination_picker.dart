@@ -10,6 +10,7 @@ import '../../../app/adaptive.dart';
 import '../../../models/destination_input.dart';
 import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 
@@ -138,8 +139,8 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                 runSpacing: TpSpacing.s2,
                 children: [
                   for (final h in _hotDestinations)
-                    ActionChip(
-                      label: Text(h),
+                    TpChip(
+                      label: h,
                       onPressed: widget.enabled
                           ? () => widget.onAdd(DestinationInput(name: h))
                           : null,
@@ -161,9 +162,9 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                   runSpacing: TpSpacing.s2,
                   children: [
                     for (final destination in _recentDestinations)
-                      ActionChip(
+                      TpChip(
                         key: ValueKey('dest-recent-${destination.name}'),
-                        label: Text(destination.name),
+                        label: destination.name,
                         onPressed: widget.enabled
                             ? () => widget.onAdd(destination)
                             : null,

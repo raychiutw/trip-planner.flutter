@@ -56,17 +56,21 @@ class TpGroupedSurface extends StatelessWidget {
     required this.children,
     this.separatorIndent = TpSpacing.s4,
     this.separatorEndIndent = TpSpacing.s4,
+    this.color,
   });
 
   final List<Widget> children;
   final double separatorIndent;
   final double separatorEndIndent;
 
+  /// 覆寫 surface 底色(例如錯誤面板用 `errorContainer`);預設 `surfaceContainerLow`。
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerLow,
+      color: color ?? theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(TpRadius.lg),
       clipBehavior: Clip.antiAlias,
       child: Column(

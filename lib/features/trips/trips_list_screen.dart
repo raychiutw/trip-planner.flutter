@@ -20,6 +20,7 @@ import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_more_menu.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/tp_segmented_control.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'current_trip_provider.dart';
 import 'trip_card.dart';
@@ -366,20 +367,16 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     TpSpacing.s4,
                     TpSpacing.s2,
                   ),
-                  child: SegmentedButton<TripFilter>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                      ButtonSegment(value: TripFilter.mine, label: Text('我的')),
-                      ButtonSegment(
-                        value: TripFilter.shared,
-                        label: Text('共編'),
-                      ),
-                    ],
-                    selected: {_filterTab},
-                    onSelectionChanged: (selection) {
+                  child: TpSegmentedControl<TripFilter>(
+                    value: _filterTab,
+                    options: const {
+                      TripFilter.all: '全部',
+                      TripFilter.mine: '我的',
+                      TripFilter.shared: '共編',
+                    },
+                    onChanged: (value) {
                       setState(() {
-                        _filterTab = selection.first;
+                        _filterTab = value;
                       });
                     },
                   ),

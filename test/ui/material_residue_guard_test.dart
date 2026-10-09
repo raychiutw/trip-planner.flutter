@@ -56,4 +56,64 @@ void main() {
     }
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
+
+  // #426 第二輪:Material 控制項改走 Tp 元件(lib/ui/tp_*.dart)。
+  String stripComments(String source) => source
+      .split('\n')
+      .where((l) => !l.trimLeft().startsWith('//'))
+      .join('\n');
+
+  List<String> libFilesMatching(RegExp pattern, {Set<String> skip = const {}}) {
+    final hits = <String>[];
+    for (final entity in Directory('lib').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      if (skip.contains(entity.path)) continue;
+      if (pattern.hasMatch(stripComments(entity.readAsStringSync()))) {
+        hits.add(entity.path);
+      }
+    }
+    return hits;
+  }
+
+  test('全 lib 不再使用 Material Checkbox／Chip／SegmentedButton／Dropdown／線性進度', () {
+    final hits = libFilesMatching(
+      RegExp(
+        r'(?<![A-Za-z])(Checkbox|FilterChip|ChoiceChip|ActionChip|'
+        r'SegmentedButton|DropdownButton|DropdownButtonFormField|'
+        r'DropdownMenuItem|LinearProgressIndicator)\b',
+      ),
+    );
+    expect(hits, isEmpty, reason: hits.join('\n'));
+  });
+
+  test('衝突解決 sheet 與 TpStateView 不再用 Card／FilledButton', () {
+    final hits = libFilesMatching(
+      RegExp(r'(?<![A-Za-z])(Card|FilledButton)\('),
+      skip: {
+        for (final f in Directory('lib').listSync(recursive: true))
+          if (f is File &&
+              f.path.endsWith('.dart') &&
+              f.path != 'lib/features/offline/conflict_resolve_sheet.dart' &&
+              f.path != 'lib/ui/tp_state_view.dart')
+            f.path,
+      },
+    );
+    expect(hits, isEmpty, reason: hits.join('\n'));
+  });
+
+  test('登入裝置／已連結應用／開發者應用三頁用 TpGroupedSurface,不自組 Card', () {
+    for (final path in [
+      'lib/features/account/account_sessions_screen.dart',
+      'lib/features/account/connected_apps_screen.dart',
+      'lib/features/account/developer_apps_screen.dart',
+    ]) {
+      final source = stripComments(File(path).readAsStringSync());
+      expect(source, contains('TpGroupedSurface'), reason: path);
+      expect(
+        RegExp(r'(?<![A-Za-z])Card\(').hasMatch(source),
+        isFalse,
+        reason: '$path 仍有 Card(',
+      );
+    }
+  });
 }

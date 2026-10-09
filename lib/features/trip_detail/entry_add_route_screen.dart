@@ -14,9 +14,14 @@ import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_progress_bar.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_action_item.dart';
+import '../../ui/tp_picker_field.dart';
+import '../../ui/tp_segmented_control.dart';
+import '../../ui/tp_selection_circle.dart';
 import '../favorites/favorites_providers.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
@@ -448,8 +453,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                                       .retry(),
                                 ),
                               ),
-                            if (daysAsync.isLoading)
-                              const LinearProgressIndicator(),
+                            if (daysAsync.isLoading) const TpProgressBar(),
                             if (_submittingSelected && _submitTotal > 0)
                               _BatchProgress(
                                 done: _submitDone,
@@ -464,27 +468,14 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                               }),
                             ),
                             const SizedBox(height: TpSpacing.s3),
-                            SegmentedButton<EntryAddMode>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: EntryAddMode.search,
-                                  icon: Icon(CupertinoIcons.search),
-                                  label: Text('搜尋'),
-                                ),
-                                ButtonSegment(
-                                  value: EntryAddMode.favorites,
-                                  icon: Icon(CupertinoIcons.heart),
-                                  label: Text('收藏'),
-                                ),
-                                ButtonSegment(
-                                  value: EntryAddMode.custom,
-                                  icon: Icon(CupertinoIcons.map_pin_ellipse),
-                                  label: Text('自訂'),
-                                ),
-                              ],
-                              selected: {_mode},
-                              onSelectionChanged: (values) =>
-                                  _setMode(values.first),
+                            TpSegmentedControl<EntryAddMode>(
+                              value: _mode,
+                              options: const {
+                                EntryAddMode.search: '搜尋',
+                                EntryAddMode.favorites: '收藏',
+                                EntryAddMode.custom: '自訂',
+                              },
+                              onChanged: _setMode,
                             ),
                             const SizedBox(height: TpSpacing.s2),
                             if (_mode == EntryAddMode.search ||
@@ -588,7 +579,7 @@ class _BatchProgress extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            LinearProgressIndicator(value: done / total),
+            TpProgressBar(value: done / total, semanticLabel: null),
             const SizedBox(height: TpSpacing.s2),
             Text(label),
           ],
@@ -698,8 +689,9 @@ class _FavoritePoiPanel extends StatelessWidget {
               subtitle: favorite.poiAddress == null
                   ? null
                   : Text(favorite.poiAddress!),
-              trailing: Checkbox(
-                value: selectedFavoriteIds.contains(favorite.id),
+              trailing: TpSelectionCircle(
+                selected: selectedFavoriteIds.contains(favorite.id),
+                semanticLabel: '選取 ${favorite.displayName}',
                 onChanged: submitting ? null : (_) => onToggle(favorite),
               ),
               onTap: submitting ? null : () => onToggle(favorite),
@@ -786,7 +778,7 @@ class _SearchPoiPanel extends StatelessWidget {
         ),
         if (searching) ...[
           const SizedBox(height: TpSpacing.s1),
-          const LinearProgressIndicator(minHeight: 2),
+          const TpProgressBar(height: 2, semanticLabel: '搜尋中'),
         ],
         if (error != null)
           Padding(
@@ -827,8 +819,9 @@ class _SearchPoiPanel extends StatelessWidget {
                     onPoiTypeChanged: (nextType) =>
                         onPoiTypeChanged(poi, nextType),
                   ),
-                  trailing: Checkbox(
-                    value: selected,
+                  trailing: TpSelectionCircle(
+                    selected: selected,
+                    semanticLabel: '選取 ${poi.name}',
                     onChanged: submitting ? null : (_) => onToggle(poi),
                   ),
                   onTap: submitting ? null : () => onToggle(poi),
@@ -881,23 +874,13 @@ class _SearchPoiSubtitle extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: TpSpacing.s2),
-              DropdownButton<String>(
+              TpPickerField<String>(
                 key: ValueKey('entry-add-poi-type-${poi.placeId}'),
+                label: '類型',
+                compact: true,
                 value: poiType,
-                isDense: true,
-                underline: const SizedBox.shrink(),
-                onChanged: enabled
-                    ? (value) {
-                        if (value != null) onPoiTypeChanged(value);
-                      }
-                    : null,
-                items: [
-                  for (final entry in kPoiTypeLabels.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ),
-                ],
+                options: kPoiTypeLabels,
+                onChanged: enabled ? onPoiTypeChanged : null,
               ),
             ],
           ),
@@ -932,11 +915,11 @@ class _EntryAddCategoryFilter extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
         itemBuilder: (context, index) {
           final (category, label) = _entryAddCategoryChips[index];
-          return FilterChip(
+          return TpChip(
             key: ValueKey('entry-add-category-${category.name}'),
             selected: selected == category,
-            onSelected: (_) => onSelected(category),
-            label: Text(label),
+            onPressed: () => onSelected(category),
+            label: label,
           );
         },
       ),

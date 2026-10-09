@@ -14,7 +14,10 @@ import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_progress_bar.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_segmented_control.dart';
+import '../../ui/tp_settings_group.dart';
 
 /// 開發者 OAuth apps 清單（GET /dev/apps）。
 final developerAppsProvider = FutureProvider<List<DeveloperApp>>((ref) {
@@ -90,32 +93,24 @@ class DeveloperAppsScreen extends ConsumerWidget {
               if (apps.isEmpty)
                 const _EmptyDeveloperAppsState()
               else
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < apps.length; index++) ...[
-                        _DeveloperAppTile(
-                          app: apps[index],
-                          onTap: () => unawaited(
-                            Navigator.of(context).push<void>(
-                              MaterialPageRoute<void>(
-                                builder: (_) => DeveloperAppEditScreen(
-                                  clientId: apps[index].clientId,
-                                ),
+                TpGroupedSurface(
+                  separatorIndent: 0,
+                  separatorEndIndent: 0,
+                  children: [
+                    for (var index = 0; index < apps.length; index++)
+                      _DeveloperAppTile(
+                        app: apps[index],
+                        onTap: () => unawaited(
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => DeveloperAppEditScreen(
+                                clientId: apps[index].clientId,
                               ),
                             ),
                           ),
                         ),
-                        if (index != apps.length - 1)
-                          Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                      ],
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
             ],
           ),
@@ -301,7 +296,7 @@ class _DeveloperAppFormScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const LinearProgressIndicator(),
+                      const TpProgressBar(semanticLabel: null),
                       const SizedBox(height: TpSpacing.s2),
                       Text(_pendingLabel),
                     ],
@@ -325,63 +320,65 @@ class _DeveloperAppFormScreenState
                       ),
                     ),
                     const SizedBox(height: TpSpacing.s2),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(TpSpacing.s4),
-                        child: Column(
-                          children: [
-                            TextFormField(
-                              key: const Key('developer-app-name'),
-                              controller: _nameController,
-                              focusNode: _nameFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: '應用程式名稱',
+                    TpGroupedSurface(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(TpSpacing.s4),
+                          child: Column(
+                            children: [
+                              TextFormField(
+                                key: const Key('developer-app-name'),
+                                controller: _nameController,
+                                focusNode: _nameFocusNode,
+                                decoration: const InputDecoration(
+                                  labelText: '應用程式名稱',
+                                ),
+                                textInputAction: TextInputAction.next,
+                                onFieldSubmitted: (_) {
+                                  _descriptionFocusNode.requestFocus();
+                                },
+                                validator: (value) {
+                                  final length = value?.trim().length ?? 0;
+                                  if (length < 2 || length > 80) {
+                                    return '名稱需 2-80 字';
+                                  }
+                                  return null;
+                                },
                               ),
-                              textInputAction: TextInputAction.next,
-                              onFieldSubmitted: (_) {
-                                _descriptionFocusNode.requestFocus();
-                              },
-                              validator: (value) {
-                                final length = value?.trim().length ?? 0;
-                                if (length < 2 || length > 80) {
-                                  return '名稱需 2-80 字';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: TpSpacing.s3),
-                            TextFormField(
-                              key: const Key('developer-app-description'),
-                              controller: _descriptionController,
-                              focusNode: _descriptionFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: '描述（選填）',
+                              const SizedBox(height: TpSpacing.s3),
+                              TextFormField(
+                                key: const Key('developer-app-description'),
+                                controller: _descriptionController,
+                                focusNode: _descriptionFocusNode,
+                                decoration: const InputDecoration(
+                                  labelText: '描述（選填）',
+                                ),
+                                maxLines: 2,
+                                textInputAction: TextInputAction.next,
+                                onFieldSubmitted: (_) {
+                                  _homepageFocusNode.requestFocus();
+                                },
                               ),
-                              maxLines: 2,
-                              textInputAction: TextInputAction.next,
-                              onFieldSubmitted: (_) {
-                                _homepageFocusNode.requestFocus();
-                              },
-                            ),
-                            const SizedBox(height: TpSpacing.s3),
-                            TextFormField(
-                              key: const Key('developer-app-homepage'),
-                              controller: _homepageController,
-                              focusNode: _homepageFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: '首頁 URL（選填）',
+                              const SizedBox(height: TpSpacing.s3),
+                              TextFormField(
+                                key: const Key('developer-app-homepage'),
+                                controller: _homepageController,
+                                focusNode: _homepageFocusNode,
+                                decoration: const InputDecoration(
+                                  labelText: '首頁 URL（選填）',
+                                ),
+                                keyboardType: TextInputType.url,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                textInputAction: TextInputAction.next,
+                                onFieldSubmitted: (_) {
+                                  _redirectUrisFocusNode.requestFocus();
+                                },
                               ),
-                              keyboardType: TextInputType.url,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              textInputAction: TextInputAction.next,
-                              onFieldSubmitted: (_) {
-                                _redirectUrisFocusNode.requestFocus();
-                              },
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                     const SizedBox(height: TpSpacing.s4),
                     Text(
@@ -391,99 +388,93 @@ class _DeveloperAppFormScreenState
                       ),
                     ),
                     const SizedBox(height: TpSpacing.s2),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(TpSpacing.s4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: 'public',
-                                  icon: Icon(CupertinoIcons.globe),
-                                  label: Text('Public'),
-                                ),
-                                ButtonSegment(
-                                  value: 'confidential',
-                                  icon: Icon(CupertinoIcons.lock),
-                                  label: Text('Confidential'),
+                    TpGroupedSurface(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(TpSpacing.s4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TpSegmentedControl<String>(
+                                value: _clientType,
+                                options: const {
+                                  'public': 'Public',
+                                  'confidential': 'Confidential',
+                                },
+                                onChanged: _app != null
+                                    ? null
+                                    : (value) {
+                                        setState(() {
+                                          _clientType = value;
+                                        });
+                                      },
+                              ),
+                              if (_app != null) ...[
+                                const SizedBox(height: TpSpacing.s2),
+                                Text(
+                                  '應用程式類型建立後無法變更。',
+                                  key: const Key(
+                                    'developer-app-client-type-note',
+                                  ),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
-                              selected: {_clientType},
-                              onSelectionChanged: _app != null
-                                  ? null
-                                  : (selection) {
-                                      setState(() {
-                                        _clientType = selection.single;
-                                      });
-                                    },
-                            ),
-                            if (_app != null) ...[
-                              const SizedBox(height: TpSpacing.s2),
-                              Text(
-                                '應用程式類型建立後無法變更。',
-                                key: const Key(
-                                  'developer-app-client-type-note',
+                              const SizedBox(height: TpSpacing.s4),
+                              TextFormField(
+                                key: const Key('developer-app-redirect-uris'),
+                                controller: _redirectUrisController,
+                                focusNode: _redirectUrisFocusNode,
+                                decoration: const InputDecoration(
+                                  labelText: 'Redirect URI',
+                                  helperText: '每行一個 URI',
                                 ),
-                                style: theme.textTheme.bodySmall?.copyWith(
+                                keyboardType: TextInputType.url,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                minLines: 2,
+                                maxLines: 4,
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) {
+                                  _redirectUrisFocusNode.unfocus();
+                                },
+                                validator: (value) {
+                                  if (_redirectUris(value ?? '').isEmpty) {
+                                    return '至少需要一個 Redirect URI';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: TpSpacing.s4),
+                              Text(
+                                'Scopes',
+                                style: theme.textTheme.labelMedium?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ),
+                              const SizedBox(height: TpSpacing.s1),
+                              for (final scope in kDeveloperAllowedScopes)
+                                CheckboxListTile(
+                                  key: Key('developer-app-scope-$scope'),
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(scope),
+                                  subtitle: Text(oauthScopeLabel(scope)),
+                                  value: _selectedScopes.contains(scope),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _selectedScopes.add(scope);
+                                      } else {
+                                        _selectedScopes.remove(scope);
+                                      }
+                                    });
+                                  },
+                                ),
                             ],
-                            const SizedBox(height: TpSpacing.s4),
-                            TextFormField(
-                              key: const Key('developer-app-redirect-uris'),
-                              controller: _redirectUrisController,
-                              focusNode: _redirectUrisFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: 'Redirect URI',
-                                helperText: '每行一個 URI',
-                              ),
-                              keyboardType: TextInputType.url,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              minLines: 2,
-                              maxLines: 4,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) {
-                                _redirectUrisFocusNode.unfocus();
-                              },
-                              validator: (value) {
-                                if (_redirectUris(value ?? '').isEmpty) {
-                                  return '至少需要一個 Redirect URI';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: TpSpacing.s4),
-                            Text(
-                              'Scopes',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: TpSpacing.s1),
-                            for (final scope in kDeveloperAllowedScopes)
-                              CheckboxListTile(
-                                key: Key('developer-app-scope-$scope'),
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(scope),
-                                subtitle: Text(oauthScopeLabel(scope)),
-                                value: _selectedScopes.contains(scope),
-                                onChanged: (value) {
-                                  setState(() {
-                                    if (value == true) {
-                                      _selectedScopes.add(scope);
-                                    } else {
-                                      _selectedScopes.remove(scope);
-                                    }
-                                  });
-                                },
-                              ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                     if (_app != null) ...[
                       const SizedBox(height: TpSpacing.s5),
@@ -874,17 +865,19 @@ class _DeveloperAppsLoadError extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
         children: [
-          Card(
+          TpGroupedSurface(
             color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s4),
-              child: Row(
-                children: [
-                  Expanded(child: Text(message)),
-                  TextButton(onPressed: onRetry, child: const Text('重試')),
-                ],
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(TpSpacing.s4),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(message)),
+                    TextButton(onPressed: onRetry, child: const Text('重試')),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -902,26 +895,28 @@ class _InlineErrorPanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      child: Card(
+      child: TpGroupedSurface(
         color: colorScheme.errorContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s4),
-          child: Row(
-            children: [
-              Icon(
-                CupertinoIcons.exclamationmark_circle,
-                color: colorScheme.onErrorContainer,
-              ),
-              const SizedBox(width: TpSpacing.s3),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: colorScheme.onErrorContainer),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: colorScheme.onErrorContainer,
                 ),
-              ),
-            ],
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

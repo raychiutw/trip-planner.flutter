@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart';
@@ -353,7 +354,7 @@ void main() {
     await tester.tap(find.text('地鐵站  1'));
     await tester.pumpAndSettle();
 
-    final selectedMore = tester.widget<ChoiceChip>(more);
+    final selectedMore = tester.widget<TpChip>(more);
     expect(selectedMore.selected, isTrue);
     expect(find.byType(PoiSearchCard), findsOneWidget);
     expect(find.text('車站'), findsOneWidget);

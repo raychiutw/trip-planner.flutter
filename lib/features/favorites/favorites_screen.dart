@@ -12,6 +12,7 @@ import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
@@ -748,11 +749,11 @@ class _FavoritesFilterFormState extends State<_FavoritesFilterForm> {
             runSpacing: TpSpacing.s2,
             children: [
               for (final option in _typeFilterOptions)
-                FilterChip(
+                TpChip(
                   key: ValueKey('favorites-type-${option.key}'),
-                  label: Text(option.label),
+                  label: option.label,
                   selected: _pendingType == option.key,
-                  onSelected: (_) => _select(type: option.key),
+                  onPressed: () => _select(type: option.key),
                 ),
             ],
           ),
@@ -764,18 +765,18 @@ class _FavoritesFilterFormState extends State<_FavoritesFilterForm> {
               spacing: TpSpacing.s2,
               runSpacing: TpSpacing.s2,
               children: [
-                FilterChip(
+                TpChip(
                   key: const ValueKey('favorites-region-all'),
-                  label: Text('全部 ${widget.regionCounts['all'] ?? 0}'),
+                  label: '全部 ${widget.regionCounts['all'] ?? 0}',
                   selected: _pendingRegion == 'all',
-                  onSelected: (_) => _select(region: 'all'),
+                  onPressed: () => _select(region: 'all'),
                 ),
                 for (final region in widget.regionOptions)
-                  FilterChip(
+                  TpChip(
                     key: ValueKey('favorites-region-$region'),
-                    label: Text('$region ${widget.regionCounts[region] ?? 0}'),
+                    label: '$region ${widget.regionCounts[region] ?? 0}',
                     selected: _pendingRegion == region,
-                    onSelected: (_) => _select(region: region),
+                    onPressed: () => _select(region: region),
                   ),
               ],
             ),

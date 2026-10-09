@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/providers.dart';
@@ -265,7 +266,7 @@ void main() {
       find.byKey(const ValueKey('collab-email')),
       'pending@x.com',
     );
-    await tester.tap(find.widgetWithText(ChoiceChip, '檢視成員'));
+    await tester.tap(find.widgetWithText(TpChip, '檢視成員'));
     await tester.tap(find.byKey(const ValueKey('collab-add')));
     await tester.pump();
 
@@ -283,10 +284,7 @@ void main() {
     expect(progress.properties.liveRegion, isTrue);
     expect(progress.properties.label, '正在新增共編成員');
 
-    await tester.tap(
-      find.widgetWithText(ChoiceChip, '共編成員'),
-      warnIfMissed: false,
-    );
+    await tester.tap(find.widgetWithText(TpChip, '共編成員'), warnIfMissed: false);
     await tester.tap(
       find.byKey(const ValueKey('collab-add')),
       warnIfMissed: false,
@@ -301,9 +299,7 @@ void main() {
       'pending@x.com',
     );
     expect(
-      tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '檢視成員'))
-          .selected,
+      tester.widget<TpChip>(find.widgetWithText(TpChip, '檢視成員')).selected,
       isTrue,
     );
     verify(

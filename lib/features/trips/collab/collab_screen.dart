@@ -12,6 +12,7 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../app/irreversible_action.dart';
 import '../../../models/trip_member.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'collab_controller.dart';
@@ -286,15 +287,15 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
               runSpacing: TpSpacing.s2,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                ChoiceChip(
-                  label: const Text('共編成員'),
+                TpChip(
+                  label: '共編成員',
                   selected: _role == 'member',
-                  onSelected: (_) => setState(() => _role = 'member'),
+                  onPressed: () => setState(() => _role = 'member'),
                 ),
-                ChoiceChip(
-                  label: const Text('檢視成員'),
+                TpChip(
+                  label: '檢視成員',
                   selected: _role == 'viewer',
-                  onSelected: (_) => setState(() => _role = 'viewer'),
+                  onPressed: () => setState(() => _role = 'viewer'),
                 ),
                 FilledButton(
                   key: const ValueKey('collab-add'),

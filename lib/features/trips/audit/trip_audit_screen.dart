@@ -13,6 +13,7 @@ import '../../../app/error_message.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 
 const _auditLimit = 50;
@@ -133,7 +134,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
                               key: const ValueKey('trip-audit-refreshing'),
                               liveRegion: true,
                               label: '正在更新異動紀錄',
-                              child: const LinearProgressIndicator(),
+                              child: const TpProgressBar(semanticLabel: null),
                             ),
                             const SizedBox(height: TpSpacing.s3),
                           ],

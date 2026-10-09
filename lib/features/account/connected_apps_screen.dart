@@ -14,6 +14,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_settings_group.dart';
 import 'account_display.dart';
 import 'ai_authorize_card.dart';
 
@@ -86,27 +87,17 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
                 if (visibleApps.isEmpty)
                   const _EmptyConnectedAppsState()
                 else
-                  Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        for (final (index, app) in visibleApps.indexed) ...[
-                          _ConnectedAppTile(
-                            app: app,
-                            isBusy: _busyClientId == app.clientId,
-                            onRevoke: () => unawaited(_confirmRevoke(app)),
-                          ),
-                          if (index != visibleApps.length - 1)
-                            Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            ),
-                        ],
-                      ],
-                    ),
+                  TpGroupedSurface(
+                    separatorIndent: 0,
+                    separatorEndIndent: 0,
+                    children: [
+                      for (final app in visibleApps)
+                        _ConnectedAppTile(
+                          app: app,
+                          isBusy: _busyClientId == app.clientId,
+                          onRevoke: () => unawaited(_confirmRevoke(app)),
+                        ),
+                    ],
                   ),
               ],
             ),
@@ -264,28 +255,30 @@ class _InlineErrorPanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      child: Card(
+      child: TpGroupedSurface(
         color: colorScheme.errorContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                CupertinoIcons.exclamationmark_circle,
-                color: colorScheme.onErrorContainer,
-              ),
-              const SizedBox(width: TpSpacing.s3),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: colorScheme.onErrorContainer),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: colorScheme.onErrorContainer,
                 ),
-              ),
-              TextButton(onPressed: onRetry, child: const Text('重試')),
-            ],
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ),
+                TextButton(onPressed: onRetry, child: const Text('重試')),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

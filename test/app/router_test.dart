@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_segmented_control.dart';
 import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
@@ -1676,11 +1677,11 @@ void main() {
     );
     expect(
       tester
-          .widget<SegmentedButton<TripFilter>>(
-            find.byType(SegmentedButton<TripFilter>, skipOffstage: false),
+          .widget<TpSegmentedControl<TripFilter>>(
+            find.byType(TpSegmentedControl<TripFilter>, skipOffstage: false),
           )
-          .selected,
-      {TripFilter.mine},
+          .value,
+      TripFilter.mine,
     );
     expect(listScroll.position.pixels, closeTo(listOffset, 0.5));
 
@@ -1705,11 +1706,11 @@ void main() {
     );
     expect(
       tester
-          .widget<SegmentedButton<TripFilter>>(
-            find.byType(SegmentedButton<TripFilter>, skipOffstage: false),
+          .widget<TpSegmentedControl<TripFilter>>(
+            find.byType(TpSegmentedControl<TripFilter>, skipOffstage: false),
           )
-          .selected,
-      {TripFilter.mine},
+          .value,
+      TripFilter.mine,
     );
     expect(listScroll.position.pixels, closeTo(listOffset, 0.5));
   });
@@ -1746,7 +1747,7 @@ void main() {
     expect(find.byType(TripsListScreen), findsOneWidget);
     expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
     expect(find.byKey(const ValueKey('trips-search-field')), findsOneWidget);
-    expect(find.byType(SegmentedButton<TripFilter>), findsOneWidget);
+    expect(find.byType(TpSegmentedControl<TripFilter>), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('trips-search-field')),
       '沖繩',

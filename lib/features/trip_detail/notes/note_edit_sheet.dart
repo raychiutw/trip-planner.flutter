@@ -9,6 +9,7 @@ import '../../../api/trip_repository.dart';
 import '../../../app/adaptive.dart';
 import '../../../models/note_section.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../trip_providers.dart';
 import 'note_field_spec.dart';
 
@@ -448,11 +449,11 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               spacing: TpSpacing.s2,
               children: [
                 for (final (value, label) in spec.options)
-                  ChoiceChip(
+                  TpChip(
                     key: ValueKey('note-enum-${spec.key}-$value'),
-                    label: Text(label),
+                    label: label,
                     selected: _enums[spec.key] == value,
-                    onSelected: (_) {
+                    onPressed: () {
                       _enums[spec.key] = value;
                       _markChanged();
                     },

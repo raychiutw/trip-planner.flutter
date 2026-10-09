@@ -18,6 +18,7 @@ import '../../models/poi_type.dart';
 import '../../models/segment.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_progress_bar.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_horizontal_selector.dart';
@@ -1450,8 +1451,9 @@ class _EntryCopyDaySheetState extends State<_EntryCopyDaySheet> {
           Semantics(
             liveRegion: true,
             label: '正在複製停留點',
-            child: const LinearProgressIndicator(
+            child: const TpProgressBar(
               key: ValueKey('entry-copy-progress'),
+              semanticLabel: null,
             ),
           ),
         if (_error != null)

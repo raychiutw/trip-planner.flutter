@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_selection_circle.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
@@ -210,8 +212,8 @@ void main() {
       );
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
-      expect(find.byType(FilterChip), findsNothing);
-      expect(find.byType(Checkbox), findsNothing);
+      expect(find.byType(TpChip), findsNothing);
+      expect(find.byType(TpSelectionCircle), findsNothing);
       expect(
         find.byKey(const ValueKey('favorites-search-action')),
         findsNothing,
@@ -867,17 +869,21 @@ void main() {
       );
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .selected,
         isTrue,
         reason: '「⋯」的選取與長按選單結果相同',
       );
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
             .semanticLabel,
         startsWith('選取'),
-        reason: '選取模式 Checkbox 要有名稱',
+        reason: '選取模式勾選圓 要有名稱',
       );
       semantics.dispose();
     });
@@ -1081,8 +1087,10 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .selected,
         isTrue,
       );
       expect(find.text('無法刪除「美麗海水族館」，收藏仍保留。'), findsOneWidget);
@@ -1249,8 +1257,10 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .selected,
         isTrue,
       );
       semantics.dispose();
@@ -1341,8 +1351,10 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-8')), findsOneWidget);
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-8')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-8')),
+            )
+            .selected,
         isTrue,
       );
       expect(find.text('已選 1 個'), findsOneWidget);

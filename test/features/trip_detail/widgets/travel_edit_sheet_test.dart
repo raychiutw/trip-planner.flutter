@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -381,7 +382,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('交通方式'), findsOneWidget);
-      expect(tester.widget<ChoiceChip>(mode).selected, isTrue);
+      expect(tester.widget<TpChip>(mode).selected, isTrue);
       expect(tester.widget<TextField>(name).controller?.text, '接駁船');
       expect(tester.widget<TextField>(minutes).controller?.text, '25');
 
@@ -598,7 +599,7 @@ void main() {
     expect(minField.controller?.text, '12', reason: 'Travel.min 帶進分鐘欄');
     expect(
       tester
-          .widget<ChoiceChip>(find.byKey(const ValueKey('travel-mode-walking')))
+          .widget<TpChip>(find.byKey(const ValueKey('travel-mode-walking')))
           .selected,
       isTrue,
       reason: 'Travel.type 帶進交通方式',
@@ -634,9 +635,7 @@ void main() {
 
     expect(
       tester
-          .widget<ChoiceChip>(
-            find.byKey(const ValueKey('travel-mode-no-travel')),
-          )
+          .widget<TpChip>(find.byKey(const ValueKey('travel-mode-no-travel')))
           .selected,
       isTrue,
     );
