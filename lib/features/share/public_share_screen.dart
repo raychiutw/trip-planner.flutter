@@ -141,7 +141,9 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
         case _PublicShareAction.pdf:
           final shared = await actions.sharePdf(data);
           if (!mounted) return;
-          if (shared) _showMessage('PDF 已建立');
+          // printing 的 sharePdf 在 iOS 固定回 true、偵測不到取消，故只說選單已開啟，
+          // 不宣稱已分享或已建立。
+          if (shared) _showMessage('已開啟分享選單');
           return;
       }
     } on TripPdfOfflineException {

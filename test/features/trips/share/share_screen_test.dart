@@ -216,7 +216,7 @@ void main() {
               ),
             ).captured.single
             as List<String>;
-    expect(captured, ['flights', 'lodgings', 'pretrip']);
+    expect(captured, isEmpty, reason: '預設不公開任何敏感區段，由使用者勾選');
     expect(find.textContaining('/s/tok'), findsOneWidget);
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
   });
@@ -304,6 +304,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('share-actions-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '重新產生'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('share-error')), findsNothing);
@@ -455,7 +457,7 @@ void main() {
               ),
             ).captured.single
             as List<String>;
-    expect(captured, ['flights', 'lodgings', 'reservations', 'pretrip']);
+    expect(captured, ['reservations']);
   });
 
   testWidgets('建立期限 → 7 天 preset 送 expiresAt', (tester) async {
@@ -882,10 +884,51 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
     await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '重新產生'));
+    await tester.pumpAndSettle();
 
     verify(() => repo.rotateShare('t', 1)).called(1);
     expect(find.textContaining('/s/newtok'), findsOneWidget);
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
+  });
+
+  testWidgets('重新產生前先確認舊連結會失效，取消不呼叫 API', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.textContaining('舊連結'), findsOneWidget);
+    await tester.tap(
+      find.widgetWithText(CupertinoActionSheetAction, '取消').last,
+    );
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repo.rotateShare(any(), any()));
+  });
+
+  testWidgets('新建分享表單預設不勾選任何公開區塊', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    for (final s in [
+      'flights',
+      'lodgings',
+      'reservations',
+      'pretrip',
+      'emergency',
+    ]) {
+      expect(
+        tester
+            .widget<FilterChip>(find.byKey(ValueKey('share-section-$s')))
+            .selected,
+        isFalse,
+        reason: s,
+      );
+    }
   });
 
   testWidgets('非 write 權限(403)→ 提示', (tester) async {

@@ -586,6 +586,8 @@ void main() {
 
     expect(printActions.shared, hasLength(1));
     expect(printActions.shared.single.destinationsLabel, '那霸');
+    expect(find.text('已開啟分享選單'), findsOneWidget);
+    expect(find.text('PDF 已建立'), findsNothing);
   });
 
   testWidgets('公開分享逾時可原地重試', (tester) async {

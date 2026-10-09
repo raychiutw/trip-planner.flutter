@@ -39,7 +39,9 @@ const _shareSectionLabels = {
   'pretrip': '行前須知',
   'emergency': '緊急聯絡',
 };
-const _defaultShareSections = {'flights', 'lodgings', 'pretrip'};
+
+/// 預設不公開任何區塊 —— 航班、住宿（含地址電話）、行前須知都屬個資，由使用者勾選。
+const _defaultShareSections = <String>{};
 const _expiryPresets = {
   'never': null,
   '24h': Duration(hours: 24),
@@ -189,7 +191,23 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       case _ShareRowAction.edit:
         await _editShare(share);
       case _ShareRowAction.rotate:
-        await _ctrl.rotate(share.id);
+        await confirmAndRunIrreversibleAction(
+          context,
+          source: TpDestructiveConfirmSource.menu,
+          title: '重新產生「${share.label.isEmpty ? '無標籤連結' : share.label}」？',
+          message: '重新產生後，舊連結會立即失效，已拿到舊連結的人將無法再開啟。',
+          actionLabel: '重新產生',
+          progressLabel: '正在重新產生…',
+          successMessage: '已重新產生分享連結',
+          failureMessage: '重新產生失敗，舊連結仍有效',
+          action: () async {
+            await _ctrl.rotate(share.id);
+            return ref
+                    .read(shareControllerProvider(widget.tripId))
+                    .rotateFailedId !=
+                share.id;
+          },
+        );
       case _ShareRowAction.revoke:
         await confirmAndRunIrreversibleAction(
           context,
