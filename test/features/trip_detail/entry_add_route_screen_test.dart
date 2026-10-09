@@ -202,7 +202,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(reads, 2);
-    expect(find.text('DAY 3 · 2026-10-03'), findsOneWidget);
+    expect(find.text('Day 3 · 2026-10-03'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('entry-add-search-field')),
       findsOneWidget,
@@ -236,7 +236,7 @@ void main() {
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
     expect(reads, 2);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -341,7 +341,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(reads, 2);
     expect(find.text('保留自訂草稿'), findsOneWidget);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     await tester.ensureVisible(find.text('收藏'));
     await tester.tap(find.text('收藏'));
     await tester.pumpAndSettle();
@@ -383,7 +383,7 @@ void main() {
     expect(reads, 2);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('等待日期更新的草稿'), findsOneWidget);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-add-loading')), findsNothing);
 
     retry.add(const [
@@ -395,7 +395,7 @@ void main() {
     expect(reads, 2);
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('等待日期更新的草稿'), findsOneWidget);
-    expect(find.text('DAY 2 · 2026-10-02'), findsOneWidget);
+    expect(find.text('Day 2 · 2026-10-02'), findsOneWidget);
     expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -568,7 +568,7 @@ void main() {
     expect(find.text('加入'), findsOneWidget);
     expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
-    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.text('搜尋'), findsOneWidget);
     expect(find.text('收藏'), findsOneWidget);
     expect(find.text('搜尋景點'), findsNothing);

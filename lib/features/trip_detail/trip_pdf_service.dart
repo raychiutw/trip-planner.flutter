@@ -12,6 +12,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/note_content.dart';
 import 'trip_print_data.dart';
+import '../../models/display_format.dart';
 
 /// Print/PDF action implementation used by [TripPrintScreen].
 final tripPrintActionsProvider = Provider<TripPrintActions>((ref) {
@@ -132,7 +133,7 @@ class _PdfDaySection extends pw.StatelessWidget {
           pw.Row(
             children: [
               pw.Text(
-                'Day ${day.dayNum}',
+                dayLabel(day.dayNum),
                 style: pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
@@ -152,7 +153,7 @@ class _PdfDaySection extends pw.StatelessWidget {
           ),
           pw.SizedBox(height: 6),
           if (day.timeline.isEmpty && day.hotel == null)
-            pw.Text('尚無景點', style: const pw.TextStyle(fontSize: 10))
+            pw.Text('尚無停留點', style: const pw.TextStyle(fontSize: 10))
           else
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),

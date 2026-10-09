@@ -525,7 +525,7 @@ class _PrimaryAction extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(Icons.check_circle_outline),
-        label: Text(accepting ? '接受中...' : '接受邀請'),
+        label: Text(accepting ? '接受中…' : '接受邀請'),
       ),
       InviteAccountStatus.mismatch => FilledButton.icon(
         key: const ValueKey('invite-switch-account'),
@@ -539,7 +539,7 @@ class _PrimaryAction extends StatelessWidget {
           dimension: 18,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
-        label: const Text('確認帳號中...'),
+        label: const Text('確認帳號中…'),
       ),
     };
   }
@@ -606,7 +606,7 @@ class _LoadingView extends StatelessWidget {
             children: [
               const CircularProgressIndicator(),
               const SizedBox(height: TpSpacing.s4),
-              Text('載入邀請資料...', style: Theme.of(context).textTheme.bodyLarge),
+              Text('載入邀請資料…', style: Theme.of(context).textTheme.bodyLarge),
             ],
           ),
         ),

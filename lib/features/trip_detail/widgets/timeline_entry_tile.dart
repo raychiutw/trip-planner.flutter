@@ -7,6 +7,7 @@ import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
 import 'entry_duration.dart';
+import '../../../models/display_format.dart';
 
 const double kTimelineRailWidth = 32;
 
@@ -187,12 +188,8 @@ String _timeLabel(TimelineEntry entry) {
   final start = _resolvedStartTime(entry);
   final end = _resolvedEndTime(entry);
   if (start.isEmpty && end.isEmpty) return '未設定時間';
-  if (start.isEmpty) return _displayTime(end);
-  if (end.isEmpty) return _displayTime(start);
-  return '${_displayTime(start)} - ${_displayTime(end)}';
+  return formatTimeRange(start, end);
 }
-
-String _displayTime(String value) => value.replaceAll(':', '：');
 
 String _resolvedStartTime(TimelineEntry entry) =>
     (entry.startTime ?? entry.time ?? '').trim();

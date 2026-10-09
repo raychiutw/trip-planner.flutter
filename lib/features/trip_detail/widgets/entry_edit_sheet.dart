@@ -17,6 +17,7 @@ import '../../../ui/tp_compact_time_field.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
 import 'entry_field_merge.dart';
+import '../../../models/display_format.dart';
 
 /// 編輯/新增停留點的模式參數。
 sealed class EntryEditArgs {
@@ -558,7 +559,9 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                     for (final day in dayOptions)
                       DropdownMenuItem(
                         value: day.dayNum,
-                        child: Text('DAY ${day.dayNum} · ${day.displayTitle}'),
+                        child: Text(
+                          dayLabel(day.dayNum, title: day.displayTitle),
+                        ),
                       ),
                   ],
                   onChanged: _submitting

@@ -408,7 +408,7 @@ String _diffValue(Object? value) {
 
 String _compactValue(Object? value) {
   final text = value?.toString() ?? 'null';
-  return text.length > 48 ? '${text.substring(0, 48)}...' : text;
+  return text.length > 48 ? '${text.substring(0, 48)}…' : text;
 }
 
 String _formatTimestamp(String value) {

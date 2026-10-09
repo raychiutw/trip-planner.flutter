@@ -79,10 +79,10 @@ class _MenuTileHostState extends State<_MenuTileHost> {
       trailing: TpMoreMenuButton<int>(
         key: const ValueKey('entry-more-60'),
         controller: _menuController,
-        tooltip: '景點操作',
+        tooltip: '停留點操作',
         items: const [
-          TpActionItem(value: 0, label: '編輯景點', icon: CupertinoIcons.pencil),
-          TpActionItem(value: 1, label: '刪除景點', icon: CupertinoIcons.delete),
+          TpActionItem(value: 0, label: '編輯停留點', icon: CupertinoIcons.pencil),
+          TpActionItem(value: 1, label: '刪除停留點', icon: CupertinoIcons.delete),
         ],
         onSelected: (_) {},
       ),
@@ -1047,9 +1047,9 @@ void main() {
       await tester.longPress(find.text('首里城'));
       await tester.pumpAndSettle();
 
-      expect(find.text('編輯景點'), findsOneWidget);
-      expect(find.text('編輯景點'), findsOneWidget);
-      expect(find.text('刪除景點'), findsOneWidget);
+      expect(find.text('編輯停留點'), findsOneWidget);
+      expect(find.text('編輯停留點'), findsOneWidget);
+      expect(find.text('刪除停留點'), findsOneWidget);
     });
 
     testWidgets('長按與 ⋯ 叫出同一份選單：同樣的項目、同樣的位置', (tester) async {
@@ -1057,15 +1057,15 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('entry-more-60')));
       await tester.pumpAndSettle();
-      final byMoreButton = tester.getRect(find.text('編輯景點'));
-      expect(find.text('刪除景點'), findsOneWidget);
+      final byMoreButton = tester.getRect(find.text('編輯停留點'));
+      expect(find.text('刪除停留點'), findsOneWidget);
       await dismissMenu(tester);
-      expect(find.text('編輯景點'), findsNothing);
+      expect(find.text('編輯停留點'), findsNothing);
 
       await tester.longPress(find.text('首里城'));
       await tester.pumpAndSettle();
-      final byLongPress = tester.getRect(find.text('編輯景點'));
-      expect(find.text('刪除景點'), findsOneWidget);
+      final byLongPress = tester.getRect(find.text('編輯停留點'));
+      expect(find.text('刪除停留點'), findsOneWidget);
       expect(
         (byLongPress.center - byMoreButton.center).distance,
         lessThan(0.1),
@@ -1087,7 +1087,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('展開區塊'), findsOneWidget);
-      expect(find.text('編輯景點'), findsNothing);
+      expect(find.text('編輯停留點'), findsNothing);
     });
 
     testWidgets('沒有長按入口時（排序編輯模式）長按不叫選單', (tester) async {
@@ -1096,8 +1096,8 @@ void main() {
       await tester.longPress(find.text('首里城'));
       await tester.pumpAndSettle();
 
-      expect(find.text('編輯景點'), findsNothing);
-      expect(find.text('刪除景點'), findsNothing);
+      expect(find.text('編輯停留點'), findsNothing);
+      expect(find.text('刪除停留點'), findsNothing);
     });
 
     testWidgets('讀螢幕使用者可用長按語意動作叫出同一份選單', (tester) async {
@@ -1115,8 +1115,8 @@ void main() {
       node.owner!.performAction(node.id, SemanticsAction.longPress);
       await tester.pumpAndSettle();
 
-      expect(find.text('編輯景點'), findsOneWidget);
-      expect(find.text('刪除景點'), findsOneWidget);
+      expect(find.text('編輯停留點'), findsOneWidget);
+      expect(find.text('刪除停留點'), findsOneWidget);
       semantics.dispose();
     });
   });

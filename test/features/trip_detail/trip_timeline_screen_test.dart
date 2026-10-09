@@ -386,7 +386,7 @@ List<TripDay> _scrollSpyDays() => [
             sortOrder: index,
             startTime: '${(8 + index).toString().padLeft(2, '0')}:00',
             endTime: '${(9 + index).toString().padLeft(2, '0')}:00',
-            title: 'DAY $day 景點 $index',
+            title: 'Day $day 景點 $index',
             version: 1,
           ),
       ],
@@ -537,7 +537,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_sharedDayNum(tester), 2);
 
-    // SWR 第二段 emit 少掉 DAY 2，同一批切到背景：畫面內部會退回 DAY 1，
+    // SWR 第二段 emit 少掉 Day 2，同一批切到背景：畫面內部會退回 Day 1，
     // 但背景分支不得把這個退回寫進共用狀態。
     days.add([_fakeDays.first]);
     active.value = false;
@@ -610,7 +610,7 @@ void main() {
     expect(_selectorDayNum(tester), 2);
   });
 
-  testWidgets('切換 Trip 會重設 DAY 1，並拒絕舊行程的移動與複製 sheet', (tester) async {
+  testWidgets('切換 Trip 會重設 Day 1，並拒絕舊行程的移動與複製 sheet', (tester) async {
     const otherTripId = 'tokyo-2026';
     final activeTripId = ValueNotifier(_tripId);
     final repo = _MockTripRepository();
@@ -1028,15 +1028,15 @@ void main() {
     await _pumpTimeline(tester);
 
     // selector 使用精簡 DAY N；內容 eyebrow 保留兩位數 DAY NN。
-    expect(find.text('DAY 1'), findsOneWidget);
-    expect(find.text('DAY 2'), findsOneWidget);
-    expect(find.text('DAY 01'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
+    expect(find.text('Day 1'), findsOneWidget);
     expect(find.text('2026-04-23（四）'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    expect(find.text('DAY 02'), findsOneWidget);
+    expect(find.text('Day 2'), findsOneWidget);
     expect(find.text('2026-04-24（五）'), findsOneWidget);
     expect(
       tester
@@ -1614,7 +1614,7 @@ void main() {
       const ValueKey('trip-timeline-view-day-selector'),
     );
     final selectorRect = tester.getRect(selector);
-    final selectedLabelRect = tester.getRect(find.text('DAY 1'));
+    final selectedLabelRect = tester.getRect(find.text('Day 1'));
 
     expect(tester.takeException(), isNull);
     expect(selectorRect.height, greaterThan(TpSpacing.tapMin));
@@ -1985,7 +1985,7 @@ void main() {
   testWidgets('景點更多選單固定六項四組，刪除獨立成組置於尾端，編輯使用短任務表單 sheet', (tester) async {
     final semantics = tester.ensureSemantics();
     await _pumpTimeline(tester);
-    // 停留點卡上的「⋯」：不套玻璃、44×44、獨立的「景點操作」按鈕語意。
+    // 停留點卡上的「⋯」：不套玻璃、44×44、獨立的「停留點操作」按鈕語意。
     final more = find.byKey(const ValueKey('entry-more-11'));
     final moreSize = tester.getSize(more);
     expect(moreSize.width, greaterThanOrEqualTo(44));
@@ -1997,7 +1997,7 @@ void main() {
     );
     expect(
       tester
-          .getSemantics(find.bySemanticsLabel('景點操作').first)
+          .getSemantics(find.bySemanticsLabel('停留點操作').first)
           .getSemanticsData()
           .flagsCollection
           .isButton,
@@ -2007,17 +2007,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
 
-    for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
+    for (final label in [
+      '調整順序',
+      '換景點',
+      '編輯停留點',
+      '移到其他 Day',
+      '複製到其他 Day',
+      '刪除停留點',
+    ]) {
       expect(find.text(label), findsOneWidget);
     }
     double gap(String before, String after) =>
         tester.getRect(find.text(after)).top -
         tester.getRect(find.text(before)).bottom;
-    final ordinaryGap = gap('重新排序', '換景點');
-    expect(gap('換景點', '編輯景點'), greaterThan(ordinaryGap));
-    expect(gap('移動到其他天', '複製到其他天'), greaterThan(ordinaryGap));
+    final ordinaryGap = gap('調整順序', '換景點');
+    expect(gap('換景點', '編輯停留點'), greaterThan(ordinaryGap));
+    expect(gap('移到其他 Day', '複製到其他 Day'), greaterThan(ordinaryGap));
     expect(
-      gap('複製到其他天', '刪除景點'),
+      gap('複製到其他 Day', '刪除停留點'),
       greaterThan(ordinaryGap),
       reason: '刪除與其他動作分隔、獨立成組置於尾端',
     );
@@ -2037,8 +2044,15 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.text('重新排序'), findsOneWidget);
-    for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
+    expect(find.text('調整順序'), findsOneWidget);
+    for (final label in [
+      '調整順序',
+      '換景點',
+      '編輯停留點',
+      '移到其他 Day',
+      '複製到其他 Day',
+      '刪除停留點',
+    ]) {
       expect(find.text(label), findsOneWidget);
     }
     // 長按只叫選單，不順手把卡片展開。
@@ -2055,15 +2069,15 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('entry-more-11')));
     await tester.pumpAndSettle();
-    final byMoreButton = tester.getRect(find.text('重新排序'));
+    final byMoreButton = tester.getRect(find.text('調整順序'));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.text('重新排序'), findsNothing);
+    expect(find.text('調整順序'), findsNothing);
 
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    final byLongPress = tester.getRect(find.text('重新排序'));
+    final byLongPress = tester.getRect(find.text('調整順序'));
     expect((byLongPress.center - byMoreButton.center).distance, lessThan(0.1));
     expect(byLongPress.width, closeTo(byMoreButton.width, 0.1));
     expect(byLongPress.height, closeTo(byMoreButton.height, 0.1));
@@ -2095,7 +2109,7 @@ void main() {
       EnginePhase.sendSemanticsUpdate,
       const Duration(seconds: 5),
     );
-    expect(find.text('編輯景點'), findsOneWidget);
+    expect(find.text('編輯停留點'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
     await tester.pumpAndSettle();
     expect(find.text('編輯停留點'), findsOneWidget);
@@ -2109,8 +2123,8 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.text('重新排序'), findsNothing);
-    expect(find.text('編輯景點'), findsNothing);
+    expect(find.text('調整順序'), findsNothing);
+    expect(find.text('編輯停留點'), findsNothing);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
   });
 
@@ -2147,14 +2161,14 @@ void main() {
       );
       await tester.tap(finder);
       await tester.pumpAndSettle();
-      expect(find.text('重新排序'), findsOneWidget);
-      final label = action == 'move' ? '移動到其他天' : '複製到其他天';
+      expect(find.text('調整順序'), findsOneWidget);
+      final label = action == 'move' ? '移到其他 Day' : '複製到其他 Day';
       expect(find.bySemanticsLabel('$label，目前行程只有一天，無法使用'), findsOneWidget);
     }
     semantics.dispose();
   });
 
-  testWidgets('移至其他 Day 使用短任務 sheet，並只送出一次 batch', (tester) async {
+  testWidgets('移到其他 Day 使用短任務 sheet，並只送出一次 batch', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.reorderEntries(
@@ -2175,7 +2189,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-move-11')));
     await tester.pumpAndSettle();
 
-    expect(find.text('移至其他 Day'), findsOneWidget);
+    expect(find.text('移到其他 Day'), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-move-to-day-2')), findsOneWidget);
     expect(find.text('entry-move-11'), findsNothing);
 
@@ -2364,7 +2378,7 @@ void main() {
     );
   });
 
-  testWidgets('從選單刪除景點以 action sheet 確認，左滑刪除仍是 alert', (tester) async {
+  testWidgets('從選單刪除停留點以 action sheet 確認，左滑刪除仍是 alert', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.deleteEntry(
@@ -2536,7 +2550,7 @@ void main() {
       tester
           .widget<SwipeToDelete>(find.byType(SwipeToDelete).first)
           .actionLabel,
-      '刪除景點',
+      '刪除停留點',
     );
 
     await tester.drag(
@@ -2583,7 +2597,7 @@ void main() {
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
 
-  testWidgets('拖曳 handle 提供上移、下移與移至其他 Day 輔助操作，並共用 batch', (tester) async {
+  testWidgets('拖曳 handle 提供上移、下移與移到其他 Day 輔助操作，並共用 batch', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.reorderEntries(
@@ -2607,7 +2621,7 @@ void main() {
     expect(actions.keys.map((action) => action.label), [
       '上移',
       '下移',
-      '移至其他 Day',
+      '移到其他 Day',
     ]);
 
     actions.entries.singleWhere((entry) => entry.key.label == '上移').value();

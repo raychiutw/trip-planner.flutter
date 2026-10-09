@@ -447,12 +447,12 @@ void main() {
                               options: const [
                                 TpScopeOption(
                                   value: 1,
-                                  label: 'DAY 1',
+                                  label: 'Day 1',
                                   key: ValueKey('pixel-day-1'),
                                 ),
                                 TpScopeOption(
                                   value: 2,
-                                  label: 'DAY 2',
+                                  label: 'Day 2',
                                   key: ValueKey('pixel-day-2'),
                                 ),
                               ],
@@ -833,7 +833,7 @@ void main() {
         greaterThanOrEqualTo(44),
       );
       expect(
-        tester.widget<Text>(find.text('DAY 2')).style?.color,
+        tester.widget<Text>(find.text('Day 2')).style?.color,
         scheme.primary,
       );
       if (expectsOpaqueGlass) {
@@ -898,12 +898,12 @@ void main() {
 
       // 品牌色改走前景：選取態的標籤是 tint，未選取維持中性次要前景。
       expect(
-        tester.widget<Text>(find.text('DAY 2')).style?.color,
+        tester.widget<Text>(find.text('Day 2')).style?.color,
         scheme.primary,
         reason: '選取態的標籤應是品牌 tint',
       );
       expect(
-        tester.widget<Text>(find.text('DAY 1')).style?.color,
+        tester.widget<Text>(find.text('Day 1')).style?.color,
         scheme.onSurfaceVariant,
         reason: '未選取態維持中性次要前景',
       );
@@ -1202,15 +1202,15 @@ class _MatrixSceneState extends State<_MatrixScene> {
                     options: const [
                       TpScopeOption(
                         value: 1,
-                        label: 'DAY 1',
+                        label: 'Day 1',
                         key: ValueKey('day-1-option'),
                       ),
                       TpScopeOption(
                         value: 2,
-                        label: 'DAY 2',
+                        label: 'Day 2',
                         key: ValueKey('day-2-option'),
                       ),
-                      TpScopeOption(value: 3, label: 'DAY 3'),
+                      TpScopeOption(value: 3, label: 'Day 3'),
                     ],
                     onSelected: (value) => setState(() => _day = value),
                   ),

@@ -390,8 +390,8 @@ void main() {
     expect(find.text('沖繩家族旅行'), findsOneWidget);
     expect(find.text('2026/10/1 · 那霸 · 1 天'), findsOneWidget);
     expect(find.text('Day 1'), findsOneWidget);
-    expect(find.textContaining('9:00'), findsOneWidget);
-    expect(find.textContaining('10:30'), findsOneWidget);
+    expect(find.textContaining('9：00'), findsOneWidget);
+    expect(find.textContaining('10：30'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
     expect(find.text('高鐵 · 18 分 · 0.9km'), findsOneWidget);
     expect(find.text('不需計算路程'), findsOneWidget);
@@ -411,7 +411,7 @@ void main() {
 
     expect(find.text('10/1/2026 · 那霸 · 1 天'), findsOneWidget);
     expect(find.textContaining('10/1/2026'), findsNWidgets(2));
-    expect(find.text('9:00 AM–10:30 AM'), findsOneWidget);
+    expect(find.text('9：00 AM - 10：30 AM'), findsOneWidget);
   });
 
   for (final user in [
@@ -640,9 +640,9 @@ void main() {
     expect(find.text('沖繩家族旅行'), findsOneWidget);
   });
 
-  testWidgets('大字級失效說明可捲動到重試並恢復內容', (tester) async {
+  testWidgets('大字級載入失敗說明可捲動到重試並恢復內容', (tester) async {
     when(() => repository.fetchPublicTripShare(any())).thenThrow(
-      const ApiError(status: 404, code: 'NOT_FOUND', message: 'NOT_FOUND'),
+      const ApiError(status: 500, code: 'INTERNAL', message: 'INTERNAL'),
     );
     await pumpScreen(tester, size: const Size(320, 568), textScale: 3.2);
 
@@ -668,6 +668,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('public-share-notfound')), findsOneWidget);
     expect(find.text('連結已失效'), findsOneWidget);
+    expect(find.text('重試'), findsNothing, reason: '連結不存在,重試只會再得到 404');
     expect(
       tester
           .getSemantics(find.byKey(const ValueKey('public-share-notfound')))

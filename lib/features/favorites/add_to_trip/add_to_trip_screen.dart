@@ -27,6 +27,7 @@ import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
 import '../explore/explore_controller.dart' show poiRepositoryProvider;
 import '../favorites_providers.dart';
+import '../../../models/display_format.dart';
 
 /// 時間區間有效性：結束須晚於開始。抽為頂層純函式以利單元測試。
 bool isAddToTripTimeValid(TimeOfDay start, TimeOfDay end) =>
@@ -345,7 +346,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                     for (final d in days)
                       (
                         value: d.dayNum,
-                        label: 'DAY ${d.dayNum} · ${d.displayTitle}',
+                        label: dayLabel(d.dayNum, title: d.displayTitle),
                       ),
                   ],
                   onChanged: (v) => setState(() {

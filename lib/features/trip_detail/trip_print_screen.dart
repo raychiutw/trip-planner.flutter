@@ -22,6 +22,7 @@ import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import 'trip_pdf_service.dart';
 import 'trip_print_data.dart';
+import '../../models/display_format.dart';
 
 final _tripPrintNotesProvider = FutureProvider.family<TripNotes, String>((
   ref,
@@ -297,7 +298,7 @@ class _PrintDaySection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('Day ${day.dayNum}', style: theme.textTheme.titleMedium),
+              Text(dayLabel(day.dayNum), style: theme.textTheme.titleMedium),
               if (dateLine.isNotEmpty) ...[
                 const SizedBox(width: TpSpacing.s2),
                 Expanded(
@@ -341,7 +342,7 @@ class _PrintDaySection extends StatelessWidget {
                   ),
                 ],
                 if (day.timeline.isEmpty && day.hotel == null)
-                  const ListTile(title: Text('尚無景點')),
+                  const ListTile(title: Text('尚無停留點')),
               ],
             ),
           ),

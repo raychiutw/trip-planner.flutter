@@ -2,6 +2,7 @@
 library;
 
 import 'entry.dart';
+import 'display_format.dart';
 
 /// 座標位置（server 合成 view，全 nullable）。
 class TripLocation {
@@ -78,7 +79,7 @@ class TripDay {
   /// 2026-07 起日期是每日主標；舊 title/label 僅保留解析相容性。
   String get displayTitle {
     final value = date?.trim();
-    if (value == null || value.isEmpty) return 'Day $dayNum';
+    if (value == null || value.isEmpty) return dayLabel(dayNum);
     final weekday = dayOfWeek?.trim();
     return weekday == null || weekday.isEmpty ? value : '$value（$weekday）';
   }

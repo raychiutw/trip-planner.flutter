@@ -98,7 +98,7 @@ class TpInlineEditControlVisual extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 100),
+      duration: TpMotion.resolve(context, const Duration(milliseconds: 100)),
       width: TpSpacing.tapMin,
       height: TpSpacing.tapMin,
       decoration: BoxDecoration(

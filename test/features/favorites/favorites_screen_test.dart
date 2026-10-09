@@ -1430,6 +1430,11 @@ void main() {
         expect(tester.getSemantics(summary).label, contains('第 1 / 9 頁'));
         await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
         await tester.pump();
+        // 翻頁後回到頂端,要再捲回分頁列才讀得到摘要。
+        for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+          await tester.drag(scrollView, const Offset(0, -500));
+          await tester.pump();
+        }
 
         expect(tester.getSemantics(summary).label, contains('第 2 / 9 頁'));
         expect(tester.getSemantics(summary).label, contains('顯示第 25 至 48 個'));
@@ -1441,6 +1446,35 @@ void main() {
       } finally {
         semantics.dispose();
       }
+    });
+
+    testWidgets('翻頁後回到清單頂端', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith(
+              (ref) => Stream.value(_manyFavorites()),
+            ),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      final pagination = find.byKey(const ValueKey('favorites-pagination'));
+      final scrollView = find.byType(CustomScrollView);
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(scrollView, const Offset(0, -500));
+        await tester.pump();
+      }
+      ScrollPosition position() =>
+          tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+      expect(position().pixels, greaterThan(0));
+
+      await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
+      await tester.pumpAndSettle();
+
+      expect(position().pixels, 0, reason: '翻頁後內容換了一批,視線不該停在舊的捲動位置');
     });
 
     testWidgets('篩選零筆時宣告結果數並保留清除操作', (tester) async {
@@ -1505,6 +1539,10 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
       await tester.pump();
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(scrollView, const Offset(0, -500));
+        await tester.pump();
+      }
 
       expect(find.text('25-48 / 200'), findsOneWidget);
       expect(find.text('第 2 / 9 頁'), findsOneWidget);

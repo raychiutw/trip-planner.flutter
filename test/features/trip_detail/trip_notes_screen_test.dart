@@ -256,6 +256,7 @@ Widget _buildScreen(
   Stream<TripNotes> Function(Ref ref, String tripId)? notesBuilder,
   ThemeData? theme,
   TextScaler? textScaler,
+  bool disableAnimations = false,
   bool stubAiState = true,
 }) {
   // ai-state 對絕大多數測試是背景雜訊:預設成功回空,只有專門測隔離的那條
@@ -281,10 +282,13 @@ Widget _buildScreen(
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.light(),
-      builder: textScaler == null
+      builder: textScaler == null && !disableAnimations
           ? null
           : (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              data: MediaQuery.of(context).copyWith(
+                textScaler: textScaler,
+                disableAnimations: disableAnimations,
+              ),
               child: child!,
             ),
       home: const TripNotesScreen(tripId: 'trip-1'),
@@ -620,6 +624,20 @@ void main() {
     verify(
       () => repo.deleteNote(NoteSection.flights, tripId: 'trip-1', rowId: 1),
     ).called(1);
+  });
+
+  testWidgets('系統要求減少動態效果時,筆記區塊展開不跑過場', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), disableAnimations: true),
+    );
+    await tester.pumpAndSettle();
+    final tile = tester.widget<ExpansionTile>(
+      find.descendant(
+        of: find.byKey(const ValueKey('notes-section-flights')),
+        matching: find.byType(ExpansionTile),
+      ),
+    );
+    expect(tile.expansionAnimationStyle?.duration, Duration.zero);
   });
 
   testWidgets('刪除筆記的確認對話框具名:顯示該筆內容而非區名', (tester) async {

@@ -16,6 +16,7 @@ import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../widgets/destination_picker.dart';
 import 'edit_trip_controller.dart';
+import '../../../models/display_format.dart';
 
 const _langs = {'zh-TW': '繁體中文', 'en': 'English', 'ja': '日本語'};
 
@@ -215,7 +216,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     TripDay day, {
     bool requiresConfirmation = true,
   }) async {
-    final label = 'DAY ${day.dayNum}・${day.displayTitle}';
+    final label = dayLabel(day.dayNum, title: day.displayTitle);
     if (requiresConfirmation) {
       final confirmed = await showAppDestructiveConfirm(
         context,
@@ -223,7 +224,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
         title: '刪除行程日',
         message:
             '確定要刪除「$label」嗎？'
-            '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
+            '這會刪除當天所有停留點，並重新編號後續行程日。此動作無法復原。',
         confirmLabel: '刪除',
       );
       if (!confirmed || !mounted) return;
@@ -247,7 +248,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     TripDay day,
     DayDeletionResult result,
   ) {
-    final label = 'DAY ${day.dayNum}・${day.displayTitle}';
+    final label = dayLabel(day.dayNum, title: day.displayTitle);
     switch (result.resolution) {
       case DayDeletionResolution.committed:
         showAppNotice(
@@ -257,7 +258,10 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
         return;
       case DayDeletionResolution.targetStillPresent:
         final latestDay = controller.dayById(day.id) ?? day;
-        final latestLabel = 'DAY ${latestDay.dayNum}・${latestDay.displayTitle}';
+        final latestLabel = dayLabel(
+          latestDay.dayNum,
+          title: latestDay.displayTitle,
+        );
         showAppError(
           context,
           '無法確認「$latestLabel」已刪除；重新整理後仍找到同一個行程日',
@@ -323,8 +327,8 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
 
   String _dayDeletedMessage(TripDay day, int? removedEntryCount) =>
       removedEntryCount != null && removedEntryCount > 0
-      ? 'Day ${day.dayNum} 已刪除（連同 $removedEntryCount 個景點）'
-      : 'Day ${day.dayNum} 已刪除';
+      ? '${dayLabel(day.dayNum)} 已刪除（連同 $removedEntryCount 個停留點）'
+      : '${dayLabel(day.dayNum)} 已刪除';
 }
 
 class _DayManagementSection extends StatelessWidget {
@@ -490,7 +494,7 @@ class _DaySummaryRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'DAY ${day.dayNum}',
+                dayLabel(day.dayNum),
                 style: textTheme.labelMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),

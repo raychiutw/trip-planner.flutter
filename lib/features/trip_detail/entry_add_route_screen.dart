@@ -22,6 +22,7 @@ import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'trip_providers.dart';
 import 'widgets/entry_edit_sheet.dart';
+import '../../models/display_format.dart';
 
 /// 新增停留點頁的初始模式。
 enum EntryAddMode { search, favorites, custom }
@@ -30,7 +31,7 @@ enum _EntryAddCategory { all, attraction, food, hotel, shopping }
 
 const _entryAddRegionOptions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
 const _entryAddCategoryChips = [
-  (_EntryAddCategory.all, '為你推薦'),
+  (_EntryAddCategory.all, '全部'),
   (_EntryAddCategory.attraction, '景點'),
   (_EntryAddCategory.food, '美食'),
   (_EntryAddCategory.hotel, '住宿'),
@@ -939,11 +940,7 @@ class _DayPicker extends StatelessWidget {
   }
 }
 
-String _dayLabel(TripDay day) {
-  final title = day.displayTitle;
-  if (title == 'Day ${day.dayNum}') return 'DAY ${day.dayNum}';
-  return 'DAY ${day.dayNum} · $title';
-}
+String _dayLabel(TripDay day) => dayLabel(day.dayNum, title: day.displayTitle);
 
 String _normaliseRegion(String? region) {
   final trimmed = region?.trim();

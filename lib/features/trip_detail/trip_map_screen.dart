@@ -27,6 +27,7 @@ import 'google_poi_accessory_card.dart';
 import 'selected_day_provider.dart';
 import 'trip_days_lookup.dart';
 import 'trip_providers.dart';
+import '../../models/display_format.dart';
 
 /// 行程地圖：Header 行程 action + 全部／DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerStatefulWidget {
@@ -853,7 +854,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               for (final (index, day) in widget.index.days.indexed)
                 TpScopeOption(
                   value: index + 1,
-                  label: 'Day ${day.dayNum}',
+                  label: dayLabel(day.dayNum),
                   semanticsLabel:
                       '第 ${day.dayNum} 天，共 ${widget.index.days.length} 天',
                   key: ValueKey('trip-map-day-${day.dayNum}'),
@@ -914,7 +915,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       color: pin.color,
       style: style,
       title: '$number. ${pin.entry.title}',
-      snippet: 'DAY ${pin.dayNum}',
+      snippet: dayLabel(pin.dayNum),
       glyph: '$number',
       onTap: () => _selectStop(pin, animatePage: true),
       zIndex: _activeEntryId == pin.entry.id ? 1000 : 100 - pin.dayIndex,
@@ -1024,9 +1025,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     final endTime = stop.entry.endTime?.trim();
     final timeLabel = startTime == null || startTime.isEmpty
         ? '時間未設定'
-        : endTime == null || endTime.isEmpty
-        ? startTime
-        : '$startTime–$endTime';
+        : formatTimeRange(startTime, endTime);
     final isActive = _activeEntryId == stop.entry.id;
     final isPreview = _previewEntryId == stop.entry.id;
     final category = stop.entry.master?.category?.trim();

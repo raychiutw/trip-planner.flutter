@@ -812,6 +812,12 @@ class _NotesSection extends ConsumerWidget {
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
+          expansionAnimationStyle: AnimationStyle(
+            duration: TpMotion.resolve(
+              context,
+              const Duration(milliseconds: 200),
+            ),
+          ),
           shape: const Border(),
           collapsedShape: const Border(),
           iconColor: colors.onSurfaceVariant,
@@ -903,7 +909,7 @@ class _NotesSection extends ConsumerWidget {
                           icon: const Icon(Icons.auto_awesome_outlined),
                           label: Text(
                             aiBusyTypes.contains(action.type)
-                                ? '生成中...'
+                                ? '生成中…'
                                 : action.label,
                           ),
                         ),

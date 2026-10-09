@@ -782,7 +782,7 @@ class _EmptyTripGuard extends StatelessWidget {
         borderRadius: BorderRadius.circular(TpRadius.md),
       ),
       child: Text(
-        '此行程尚無景點，請先加入景點再執行健檢。',
+        '此行程尚無停留點，請先加入停留點再執行健檢。',
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: colorScheme.onErrorContainer),
@@ -894,7 +894,7 @@ String _dimensionLabel(TripHealthDimension dimension) => switch (dimension) {
 };
 
 String _entryTargetLabel(TripHealthActionTarget? target) =>
-    target?.entryId != null ? '前往景點' : '前往 Day ${target?.day ?? ''}';
+    target?.entryId != null ? '前往停留點' : '前往 Day ${target?.day ?? ''}';
 
 String _formatTimestamp(String value) {
   if (value.length >= 16) {
@@ -906,7 +906,7 @@ String _formatTimestamp(String value) {
 String _healthErrorMessage(Object error, String fallback) {
   if (error is ApiError) {
     if (hasCjk(error.message)) return error.message;
-    if (error.code == 'TRIP_EMPTY') return '此行程尚無景點，請先加入景點再執行健檢';
+    if (error.code == 'TRIP_EMPTY') return '此行程尚無停留點，請先加入停留點再執行健檢';
     return fallback;
   }
   return fallback;

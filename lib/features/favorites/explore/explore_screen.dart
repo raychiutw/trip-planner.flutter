@@ -164,7 +164,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   if (index == 0) {
                     return _categoryChip(
                       key: const ValueKey('explore-category-all'),
-                      label: '為你推薦',
+                      label: '全部',
                       count: state.results.length,
                       selected: state.category == 'all',
                       onSelected: () => ref
@@ -321,7 +321,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「為你推薦」。',
+              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「全部」。',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
@@ -330,7 +330,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               onPressed: () => ref
                   .read(exploreControllerProvider.notifier)
                   .setCategory('all'),
-              child: const Text('回到為你推薦'),
+              child: const Text('回到全部'),
             ),
           ],
         ),
