@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
@@ -62,6 +64,7 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     bool settle = true,
+    CacheStore? cache,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -98,6 +101,7 @@ void main() {
       ProviderScope(
         overrides: [
           collabRepositoryProvider.overrideWithValue(repo),
+          if (cache != null) cacheStoreProvider.overrideWithValue(cache),
           authStateProvider.overrideWith(() => _FakeAuthNotifier(user)),
         ],
         child: MaterialApp.router(
@@ -131,6 +135,71 @@ void main() {
       (_) async =>
           const InvitationAcceptResult(tripId: 'trip-1', tripTitle: '沖繩家庭旅行'),
     );
+  });
+
+  group('#415', () {
+    final queued = QueuedMutation(
+      id: 'm1',
+      method: 'PATCH',
+      path: '/trips/t/entries/1',
+      type: 'entry.patch',
+      cacheKey: 'k',
+      args: const {},
+      createdAt: '2026-10-09T00:00:00.000Z',
+    );
+
+    testWidgets('有待同步變更時切換帳號先確認並寫明筆數，取消不動佇列', (tester) async {
+      final cache = InMemoryCacheStore();
+      await cache.appendMutation(queued);
+      await pumpInvite(tester, user: _otherUser, cache: cache);
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('invite-switch-account')),
+      );
+      await tester.tap(find.byKey(const ValueKey('invite-switch-account')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('1 筆'), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('login '), findsNothing);
+      expect((await cache.readQueue()), hasLength(1));
+    });
+
+    testWidgets('暫時性載入失敗顯示重試，點了會重新抓取', (tester) async {
+      when(
+        () => repo.fetchInvitation(any()),
+      ).thenAnswer((_) async => throw const SocketException('offline'));
+      await pumpInvite(tester);
+
+      expect(find.byKey(const ValueKey('invite-retry')), findsOneWidget);
+      when(
+        () => repo.fetchInvitation(any()),
+      ).thenAnswer((_) async => _invitation);
+      await tester.tap(find.byKey(const ValueKey('invite-retry')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.fetchInvitation('raw-token')).called(2);
+      expect(find.byKey(const ValueKey('invite-page')), findsOneWidget);
+      expect(find.byKey(const ValueKey('invite-retry')), findsNothing);
+    });
+
+    testWidgets('永久失效顯示回到登入而非重試', (tester) async {
+      when(() => repo.fetchInvitation(any())).thenAnswer(
+        (_) async => throw const ApiError(
+          status: 410,
+          code: 'INVITATION_EXPIRED',
+          message: 'expired',
+        ),
+      );
+      await pumpInvite(tester);
+
+      expect(find.byKey(const ValueKey('invite-retry')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('invite-back-to-login')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('login '), findsOneWidget);
+    });
   });
 
   testWidgets('未登入顯示 C 版 checklist 並保留 invite redirect', (tester) async {

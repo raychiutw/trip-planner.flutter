@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/user.dart';
@@ -126,13 +127,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showAppDestructiveConfirm(
-      context,
-      source: TpDestructiveConfirmSource.direct,
-      title: '登出帳號',
-      message: '確定要登出嗎？',
-      confirmLabel: '登出',
-    );
+    final shouldLogout = await confirmLogout(context, ref);
     if (shouldLogout && mounted) {
       await ref.read(authStateProvider.notifier).logout();
     }

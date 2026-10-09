@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/auth_repository.dart';
 import '../../api/providers.dart';
+import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_version.dart';
 import '../../app/external_links.dart';
@@ -93,13 +94,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
   /// 登出前確認，確認才呼叫 authStateProvider.logout()。
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final ok = await showAppDestructiveConfirm(
-      context,
-      source: TpDestructiveConfirmSource.direct,
-      title: '登出帳號',
-      message: '確定要登出嗎？',
-      confirmLabel: '登出',
-    );
+    final ok = await confirmLogout(context, ref);
     if (ok) {
       await ref.read(authStateProvider.notifier).logout();
     }

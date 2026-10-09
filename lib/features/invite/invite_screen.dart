@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/logout_confirm.dart';
 import '../../models/trip_member.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
@@ -65,6 +66,10 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                   onLogin: _goLogin,
                   onSignup: _goSignup,
                   onSwitchAccount: () => unawaited(_switchAccount()),
+                  onRetry: () => ref
+                      .read(inviteControllerProvider(_token).notifier)
+                      .retry(),
+                  onBackToLogin: _goLogin,
                   onAccept:
                       inviteState.canAccept(user, authLoading: authLoading)
                       ? () => unawaited(_accept())
@@ -90,6 +95,14 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
 
   Future<void> _switchAccount() async {
     if (_token.isEmpty) return;
+    final ok = await confirmLogout(
+      context,
+      ref,
+      alwaysAsk: false,
+      title: '切換帳號',
+      confirmLabel: '切換帳號',
+    );
+    if (!ok || !mounted) return;
     await ref.read(authStateProvider.notifier).logout();
     if (!mounted) return;
     context.go(_loginLocation);
@@ -112,6 +125,8 @@ class _InviteBody extends StatelessWidget {
     required this.onLogin,
     required this.onSignup,
     required this.onSwitchAccount,
+    required this.onRetry,
+    required this.onBackToLogin,
     required this.onAccept,
   });
 
@@ -121,13 +136,20 @@ class _InviteBody extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onSignup;
   final VoidCallback onSwitchAccount;
+  final VoidCallback onRetry;
+  final VoidCallback onBackToLogin;
   final VoidCallback? onAccept;
 
   @override
   Widget build(BuildContext context) {
     if (state.loading) return const _LoadingView();
     if (state.error != null || state.invitation == null) {
-      return _ErrorView(message: state.error ?? '邀請連結無效，請聯絡邀請者重寄。');
+      return _ErrorView(
+        message: state.error ?? '邀請連結無效，請聯絡邀請者重寄。',
+        retryable: state.retryable,
+        onRetry: onRetry,
+        onBackToLogin: onBackToLogin,
+      );
     }
 
     final invitation = state.invitation!;
@@ -612,9 +634,17 @@ class _LoadingView extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message});
+  const _ErrorView({
+    required this.message,
+    required this.retryable,
+    required this.onRetry,
+    required this.onBackToLogin,
+  });
 
   final String message;
+  final bool retryable;
+  final VoidCallback onRetry;
+  final VoidCallback onBackToLogin;
 
   @override
   Widget build(BuildContext context) {
@@ -626,6 +656,18 @@ class _ErrorView extends StatelessWidget {
           title: '邀請無效',
           message: _errorMessageWithRecovery(message),
         ),
+        const SizedBox(height: TpSpacing.s3),
+        retryable
+            ? FilledButton(
+                key: const ValueKey('invite-retry'),
+                onPressed: onRetry,
+                child: const Text('重試'),
+              )
+            : OutlinedButton(
+                key: const ValueKey('invite-back-to-login'),
+                onPressed: onBackToLogin,
+                child: const Text('回到登入'),
+              ),
       ],
     );
   }

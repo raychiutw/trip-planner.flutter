@@ -22,6 +22,7 @@ class InviteState {
     this.token = '',
     this.invitation,
     this.error,
+    this.retryable = false,
     this.accepting = false,
     this.acceptError,
     this.acceptedTripId,
@@ -32,6 +33,9 @@ class InviteState {
   final String token;
   final InvitationDetails? invitation;
   final String? error;
+
+  /// 載入失敗是否為暫時性（網路／伺服器），可重試；過期、無效等永久失效為 false。
+  final bool retryable;
   final bool accepting;
   final String? acceptError;
   final String? acceptedTripId;
@@ -61,6 +65,7 @@ class InviteState {
     String? token,
     Object? invitation = _sentinel,
     Object? error = _sentinel,
+    bool? retryable,
     bool? accepting,
     Object? acceptError = _sentinel,
     Object? acceptedTripId = _sentinel,
@@ -73,6 +78,7 @@ class InviteState {
           ? this.invitation
           : invitation as InvitationDetails?,
       error: error == _sentinel ? this.error : error as String?,
+      retryable: retryable ?? this.retryable,
       accepting: accepting ?? this.accepting,
       acceptError: acceptError == _sentinel
           ? this.acceptError
@@ -109,6 +115,12 @@ class InviteController extends Notifier<InviteState> {
     return InviteState(loading: true, token: token);
   }
 
+  void retry() {
+    if (state.loading || _token.isEmpty) return;
+    state = state.copyWith(loading: true, error: null, retryable: false);
+    unawaited(_load(_token));
+  }
+
   Future<void> _load(String token) async {
     try {
       final invitation = await _repo.fetchInvitation(token);
@@ -120,10 +132,18 @@ class InviteController extends Notifier<InviteState> {
       );
     } on ApiError catch (e) {
       if (_disposed) return;
-      state = state.copyWith(loading: false, error: _inviteErrorMessage(e));
+      state = state.copyWith(
+        loading: false,
+        error: _inviteErrorMessage(e),
+        retryable: e.status >= 500 || e.status == 429,
+      );
     } on Exception {
       if (_disposed) return;
-      state = state.copyWith(loading: false, error: '無法載入邀請，請稍後再試。');
+      state = state.copyWith(
+        loading: false,
+        error: '無法載入邀請，請稍後再試。',
+        retryable: true,
+      );
     }
   }
 
