@@ -1974,6 +1974,32 @@ void main() {
     expect(accountOpened, isTrue);
   });
 
+  testWidgets('large sheet 內忽略 accountEntry，只留關閉鈕', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            TpAccountActionScope(onOpen: (_) {}, child: child!),
+        home: Scaffold(
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(kToolbarHeight),
+            child: TpLargeSheetNavigationScope(
+              onClose: () {},
+              child: const TpAppBar(
+                role: TpAppBarRole.detail,
+                title: Text('共編設定'),
+                accountEntry: TpAccountAvatarButton(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+  });
+
   testWidgets('內容 header 的帳號入口不佔用一般動作額度', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
