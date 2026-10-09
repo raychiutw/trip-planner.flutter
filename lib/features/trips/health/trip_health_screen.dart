@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -201,7 +202,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
             key: const ValueKey('trip-health-refresh-button'),
             tooltip: '重新整理',
             onPressed: _loading || _starting ? null : _load,
-            icon: Icons.refresh,
+            icon: CupertinoIcons.refresh,
           ),
         ],
       ),
@@ -326,13 +327,13 @@ class _Header extends StatelessWidget {
             ),
             Chip(
               visualDensity: VisualDensity.compact,
-              avatar: const Icon(Icons.place_outlined, size: 16),
+              avatar: const Icon(CupertinoIcons.location, size: 16),
               label: Text('$entryCount 個停留點'),
             ),
             if (completedAt != null)
               Chip(
                 visualDensity: VisualDensity.compact,
-                avatar: const Icon(Icons.schedule, size: 16),
+                avatar: const Icon(CupertinoIcons.clock, size: 16),
                 label: Text(_formatTimestamp(completedAt)),
               ),
           ],
@@ -363,9 +364,11 @@ class _StartButton extends StatelessWidget {
       icon: starting
           ? const SizedBox.square(
               dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             )
-          : Icon(report == null ? Icons.auto_awesome : Icons.refresh),
+          : Icon(
+              report == null ? CupertinoIcons.sparkles : CupertinoIcons.refresh,
+            ),
       label: Text(_buttonLabel(report, starting)),
     );
   }
@@ -391,7 +394,7 @@ class _PoiHealthCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.location_searching, color: colorScheme.primary),
+                Icon(CupertinoIcons.location, color: colorScheme.primary),
                 const SizedBox(width: TpSpacing.s2),
                 Text('POI 狀態', style: Theme.of(context).textTheme.titleMedium),
               ],
@@ -410,8 +413,8 @@ class _PoiHealthCard extends StatelessWidget {
                     children: [
                       Icon(
                         item.status == TripPoiHealthStatus.closed
-                            ? Icons.block
-                            : Icons.help_outline,
+                            ? CupertinoIcons.nosign
+                            : CupertinoIcons.question_circle,
                         size: 18,
                         color: colorScheme.error,
                       ),
@@ -491,7 +494,7 @@ class _EmptyReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _StatePanel(
       key: ValueKey('trip-health-empty'),
-      icon: Icons.auto_awesome,
+      icon: CupertinoIcons.sparkles,
       title: '尚未健檢過此行程',
       message: '由 AI 檢視時間衝突、距離過遠、餐飲空窗與漏排行程。',
     );
@@ -507,7 +510,7 @@ class _PendingReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return _StatePanel(
       key: const ValueKey('trip-health-pending'),
-      icon: Icons.hourglass_top,
+      icon: CupertinoIcons.hourglass,
       title: 'AI 健檢進行中',
       message: '通常 3-7 分鐘完成。你可以先離開，稍後回來查看結果。',
       liveRegion: true,
@@ -540,7 +543,7 @@ class _StalledReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _StatePanel(
       key: ValueKey('trip-health-stalled'),
-      icon: Icons.hourglass_disabled,
+      icon: CupertinoIcons.hourglass,
       title: '這次健檢已經停止',
       message: '報告不會再更新了。可以重新健檢一次。',
       liveRegion: true,
@@ -557,7 +560,7 @@ class _FailedReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return _StatePanel(
       key: const ValueKey('trip-health-failed'),
-      icon: Icons.error_outline,
+      icon: CupertinoIcons.exclamationmark_circle,
       title: '健檢失敗',
       message: message ?? 'AI 處理時發生錯誤，可重新生成再試。',
       liveRegion: true,
@@ -572,7 +575,7 @@ class _NoIssuesReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _StatePanel(
       key: ValueKey('trip-health-no-issues'),
-      icon: Icons.check_circle_outline,
+      icon: CupertinoIcons.check_mark_circled,
       title: '看起來沒有問題',
       message: 'AI 沒有找到需要修正的地方。行程安排良好。',
     );
@@ -676,7 +679,7 @@ class _FindingCard extends StatelessWidget {
                       ).toString(),
                     );
                   },
-                  icon: const Icon(Icons.arrow_forward),
+                  icon: const Icon(CupertinoIcons.arrow_right),
                   label: Text(_entryTargetLabel(target)),
                 ),
               ),
@@ -865,11 +868,11 @@ String _statusLabel(TripHealthStatus? status) {
 }
 
 IconData _statusIcon(TripHealthStatus? status) {
-  if (status == null) return Icons.auto_awesome;
+  if (status == null) return CupertinoIcons.sparkles;
   return switch (status) {
-    TripHealthStatus.pending => Icons.hourglass_top,
-    TripHealthStatus.completed => Icons.check_circle_outline,
-    TripHealthStatus.failed => Icons.error_outline,
+    TripHealthStatus.pending => CupertinoIcons.hourglass,
+    TripHealthStatus.completed => CupertinoIcons.check_mark_circled,
+    TripHealthStatus.failed => CupertinoIcons.exclamationmark_circle,
   };
 }
 

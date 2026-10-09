@@ -218,7 +218,7 @@ class EntryPoiScreen extends ConsumerWidget {
                         IconButton(
                           key: ValueKey('alt-move-up-${alt.poiId}'),
                           tooltip: '上移${alt.name ?? '備選地點'}',
-                          icon: const Icon(Icons.keyboard_arrow_up),
+                          icon: const Icon(CupertinoIcons.chevron_up),
                           onPressed: index == 0
                               ? null
                               : () => _moveAlternate(
@@ -232,7 +232,7 @@ class EntryPoiScreen extends ConsumerWidget {
                         IconButton(
                           key: ValueKey('alt-move-down-${alt.poiId}'),
                           tooltip: '下移${alt.name ?? '備選地點'}',
-                          icon: const Icon(Icons.keyboard_arrow_down),
+                          icon: const Icon(CupertinoIcons.chevron_down),
                           onPressed: index == entry.alternates.length - 1
                               ? null
                               : () => _moveAlternate(
@@ -564,7 +564,7 @@ class _PoiCard extends StatelessWidget {
                       height: TpSpacing.tapMin,
                     ),
                     iconSize: 18,
-                    icon: const Icon(Icons.open_in_new_rounded),
+                    icon: const Icon(CupertinoIcons.arrow_up_right_square),
                     onPressed: () => _openReservationUrl(
                       context,
                       reservationUrlLauncher,

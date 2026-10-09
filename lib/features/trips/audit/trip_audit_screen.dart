@@ -1,6 +1,7 @@
 /// Trip audit log screen.
 library;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -94,7 +95,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
             key: const ValueKey('trip-audit-refresh-button'),
             tooltip: '重新整理',
             onPressed: _loading ? null : _load,
-            icon: Icons.refresh,
+            icon: CupertinoIcons.refresh,
           ),
         ],
       ),
@@ -180,7 +181,7 @@ class _Header extends StatelessWidget {
           children: [
             Chip(
               visualDensity: VisualDensity.compact,
-              avatar: const Icon(Icons.history_outlined, size: 16),
+              avatar: const Icon(CupertinoIcons.clock, size: 16),
               label: Text('$count 筆'),
             ),
           ],
@@ -325,7 +326,7 @@ class _EmptyAudit extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.history_outlined),
+            Icon(CupertinoIcons.clock),
             SizedBox(height: TpSpacing.s3),
             Text('尚無異動紀錄'),
           ],

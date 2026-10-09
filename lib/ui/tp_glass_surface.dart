@@ -480,9 +480,11 @@ class TpNavigationGlassButton extends StatelessWidget {
             child: Center(
               child: SizedBox.square(
                 dimension: 18,
-                child: CircularProgressIndicator(
+                child: CircularProgressIndicator.adaptive(
                   strokeWidth: 2,
-                  color: appearance.foreground,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    appearance.foreground,
+                  ),
                 ),
               ),
             ),

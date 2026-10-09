@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -370,13 +371,13 @@ class _DayManagementSection extends StatelessWidget {
               OutlinedButton.icon(
                 key: const ValueKey('edit-add-day-start'),
                 onPressed: mutating ? null : onAddStart,
-                icon: const Icon(Icons.first_page_outlined),
+                icon: const Icon(CupertinoIcons.chevron_left_2),
                 label: const Text('加到最前'),
               ),
               OutlinedButton.icon(
                 key: const ValueKey('edit-add-day-end'),
                 onPressed: mutating ? null : onAddEnd,
-                icon: const Icon(Icons.last_page_outlined),
+                icon: const Icon(CupertinoIcons.chevron_right_2),
                 label: const Text('加到最後'),
               ),
             ],
@@ -452,7 +453,11 @@ class _MissingDayRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: TpSpacing.s2),
       child: Row(
         children: [
-          Icon(Icons.more_horiz, color: colorScheme.onSurfaceVariant, size: 18),
+          Icon(
+            CupertinoIcons.ellipsis,
+            color: colorScheme.onSurfaceVariant,
+            size: 18,
+          ),
           const SizedBox(width: TpSpacing.s2),
           Expanded(
             child: Text(
@@ -465,7 +470,7 @@ class _MissingDayRow extends StatelessWidget {
           TextButton.icon(
             key: ValueKey('edit-create-missing-day-$date'),
             onPressed: mutating ? null : onCreate,
-            icon: const Icon(Icons.add),
+            icon: const Icon(CupertinoIcons.add),
             label: const Text('新增缺少日期'),
           ),
         ],
@@ -510,7 +515,7 @@ class _DaySummaryRow extends StatelessWidget {
           key: ValueKey('edit-delete-day-${day.dayNum}'),
           tooltip: '刪除 Day ${day.dayNum}',
           onPressed: mutating ? null : onDelete,
-          icon: const Icon(Icons.delete_outline),
+          icon: const Icon(CupertinoIcons.delete),
         ),
       ],
     );
@@ -564,9 +569,9 @@ class _ShiftDateSection extends StatelessWidget {
               icon: shifting
                   ? const SizedBox.square(
                       dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.event_repeat_outlined),
+                  : const Icon(CupertinoIcons.calendar),
               label: const Text('平移日期'),
             ),
           ),

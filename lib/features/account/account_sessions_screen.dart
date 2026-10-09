@@ -40,25 +40,9 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   Widget build(BuildContext context) {
     final sessionsAsync = ref.watch(accountSessionsProvider);
     final currentUser = ref.watch(authStateProvider).value;
-    final sessionsPage = sessionsAsync.value;
-    final canRevokeOthers =
-        sessionsPage?.sessions.any((session) => !session.isCurrent) ?? false;
 
     return Scaffold(
-      appBar: TpAppBar(
-        role: TpAppBarRole.detail,
-        title: const Text('登入裝置'),
-        actions: [
-          TpToolbarGlassButton(
-            key: const Key('account-sessions-revoke-others'),
-            tooltip: '登出其他裝置',
-            onPressed: canRevokeOthers
-                ? () => unawaited(_showRevokeOtherSessionsBlocked())
-                : null,
-            child: const Icon(CupertinoIcons.square_arrow_right),
-          ),
-        ],
-      ),
+      appBar: TpAppBar(role: TpAppBarRole.detail, title: const Text('登入裝置')),
       body: sessionsAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: Key('account-sessions-loading')),
@@ -93,18 +77,6 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
           onLogout: () => _confirmLogout(context, ref),
         ),
       ),
-    );
-  }
-
-  Future<void> _showRevokeOtherSessionsBlocked() async {
-    await showAppAlert(
-      context,
-      key: const ValueKey('revoke-other-sessions-blocked-dialog'),
-      title: '目前無法一次登出其他裝置',
-      message:
-          '目前無法驗證身分以一次登出其他裝置。'
-          '請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。',
-      actionLabel: '返回裝置清單',
     );
   }
 
@@ -272,7 +244,7 @@ class _SessionsInfoPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.info_outline,
+            CupertinoIcons.info_circle,
             color: colorScheme.onSurfaceVariant,
             size: 20,
           ),
@@ -295,7 +267,7 @@ class _SessionsInfoPanel extends StatelessWidget {
                   child: TextButton.icon(
                     key: const Key('account-sessions-connected-apps'),
                     onPressed: onOpenConnectedApps,
-                    icon: const Icon(Icons.extension_outlined, size: 18),
+                    icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
                     label: const Text('管理已連結應用'),
                   ),
                 ),
@@ -321,7 +293,11 @@ class _SessionsFooter extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         key: const Key('account-sessions-logout'),
-        leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
+        leading: Icon(
+          CupertinoIcons.square_arrow_right,
+          size: 20,
+          color: colorScheme.error,
+        ),
         title: Text(
           '登出此帳號',
           style: TextStyle(

@@ -39,7 +39,7 @@ class OfflineStatusBanner extends ConsumerWidget {
         key: const ValueKey('offline-pending-banner'),
         background: colorScheme.secondaryContainer,
         foreground: colorScheme.onSecondaryContainer,
-        icon: Icons.cloud_off_outlined,
+        icon: CupertinoIcons.wifi_slash,
         text: '$pending 筆變更待同步',
         busy: syncing,
         actionLabel: syncing ? null : '立即重試',
