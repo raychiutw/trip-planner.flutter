@@ -109,7 +109,22 @@ class EntryPoiScreen extends ConsumerWidget {
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('無法載入地點:$error', textAlign: TextAlign.center),
+            child: Semantics(
+              key: const ValueKey('entry-poi-load-error'),
+              liveRegion: true,
+              container: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('無法載入地點，請稍後再試', textAlign: TextAlign.center),
+                  const SizedBox(height: TpSpacing.s2),
+                  TextButton(
+                    onPressed: () => ref.invalidate(entryDetailProvider(_key)),
+                    child: const Text('重試'),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         data: (entry) => _body(context, ref, entry),
@@ -825,6 +840,8 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   List<PoiFavorite> _favorites = const [];
   bool _searching = false;
   int _searchRequest = 0;
+  bool _searchFailed = false;
+  bool _searchedEmpty = false;
   bool _favoritesLoaded = false;
   bool _favoritesLoading = false;
   String? _favoritesError;
@@ -851,22 +868,33 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
         setState(() {
           _results = const [];
           _searching = false;
+          _searchFailed = false;
+          _searchedEmpty = false;
         });
       }
       return;
     }
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchFailed = false;
+    });
     try {
       final results = await ref.read(poiRepositoryProvider).searchPois(q: q);
       if (mounted && request == _searchRequest) {
         setState(() {
           _results = results;
           _searching = false;
+          _searchedEmpty = results.isEmpty;
         });
       }
     } on Exception {
       if (mounted && request == _searchRequest) {
-        setState(() => _searching = false);
+        setState(() {
+          _searching = false;
+          _searchFailed = true;
+          _searchedEmpty = false;
+          _results = const [];
+        });
       }
     }
   }
@@ -1039,6 +1067,29 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                   const LinearProgressIndicator(minHeight: 2),
                 ],
                 const SizedBox(height: TpSpacing.s3),
+                if (_searchFailed || (_searchedEmpty && !_searching))
+                  Semantics(
+                    key: const ValueKey('poi-picker-search-status'),
+                    liveRegion: true,
+                    container: true,
+                    child: Padding(
+                      padding: const EdgeInsets.all(TpSpacing.s3),
+                      child: Column(
+                        children: [
+                          Text(
+                            _searchFailed ? '搜尋失敗，請稍後再試' : '找不到符合的地點',
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_searchFailed)
+                            TextButton(
+                              key: const ValueKey('poi-picker-search-retry'),
+                              onPressed: () => unawaited(_search()),
+                              child: const Text('重試'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 320),
                   child: ListView(
@@ -1070,9 +1121,23 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                     ),
                   )
                 else if (_favoritesError != null)
-                  Padding(
-                    padding: const EdgeInsets.all(TpSpacing.s4),
-                    child: Text(_favoritesError!),
+                  Semantics(
+                    key: const ValueKey('poi-picker-favorites-error'),
+                    liveRegion: true,
+                    container: true,
+                    child: Padding(
+                      padding: const EdgeInsets.all(TpSpacing.s4),
+                      child: Column(
+                        children: [
+                          Text(_favoritesError!),
+                          TextButton(
+                            key: const ValueKey('poi-picker-favorites-retry'),
+                            onPressed: () => unawaited(_loadFavorites()),
+                            child: const Text('重試'),
+                          ),
+                        ],
+                      ),
+                    ),
                   )
                 else if (_favoritesLoaded && _favorites.isEmpty)
                   const Padding(
