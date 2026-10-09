@@ -979,9 +979,9 @@ class _BulkToolbar extends StatelessWidget {
               icon: deleting
                   ? const SizedBox.square(
                       dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.delete_outline),
+                  : const Icon(CupertinoIcons.delete),
               label: Text(deleting ? '刪除中' : '刪除'),
             ),
           ],
@@ -1021,7 +1021,7 @@ class _PaginationControls extends StatelessWidget {
             key: const ValueKey('favorites-page-prev'),
             tooltip: '上一頁',
             onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left),
+            icon: const Icon(CupertinoIcons.chevron_left),
           ),
           Expanded(
             child: Semantics(
@@ -1043,7 +1043,7 @@ class _PaginationControls extends StatelessWidget {
             key: const ValueKey('favorites-page-next'),
             tooltip: '下一頁',
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right),
+            icon: const Icon(CupertinoIcons.chevron_right),
           ),
         ],
       ),

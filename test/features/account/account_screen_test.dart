@@ -501,16 +501,20 @@ void main() {
     expect(find.text('此操作無法復原。'), findsNothing);
     expect(find.textContaining('此操作無法復原'), findsOneWidget);
     expect(find.text('目前密碼（重新驗證）'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
     expect(
-      tester
-          .widget<TextButton>(find.widgetWithText(TextButton, '取消'))
-          .autofocus,
-      isTrue,
+      find.descendant(
+        of: find.byKey(const ValueKey('delete-account-dialog')),
+        matching: find.byType(CupertinoTextField),
+      ),
+      findsOneWidget,
     );
     final confirmButton = find.byKey(
       const ValueKey('delete-account-confirm-button'),
     );
-    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNull);
+    final confirmAction = tester.widget<CupertinoDialogAction>(confirmButton);
+    expect(confirmAction.isDestructiveAction, isTrue);
+    expect(confirmAction.onPressed, isNull);
 
     await tester.enterText(
       find.byKey(const ValueKey('delete-account-confirmation-field')),

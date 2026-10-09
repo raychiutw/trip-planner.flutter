@@ -68,7 +68,7 @@ class PoiSearchCard extends StatelessWidget {
                   child: IconButton(
                     key: ValueKey('poi-add-to-trip-${poi.placeId}'),
                     tooltip: '加入行程',
-                    icon: const Icon(Icons.add_location_alt_outlined),
+                    icon: const Icon(CupertinoIcons.add_circled),
                     onPressed: onAddToTrip,
                   ),
                 ),

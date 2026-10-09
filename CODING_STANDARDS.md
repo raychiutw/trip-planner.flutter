@@ -289,7 +289,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 內容卡與內容列上的「⋯」用 `TpMoreMenuButton(plain: true)`(`lib/ui/tp_more_menu.dart`),長按同一張卡以 `TpMoreMenuController.open` 開同一份選單;適用行程卡、收藏卡、停留點卡、共編成員列、分享連結列與筆記列。feature 不得自組 `IconButton` 開 `showAppActionSheet` 當卡片選單;也不得為了有東西可錨定而放看不見但可聚焦的空按鈕 —— 沒有動作的對象就不放入口。
 - 自訂觸發器(`triggerBuilder`)可以是 chip 等需要 `Material` 的元件;overlay 內的複本由 `TpMoreMenuButton` 固定成頁面觸發器的尺寸並提供透明 `Material`,feature 不必自己包。
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:666`、`lib/features/trips/collab/collab_screen.dart:230`、`lib/features/favorites/favorites_screen.dart:469`)。
-- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存唯一例:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off)。
+- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存例外:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off;`travel_pill.dart` 的交通工具圖示〔步行、開車、計程車、公車、火車、電車、飛機、船、單車、路線〕,Cupertino 沒有成套對應,整組維持 Material 以免同一排風格混用)。`test/ui/material_residue_guard_test.dart` 守住已收斂的檔案與例外清單。進度指示器一律 `CircularProgressIndicator.adaptive()`。
 
 ## 測試規範
 

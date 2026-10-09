@@ -129,10 +129,7 @@ void main() {
 
   test('功能頁共用 HIG notice、confirm 與 alert，不自行建立 Material 分支', () {
     final violations = <String>[];
-    const materialAlertAllowlist = {
-      // 帳號永久刪除含重新驗證輸入欄，不能降級成一般確認提示。
-      'lib/features/account/account_screen.dart': 1,
-    };
+    const materialAlertAllowlist = <String, int>{};
     for (final entity in Directory('lib/features').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
       final source = entity.readAsStringSync();

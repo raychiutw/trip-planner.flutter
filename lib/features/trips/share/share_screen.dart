@@ -301,8 +301,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           setState(() => _showRevoked = !_showRevoked),
                       icon: Icon(
                         _showRevoked
-                            ? Icons.expand_less_outlined
-                            : Icons.expand_more_outlined,
+                            ? CupertinoIcons.chevron_up
+                            : CupertinoIcons.chevron_down,
                       ),
                       label: Text('已關閉的連結（${revokedShares.length}）'),
                     ),
@@ -378,7 +378,10 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             OutlinedButton.icon(
                               key: const ValueKey('share-custom-expiry-date'),
                               onPressed: _pickCustomExpiryDate,
-                              icon: const Icon(Icons.event_outlined, size: 18),
+                              icon: const Icon(
+                                CupertinoIcons.calendar,
+                                size: 18,
+                              ),
                               label: Text(_customExpiryLabel(context)),
                             ),
                           ],
@@ -553,7 +556,7 @@ class _CreatedCardState extends State<_CreatedCard> {
                   key: const ValueKey('share-qr-toggle'),
                   onPressed: () => setState(() => _showQr = !_showQr),
                   icon: Icon(
-                    _showQr ? Icons.visibility_off_outlined : Icons.qr_code_2,
+                    _showQr ? CupertinoIcons.eye_slash : CupertinoIcons.qrcode,
                     size: 18,
                   ),
                   label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
@@ -561,7 +564,7 @@ class _CreatedCardState extends State<_CreatedCard> {
                 OutlinedButton.icon(
                   key: const ValueKey('share-native'),
                   onPressed: () => widget.onShare(widget.url),
-                  icon: const Icon(Icons.ios_share_outlined, size: 18),
+                  icon: const Icon(CupertinoIcons.share, size: 18),
                   label: const Text('分享'),
                 ),
                 FilledButton.tonalIcon(
@@ -916,7 +919,7 @@ class _EditShareFormState extends State<_EditShareForm> {
           OutlinedButton.icon(
             key: const ValueKey('share-edit-custom-expiry-date'),
             onPressed: _pickCustomExpiryDate,
-            icon: const Icon(Icons.event_outlined, size: 18),
+            icon: const Icon(CupertinoIcons.calendar, size: 18),
             label: Text(_customExpiryLabel(context)),
           ),
         ],

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
@@ -126,7 +127,7 @@ void main() {
       await pumpPill(tester, const Travel(type: 'transit', sameplace: true));
       expect(find.text('不需計算路程'), findsOneWidget);
       expect(find.byKey(const ValueKey('travel-no-travel')), findsOneWidget);
-      expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.location), findsOneWidget);
     });
 
     testWidgets('segment 是顯示 source of truth', (tester) async {

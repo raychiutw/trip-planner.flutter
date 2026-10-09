@@ -441,17 +441,17 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                               segments: const [
                                 ButtonSegment(
                                   value: EntryAddMode.search,
-                                  icon: Icon(Icons.search),
+                                  icon: Icon(CupertinoIcons.search),
                                   label: Text('搜尋'),
                                 ),
                                 ButtonSegment(
                                   value: EntryAddMode.favorites,
-                                  icon: Icon(Icons.favorite_border),
+                                  icon: Icon(CupertinoIcons.heart),
                                   label: Text('收藏'),
                                 ),
                                 ButtonSegment(
                                   value: EntryAddMode.custom,
-                                  icon: Icon(Icons.edit_location_alt_outlined),
+                                  icon: Icon(CupertinoIcons.map_pin_ellipse),
                                   label: Text('自訂'),
                                 ),
                               ],
@@ -919,7 +919,7 @@ class _DayPicker extends StatelessWidget {
                   key: ValueKey('entry-add-day-${day.dayNum}'),
                   title: Text(_dayLabel(day)),
                   trailing: day.dayNum == selectedDayNum
-                      ? const Icon(Icons.check)
+                      ? const Icon(CupertinoIcons.check_mark)
                       : null,
                   onTap: () => select(day.dayNum),
                 ),
@@ -931,7 +931,7 @@ class _DayPicker extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(_dayLabel(selectedDay))),
-          const Icon(Icons.keyboard_arrow_down),
+          const Icon(CupertinoIcons.chevron_down),
         ],
       ),
     );

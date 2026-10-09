@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 /// 顯示會持續留在畫面上的錯誤訊息，直到使用者關閉或重試。
@@ -22,7 +23,7 @@ void showAppError(
       MaterialBanner(
         key: const ValueKey('app-error-banner'),
         leading: Icon(
-          Icons.error_outline,
+          CupertinoIcons.exclamationmark_circle,
           color: Theme.of(context).colorScheme.onErrorContainer,
         ),
         backgroundColor: Theme.of(context).colorScheme.errorContainer,

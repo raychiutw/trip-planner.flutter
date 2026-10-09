@@ -371,9 +371,9 @@ class _NotesAiPendingPanel extends StatelessWidget {
           SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(
+            child: CircularProgressIndicator.adaptive(
               strokeWidth: 2,
-              color: colors.primary,
+              valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
             ),
           ),
           const SizedBox(width: TpSpacing.s2),
@@ -514,7 +514,10 @@ class _NotesAiErrorPanel extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.error_outline, color: colors.onErrorContainer),
+                Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: colors.onErrorContainer,
+                ),
                 const SizedBox(width: TpSpacing.s3),
                 Expanded(
                   child: Column(
@@ -680,7 +683,7 @@ const _sectionIcons = <NoteSection, IconData>{
   NoteSection.lodgings: CupertinoIcons.bed_double,
   NoteSection.reservations: CupertinoIcons.ticket,
   NoteSection.pretrip: CupertinoIcons.list_bullet,
-  NoteSection.emergency: Icons.support_agent_outlined,
+  NoteSection.emergency: CupertinoIcons.phone,
 };
 
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
@@ -860,7 +863,7 @@ class _NotesSection extends ConsumerWidget {
                                   !action.enabled
                               ? null
                               : () => onGenerateNotes(action.type),
-                          icon: const Icon(Icons.auto_awesome_outlined),
+                          icon: const Icon(CupertinoIcons.sparkles),
                           label: Text(
                             aiBusyTypes.contains(action.type)
                                 ? '生成中...'

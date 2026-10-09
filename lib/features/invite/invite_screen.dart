@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -253,7 +254,7 @@ class _ChecklistCard extends StatelessWidget {
             _SummaryRow(
               title: '邀請連結有效',
               body: _expiryLabel(context, invitation.expiresAt),
-              trailing: Icons.check_rounded,
+              trailing: CupertinoIcons.checkmark,
               tone: _SummaryTone.success,
             ),
             divider,
@@ -366,7 +367,11 @@ class _AccountStatusBlock extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.manage_accounts_outlined, color: tone, size: 22),
+                  Icon(
+                    CupertinoIcons.person_crop_circle,
+                    color: tone,
+                    size: 22,
+                  ),
                   const SizedBox(width: TpSpacing.s3),
                   Expanded(
                     child: Column(
@@ -500,14 +505,14 @@ class _PrimaryAction extends StatelessWidget {
           FilledButton.icon(
             key: const ValueKey('invite-signup'),
             onPressed: onSignup,
-            icon: const Icon(Icons.person_add_alt_1_outlined),
+            icon: const Icon(CupertinoIcons.person_add),
             label: const Text('註冊並加入'),
           ),
           const SizedBox(height: TpSpacing.s2),
           OutlinedButton.icon(
             key: const ValueKey('invite-login'),
             onPressed: onLogin,
-            icon: const Icon(Icons.login_outlined),
+            icon: const Icon(CupertinoIcons.arrow_right_square),
             label: const Text('登入並加入'),
           ),
         ],
@@ -518,22 +523,22 @@ class _PrimaryAction extends StatelessWidget {
         icon: accepting
             ? const SizedBox.square(
                 dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator.adaptive(strokeWidth: 2),
               )
-            : const Icon(Icons.check_circle_outline),
+            : const Icon(CupertinoIcons.check_mark_circled),
         label: Text(accepting ? '接受中...' : '接受邀請'),
       ),
       InviteAccountStatus.mismatch => FilledButton.icon(
         key: const ValueKey('invite-switch-account'),
         onPressed: onSwitchAccount,
-        icon: const Icon(Icons.switch_account_outlined),
+        icon: const Icon(CupertinoIcons.person_2),
         label: const Text('切換帳號'),
       ),
       InviteAccountStatus.checking => OutlinedButton.icon(
         onPressed: null,
         icon: const SizedBox.square(
           dimension: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator.adaptive(strokeWidth: 2),
         ),
         label: const Text('確認帳號中...'),
       ),
@@ -600,7 +605,7 @@ class _LoadingView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(),
+              const CircularProgressIndicator.adaptive(),
               const SizedBox(height: TpSpacing.s4),
               Text('載入邀請資料...', style: Theme.of(context).textTheme.bodyLarge),
             ],
@@ -681,10 +686,10 @@ String _accountBody(
 
 IconData _accountIcon(InviteAccountStatus status) {
   return switch (status) {
-    InviteAccountStatus.checking => Icons.more_horiz,
-    InviteAccountStatus.anonymous => Icons.arrow_forward_rounded,
-    InviteAccountStatus.matching => Icons.check_rounded,
-    InviteAccountStatus.mismatch => Icons.arrow_forward_rounded,
+    InviteAccountStatus.checking => CupertinoIcons.ellipsis,
+    InviteAccountStatus.anonymous => CupertinoIcons.arrow_right,
+    InviteAccountStatus.matching => CupertinoIcons.checkmark,
+    InviteAccountStatus.mismatch => CupertinoIcons.arrow_right,
   };
 }
 

@@ -211,7 +211,7 @@ class _ShareContent extends StatelessWidget {
                       dimension: 18,
                       child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.picture_as_pdf_outlined),
+                  : const Icon(CupertinoIcons.doc_text),
             ),
             const SizedBox(width: TpSpacing.s2),
             Expanded(

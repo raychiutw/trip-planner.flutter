@@ -152,7 +152,7 @@ class _EntryActionRouteScreenState
               children: [
                 const SizedBox.square(
                   dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 ),
                 const SizedBox(width: TpSpacing.s2),
                 Text('${widget.action.submitLabel}中…'),

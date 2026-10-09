@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -79,7 +80,7 @@ class TripMapLocateButton extends StatelessWidget {
     tooltip: '定位目前位置',
     onPressed: onPressed,
     busy: locating,
-    child: const Icon(Icons.my_location),
+    child: const Icon(CupertinoIcons.location),
   );
 }
 

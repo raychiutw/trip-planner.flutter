@@ -1814,7 +1814,7 @@ class _AlternateCard extends StatelessWidget {
             icon: settingMaster
                 ? const SizedBox.square(
                     dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(CupertinoIcons.arrow_turn_down_left),
             label: const Text('設為正選'),

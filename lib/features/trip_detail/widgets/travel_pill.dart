@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
@@ -78,7 +79,7 @@ class TravelPill extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.location_on_outlined,
+              CupertinoIcons.location,
               size: 17,
               color: colorScheme.onSurfaceVariant,
             ),

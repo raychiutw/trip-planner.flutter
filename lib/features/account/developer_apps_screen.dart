@@ -186,7 +186,7 @@ class _DeveloperAppFormScreenState
   DeveloperApp? get _app => _baselineApp;
 
   String get _pendingLabel {
-    if (_isDeleting) return '正在刪除應用程式';
+    if (_isDeleting) return '正在停用應用程式';
     return _app == null ? '正在建立應用程式' : '正在儲存應用程式';
   }
 
@@ -409,6 +409,18 @@ class _DeveloperAppFormScreenState
                                       });
                                     },
                             ),
+                            if (_app != null) ...[
+                              const SizedBox(height: TpSpacing.s2),
+                              Text(
+                                '應用程式類型建立後無法變更。',
+                                key: const Key(
+                                  'developer-app-client-type-note',
+                                ),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: TpSpacing.s4),
                             TextFormField(
                               key: const Key('developer-app-redirect-uris'),
@@ -474,7 +486,7 @@ class _DeveloperAppFormScreenState
                             ? null
                             : () => unawaited(_confirmDelete()),
                         icon: const Icon(CupertinoIcons.delete),
-                        label: const Text('刪除應用程式'),
+                        label: const Text('停用應用程式'),
                       ),
                     ],
                     const SizedBox(height: TpSpacing.s5),
@@ -586,9 +598,9 @@ class _DeveloperAppFormScreenState
     final confirmed = await showAppDestructiveConfirm(
       context,
       source: TpDestructiveConfirmSource.direct,
-      title: '刪除 ${app.appName}？',
+      title: '停用 ${app.appName}？',
       message: '這會停用 ${app.appName} 的 OAuth 憑證，所有既有連線都將失效。這項操作無法復原。',
-      confirmLabel: '刪除',
+      confirmLabel: '停用',
     );
     if (!confirmed || !mounted) return;
     setState(() {
@@ -603,7 +615,7 @@ class _DeveloperAppFormScreenState
       if (!mounted) return;
       ref.invalidate(developerAppsProvider);
       final container = ProviderScope.containerOf(context, listen: false);
-      showAppNotice(context, '已刪除 ${app.appName}');
+      showAppNotice(context, '已停用 ${app.appName}');
       setState(() {
         _isSubmitting = false;
         _completed = true;
@@ -701,7 +713,7 @@ class _DeveloperAppFormScreenState
 
   String _deleteErrorMessage(Object error) {
     if (error is ApiError) return error.detail ?? error.message;
-    return '刪除應用程式失敗，請稍後再試';
+    return '停用應用程式失敗，請稍後再試';
   }
 }
 
