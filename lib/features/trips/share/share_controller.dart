@@ -20,6 +20,8 @@ class ShareState {
     this.shares = const [],
     this.error,
     this.creating = false,
+    this.createFailed = false,
+    this.rotateFailedId,
     this.updatingId,
     this.revokingId,
     this.rotatingId,
@@ -32,6 +34,12 @@ class ShareState {
   final List<TripShare> shares;
   final String? error;
   final bool creating;
+
+  /// 本次 [error] 來自建立(重試要重做建立,而非只重載清單)。
+  final bool createFailed;
+
+  /// 重新產生失敗的連結 id → 錯誤就地顯示於該列,重試重做重新產生。
+  final int? rotateFailedId;
   final int? updatingId;
   final int? revokingId;
   final int? rotatingId;
@@ -46,6 +54,8 @@ class ShareState {
     List<TripShare>? shares,
     Object? error = _sentinel,
     bool? creating,
+    bool? createFailed,
+    Object? rotateFailedId = _sentinel,
     Object? updatingId = _sentinel,
     Object? revokingId = _sentinel,
     Object? rotatingId = _sentinel,
@@ -58,6 +68,10 @@ class ShareState {
       shares: shares ?? this.shares,
       error: error == _sentinel ? this.error : error as String?,
       creating: creating ?? this.creating,
+      createFailed: createFailed ?? this.createFailed,
+      rotateFailedId: rotateFailedId == _sentinel
+          ? this.rotateFailedId
+          : rotateFailedId as int?,
       updatingId: updatingId == _sentinel
           ? this.updatingId
           : updatingId as int?,
@@ -143,7 +157,12 @@ class ShareController extends Notifier<ShareState> {
         state.deletingId != null) {
       return false;
     }
-    state = state.copyWith(creating: true, error: null, lastCreated: null);
+    state = state.copyWith(
+      creating: true,
+      createFailed: false,
+      error: null,
+      lastCreated: null,
+    );
     try {
       final link = await _repo.createShare(
         tripId,
@@ -160,12 +179,17 @@ class ShareController extends Notifier<ShareState> {
       if (_disposed) return false;
       state = state.copyWith(
         creating: false,
+        createFailed: true,
         error: e.status == 403 ? '沒有權限建立分享' : '建立失敗,請稍後再試',
       );
       return false;
     } on Exception {
       if (_disposed) return false;
-      state = state.copyWith(creating: false, error: '建立失敗,請稍後再試');
+      state = state.copyWith(
+        creating: false,
+        createFailed: true,
+        error: '建立失敗,請稍後再試',
+      );
       return false;
     }
   }
@@ -178,7 +202,7 @@ class ShareController extends Notifier<ShareState> {
         state.deletingId != null) {
       return false;
     }
-    state = state.copyWith(revokingId: shareId, error: null);
+    state = state.copyWith(revokingId: shareId);
     try {
       await _repo.revokeShare(tripId, shareId);
       await _reload();
@@ -187,7 +211,7 @@ class ShareController extends Notifier<ShareState> {
       return true;
     } on Exception {
       if (_disposed) return false;
-      state = state.copyWith(revokingId: null, error: '撤銷失敗,請稍後再試');
+      state = state.copyWith(revokingId: null);
       return false;
     }
   }
@@ -200,7 +224,11 @@ class ShareController extends Notifier<ShareState> {
         state.deletingId != null) {
       return;
     }
-    state = state.copyWith(rotatingId: shareId, error: null, lastCreated: null);
+    state = state.copyWith(
+      rotatingId: shareId,
+      rotateFailedId: null,
+      lastCreated: null,
+    );
     try {
       final rotated = await _repo.rotateShare(tripId, shareId);
       await _reload();
@@ -215,7 +243,7 @@ class ShareController extends Notifier<ShareState> {
       );
     } on Exception {
       if (_disposed) return;
-      state = state.copyWith(rotatingId: null, error: '重新產生失敗,請稍後再試');
+      state = state.copyWith(rotatingId: null, rotateFailedId: shareId);
     }
   }
 
@@ -227,7 +255,7 @@ class ShareController extends Notifier<ShareState> {
         state.rotatingId != null) {
       return false;
     }
-    state = state.copyWith(deletingId: shareId, error: null);
+    state = state.copyWith(deletingId: shareId);
     try {
       await _repo.deleteShare(tripId, shareId);
       await _reload();
@@ -236,7 +264,7 @@ class ShareController extends Notifier<ShareState> {
       return true;
     } on Exception {
       if (_disposed) return false;
-      state = state.copyWith(deletingId: null, error: '刪除失敗,請稍後再試');
+      state = state.copyWith(deletingId: null);
       return false;
     }
   }
@@ -256,7 +284,7 @@ class ShareController extends Notifier<ShareState> {
         state.rotatingId != null) {
       return false;
     }
-    state = state.copyWith(updatingId: shareId, error: null);
+    state = state.copyWith(updatingId: shareId);
     try {
       await _repo.updateShare(
         tripId,
@@ -273,7 +301,7 @@ class ShareController extends Notifier<ShareState> {
       return true;
     } on Exception {
       if (_disposed) return false;
-      state = state.copyWith(updatingId: null, error: '儲存失敗,請稍後再試');
+      state = state.copyWith(updatingId: null);
       return false;
     }
   }
