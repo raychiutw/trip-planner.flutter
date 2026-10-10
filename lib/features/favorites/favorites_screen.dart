@@ -139,7 +139,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 child: Semantics(
                   liveRegion: true,
                   label: '正在載入收藏',
-                  child: const ExcludeSemantics(child: AppListLoadingSkeleton()),
+                  child: const ExcludeSemantics(
+                    child: AppListLoadingSkeleton(),
+                  ),
                 ),
               ),
             ],
