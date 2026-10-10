@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'dynamic_type.dart';
 import 'tp_tap_target.dart';
 
 const _thumbDuration = Duration(milliseconds: 200);
@@ -35,85 +38,150 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
     final count = keys.length;
     final trackRadius = TpRadius.sm + _trackInset;
 
-    final segments = Row(
-      children: [
-        for (final key in keys)
-          Expanded(
-            child: TpTapTarget(
-              onTap: enabled ? () => onChanged!(key) : null,
-              button: true,
-              selected: key == value,
-              inMutuallyExclusiveGroup: true,
-              label: options[key],
-              focusRadius: trackRadius,
-              child: Center(
-                heightFactor: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
-                  child: Text(
-                    options[key]!,
-                    maxLines: 1,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: key == value ? FontWeight.w600 : null,
-                      color: enabled
-                          ? scheme.onSurface
-                          : scheme.onSurface.withAlpha(TpDisabled.contentAlpha),
-                    ),
-                  ),
-                ),
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    Widget segmentFor(T key, {required bool stacked}) => TpTapTarget(
+      onTap: enabled ? () => onChanged!(key) : null,
+      button: true,
+      selected: key == value,
+      inMutuallyExclusiveGroup: true,
+      label: options[key],
+      focusRadius: trackRadius,
+      child: DecoratedBox(
+        // 堆疊時沒有滑動 thumb(各列高度可能不同),直接在被選列上色。
+        decoration: BoxDecoration(
+          color: stacked && key == value
+              ? (enabled
+                    ? scheme.surface
+                    : scheme.surface.withAlpha(
+                        (TpDisabled.controlOpacity * 255).round(),
+                      ))
+              : null,
+          borderRadius: BorderRadius.circular(TpRadius.sm),
+        ),
+        child: Center(
+          heightFactor: 1,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: TpSpacing.s2,
+              vertical: stacked ? TpSpacing.s1 : 0,
+            ),
+            child: Text(
+              options[key]!,
+              maxLines: stacked ? null : 1,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: key == value ? FontWeight.w600 : null,
+                color: enabled
+                    ? scheme.onSurface
+                    : scheme.onSurface.withAlpha(TpDisabled.contentAlpha),
               ),
             ),
           ),
-      ],
+        ),
+      ),
+    );
+
+    Widget track(Widget child) => DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(trackRadius),
+      ),
+      child: Padding(padding: const EdgeInsets.all(_trackInset), child: child),
     );
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 大字級、或單列放不下最寬的標籤時改成上下堆疊:每個選項都完整可見可點,
+        // 不縮字、不靠橫向捲動藏選項。
+        final stacked =
+            isLargeTextScale(context) ||
+            (constraints.hasBoundedWidth &&
+                !_fitsInRow(
+                  context,
+                  labelStyle,
+                  options.values,
+                  constraints.maxWidth - 2 * _trackInset,
+                ));
+        if (stacked) {
+          final column = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [for (final key in keys) segmentFor(key, stacked: true)],
+          );
+          return track(
+            constraints.hasBoundedWidth
+                ? column
+                : IntrinsicWidth(child: column),
+          );
+        }
+        final segments = Row(
+          children: [
+            for (final key in keys)
+              Expanded(child: segmentFor(key, stacked: false)),
+          ],
+        );
         // 有限寬度就填滿;無限寬(水平捲動容器內)則各段等寬於最寬者。
         final body = constraints.hasBoundedWidth
             ? segments
             : IntrinsicWidth(child: segments);
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(trackRadius),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(_trackInset),
-            child: Stack(
-              children: [
-                if (index >= 0)
-                  Positioned.fill(
-                    child: AnimatedAlign(
-                      key: const ValueKey('tp-segment-thumb'),
-                      duration: reduceMotion ? Duration.zero : _thumbDuration,
-                      curve: Curves.easeOut,
-                      alignment: Alignment(
-                        count == 1 ? 0 : -1 + 2 * index / (count - 1),
-                        0,
-                      ),
-                      child: FractionallySizedBox(
-                        widthFactor: 1 / count,
-                        heightFactor: 1,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: enabled
-                                ? scheme.surface
-                                : scheme.surface.withAlpha(
-                                    (TpDisabled.controlOpacity * 255).round(),
-                                  ),
-                            borderRadius: BorderRadius.circular(TpRadius.sm),
-                          ),
+        return track(
+          Stack(
+            children: [
+              if (index >= 0)
+                Positioned.fill(
+                  child: AnimatedAlign(
+                    key: const ValueKey('tp-segment-thumb'),
+                    duration: reduceMotion ? Duration.zero : _thumbDuration,
+                    curve: Curves.easeOut,
+                    alignment: Alignment(
+                      count == 1 ? 0 : -1 + 2 * index / (count - 1),
+                      0,
+                    ),
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / count,
+                      heightFactor: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: enabled
+                              ? scheme.surface
+                              : scheme.surface.withAlpha(
+                                  (TpDisabled.controlOpacity * 255).round(),
+                                ),
+                          borderRadius: BorderRadius.circular(TpRadius.sm),
                         ),
                       ),
                     ),
                   ),
-                body,
-              ],
-            ),
+                ),
+              body,
+            ],
           ),
         );
       },
     );
+  }
+
+  /// 每段等寬時,最寬的標籤(含左右內距)是否放得進單列。
+  bool _fitsInRow(
+    BuildContext context,
+    TextStyle? style,
+    Iterable<String> labels,
+    double width,
+  ) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    var widest = 0.0;
+    for (final label in labels) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: style),
+        textDirection: direction,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      widest = math.max(widest, painter.width);
+      painter.dispose();
+    }
+    return (widest + 2 * TpSpacing.s2) * labels.length <= width;
   }
 }

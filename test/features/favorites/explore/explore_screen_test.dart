@@ -552,4 +552,11 @@ void main() {
     expect(find.text('搜尋失敗,請稍後再試'), findsNothing);
     expect(find.text('沒有找到「東京」的結果。換個關鍵字試試?'), findsOneWidget);
   });
+
+  testWidgets('進頁自動搜尋預設地區時,搜尋框同步回填關鍵字', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final field = tester.widget<EditableText>(find.byType(EditableText).first);
+    expect(field.controller.text, '東京');
+  });
 }

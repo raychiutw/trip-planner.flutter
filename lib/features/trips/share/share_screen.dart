@@ -21,6 +21,7 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../app/irreversible_action.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/dynamic_type.dart';
 import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -312,6 +313,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       onCopy: _copy,
                       onShare: _share,
                     ),
+                  if (state.lastCreated != null)
+                    const SizedBox(height: TpSpacing.s3),
                   Text(
                     '使用中的連結（${activeShares.length}）',
                     style: Theme.of(context).textTheme.titleMedium,
@@ -360,11 +363,20 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           TextField(
                             key: const ValueKey('share-label'),
                             controller: _label,
-                            decoration: const InputDecoration(
-                              labelText: '標籤（選填,如「給爸媽」）',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
+                            // 浮動 label 只有單行,大字級會被截成「給爸…」;
+                            // 改用可換行的 hint 完整顯示。
+                            decoration: isLargeTextScale(context)
+                                ? const InputDecoration(
+                                    hintText: '標籤（選填,如「給爸媽」）',
+                                    hintMaxLines: 4,
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  )
+                                : const InputDecoration(
+                                    labelText: '標籤（選填,如「給爸媽」）',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
                           ),
                           const SizedBox(height: TpSpacing.s3),
                           Text(
@@ -395,17 +407,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                           const SizedBox(height: TpSpacing.s1),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: TpSegmentedControl<String>(
-                              value: _expiryKey,
-                              onChanged: (next) =>
-                                  setState(() => _expiryKey = next),
-                              options: {
-                                for (final key in _expiryPresets.keys)
-                                  key: _expiryLabels[key] ?? key,
-                              },
-                            ),
+                          TpSegmentedControl<String>(
+                            value: _expiryKey,
+                            onChanged: (next) =>
+                                setState(() => _expiryKey = next),
+                            options: {
+                              for (final key in _expiryPresets.keys)
+                                key: _expiryLabels[key] ?? key,
+                            },
                           ),
                           if (_expiryKey == 'custom') ...[
                             const SizedBox(height: TpSpacing.s2),
@@ -423,14 +432,35 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                 padding: const EdgeInsets.only(
                                   top: TpSpacing.s1,
                                 ),
-                                child: Text(
-                                  '請選擇到期日',
-                                  key: const ValueKey('share-expiry-required'),
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
+                                child: Row(
+                                  key: const ValueKey(
+                                    'share-expiry-required-row',
                                   ),
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      CupertinoIcons.exclamationmark_circle,
+                                      size: 18,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                                    const SizedBox(width: TpSpacing.s1),
+                                    Expanded(
+                                      child: Text(
+                                        '請選擇到期日',
+                                        key: const ValueKey(
+                                          'share-expiry-required',
+                                        ),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                           ],
@@ -996,22 +1026,19 @@ class _EditShareFormState extends State<_EditShareForm> {
         const SizedBox(height: TpSpacing.s2),
         Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: TpSpacing.s1),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: TpSegmentedControl<String>(
-            value: _expiryKey,
-            onChanged: (next) {
-              setState(() {
-                _expiryKey = next;
-                _error = null;
-              });
-              _syncFormState();
-            },
-            options: {
-              for (final key in _expiryPresets.keys)
-                key: _expiryLabels[key] ?? key,
-            },
-          ),
+        TpSegmentedControl<String>(
+          value: _expiryKey,
+          onChanged: (next) {
+            setState(() {
+              _expiryKey = next;
+              _error = null;
+            });
+            _syncFormState();
+          },
+          options: {
+            for (final key in _expiryPresets.keys)
+              key: _expiryLabels[key] ?? key,
+          },
         ),
         if (_expiryKey == 'custom') ...[
           const SizedBox(height: TpSpacing.s2),

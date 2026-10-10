@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/ui/tp_segmented_control.dart';
@@ -1007,5 +1008,81 @@ void main() {
       );
     }
     semantics.dispose();
+  });
+
+  testWidgets('2.0 倍字級:有效期限五個選項都可見,標籤欄提示不被截成「給爸…」', (tester) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      buildApp(theme: AppTheme.dark(), textScaler: const TextScaler.linear(2)),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find.byType(Scrollable).first;
+    for (final label in ['永久', '24 小時', '7 天', '30 天', '自訂']) {
+      final finder = find
+          .descendant(
+            of: find.byType(TpSegmentedControl<String>).first,
+            matching: find.text(label),
+          )
+          .first;
+      await tester.scrollUntilVisible(finder, 200, scrollable: scrollable);
+      expect(
+        tester.getRect(finder).right,
+        lessThanOrEqualTo(393),
+        reason: label,
+      );
+    }
+    final hint = find.textContaining('給爸媽」');
+    expect(hint, findsOneWidget);
+    expect(
+      tester.renderObject<RenderParagraph>(hint).didExceedMaxLines,
+      isFalse,
+      reason: '提示文字要換行完整顯示',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('建立成功後結果卡與「使用中的連結」標題之間要有間距', (tester) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(id: 99, token: 'tk', url: '/s/tk'),
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+    final card = tester.getRect(
+      find.byKey(const ValueKey('share-created-card')),
+    );
+    final title = tester.getRect(find.textContaining('使用中的連結'));
+    expect(title.top - card.bottom, greaterThanOrEqualTo(12));
+  });
+
+  testWidgets('未選到期日的提示帶警示圖示與粗體,不只靠顏色', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+    final text = tester.widget<Text>(find.text('請選擇到期日'));
+    expect(text.style?.fontWeight, FontWeight.w600);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('share-expiry-required-row')),
+        matching: find.byIcon(CupertinoIcons.exclamationmark_circle),
+      ),
+      findsOneWidget,
+    );
   });
 }

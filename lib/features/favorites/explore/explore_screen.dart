@@ -40,9 +40,13 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final controller = ref.read(exploreControllerProvider.notifier);
       await controller.ensureSavedLoaded();
+      if (!mounted) return;
       final state = ref.read(exploreControllerProvider);
       if (!state.hasSearched) {
-        await controller.search(state.region != '全部地區' ? state.region : '東京');
+        final query = state.region != '全部地區' ? state.region : '東京';
+        // 自動搜尋也要回填搜尋框,否則空欄位配上「沒有找到『東京』」會對不起來。
+        if (_searchController.text.isEmpty) _searchController.text = query;
+        await controller.search(query);
       }
     });
   }
