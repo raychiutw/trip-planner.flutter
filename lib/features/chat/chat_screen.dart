@@ -16,8 +16,10 @@ import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/tp_state_view.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
@@ -180,9 +182,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         // 自動重試仍保留錯誤出口；已有清單時讓對話與草稿繼續留在原處。
         skipLoadingOnReload: tripsAsync.retrying,
         skipError: trips.isNotEmpty,
-        loading: () => initiallyBelowHeader(
-          const Center(child: CircularProgressIndicator.adaptive()),
-        ),
+        loading: () =>
+            initiallyBelowHeader(const TpLoadingIndicator(label: '正在載入行程')),
         error: (e, _) => initiallyBelowHeader(
           Semantics(
             liveRegion: true,
@@ -209,7 +210,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if ((selectedAsync.isLoading && _pendingRouteTripId == null) ||
               (_pendingRouteTripId != null && tripId != _pendingRouteTripId)) {
             return initiallyBelowHeader(
-              const Center(child: CircularProgressIndicator.adaptive()),
+              const TpLoadingIndicator(label: '正在載入行程'),
             );
           }
           final pendingPrefill =
@@ -641,11 +642,7 @@ class _JumpToLatestButton extends StatelessWidget {
         tooltip: '回到最新訊息',
         padding: EdgeInsets.zero,
         onPressed: onPressed,
-        icon: const Icon(
-          CupertinoIcons.chevron_down,
-          size: 20,
-          semanticLabel: '回到最新訊息',
-        ),
+        icon: const Icon(CupertinoIcons.chevron_down, size: 20),
       ),
     ),
   );
@@ -769,15 +766,18 @@ class _MessageBubble extends StatelessWidget {
         ],
       );
     } else if (isAssistant && message.isMarkdown) {
-      content = MarkdownBody(
-        data: message.text,
-        onTapLink: (text, href, title) {
-          final loc = mapReplyLink(href ?? '', tripId);
-          if (loc != null) context.push(loc);
-        },
+      content = SelectionArea(
+        child: MarkdownBody(
+          data: message.text,
+          onTapLink: (text, href, title) {
+            final loc = mapReplyLink(href ?? '', tripId);
+            if (loc != null) context.push(loc);
+          },
+        ),
       );
     } else {
-      content = Text(message.text);
+      // 長按即出系統選取／拷貝選單,AI 回覆與使用者訊息都能複製。
+      content = SelectionArea(child: Text(message.text));
     }
 
     return Padding(
@@ -1033,10 +1033,7 @@ class _ComposerState extends ConsumerState<_Composer> {
                               ),
                             ),
                           )
-                        : const Icon(
-                            CupertinoIcons.arrow_up_circle_fill,
-                            semanticLabel: '送出訊息',
-                          ),
+                        : const Icon(CupertinoIcons.arrow_up_circle_fill),
                   )
                 else
                   IconButton(
@@ -1046,7 +1043,6 @@ class _ComposerState extends ConsumerState<_Composer> {
                     color: _listening ? scheme.primary : null,
                     icon: Icon(
                       _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
-                      semanticLabel: _listening ? '停止語音輸入' : '語音輸入',
                     ),
                   ),
               ],
@@ -1090,9 +1086,9 @@ class _EmptyStatePrompts extends StatelessWidget {
               alignment: WrapAlignment.center,
               children: [
                 for (var i = 0; i < _suggestedPrompts.length; i++)
-                  ActionChip(
+                  TpChip(
                     key: ValueKey('chat-suggestion-$i'),
-                    label: Text(_suggestedPrompts[i]),
+                    label: _suggestedPrompts[i],
                     onPressed: sending
                         ? null
                         : () => onSelect(_suggestedPrompts[i]),
@@ -1188,9 +1184,12 @@ class _Banner extends StatelessWidget {
             ),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
-              child: Text(
-                text,
-                style: TextStyle(color: scheme.onErrorContainer),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  text,
+                  style: TextStyle(color: scheme.onErrorContainer),
+                ),
               ),
             ),
             if (onRetry != null)

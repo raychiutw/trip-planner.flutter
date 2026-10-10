@@ -267,6 +267,26 @@ void main() {
     expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
   });
 
+  testWidgets('帳號頁版本 footer 在 AX 字級可換行,不被單行截斷', (tester) async {
+    await pumpAccountEntry(tester, textScaler: const TextScaler.linear(3));
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+
+    final footer = find.byKey(const ValueKey('account-version-footer'));
+    await tester.scrollUntilVisible(
+      footer,
+      500,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('account-sheet-content')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tester.widget<Text>(footer).maxLines, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Account grouped list 在 200% Dynamic Type 維持可捲動與可辨識語意', (
     tester,
   ) async {
@@ -501,16 +521,28 @@ void main() {
     expect(find.text('此操作無法復原。'), findsNothing);
     expect(find.textContaining('此操作無法復原'), findsOneWidget);
     expect(find.text('目前密碼（重新驗證）'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
     expect(
-      tester
-          .widget<TextButton>(find.widgetWithText(TextButton, '取消'))
-          .autofocus,
-      isTrue,
+      find.descendant(
+        of: find.byKey(const ValueKey('delete-account-dialog')),
+        matching: find.byType(CupertinoTextField),
+      ),
+      findsOneWidget,
     );
     final confirmButton = find.byKey(
       const ValueKey('delete-account-confirm-button'),
     );
-    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNull);
+    final confirmAction = tester.widget<CupertinoDialogAction>(confirmButton);
+    expect(confirmAction.isDestructiveAction, isTrue);
+    expect(confirmAction.onPressed, isNull);
+    expect(
+      tester
+          .widget<CupertinoTextField>(
+            find.byKey(const ValueKey('delete-account-confirmation-field')),
+          )
+          .autofillHints,
+      contains(AutofillHints.password),
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('delete-account-confirmation-field')),
@@ -527,7 +559,50 @@ void main() {
       ),
     ).called(1);
     expect(find.text('密碼不正確，請重新輸入'), findsOneWidget);
+    final errorText = tester.widget<Text>(find.text('密碼不正確，請重新輸入'));
+    expect(
+      errorText.style?.color,
+      Theme.of(tester.element(find.text('密碼不正確，請重新輸入'))).colorScheme.onSurface,
+      reason: '錯誤文字用 onSurface 才能達 4.5:1，不用紅字',
+    );
     expect(find.byKey(const ValueKey('delete-account-dialog')), findsOneWidget);
+  });
+
+  testWidgets('刪除預覽遇到伺服器錯誤：不說網路問題，也不外洩 detail', (tester) async {
+    when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenThrow(
+      const ApiError(
+        status: 500,
+        code: 'INTERNAL',
+        message: 'internal',
+        detail: 'D1_ERROR: boom',
+      ),
+    );
+    await pumpAccountScreen(tester);
+
+    final deleteRow = find.byKey(const ValueKey('settings-delete-account'));
+    await tester.ensureVisible(deleteRow);
+    await tester.tap(deleteRow);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.textContaining('D1_ERROR'), findsNothing);
+    expect(find.textContaining('網路'), findsNothing);
+    expect(find.text('無法載入刪除資訊'), findsOneWidget);
+  });
+
+  testWidgets('刪除預覽斷線：提示檢查網路', (tester) async {
+    when(
+      () => mockAuthRepository.fetchAccountDeletionPreview(),
+    ).thenThrow(Exception('offline'));
+    await pumpAccountScreen(tester);
+
+    final deleteRow = find.byKey(const ValueKey('settings-delete-account'));
+    await tester.ensureVisible(deleteRow);
+    await tester.tap(deleteRow);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.textContaining('網路'), findsOneWidget);
   });
 
   testWidgets('純 OAuth 帳號無 fresh-auth 契約時安全阻擋刪除', (tester) async {

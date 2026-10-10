@@ -10,6 +10,8 @@ import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_chip.dart';
+import 'package:tripline/ui/tp_tag.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -88,8 +90,45 @@ void main() {
     expect(find.text('更新'), findsOneWidget);
     expect(find.text('停留點'), findsOneWidget);
     expect(find.text('ray@example.com'), findsOneWidget);
-    expect(find.textContaining('title'), findsOneWidget);
+    expect(find.textContaining('標題'), findsOneWidget);
     expect(find.textContaining('首里城 → 首里城公園'), findsOneWidget);
+    // 動作、資料表、筆數是唯讀資訊,不得用按鈕語意的 TpChip。
+    expect(find.byType(TpChip), findsNothing);
+    expect(find.widgetWithText(TpTag, '更新'), findsOneWidget);
+    expect(find.widgetWithText(TpTag, '停留點'), findsOneWidget);
+  });
+
+  testWidgets('不對使用者顯示內部 id、Request/Record 編號與 system 字樣', (tester) async {
+    when(
+      () => repository.fetchAuditLog(
+        'trip-1',
+        limit: any(named: 'limit'),
+        requestId: any(named: 'requestId'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        ...rows,
+        const TripAuditRow(
+          id: 9,
+          tripId: 'trip-1',
+          tableName: 'trip_entries',
+          recordId: 102,
+          action: TripAuditAction.delete,
+          diffJson: '{"start_time":{"old":"09:00","new":"10:00"}}',
+          createdAt: '2026-07-09T11:00:00Z',
+        ),
+      ],
+    );
+    await pumpScreen(tester);
+
+    expect(find.textContaining('#8'), findsNothing);
+    expect(find.textContaining('#9'), findsNothing);
+    expect(find.textContaining('Request'), findsNothing);
+    expect(find.textContaining('Record'), findsNothing);
+    expect(find.text('system'), findsNothing);
+    expect(find.text('系統'), findsOneWidget);
+    expect(find.textContaining('開始時間: 09:00 → 10:00'), findsOneWidget);
+    expect(find.textContaining('start_time'), findsNothing);
   });
 
   testWidgets('audit log 是唯讀紀錄，更新與刪除 row 都不提供回滾入口', (tester) async {

@@ -15,6 +15,8 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
+import '../../helpers/contrast.dart';
+
 class MockAuthRepository extends Mock implements AuthRepository {}
 
 void main() {
@@ -106,6 +108,21 @@ void main() {
   }
 
   group('渲染', () {
+    testWidgets('品牌標題是 VoiceOver header', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpLoginScreen(tester);
+
+      expect(
+        tester
+            .getSemantics(find.text('Tripline'))
+            .getSemanticsData()
+            .flagsCollection
+            .isHeader,
+        isTrue,
+      );
+      handle.dispose();
+    });
+
     testWidgets('品牌區、email 欄位、密碼欄位、登入按鈕存在', (tester) async {
       await pumpLoginScreen(tester);
 
@@ -348,6 +365,37 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('送出中欄位改 readOnly 並保留焦點（鍵盤不收起）', (tester) async {
+      final pendingLogin = Completer<UserInfo>();
+      when(
+        () => mockAuthRepository.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) => pendingLogin.future);
+      await pumpLoginScreen(tester);
+
+      await tester.enterText(find.byKey(emailFieldKey), 'ray@example.com');
+      await tester.enterText(find.byKey(passwordFieldKey), 'secret');
+      await tester.tap(find.byKey(submitButtonKey));
+      await tester.pump();
+
+      final passwordField = innerTextFieldOf(tester, passwordFieldKey);
+      expect(passwordField.readOnly, isTrue);
+      expect(passwordField.enabled, isTrue);
+      expect(innerTextFieldOf(tester, emailFieldKey).readOnly, isTrue);
+      final editable = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(passwordFieldKey),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(editable.focusNode.hasFocus, isTrue);
+
+      pendingLogin.complete(loggedInUser);
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('鍵盤 Next 移到密碼，Done 送出既有 login contract', (tester) async {
       when(
         () => mockAuthRepository.login(
@@ -469,6 +517,35 @@ void main() {
       final semantics = tester.getSemantics(find.byKey(errorBannerKey));
       expect(semantics.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
     });
+
+    for (final brightness in Brightness.values) {
+      testWidgets('登入錯誤橫幅文字對比 ≥ 4.5:1（${brightness.name}）', (tester) async {
+        when(
+          () => mockAuthRepository.login(
+            email: any(named: 'email'),
+            password: any(named: 'password'),
+          ),
+        ).thenAnswer(
+          (_) async => throw const ApiError(
+            status: 401,
+            code: 'LOGIN_INVALID',
+            message: '帳號或密碼錯誤',
+          ),
+        );
+        await pumpLoginScreen(tester, brightness: brightness);
+        await tester.enterText(find.byKey(emailFieldKey), 'ray@example.com');
+        await tester.enterText(find.byKey(passwordFieldKey), 'wrong');
+        await tester.tap(find.byKey(submitButtonKey));
+        await tester.pumpAndSettle();
+
+        final finder = find.text('帳號或密碼錯誤');
+        final scheme = Theme.of(tester.element(finder)).colorScheme;
+        expect(
+          errorTextContrast(tester.widget<Text>(finder).style?.color, scheme),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+    }
 
     testWidgets('LOGIN_RATE_LIMITED 英文 message：改用繁中人話 fallback', (
       tester,

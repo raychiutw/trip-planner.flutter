@@ -103,11 +103,14 @@ void main() {
     );
     expect(
       tester
-          .widget<TextFormField>(
-            find.byKey(const ValueKey('login-email-field')),
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(const ValueKey('login-email-field')),
+              matching: find.byType(TextField),
+            ),
           )
-          .enabled,
-      isFalse,
+          .readOnly,
+      isTrue,
     );
     expect(
       tester
@@ -162,12 +165,28 @@ void main() {
   });
 
   testWidgets('OAuth 登入失敗 → 顯示錯誤', (tester) async {
-    when(() => oauthLogin.login()).thenThrow(OAuthLoginException('登入逾時'));
+    when(
+      () => oauthLogin.login(),
+    ).thenThrow(OAuthLoginException('登入逾時', userMessage: '登入逾時'));
 
     await pump(tester, oauthEnabled: true);
     await tester.tap(find.byKey(const ValueKey('login-oauth-button')));
     await tester.pumpAndSettle();
     expect(find.text('登入逾時'), findsOneWidget);
+  });
+
+  testWidgets('OAuth 技術性錯誤不外洩 client_id／埠號，改顯示通用訊息', (tester) async {
+    when(() => oauthLogin.login()).thenThrow(
+      OAuthLoginException('未設定 OAuth client_id(--dart-define) 127.0.0.1:53682'),
+    );
+
+    await pump(tester, oauthEnabled: true);
+    await tester.tap(find.byKey(const ValueKey('login-oauth-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('client_id'), findsNothing);
+    expect(find.textContaining('53682'), findsNothing);
+    expect(find.text('Tripline 登入失敗，請稍後再試'), findsOneWidget);
   });
 
   testWidgets('Tripline 登入發生未預期錯誤時顯示易懂訊息', (tester) async {

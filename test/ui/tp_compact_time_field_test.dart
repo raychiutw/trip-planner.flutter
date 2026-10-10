@@ -1,3 +1,4 @@
+import '../helpers/semantics_flags.dart';
 import 'package:flutter/cupertino.dart' show CupertinoDatePicker;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -467,5 +468,29 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('時間欄位的驗證訊息是 liveRegion', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: TpCompactTimeField(
+            label: '結束',
+            value: const TimeOfDay(hour: 9, minute: 0),
+            onChanged: (_) {},
+            errorKey: const ValueKey('time-error'),
+            errorText: '結束時間需晚於開始時間',
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.isLiveRegionOf(find.byKey(const ValueKey('time-error'))),
+      isTrue,
+    );
+    handle.dispose();
   });
 }

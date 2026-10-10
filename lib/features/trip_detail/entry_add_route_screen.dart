@@ -14,13 +14,20 @@ import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_progress_bar.dart';
+import '../../ui/tp_chip.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_action_item.dart';
+import '../../ui/tp_picker_field.dart';
+import '../../ui/tp_segmented_control.dart';
+import '../../ui/tp_selection_circle.dart';
 import '../favorites/favorites_providers.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'trip_providers.dart';
 import 'widgets/entry_edit_sheet.dart';
+import '../../models/display_format.dart';
 
 /// 新增停留點頁的初始模式。
 enum EntryAddMode { search, favorites, custom }
@@ -29,7 +36,7 @@ enum _EntryAddCategory { all, attraction, food, hotel, shopping }
 
 const _entryAddRegionOptions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
 const _entryAddCategoryChips = [
-  (_EntryAddCategory.all, '為你推薦'),
+  (_EntryAddCategory.all, '全部'),
   (_EntryAddCategory.attraction, '景點'),
   (_EntryAddCategory.food, '美食'),
   (_EntryAddCategory.hotel, '住宿'),
@@ -76,6 +83,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   String? _favoritesError;
   final Set<int> _selectedFavoriteIds = <int>{};
   bool _submittingSelected = false;
+  // 批次加入進度：已寫入筆數／總筆數（只在 _submittingSelected 期間有意義）。
+  int _submitDone = 0;
+  int _submitTotal = 0;
   bool _dirty = false;
   late String _region;
   _EntryAddCategory _category = _EntryAddCategory.all;
@@ -219,8 +229,13 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       return;
     }
 
+    final total = _mode == EntryAddMode.search
+        ? selectedPois.length
+        : selectedFavorites.length;
     setState(() {
       _submittingSelected = true;
+      _submitDone = 0;
+      _submitTotal = total;
       _searchError = null;
       _favoritesError = null;
     });
@@ -245,6 +260,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
           setState(() {
             _selectedPlaceIds.remove(poi.placeId);
             _searchPoiTypeOverrides.remove(poi.placeId);
+            _submitDone++;
           });
         }
       } else {
@@ -260,15 +276,26 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             source: 'favorite',
           );
           if (!mounted) return;
-          setState(() => _selectedFavoriteIds.remove(favorite.id));
+          setState(() {
+            _selectedFavoriteIds.remove(favorite.id);
+            _submitDone++;
+          });
         }
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
       context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
     } on Exception {
+      // 部分已寫入：時間軸必須重抓，否則看不到已成功的項目。
+      if (_submitDone > 0) ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
-      setState(() => _setSubmitError('加入行程失敗，請稍後再試'));
+      setState(
+        () => _setSubmitError(
+          _submitDone > 0
+              ? '已加入 $_submitDone／$_submitTotal 筆，其餘未加入，請稍後再試'
+              : '加入行程失敗，請稍後再試',
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _submittingSelected = false);
@@ -426,8 +453,12 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                                       .retry(),
                                 ),
                               ),
-                            if (daysAsync.isLoading)
-                              const LinearProgressIndicator(),
+                            if (daysAsync.isLoading) const TpProgressBar(),
+                            if (_submittingSelected && _submitTotal > 0)
+                              _BatchProgress(
+                                done: _submitDone,
+                                total: _submitTotal,
+                              ),
                             _DayPicker(
                               days: days,
                               selectedDayNum: dayNum,
@@ -437,27 +468,14 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                               }),
                             ),
                             const SizedBox(height: TpSpacing.s3),
-                            SegmentedButton<EntryAddMode>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: EntryAddMode.search,
-                                  icon: Icon(Icons.search),
-                                  label: Text('搜尋'),
-                                ),
-                                ButtonSegment(
-                                  value: EntryAddMode.favorites,
-                                  icon: Icon(Icons.favorite_border),
-                                  label: Text('收藏'),
-                                ),
-                                ButtonSegment(
-                                  value: EntryAddMode.custom,
-                                  icon: Icon(Icons.edit_location_alt_outlined),
-                                  label: Text('自訂'),
-                                ),
-                              ],
-                              selected: {_mode},
-                              onSelectionChanged: (values) =>
-                                  _setMode(values.first),
+                            TpSegmentedControl<EntryAddMode>(
+                              value: _mode,
+                              options: const {
+                                EntryAddMode.search: '搜尋',
+                                EntryAddMode.favorites: '收藏',
+                                EntryAddMode.custom: '自訂',
+                              },
+                              onChanged: _setMode,
                             ),
                             const SizedBox(height: TpSpacing.s2),
                             if (_mode == EntryAddMode.search ||
@@ -534,6 +552,39 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// 批次加入進度：第 n／m 筆，供 VoiceOver 朗讀。
+class _BatchProgress extends StatelessWidget {
+  const _BatchProgress({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    // 進行中的是「下一筆」，全部寫完前不超過 total。
+    final current = (done + 1).clamp(1, total);
+    final label = '正在加入第 $current／$total 筆…';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+      child: Semantics(
+        key: const ValueKey('entry-add-progress'),
+        label: label,
+        container: true,
+        excludeSemantics: true,
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TpProgressBar(value: done / total, semanticLabel: null),
+            const SizedBox(height: TpSpacing.s2),
+            Text(label),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -638,8 +689,9 @@ class _FavoritePoiPanel extends StatelessWidget {
               subtitle: favorite.poiAddress == null
                   ? null
                   : Text(favorite.poiAddress!),
-              trailing: Checkbox(
-                value: selectedFavoriteIds.contains(favorite.id),
+              trailing: TpSelectionCircle(
+                selected: selectedFavoriteIds.contains(favorite.id),
+                semanticLabel: '選取 ${favorite.displayName}',
                 onChanged: submitting ? null : (_) => onToggle(favorite),
               ),
               onTap: submitting ? null : () => onToggle(favorite),
@@ -726,7 +778,7 @@ class _SearchPoiPanel extends StatelessWidget {
         ),
         if (searching) ...[
           const SizedBox(height: TpSpacing.s1),
-          const LinearProgressIndicator(minHeight: 2),
+          const TpProgressBar(height: 2, semanticLabel: '搜尋中'),
         ],
         if (error != null)
           Padding(
@@ -767,8 +819,9 @@ class _SearchPoiPanel extends StatelessWidget {
                     onPoiTypeChanged: (nextType) =>
                         onPoiTypeChanged(poi, nextType),
                   ),
-                  trailing: Checkbox(
-                    value: selected,
+                  trailing: TpSelectionCircle(
+                    selected: selected,
+                    semanticLabel: '選取 ${poi.name}',
                     onChanged: submitting ? null : (_) => onToggle(poi),
                   ),
                   onTap: submitting ? null : () => onToggle(poi),
@@ -821,23 +874,13 @@ class _SearchPoiSubtitle extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: TpSpacing.s2),
-              DropdownButton<String>(
+              TpPickerField<String>(
                 key: ValueKey('entry-add-poi-type-${poi.placeId}'),
+                label: '類型',
+                compact: true,
                 value: poiType,
-                isDense: true,
-                underline: const SizedBox.shrink(),
-                onChanged: enabled
-                    ? (value) {
-                        if (value != null) onPoiTypeChanged(value);
-                      }
-                    : null,
-                items: [
-                  for (final entry in kPoiTypeLabels.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ),
-                ],
+                options: kPoiTypeLabels,
+                onChanged: enabled ? onPoiTypeChanged : null,
               ),
             ],
           ),
@@ -864,7 +907,7 @@ class _EntryAddCategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: TpSpacing.tapMin,
+      height: scaledTapMin(context),
       child: ListView.separated(
         key: const ValueKey('entry-add-category-list'),
         scrollDirection: Axis.horizontal,
@@ -872,11 +915,11 @@ class _EntryAddCategoryFilter extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
         itemBuilder: (context, index) {
           final (category, label) = _entryAddCategoryChips[index];
-          return FilterChip(
+          return TpChip(
             key: ValueKey('entry-add-category-${category.name}'),
             selected: selected == category,
-            onSelected: (_) => onSelected(category),
-            label: Text(label),
+            onPressed: () => onSelected(category),
+            label: label,
           );
         },
       ),
@@ -919,7 +962,7 @@ class _DayPicker extends StatelessWidget {
                   key: ValueKey('entry-add-day-${day.dayNum}'),
                   title: Text(_dayLabel(day)),
                   trailing: day.dayNum == selectedDayNum
-                      ? const Icon(Icons.check)
+                      ? const Icon(CupertinoIcons.check_mark)
                       : null,
                   onTap: () => select(day.dayNum),
                 ),
@@ -931,18 +974,14 @@ class _DayPicker extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(_dayLabel(selectedDay))),
-          const Icon(Icons.keyboard_arrow_down),
+          const Icon(CupertinoIcons.chevron_down),
         ],
       ),
     );
   }
 }
 
-String _dayLabel(TripDay day) {
-  final title = day.displayTitle;
-  if (title == 'Day ${day.dayNum}') return 'DAY ${day.dayNum}';
-  return 'DAY ${day.dayNum} · $title';
-}
+String _dayLabel(TripDay day) => dayLabel(day.dayNum, title: day.displayTitle);
 
 String _normaliseRegion(String? region) {
   final trimmed = region?.trim();

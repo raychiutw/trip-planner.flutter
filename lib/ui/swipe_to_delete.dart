@@ -72,8 +72,12 @@ class _SwipeToDeleteState extends State<SwipeToDelete>
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
+          // 動作鈕寬度跟著字級長,文字才放得下;最多佔一半寬,避免吃掉整列。
+          final actionWidth = MediaQuery.textScalerOf(
+            context,
+          ).scale(_actionWidth);
           final extentRatio = constraints.maxWidth.isFinite
-              ? (_actionWidth / constraints.maxWidth).clamp(0.0, 1.0)
+              ? (actionWidth / constraints.maxWidth).clamp(0.0, 0.5)
               : 0.24;
           return Slidable(
             key: widget.dismissKey,
@@ -104,23 +108,21 @@ class _SwipeToDeleteState extends State<SwipeToDelete>
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(CupertinoIcons.delete, color: scheme.onError),
-                          const SizedBox(height: TpSpacing.s1),
-                          Text(
-                            widget.actionLabel,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: scheme.onError,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ],
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.delete, color: scheme.onError),
+                        const SizedBox(height: TpSpacing.s1),
+                        Text(
+                          widget.actionLabel,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: scheme.onError,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

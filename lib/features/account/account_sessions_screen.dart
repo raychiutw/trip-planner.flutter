@@ -7,13 +7,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
+import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_settings_group.dart';
 import 'account_display.dart';
 import 'connected_apps_screen.dart';
 
@@ -39,25 +41,9 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   Widget build(BuildContext context) {
     final sessionsAsync = ref.watch(accountSessionsProvider);
     final currentUser = ref.watch(authStateProvider).value;
-    final sessionsPage = sessionsAsync.value;
-    final canRevokeOthers =
-        sessionsPage?.sessions.any((session) => !session.isCurrent) ?? false;
 
     return Scaffold(
-      appBar: TpAppBar(
-        role: TpAppBarRole.detail,
-        title: const Text('登入裝置'),
-        actions: [
-          TpToolbarGlassButton(
-            key: const Key('account-sessions-revoke-others'),
-            tooltip: '登出其他裝置',
-            onPressed: canRevokeOthers
-                ? () => unawaited(_showRevokeOtherSessionsBlocked())
-                : null,
-            child: const Icon(CupertinoIcons.square_arrow_right),
-          ),
-        ],
-      ),
+      appBar: TpAppBar(role: TpAppBarRole.detail, title: const Text('登入裝置')),
       body: sessionsAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: Key('account-sessions-loading')),
@@ -70,6 +56,15 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
           busySessionSid: _busySessionSid,
           mutationError: _mutationError,
           onRetry: () => ref.invalidate(accountSessionsProvider),
+          onRefresh: () async {
+            ref.invalidate(accountSessionsProvider);
+            // 等資料回來才收起轉圈；失敗時由 provider 的 error 狀態呈現。
+            try {
+              await ref.read(accountSessionsProvider.future);
+            } on Object {
+              // 錯誤畫面會接手，這裡只需結束轉圈。
+            }
+          },
           onRevoke: _revokeSession,
           onOpenConnectedApps: () {
             unawaited(
@@ -83,18 +78,6 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
           onLogout: () => _confirmLogout(context, ref),
         ),
       ),
-    );
-  }
-
-  Future<void> _showRevokeOtherSessionsBlocked() async {
-    await showAppAlert(
-      context,
-      key: const ValueKey('revoke-other-sessions-blocked-dialog'),
-      title: '目前無法一次登出其他裝置',
-      message:
-          '目前無法驗證身分以一次登出其他裝置。'
-          '請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。',
-      actionLabel: '返回裝置清單',
     );
   }
 
@@ -126,22 +109,14 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showAppDestructiveConfirm(
-      context,
-      source: TpDestructiveConfirmSource.direct,
-      title: '登出帳號',
-      message: '確定要登出嗎？',
-      confirmLabel: '登出',
-    );
+    final shouldLogout = await confirmLogout(context, ref);
     if (shouldLogout && mounted) {
       await ref.read(authStateProvider.notifier).logout();
     }
   }
 
-  String _errorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return '登出裝置失敗，請稍後再試';
-  }
+  String _errorMessage(Object error) =>
+      userFacingApiError(error, fallback: '登出裝置失敗，請稍後再試');
 }
 
 class _SessionsList extends StatelessWidget {
@@ -151,6 +126,7 @@ class _SessionsList extends StatelessWidget {
     required this.busySessionSid,
     required this.mutationError,
     required this.onRetry,
+    required this.onRefresh,
     required this.onRevoke,
     required this.onOpenConnectedApps,
     required this.onLogout,
@@ -161,6 +137,7 @@ class _SessionsList extends StatelessWidget {
   final String? busySessionSid;
   final String? mutationError;
   final VoidCallback onRetry;
+  final Future<void> Function() onRefresh;
   final Future<String?> Function(String sid) onRevoke;
   final VoidCallback onOpenConnectedApps;
   final VoidCallback onLogout;
@@ -168,7 +145,7 @@ class _SessionsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator.adaptive(
-      onRefresh: () async => onRetry(),
+      onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
         physics: const AlwaysScrollableScrollPhysics(),
@@ -184,25 +161,17 @@ class _SessionsList extends StatelessWidget {
           if (sessions.isEmpty)
             const _EmptySessionsState()
           else
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var index = 0; index < sessions.length; index++) ...[
-                    _SessionTile(
-                      session: sessions[index],
-                      isBusy: busySessionSid == sessions[index].sid,
-                      onRevoke: () => onRevoke(sessions[index].sid),
-                    ),
-                    if (index != sessions.length - 1)
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                      ),
-                  ],
-                ],
-              ),
+            TpGroupedSurface(
+              separatorIndent: 0,
+              separatorEndIndent: 0,
+              children: [
+                for (var index = 0; index < sessions.length; index++)
+                  _SessionTile(
+                    session: sessions[index],
+                    isBusy: busySessionSid == sessions[index].sid,
+                    onRevoke: () => onRevoke(sessions[index].sid),
+                  ),
+              ],
             ),
           const SizedBox(height: TpSpacing.s4),
           _SessionsInfoPanel(onOpenConnectedApps: onOpenConnectedApps),
@@ -268,7 +237,7 @@ class _SessionsInfoPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.info_outline,
+            CupertinoIcons.info_circle,
             color: colorScheme.onSurfaceVariant,
             size: 20,
           ),
@@ -291,7 +260,7 @@ class _SessionsInfoPanel extends StatelessWidget {
                   child: TextButton.icon(
                     key: const Key('account-sessions-connected-apps'),
                     onPressed: onOpenConnectedApps,
-                    icon: const Icon(Icons.extension_outlined, size: 18),
+                    icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
                     label: const Text('管理已連結應用'),
                   ),
                 ),
@@ -313,20 +282,25 @@ class _SessionsFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        key: const Key('account-sessions-logout'),
-        leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
-        title: Text(
-          '登出此帳號',
-          style: TextStyle(
+    return TpGroupedSurface(
+      children: [
+        ListTile(
+          key: const Key('account-sessions-logout'),
+          leading: Icon(
+            CupertinoIcons.square_arrow_right,
+            size: 20,
             color: colorScheme.error,
-            fontWeight: FontWeight.w600,
           ),
+          title: Text(
+            '登出此帳號',
+            style: TextStyle(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onTap: onLogout,
         ),
-        onTap: onLogout,
-      ),
+      ],
     );
   }
 }
@@ -545,32 +519,34 @@ class _InlineErrorPanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      child: Card(
+      child: TpGroupedSurface(
         color: colorScheme.errorContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                CupertinoIcons.exclamationmark_circle,
-                color: colorScheme.onErrorContainer,
-              ),
-              const SizedBox(width: TpSpacing.s3),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: colorScheme.onErrorContainer),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: colorScheme.onErrorContainer,
                 ),
-              ),
-              TextButton(
-                key: const Key('account-sessions-retry'),
-                onPressed: onRetry,
-                child: const Text('重試'),
-              ),
-            ],
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('account-sessions-retry'),
+                  onPressed: onRetry,
+                  child: const Text('重試'),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -79,7 +79,8 @@ void main() {
 
     final state = c.read(inviteControllerProvider('   '));
     expect(state.loading, isFalse);
-    expect(state.error, '邀請連結無效（缺少 token）');
+    expect(state.error, '邀請連結不完整，請向邀請者重新索取連結。');
+    expect(state.error, isNot(contains('token')));
     verifyNever(() => repo.fetchInvitation(any()));
   });
 

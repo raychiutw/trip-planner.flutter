@@ -130,8 +130,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final invitation = widget.invitationToken;
     return _AuthScaffold(
       title: '建立帳號',
+      backFallback: invitation == null
+          ? '/login'
+          : '/invite?token=${Uri.encodeQueryComponent(invitation)}',
       subtitle: widget.invitationToken == null
           ? '用 Email 加入 Tripline'
           : '建立帳號後加入這趟行程',
@@ -160,7 +164,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 autocorrect: false,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 forceErrorText: _emailServerError,
                 onChanged: (_) {
                   if (_emailServerError != null) {
@@ -177,7 +181,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 controller: _displayNameController,
                 autofillHints: const [AutofillHints.name],
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 decoration: const InputDecoration(labelText: '顯示名稱（選填）'),
               ),
               const SizedBox(height: TpSpacing.s4),
@@ -188,7 +192,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 autocorrect: false,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.done,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 forceErrorText: _passwordServerError,
                 onChanged: (_) {
                   if (_passwordServerError != null) {
@@ -459,7 +463,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               autocorrect: false,
               enableSuggestions: false,
               textInputAction: TextInputAction.done,
-              enabled: !_submitting,
+              readOnly: _submitting,
               onFieldSubmitted: (_) => _submit(),
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) =>
@@ -540,7 +544,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   error.code == 'RESET_TOKEN_MISSING');
           _error = _authErrorMessage(error, const {
             'RESET_TOKEN_INVALID': '重設連結無效或已過期',
-            'RESET_TOKEN_MISSING': '重設連結缺少 token',
+            'RESET_TOKEN_MISSING': '重設連結不完整，請重新申請',
           }, '暫時無法處理，請稍後再試');
         });
       }
@@ -605,7 +609,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 autocorrect: false,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 forceErrorText: _passwordServerError,
                 onChanged: (_) {
                   if (_passwordServerError != null) {
@@ -640,7 +644,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 autocorrect: false,
                 obscureText: _obscureConfirm,
                 textInputAction: TextInputAction.done,
-                enabled: !_submitting,
+                readOnly: _submitting,
                 onFieldSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
                   labelText: '再次輸入新密碼',
@@ -779,11 +783,15 @@ class _AuthScaffold extends StatelessWidget {
     this.primaryActionKey,
     this.onPrimaryAction,
     this.primaryActionEnabled = true,
+    this.backFallback = '/login',
   });
 
   final String title;
   final String subtitle;
   final Widget child;
+
+  /// 返回時沒有可 pop 的 route 才去的位置(例如從邀請頁進來要回邀請頁)。
+  final String backFallback;
   final String? primaryActionLabel;
   final Key? primaryActionKey;
   final VoidCallback? onPrimaryAction;
@@ -797,7 +805,9 @@ class _AuthScaffold extends StatelessWidget {
       appBar: TpAppBar(
         role: TpAppBarRole.publicDetail,
         title: Text(title),
-        onBack: () => context.go('/login'),
+        // 優先 pop 保留原本的 route stack;沒有可 pop 的才走 fallback。
+        onBack: () =>
+            context.canPop() ? context.pop() : context.go(backFallback),
         primaryActionLabel: primaryActionLabel,
         primaryActionKey: primaryActionKey,
         onPrimaryAction: onPrimaryAction,
@@ -820,11 +830,14 @@ class _AuthScaffold extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Tripline',
-                    textAlign: TextAlign.center,
-                    style: textTheme.displaySmall?.copyWith(
-                      color: colorScheme.primary,
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      'Tripline',
+                      textAlign: TextAlign.center,
+                      style: textTheme.displaySmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: TpSpacing.s6),
@@ -872,7 +885,7 @@ class _InlineAuthMessage extends StatelessWidget {
           message,
           style: Theme.of(
             context,
-          ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+          ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface),
         ),
       ),
     );

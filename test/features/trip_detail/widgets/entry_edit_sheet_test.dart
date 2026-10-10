@@ -681,7 +681,7 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 3 · 2026-07-03').last);
+    await tester.tap(find.text('Day 3 · 2026-07-03').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();

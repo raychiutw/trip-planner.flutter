@@ -7,13 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_settings_group.dart';
 import 'account_display.dart';
 import 'ai_authorize_card.dart';
 
@@ -86,27 +87,17 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
                 if (visibleApps.isEmpty)
                   const _EmptyConnectedAppsState()
                 else
-                  Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        for (final (index, app) in visibleApps.indexed) ...[
-                          _ConnectedAppTile(
-                            app: app,
-                            isBusy: _busyClientId == app.clientId,
-                            onRevoke: () => unawaited(_confirmRevoke(app)),
-                          ),
-                          if (index != visibleApps.length - 1)
-                            Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            ),
-                        ],
-                      ],
-                    ),
+                  TpGroupedSurface(
+                    separatorIndent: 0,
+                    separatorEndIndent: 0,
+                    children: [
+                      for (final app in visibleApps)
+                        _ConnectedAppTile(
+                          app: app,
+                          isBusy: _busyClientId == app.clientId,
+                          onRevoke: () => unawaited(_confirmRevoke(app)),
+                        ),
+                    ],
                   ),
               ],
             ),
@@ -170,10 +161,8 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     }
   }
 
-  String _errorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return '撤銷應用程式失敗，請稍後再試';
-  }
+  String _errorMessage(Object error) =>
+      userFacingApiError(error, fallback: '撤銷應用程式失敗，請稍後再試');
 }
 
 class _ConnectedAppTile extends StatelessWidget {
@@ -235,7 +224,7 @@ class _ConnectedAppTile extends StatelessWidget {
                 dimension: 18,
                 child: CircularProgressIndicator.adaptive(strokeWidth: 2),
               )
-            : const Text('撤銷'),
+            : Text('撤銷', semanticsLabel: '撤銷 ${app.appName}'),
       ),
     );
   }
@@ -266,28 +255,30 @@ class _InlineErrorPanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      child: Card(
+      child: TpGroupedSurface(
         color: colorScheme.errorContainer,
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                CupertinoIcons.exclamationmark_circle,
-                color: colorScheme.onErrorContainer,
-              ),
-              const SizedBox(width: TpSpacing.s3),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: colorScheme.onErrorContainer),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_circle,
+                  color: colorScheme.onErrorContainer,
                 ),
-              ),
-              TextButton(onPressed: onRetry, child: const Text('重試')),
-            ],
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ),
+                TextButton(onPressed: onRetry, child: const Text('重試')),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

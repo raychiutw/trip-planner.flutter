@@ -527,6 +527,40 @@ void main() {
       expect(find.text('找不到符合的行程'), findsOneWidget);
     });
 
+    testWidgets('搜尋無結果是 liveRegion,且有清除搜尋的出口', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        '找不到我',
+      );
+      await tester.pump();
+
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('trips-no-results')))
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
+      await tester.tap(find.text('清除搜尋'));
+      await tester.pump();
+
+      expect(find.text('找不到符合的行程'), findsNothing);
+      expect(find.byType(TripCard), findsWidgets);
+      semantics.dispose();
+    });
+
     testWidgets('搜尋匹配 name 欄位（無 title 的行程）', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
@@ -1389,7 +1423,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('確定要刪除「沖繩家族之旅」嗎？這會刪除其中所有行程日與景點。此動作無法復原。'),
+        find.text('確定要刪除「沖繩家族之旅」嗎？這會刪除其中所有行程日與停留點。此動作無法復原。'),
         findsOneWidget,
       );
 

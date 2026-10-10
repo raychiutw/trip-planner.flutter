@@ -12,6 +12,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/note_content.dart';
 import 'trip_print_data.dart';
+import '../../models/display_format.dart';
 
 /// Print/PDF action implementation used by [TripPrintScreen].
 final tripPrintActionsProvider = Provider<TripPrintActions>((ref) {
@@ -23,10 +24,16 @@ abstract class TripPrintActions {
   const TripPrintActions();
 
   /// Opens the platform print dialog for [data].
-  Future<void> print(TripPrintData data);
+  ///
+  /// 回傳 true 表示已送出列印、false 表示使用者在列印對話框取消
+  /// （`Printing.layoutPdf` 的語意）。字型下載失敗拋 [TripPdfOfflineException]。
+  Future<bool> print(TripPrintData data);
 
   /// Builds and shares a PDF file for [data].
-  Future<void> sharePdf(TripPrintData data);
+  ///
+  /// 回傳 `Printing.sharePdf` 的結果；注意 iOS 端永遠回 true，無法偵測使用者
+  /// 關閉分享選單。字型下載失敗拋 [TripPdfOfflineException]。
+  Future<bool> sharePdf(TripPrintData data);
 }
 
 /// Production print/share actions backed by the `printing` package.
@@ -34,7 +41,7 @@ class PrintingTripPrintActions implements TripPrintActions {
   const PrintingTripPrintActions();
 
   @override
-  Future<void> print(TripPrintData data) {
+  Future<bool> print(TripPrintData data) {
     return Printing.layoutPdf(
       name: data.pdfFileName(),
       onLayout: (format) => buildTripPdf(data, pageFormat: format),
@@ -42,10 +49,18 @@ class PrintingTripPrintActions implements TripPrintActions {
   }
 
   @override
-  Future<void> sharePdf(TripPrintData data) async {
+  Future<bool> sharePdf(TripPrintData data) async {
     final bytes = await buildTripPdf(data);
-    await Printing.sharePdf(bytes: bytes, filename: data.pdfFileName());
+    return Printing.sharePdf(bytes: bytes, filename: data.pdfFileName());
   }
+}
+
+/// 中文字型（Noto Sans TC）需連網下載；下載失敗時拋出，讓畫面能指出「需要網路」。
+class TripPdfOfflineException implements Exception {
+  const TripPdfOfflineException();
+
+  @override
+  String toString() => 'TripPdfOfflineException';
 }
 
 /// Builds the PDF bytes for a trip print document.
@@ -54,8 +69,14 @@ Future<Uint8List> buildTripPdf(
   PdfPageFormat pageFormat = PdfPageFormat.a4,
 }) async {
   final notes = projectTripNotes(data.notes);
-  final baseFont = await PdfGoogleFonts.notoSansTCRegular();
-  final boldFont = await PdfGoogleFonts.notoSansTCBold();
+  final pw.Font baseFont;
+  final pw.Font boldFont;
+  try {
+    baseFont = await PdfGoogleFonts.notoSansTCRegular();
+    boldFont = await PdfGoogleFonts.notoSansTCBold();
+  } on Exception {
+    throw const TripPdfOfflineException();
+  }
   final document = pw.Document();
   document.addPage(
     pw.MultiPage(
@@ -132,7 +153,7 @@ class _PdfDaySection extends pw.StatelessWidget {
           pw.Row(
             children: [
               pw.Text(
-                'Day ${day.dayNum}',
+                dayLabel(day.dayNum),
                 style: pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
@@ -152,7 +173,7 @@ class _PdfDaySection extends pw.StatelessWidget {
           ),
           pw.SizedBox(height: 6),
           if (day.timeline.isEmpty && day.hotel == null)
-            pw.Text('尚無景點', style: const pw.TextStyle(fontSize: 10))
+            pw.Text('尚無停留點', style: const pw.TextStyle(fontSize: 10))
           else
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),

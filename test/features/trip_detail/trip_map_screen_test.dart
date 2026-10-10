@@ -104,6 +104,29 @@ class _StubMapRepository implements MapRepository {
   }
 }
 
+/// 第一次呼叫丟例外，之後回正常幾何。
+class _FlakyMapRepository extends _StubMapRepository {
+  @override
+  Future<TripRouteResult> fetchRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+    cancelToken,
+  }) async {
+    if (calls < 1) {
+      calls++;
+      throw StateError('SECRET-route-trace');
+    }
+    return super.fetchRoute(
+      fromLat: fromLat,
+      fromLng: fromLng,
+      toLat: toLat,
+      toLng: toLng,
+    );
+  }
+}
+
 class _DelayedSecondRouteRepository implements MapRepository {
   final secondRoute = Completer<TripRouteResult>();
   int calls = 0;
@@ -853,6 +876,37 @@ void main() {
     expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
   });
 
+  testWidgets('選取的卡片以 tint 粗框標示，未選取卡片維持淡框', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-card-21')));
+    await tester.pumpAndSettle();
+
+    Border borderOf(String id) =>
+        (tester
+                        .widget<DecoratedBox>(
+                          find.byKey(ValueKey('entry-card-$id')),
+                        )
+                        .decoration
+                    as BoxDecoration)
+                .border!
+            as Border;
+    final scheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('entry-card-21'))),
+    ).colorScheme;
+
+    final active = borderOf('21');
+    expect(active.top.color, scheme.primary);
+    expect(active.top.width, greaterThanOrEqualTo(2));
+    // 對照：未選取卡片不使用 tint。
+    final inactive = find.byKey(const ValueKey('entry-card-22'));
+    if (inactive.evaluate().isNotEmpty) {
+      expect(borderOf('22').top.color, isNot(scheme.primary));
+    }
+  });
+
   testWidgets('Google POI 關閉後還原 Day、卡片索引與 marker 聚焦', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
@@ -988,7 +1042,7 @@ void main() {
     expect(region.value.statusBarBrightness, Brightness.dark);
   });
 
-  testWidgets('DAY 1：Header 行程切換、全部/DAY selector 與當日 POI', (tester) async {
+  testWidgets('Day 1：Header 行程切換、全部/DAY selector 與當日 POI', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
       _buildScreen([
@@ -1067,7 +1121,7 @@ void main() {
       findsOneWidget,
     );
 
-    // pins：只顯示 DAY 1 且 master 座標非 null 的 2 筆
+    // pins：只顯示 Day 1 且 master 座標非 null 的 2 筆
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-21')), findsNothing);
@@ -1084,7 +1138,7 @@ void main() {
       findsNothing,
     );
     expect(find.text('首里城'), findsOneWidget);
-    expect(find.textContaining('09:00'), findsOneWidget);
+    expect(find.textContaining('09：00'), findsOneWidget);
 
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
     expect(
@@ -1195,7 +1249,7 @@ void main() {
     expect(mapConfig?.initialCenter?.longitude, 127.719);
   });
 
-  testWidgets('切到 DAY 02：只顯示該日內容且鏡頭維持 zoom 13', (tester) async {
+  testWidgets('切到 Day 2：只顯示該日內容且鏡頭維持 zoom 13', (tester) async {
     final nativeController = _FakeTripMapPlatformController();
     TripMapCanvasConfig? mapConfig;
     var attached = false;
@@ -1295,12 +1349,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(_sharedDayNum(tester), 2);
 
-    // 使用者在前景改看 DAY 1
+    // 使用者在前景改看 Day 1
     await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
     await tester.pumpAndSettle();
     expect(_sharedDayNum(tester), 1);
 
-    // SWR 第二段 emit 給出新的 list，同一批切到背景：保留仍有效的 DAY 1，
+    // SWR 第二段 emit 給出新的 list，同一批切到背景：保留仍有效的 Day 1，
     // 背景分支也不得把這次資料更新寫進共用狀態。
     days.add([_dayOne, _dayTwo]);
     active.value = false;
@@ -1473,6 +1527,63 @@ void main() {
     expect(find.byKey(const ValueKey('map-route-day-route-0')), findsOneWidget);
   });
 
+  testWidgets('路線載入失敗顯示可重試提示，重試成功後提示消失', (tester) async {
+    final repository = _FlakyMapRepository();
+    await tester.pumpWidget(_buildScreen([_dayOne], mapRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('部分路線無法載入'), findsOneWidget);
+    expect(find.textContaining('SECRET-route-trace'), findsNothing);
+    expect(find.byKey(const ValueKey('map-route-day-route-0')), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('trip-map-route-error')))
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-route-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('部分路線無法載入'), findsNothing);
+    expect(find.byKey(const ValueKey('map-route-day-route-0')), findsOneWidget);
+  });
+
+  testWidgets('路線載入圈帶有語意標籤', (tester) async {
+    final repository = _DelayedSecondRouteRepository();
+    final handle = tester.ensureSemantics();
+    final secondDay = TripDay(
+      id: 2,
+      dayNum: 2,
+      version: 1,
+      timeline: [
+        _entry(id: 21, title: '首里城', lat: 26.217, lng: 127.719),
+        _entry(id: 22, title: '國際通', lat: 26.214, lng: 127.688),
+      ],
+    );
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, secondDay], mapRepository: repository),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pump();
+
+    expect(find.bySemanticsLabel('路線載入中'), findsOneWidget);
+    repository.secondRoute.complete(
+      const TripRouteResult(
+        polyline: [
+          TripRoutePoint(lat: 26.217, lng: 127.719),
+          TripRoutePoint(lat: 26.214, lng: 127.688),
+        ],
+        durationSeconds: 600,
+        distanceMeters: 4200,
+      ),
+    );
+    await tester.pumpAndSettle();
+    handle.dispose();
+  });
+
   testWidgets('切換 Day 時立即移除前一日 route，再等待新 route', (tester) async {
     final repository = _DelayedSecondRouteRepository();
     final secondDay = TripDay(
@@ -1565,7 +1676,7 @@ void main() {
 
     final card = find.byKey(const ValueKey('entry-card-11'));
     expect(
-      find.descendant(of: card, matching: find.text('09:00–10:30')),
+      find.descendant(of: card, matching: find.text('09：00 - 10：30')),
       findsOneWidget,
     );
     expect(
@@ -1652,14 +1763,14 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-51')),
-        matching: find.text('07:45'),
+        matching: find.text('07：45'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-52')),
-        matching: find.text('08:00'),
+        matching: find.text('08：00'),
       ),
       findsOneWidget,
     );

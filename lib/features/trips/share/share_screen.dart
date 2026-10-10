@@ -2,6 +2,7 @@
 /// QR code + 複製(raw token 只回一次)。管理限有 write 權限者(否則提示)。
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show listEquals;
@@ -20,8 +21,11 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../app/irreversible_action.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/dynamic_type.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_segmented_control.dart';
 import 'share_controller.dart';
 
 const _shareSectionOrder = [
@@ -38,7 +42,9 @@ const _shareSectionLabels = {
   'pretrip': '行前須知',
   'emergency': '緊急聯絡',
 };
-const _defaultShareSections = {'flights', 'lodgings', 'pretrip'};
+
+/// 預設不公開任何區塊 —— 航班、住宿（含地址電話）、行前須知都屬個資，由使用者勾選。
+const _defaultShareSections = <String>{};
 const _expiryPresets = {
   'never': null,
   '24h': Duration(hours: 24),
@@ -90,10 +96,12 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   DateTime? _customExpiryDate;
   bool _anonymous = false;
   bool _showRevoked = false;
+  final _scroll = ScrollController();
 
   @override
   void dispose() {
     _label.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -102,6 +110,10 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   List<String> get _visibleSections =>
       _shareSectionOrder.where(_sections.contains).toList();
+
+  /// 選「自訂」卻沒選日期 → 不可建立(否則會送出永不過期的公開連結)。
+  bool get _customDateMissing =>
+      _expiryKey == 'custom' && _customExpiryDate == null;
 
   int? get _expiresAt {
     if (_expiryKey == 'custom') {
@@ -182,7 +194,17 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       case _ShareRowAction.edit:
         await _editShare(share);
       case _ShareRowAction.rotate:
-        await _ctrl.rotate(share.id);
+        await confirmAndRunIrreversibleAction(
+          context,
+          source: TpDestructiveConfirmSource.menu,
+          title: '重新產生「${share.label.isEmpty ? '無標籤連結' : share.label}」？',
+          message: '重新產生後，舊連結會立即失效，已拿到舊連結的人將無法再開啟。',
+          actionLabel: '重新產生',
+          progressLabel: '正在重新產生…',
+          successMessage: '已重新產生分享連結',
+          failureMessage: '重新產生失敗，舊連結仍有效',
+          action: () => _ctrl.rotate(share.id),
+        );
       case _ShareRowAction.revoke:
         await confirmAndRunIrreversibleAction(
           context,
@@ -211,6 +233,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   }
 
   Future<void> _createShare() async {
+    if (_customDateMissing) return;
     FocusManager.instance.primaryFocus?.unfocus();
     final succeeded = await _ctrl.create(
       _label.text,
@@ -240,6 +263,20 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(shareControllerProvider(widget.tripId));
+    // 建立／重產生成功後,結果卡在清單最上方而觸發鈕在下方:捲回頂端讓
+    // 一次性 token 一定被看見。
+    ref.listen(shareControllerProvider(widget.tripId), (prev, next) {
+      final link = next.lastCreated;
+      if (link != null && link != prev?.lastCreated && _scroll.hasClients) {
+        unawaited(
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          ),
+        );
+      }
+    });
     final activeShares = state.shares.where((s) => !s.isRevoked).toList();
     final revokedShares = state.shares.where((s) => s.isRevoked).toList();
 
@@ -267,6 +304,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 ),
               )
             : ListView(
+                controller: _scroll,
                 padding: const EdgeInsets.all(TpSpacing.s4),
                 children: [
                   if (state.lastCreated != null)
@@ -275,6 +313,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       onCopy: _copy,
                       onShare: _share,
                     ),
+                  if (state.lastCreated != null)
+                    const SizedBox(height: TpSpacing.s3),
                   Text(
                     '使用中的連結（${activeShares.length}）',
                     style: Theme.of(context).textTheme.titleMedium,
@@ -301,8 +341,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           setState(() => _showRevoked = !_showRevoked),
                       icon: Icon(
                         _showRevoked
-                            ? Icons.expand_less_outlined
-                            : Icons.expand_more_outlined,
+                            ? CupertinoIcons.chevron_up
+                            : CupertinoIcons.chevron_down,
                       ),
                       label: Text('已關閉的連結（${revokedShares.length}）'),
                     ),
@@ -323,11 +363,20 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           TextField(
                             key: const ValueKey('share-label'),
                             controller: _label,
-                            decoration: const InputDecoration(
-                              labelText: '標籤（選填,如「給爸媽」）',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
+                            // 浮動 label 只有單行,大字級會被截成「給爸…」;
+                            // 改用可換行的 hint 完整顯示。
+                            decoration: isLargeTextScale(context)
+                                ? const InputDecoration(
+                                    hintText: '標籤（選填,如「給爸媽」）',
+                                    hintMaxLines: 4,
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  )
+                                : const InputDecoration(
+                                    labelText: '標籤（選填,如「給爸媽」）',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
                           ),
                           const SizedBox(height: TpSpacing.s3),
                           Text(
@@ -340,14 +389,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             runSpacing: TpSpacing.s1,
                             children: [
                               for (final section in _shareSectionOrder)
-                                FilterChip(
+                                TpChip(
                                   key: ValueKey('share-section-$section'),
-                                  label: Text(
-                                    _shareSectionLabels[section] ?? section,
-                                  ),
+                                  label:
+                                      _shareSectionLabels[section] ?? section,
                                   selected: _sections.contains(section),
-                                  onSelected: (selected) =>
-                                      _toggleSection(section, selected),
+                                  onPressed: () => _toggleSection(
+                                    section,
+                                    !_sections.contains(section),
+                                  ),
                                 ),
                             ],
                           ),
@@ -357,30 +407,62 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                           const SizedBox(height: TpSpacing.s1),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: SegmentedButton<String>(
-                              showSelectedIcon: false,
-                              selected: {_expiryKey},
-                              onSelectionChanged: (next) =>
-                                  setState(() => _expiryKey = next.single),
-                              segments: [
-                                for (final key in _expiryPresets.keys)
-                                  ButtonSegment(
-                                    value: key,
-                                    label: Text(_expiryLabels[key] ?? key),
-                                  ),
-                              ],
-                            ),
+                          TpSegmentedControl<String>(
+                            value: _expiryKey,
+                            onChanged: (next) =>
+                                setState(() => _expiryKey = next),
+                            options: {
+                              for (final key in _expiryPresets.keys)
+                                key: _expiryLabels[key] ?? key,
+                            },
                           ),
                           if (_expiryKey == 'custom') ...[
                             const SizedBox(height: TpSpacing.s2),
                             OutlinedButton.icon(
                               key: const ValueKey('share-custom-expiry-date'),
                               onPressed: _pickCustomExpiryDate,
-                              icon: const Icon(Icons.event_outlined, size: 18),
+                              icon: const Icon(
+                                CupertinoIcons.calendar,
+                                size: 18,
+                              ),
                               label: Text(_customExpiryLabel(context)),
                             ),
+                            if (_customDateMissing)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: TpSpacing.s1,
+                                ),
+                                child: Row(
+                                  key: const ValueKey(
+                                    'share-expiry-required-row',
+                                  ),
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      CupertinoIcons.exclamationmark_circle,
+                                      size: 18,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                                    const SizedBox(width: TpSpacing.s1),
+                                    Expanded(
+                                      child: Text(
+                                        '請選擇到期日',
+                                        key: const ValueKey(
+                                          'share-expiry-required',
+                                        ),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                           CheckboxListTile(
                             key: const ValueKey('share-anonymous'),
@@ -412,12 +494,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                         style: TextStyle(
                                           color: Theme.of(
                                             context,
-                                          ).colorScheme.error,
+                                          ).colorScheme.onSurface,
                                         ),
                                       ),
                                     ),
                                     TextButton(
-                                      onPressed: _ctrl.retry,
+                                      onPressed: state.createFailed
+                                          ? _createShare
+                                          : _ctrl.retry,
                                       child: const Text('重試'),
                                     ),
                                   ],
@@ -426,7 +510,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             ),
                           FilledButton(
                             key: const ValueKey('share-create'),
-                            onPressed: state.creating ? null : _createShare,
+                            onPressed: state.creating || _customDateMissing
+                                ? null
+                                : _createShare,
                             child: state.creating
                                 ? Semantics(
                                     key: const ValueKey(
@@ -468,7 +554,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       key: ValueKey('share-${s.id}'),
       contentPadding: EdgeInsets.zero,
       title: Text(s.label.isEmpty ? '(無標籤)' : s.label),
-      subtitle: Text('$status · 已被檢視 ${s.viewCount} 次'),
+      subtitle: state.rotateFailedId == s.id
+          ? _RowError(
+              key: ValueKey('share-row-error-${s.id}'),
+              message: '重新產生失敗，請重試',
+              retryKey: ValueKey('share-row-retry-${s.id}'),
+              onRetry: () => _ctrl.rotate(s.id),
+            )
+          : Text('$status · 已被檢視 ${s.viewCount} 次'),
       trailing: TpMoreMenuButton<_ShareRowAction>(
         key: ValueKey('share-actions-${s.id}'),
         tooltip: '分享連結動作',
@@ -512,6 +605,43 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   }
 }
 
+/// 列內就地錯誤:訊息 + 重做該動作的重試鈕。
+class _RowError extends StatelessWidget {
+  const _RowError({
+    super.key,
+    required this.message,
+    required this.retryKey,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Key retryKey;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            ),
+          ),
+          TextButton(
+            key: retryKey,
+            onPressed: onRetry,
+            child: const Text('重試'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CreatedCard extends StatefulWidget {
   const _CreatedCard({
     required this.url,
@@ -533,50 +663,58 @@ class _CreatedCardState extends State<_CreatedCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('連結已建立(只顯示這一次)', style: theme.textTheme.titleSmall),
-            const SizedBox(height: TpSpacing.s2),
-            SelectableText(widget.url, style: theme.textTheme.bodySmall),
-            const SizedBox(height: TpSpacing.s2),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: TpSpacing.s1,
-              runSpacing: TpSpacing.s1,
-              children: [
-                OutlinedButton.icon(
-                  key: const ValueKey('share-qr-toggle'),
-                  onPressed: () => setState(() => _showQr = !_showQr),
-                  icon: Icon(
-                    _showQr ? Icons.visibility_off_outlined : Icons.qr_code_2,
-                    size: 18,
+    return Semantics(
+      key: const ValueKey('share-created-card'),
+      liveRegion: true,
+      container: true,
+      label: '分享連結已建立，連結只顯示這一次',
+      child: Card(
+        color: theme.colorScheme.secondaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('連結已建立(只顯示這一次)', style: theme.textTheme.titleSmall),
+              const SizedBox(height: TpSpacing.s2),
+              SelectableText(widget.url, style: theme.textTheme.bodySmall),
+              const SizedBox(height: TpSpacing.s2),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: TpSpacing.s1,
+                runSpacing: TpSpacing.s1,
+                children: [
+                  OutlinedButton.icon(
+                    key: const ValueKey('share-qr-toggle'),
+                    onPressed: () => setState(() => _showQr = !_showQr),
+                    icon: Icon(
+                      _showQr
+                          ? CupertinoIcons.eye_slash
+                          : CupertinoIcons.qrcode,
+                      size: 18,
+                    ),
+                    label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
                   ),
-                  label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
-                ),
-                OutlinedButton.icon(
-                  key: const ValueKey('share-native'),
-                  onPressed: () => widget.onShare(widget.url),
-                  icon: const Icon(Icons.ios_share_outlined, size: 18),
-                  label: const Text('分享'),
-                ),
-                FilledButton.tonalIcon(
-                  key: const ValueKey('share-copy'),
-                  onPressed: () => widget.onCopy(widget.url),
-                  icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
-                  label: const Text('複製連結'),
-                ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('share-native'),
+                    onPressed: () => widget.onShare(widget.url),
+                    icon: const Icon(CupertinoIcons.share, size: 18),
+                    label: const Text('分享'),
+                  ),
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('share-copy'),
+                    onPressed: () => widget.onCopy(widget.url),
+                    icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
+                    label: const Text('複製連結'),
+                  ),
+                ],
+              ),
+              if (_showQr) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Center(child: _ShareQrCode(url: widget.url)),
               ],
-            ),
-            if (_showQr) ...[
-              const SizedBox(height: TpSpacing.s3),
-              Center(child: _ShareQrCode(url: widget.url)),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -876,47 +1014,38 @@ class _EditShareFormState extends State<_EditShareForm> {
           runSpacing: TpSpacing.s1,
           children: [
             for (final section in _shareSectionOrder)
-              FilterChip(
+              TpChip(
                 key: ValueKey('share-edit-section-$section'),
-                label: Text(_shareSectionLabels[section] ?? section),
+                label: _shareSectionLabels[section] ?? section,
                 selected: _sections.contains(section),
-                onSelected: (selected) => _toggleSection(section, selected),
+                onPressed: () =>
+                    _toggleSection(section, !_sections.contains(section)),
               ),
           ],
         ),
         const SizedBox(height: TpSpacing.s2),
         Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: TpSpacing.s1),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SegmentedButton<String>(
-            showSelectedIcon: false,
-            selected: {_expiryKey},
-            onSelectionChanged: (next) {
-              setState(() {
-                _expiryKey = next.single;
-                _error = null;
-              });
-              _syncFormState();
-            },
-            segments: [
-              for (final key in _expiryPresets.keys)
-                ButtonSegment(
-                  value: key,
-                  label: Text(
-                    _expiryLabels[key] ?? key,
-                    key: ValueKey('share-edit-expiry-$key'),
-                  ),
-                ),
-            ],
-          ),
+        TpSegmentedControl<String>(
+          value: _expiryKey,
+          onChanged: (next) {
+            setState(() {
+              _expiryKey = next;
+              _error = null;
+            });
+            _syncFormState();
+          },
+          options: {
+            for (final key in _expiryPresets.keys)
+              key: _expiryLabels[key] ?? key,
+          },
         ),
         if (_expiryKey == 'custom') ...[
           const SizedBox(height: TpSpacing.s2),
           OutlinedButton.icon(
             key: const ValueKey('share-edit-custom-expiry-date'),
             onPressed: _pickCustomExpiryDate,
-            icon: const Icon(Icons.event_outlined, size: 18),
+            icon: const Icon(CupertinoIcons.calendar, size: 18),
             label: Text(_customExpiryLabel(context)),
           ),
         ],
@@ -943,7 +1072,9 @@ class _EditShareFormState extends State<_EditShareForm> {
               padding: const EdgeInsets.only(top: TpSpacing.s2),
               child: Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
           ),

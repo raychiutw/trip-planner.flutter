@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/providers.dart';
@@ -185,6 +186,18 @@ void main() {
     verifyNever(() => repo.revokeInvite(tripId: 'okinawa', email: 'b@x.com'));
   });
 
+  testWidgets('共編 email 欄位有常駐 label 並關閉自動修正', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(
+      find.byKey(const ValueKey('collab-email')),
+    );
+    expect(field.decoration?.labelText, 'Email');
+    expect(field.autocorrect, isFalse);
+    expect(field.autofillHints, contains(AutofillHints.email));
+  });
+
   testWidgets('新增成員 → 輸入 email + 點新增 → invite', (tester) async {
     when(
       () => repo.invite(
@@ -253,7 +266,7 @@ void main() {
       find.byKey(const ValueKey('collab-email')),
       'pending@x.com',
     );
-    await tester.tap(find.widgetWithText(ChoiceChip, '檢視成員'));
+    await tester.tap(find.widgetWithText(TpChip, '檢視成員'));
     await tester.tap(find.byKey(const ValueKey('collab-add')));
     await tester.pump();
 
@@ -271,10 +284,7 @@ void main() {
     expect(progress.properties.liveRegion, isTrue);
     expect(progress.properties.label, '正在新增共編成員');
 
-    await tester.tap(
-      find.widgetWithText(ChoiceChip, '共編成員'),
-      warnIfMissed: false,
-    );
+    await tester.tap(find.widgetWithText(TpChip, '共編成員'), warnIfMissed: false);
     await tester.tap(
       find.byKey(const ValueKey('collab-add')),
       warnIfMissed: false,
@@ -289,9 +299,7 @@ void main() {
       'pending@x.com',
     );
     expect(
-      tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '檢視成員'))
-          .selected,
+      tester.widget<TpChip>(find.widgetWithText(TpChip, '檢視成員')).selected,
       isTrue,
     );
     verify(

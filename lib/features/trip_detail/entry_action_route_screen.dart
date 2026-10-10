@@ -10,6 +10,7 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'entry_mutations.dart';
 import 'trip_providers.dart';
+import '../../models/display_format.dart';
 
 /// Web 相容的停留點跨日操作。
 enum EntryRouteAction { copy, move }
@@ -152,7 +153,7 @@ class _EntryActionRouteScreenState
               children: [
                 const SizedBox.square(
                   dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 ),
                 const SizedBox(width: TpSpacing.s2),
                 Text('${widget.action.submitLabel}中…'),
@@ -180,9 +181,9 @@ class _EntryActionRouteScreenState
 
   Widget _dayTile(BuildContext context, TripDay day) {
     final selected = _targetDayId == day.id;
-    final title = day.displayTitle == 'Day ${day.dayNum}'
-        ? 'DAY ${day.dayNum}'
-        : 'DAY ${day.dayNum} · ${day.displayTitle}';
+    final title = day.displayTitle == dayLabel(day.dayNum)
+        ? dayLabel(day.dayNum)
+        : dayLabel(day.dayNum, title: day.displayTitle);
     return ListTile(
       key: ValueKey('entry-action-day-${day.id}'),
       enabled: !_submitting,

@@ -25,6 +25,7 @@ import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_state_view.dart';
 import '../trip_detail/trip_pdf_service.dart';
 import '../trip_detail/trip_print_data.dart';
+import '../../models/display_format.dart';
 
 /// 公開分享頁資料 provider。
 final publicTripShareProvider = FutureProvider.family<PublicTripShare, String>(
@@ -56,10 +57,16 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
     final shareAsync = ref.watch(publicTripShareProvider(_token));
     final currentUser = ref.watch(authStateProvider).value;
     return Scaffold(
-      appBar: const TpAppBar(
-        role: TpAppBarRole.standalone,
-        title: Text('行程分享'),
-      ),
+      // 已登入者(例如從通知冷啟動進來)需要離開入口:返回(優先 pop,否則回
+      // 首頁)與帳號入口。未登入訪客維持 standalone,沒有可去的 app 內位置。
+      appBar: currentUser == null
+          ? const TpAppBar(role: TpAppBarRole.standalone, title: Text('行程分享'))
+          : TpAppBar(
+              role: TpAppBarRole.detail,
+              title: const Text('行程分享'),
+              onBack: () => context.canPop() ? context.pop() : context.go('/'),
+              accountEntry: const TpAccountAvatarButton(),
+            ),
       body: SafeArea(
         child: shareAsync.when(
           skipLoadingOnRefresh: !shareAsync.hasError,
@@ -126,16 +133,22 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
       final actions = ref.read(tripPrintActionsProvider);
       switch (action) {
         case _PublicShareAction.print:
-          await actions.print(data);
+          final printed = await actions.print(data);
           if (!mounted) return;
-          _showMessage('已送出列印');
+          // 使用者在列印對話框取消 → 不報成功。
+          if (printed) _showMessage('已送出列印');
           return;
         case _PublicShareAction.pdf:
-          await actions.sharePdf(data);
+          final shared = await actions.sharePdf(data);
           if (!mounted) return;
-          _showMessage('PDF 已建立');
+          // printing 的 sharePdf 在 iOS 固定回 true、偵測不到取消，故只說選單已開啟，
+          // 不宣稱已分享或已建立。
+          if (shared) _showMessage('已開啟分享選單');
           return;
       }
+    } on TripPdfOfflineException {
+      if (!mounted) return;
+      showAppError(context, '需要網路連線才能下載中文字型，請連線後再試');
     } on Exception {
       if (!mounted) return;
       showAppError(
@@ -211,7 +224,7 @@ class _ShareContent extends StatelessWidget {
                       dimension: 18,
                       child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.picture_as_pdf_outlined),
+                  : const Icon(CupertinoIcons.doc_text),
             ),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
@@ -355,7 +368,7 @@ class _DaySection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('Day ${day.dayNum}', style: theme.textTheme.titleMedium),
+              Text(dayLabel(day.dayNum), style: theme.textTheme.titleMedium),
               if (dateLine.isNotEmpty) ...[
                 const SizedBox(width: TpSpacing.s2),
                 Expanded(
@@ -590,8 +603,9 @@ class _PublicShareFailure extends StatelessWidget {
               message: isInvalidLink
                   ? '這個分享連結不存在、已被關閉或已過期。請向分享者索取新的連結。'
                   : '請確認網路連線後重試。',
-              actionLabel: '重試',
-              onAction: onRetry,
+              // 404 是連結本身失效,原地重試只會再得到 404。
+              actionLabel: isInvalidLink ? null : '重試',
+              onAction: isInvalidLink ? null : onRetry,
             ),
           ),
         ),
@@ -635,7 +649,10 @@ String _timeLine(BuildContext context, TimelineEntry entry) {
   final start = entry.startTime?.trim() ?? '';
   final end = entry.endTime?.trim() ?? '';
   if (start.isNotEmpty && end.isNotEmpty) {
-    return '${_localizedTime(context, start)}–${_localizedTime(context, end)}';
+    return formatTimeRange(
+      _localizedTime(context, start),
+      _localizedTime(context, end),
+    );
   }
   if (entry.time?.trim().isNotEmpty == true) {
     return _localizedTime(context, entry.time!.trim());

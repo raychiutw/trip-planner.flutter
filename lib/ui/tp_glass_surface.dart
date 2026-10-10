@@ -480,9 +480,11 @@ class TpNavigationGlassButton extends StatelessWidget {
             child: Center(
               child: SizedBox.square(
                 dimension: 18,
-                child: CircularProgressIndicator(
+                child: CircularProgressIndicator.adaptive(
                   strokeWidth: 2,
-                  color: appearance.foreground,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    appearance.foreground,
+                  ),
                 ),
               ),
             ),
@@ -516,17 +518,27 @@ class TpHeaderTitle extends StatelessWidget {
 
   final Widget child;
 
+  /// 標題字級放大的上限。
+  ///
+  /// header 內容列固定 44pt(與兩側圓鈕等高),`headlineSmall` 放大到約 1.4 倍
+  /// 就會超出而被上下裁掉半截。對標 iOS 導覽列標題在 AX 字級停止放大;
+  /// 內文與控制項仍完整跟隨系統字級。
+  static const maxScaleFactor = 1.3;
+
   @override
-  Widget build(BuildContext context) => DefaultTextStyle.merge(
-    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-      color: tpBarForeground(
-        context,
-        onMedia: TpMediaBackdropScope.of(context),
+  Widget build(BuildContext context) => MediaQuery.withClampedTextScaling(
+    maxScaleFactor: maxScaleFactor,
+    child: DefaultTextStyle.merge(
+      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+        color: tpBarForeground(
+          context,
+          onMedia: TpMediaBackdropScope.of(context),
+        ),
       ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      child: child,
     ),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    child: child,
   );
 }
 

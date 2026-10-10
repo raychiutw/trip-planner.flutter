@@ -105,12 +105,7 @@ class TripCard extends StatelessWidget {
                   ),
                   const SizedBox(height: TpSpacing.s1),
                 ],
-                Text(
-                  trip.displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text(trip.displayTitle, style: theme.textTheme.titleMedium),
                 if (dateRangeText != null) ...[
                   const SizedBox(height: TpSpacing.s1),
                   Text(

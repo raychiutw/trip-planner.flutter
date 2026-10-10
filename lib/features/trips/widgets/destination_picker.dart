@@ -10,6 +10,7 @@ import '../../../app/adaptive.dart';
 import '../../../models/destination_input.dart';
 import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 
@@ -42,6 +43,9 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
   List<DestinationInput> _recentDestinations = const [];
   bool _searching = false;
 
+  /// 搜尋回饋:null 表示沒有要提示的狀態。
+  String? _searchStatus;
+
   @override
   void dispose() {
     _search.dispose();
@@ -52,14 +56,27 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
     if (!widget.enabled) return;
     final q = _search.text.trim();
     if (q.length < 2) return;
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchStatus = null;
+    });
     try {
       final r = await ref
           .read(poiRepositoryProvider)
           .searchPois(q: q, region: '全部地區');
-      if (mounted) setState(() => _results = r);
+      if (mounted) {
+        setState(() {
+          _results = r;
+          _searchStatus = r.isEmpty ? '找不到符合的地點' : null;
+        });
+      }
     } on Exception {
-      if (mounted) setState(() => _results = const []);
+      if (mounted) {
+        setState(() {
+          _results = const [];
+          _searchStatus = '搜尋失敗，請稍後再試';
+        });
+      }
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -72,6 +89,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
     _search.clear();
     setState(() {
       _results = const [];
+      _searchStatus = null;
       _recentDestinations = _pushRecentDestination(
         _recentDestinations,
         destination,
@@ -99,6 +117,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
             const SizedBox(width: TpSpacing.s2),
             IconButton.filled(
               key: const ValueKey('dest-poi-search-btn'),
+              tooltip: '搜尋地點',
               onPressed: widget.enabled ? _run : null,
               icon: _searching
                   ? const SizedBox(
@@ -120,8 +139,8 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                 runSpacing: TpSpacing.s2,
                 children: [
                   for (final h in _hotDestinations)
-                    ActionChip(
-                      label: Text(h),
+                    TpChip(
+                      label: h,
                       onPressed: widget.enabled
                           ? () => widget.onAdd(DestinationInput(name: h))
                           : null,
@@ -143,9 +162,9 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                   runSpacing: TpSpacing.s2,
                   children: [
                     for (final destination in _recentDestinations)
-                      ActionChip(
+                      TpChip(
                         key: ValueKey('dest-recent-${destination.name}'),
-                        label: Text(destination.name),
+                        label: destination.name,
                         onPressed: widget.enabled
                             ? () => widget.onAdd(destination)
                             : null,
@@ -156,6 +175,21 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
             ],
           ),
         ),
+        if (_searchStatus case final status?)
+          Semantics(
+            key: const ValueKey('dest-search-status'),
+            liveRegion: true,
+            container: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
+              child: Text(
+                status,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         if (_results.isNotEmpty)
           ..._results
               .take(8)
@@ -184,6 +218,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                     leading: const Icon(CupertinoIcons.location_solid),
                     title: Text(dests[i].name),
                     trailing: IconButton(
+                      tooltip: '移除${dests[i].name}',
                       icon: const Icon(CupertinoIcons.xmark),
                       onPressed: widget.enabled
                           ? () => widget.onRemove(i)

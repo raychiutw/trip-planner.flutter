@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/account_repository.dart';
@@ -98,6 +99,17 @@ void main() {
     expect(find.byKey(const ValueKey('ai-authorize-btn')), findsOneWidget);
   });
 
+  testWidgets('撤銷鈕語意帶 app 名稱，VoiceOver 分得出對象', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pumpScreen(tester);
+
+    final label = tester
+        .getSemantics(find.byKey(const Key('connected-app-revoke-tp_alpha')))
+        .label;
+    expect(label, contains('撤銷 Alpha App'));
+    semantics.dispose();
+  });
+
   testWidgets('撤銷 app 需確認，確認後呼叫 repository', (tester) async {
     await pumpScreen(tester);
 
@@ -138,6 +150,26 @@ void main() {
     verify(
       () => mockAccountRepository.fetchConnectedApps(),
     ).called(greaterThanOrEqualTo(3));
+  });
+
+  testWidgets('撤銷失敗不顯示後端 detail 原文，改顯示繁中訊息', (tester) async {
+    when(() => mockAccountRepository.revokeConnectedApp(any())).thenThrow(
+      const ApiError(
+        status: 500,
+        code: 'INTERNAL',
+        message: 'internal',
+        detail: 'D1_ERROR: no such table grants',
+      ),
+    );
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('connected-app-revoke-tp_alpha')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('D1_ERROR'), findsNothing);
+    expect(find.text('伺服器暫時無法處理，請稍後再試'), findsOneWidget);
   });
 
   testWidgets('同一應用程式重新授權後，重新整理顯示新的授權', (tester) async {

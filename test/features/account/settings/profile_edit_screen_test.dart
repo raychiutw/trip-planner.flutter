@@ -132,6 +132,28 @@ void main() {
     verify(() => accountRepo.updateProfile(displayName: '新名字')).called(1);
   });
 
+  testWidgets('清空或全空白的顯示名稱：就地提示且儲存停用，欄位帶 name AutoFill', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final field = find.byKey(const ValueKey('profile-display-name'));
+    final save = find.byKey(const ValueKey('profile-save'));
+
+    final inner = tester.widget<TextField>(
+      find.descendant(of: field, matching: find.byType(TextField)),
+    );
+    expect(inner.autofillHints, contains(AutofillHints.name));
+
+    for (final blank in ['', '   ']) {
+      await tester.enterText(field, blank);
+      await tester.pump();
+      expect(tester.widget<TpToolbarTextButton>(save).onPressed, isNull);
+      expect(find.text('顯示名稱不可空白'), findsOneWidget);
+    }
+    verifyNever(
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
+    );
+  });
+
   testWidgets('名稱只差空白不需儲存，送出時去除首尾空白', (tester) async {
     when(() => accountRepo.updateProfile(displayName: '新名字')).thenAnswer(
       (_) async =>

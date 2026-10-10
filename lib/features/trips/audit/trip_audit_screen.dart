@@ -1,6 +1,7 @@
 /// Trip audit log screen.
 library;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +13,8 @@ import '../../../app/error_message.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_tag.dart';
+import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 
 const _auditLimit = 50;
@@ -94,7 +97,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
             key: const ValueKey('trip-audit-refresh-button'),
             tooltip: '重新整理',
             onPressed: _loading ? null : _load,
-            icon: Icons.refresh,
+            icon: CupertinoIcons.refresh,
           ),
         ],
       ),
@@ -132,7 +135,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
                               key: const ValueKey('trip-audit-refreshing'),
                               liveRegion: true,
                               label: '正在更新異動紀錄',
-                              child: const LinearProgressIndicator(),
+                              child: const TpProgressBar(semanticLabel: null),
                             ),
                             const SizedBox(height: TpSpacing.s3),
                           ],
@@ -177,13 +180,7 @@ class _Header extends StatelessWidget {
         Wrap(
           spacing: TpSpacing.s2,
           runSpacing: TpSpacing.s2,
-          children: [
-            Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: const Icon(Icons.history_outlined, size: 16),
-              label: Text('$count 筆'),
-            ),
-          ],
+          children: [TpTag(label: '$count 筆')],
         ),
         const SizedBox(height: TpSpacing.s2),
         Text('顯示最近最多 $_auditLimit 筆異動', style: textTheme.bodyMedium),
@@ -216,43 +213,25 @@ class _AuditCard extends StatelessWidget {
               runSpacing: TpSpacing.s2,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: _actionBackground(context, row.action),
-                  label: Text(_actionLabel(row.action)),
+                TpTag(
+                  label: _actionLabel(row.action),
+                  emphasized: row.action != TripAuditAction.unknown,
                 ),
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(_tableLabel(row.tableName)),
-                ),
-                if (row.requestId != null)
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text('Request #${row.requestId}'),
-                  ),
+                TpTag(label: _tableLabel(row.tableName)),
               ],
             ),
             const SizedBox(height: TpSpacing.s2),
             Text(
-              '#${row.id} · ${_formatTimestamp(row.createdAt)}',
+              _formatTimestamp(row.createdAt),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: TpSpacing.s1),
             Text(
-              row.changedBy ?? 'system',
+              row.changedBy ?? '系統',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
-            if (row.recordId != null) ...[
-              const SizedBox(height: TpSpacing.s1),
-              Text(
-                'Record #${row.recordId}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
             if (diffLines.isNotEmpty) ...[
               const SizedBox(height: TpSpacing.s3),
               for (final line in diffLines)
@@ -325,7 +304,7 @@ class _EmptyAudit extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.history_outlined),
+            Icon(CupertinoIcons.clock),
             SizedBox(height: TpSpacing.s3),
             Text('尚無異動紀錄'),
           ],
@@ -333,17 +312,6 @@ class _EmptyAudit extends StatelessWidget {
       ),
     );
   }
-}
-
-Color _actionBackground(BuildContext context, TripAuditAction action) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return switch (action) {
-    TripAuditAction.insert => colorScheme.secondaryContainer,
-    TripAuditAction.update => colorScheme.primaryContainer,
-    TripAuditAction.delete => colorScheme.errorContainer,
-    TripAuditAction.error => colorScheme.errorContainer,
-    TripAuditAction.unknown => colorScheme.surfaceContainerHigh,
-  };
 }
 
 String _actionLabel(TripAuditAction action) => switch (action) {
@@ -372,7 +340,7 @@ List<String> _diffLines(TripAuditRow row) {
   if (diff != null && diff.isNotEmpty) {
     return [
       for (final entry in diff.entries.take(4))
-        '${entry.key}: ${_diffValue(entry.value)}',
+        '${_fieldLabel(entry.key)}: ${_diffValue(entry.value)}',
     ];
   }
   final snapshot = _readMap(() => row.snapshotRow);
@@ -380,13 +348,46 @@ List<String> _diffLines(TripAuditRow row) {
     return [
       '快照：',
       for (final entry in snapshot.entries.take(3))
-        '${entry.key}: ${_compactValue(entry.value)}',
+        '${_fieldLabel(entry.key)}: ${_compactValue(entry.value)}',
     ];
   }
   if (row.companionFailureReason != null) {
     return ['原因：${row.companionFailureReason}'];
   }
   return const [];
+}
+
+/// 資料表欄位名轉人話；未收錄的欄位維持原名（snake_case 轉成空白分隔）。
+String _fieldLabel(String key) {
+  final normalized = key.replaceAllMapped(
+    RegExp(r'[A-Z]'),
+    (m) => '_${m[0]!.toLowerCase()}',
+  );
+  return switch (normalized) {
+    'title' => '標題',
+    'name' => '名稱',
+    'start_time' => '開始時間',
+    'end_time' => '結束時間',
+    'time' => '時間',
+    'note' || 'notes' => '備註',
+    'description' || 'desc' => '說明',
+    'location' => '地點',
+    'sort_order' => '排序',
+    'day_num' => '第幾天',
+    'date' => '日期',
+    'start_date' => '開始日期',
+    'end_date' => '結束日期',
+    'category' || 'type' => '類別',
+    'reservation' => '訂位資訊',
+    'reservation_url' => '訂位連結',
+    'price' => '價格',
+    'hours' => '營業時間',
+    'rating' => '評分',
+    'published' => '公開狀態',
+    'role' => '角色',
+    'status' => '狀態',
+    _ => normalized.replaceAll('_', ' '),
+  };
 }
 
 Map<String, dynamic>? _readMap(Map<String, dynamic>? Function() read) {
@@ -408,7 +409,7 @@ String _diffValue(Object? value) {
 
 String _compactValue(Object? value) {
   final text = value?.toString() ?? 'null';
-  return text.length > 48 ? '${text.substring(0, 48)}...' : text;
+  return text.length > 48 ? '${text.substring(0, 48)}…' : text;
 }
 
 String _formatTimestamp(String value) {

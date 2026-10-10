@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,6 +85,59 @@ void main() {
     await pump(tester);
     expect(find.byKey(const ValueKey('offline-pending-banner')), findsNothing);
     expect(find.byKey(const ValueKey('offline-conflict-banner')), findsNothing);
+  });
+
+  testWidgets('裝置離線且無待同步 → 顯示純離線橫幅，連線後消失', (tester) async {
+    await pump(tester);
+    container.read(deviceOnlineProvider.notifier).set(false);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('offline-network-banner')),
+      findsOneWidget,
+    );
+    expect(find.text('目前離線，變更會在連線後同步'), findsOneWidget);
+
+    container.read(deviceOnlineProvider.notifier).set(true);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('offline-network-banner')), findsNothing);
+  });
+
+  testWidgets('純離線橫幅文字是 liveRegion', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pump(tester);
+    container.read(deviceOnlineProvider.notifier).set(false);
+    await tester.pumpAndSettle();
+    expect(tester.isLiveRegionOf(find.text('目前離線，變更會在連線後同步')), isTrue);
+    handle.dispose();
+  });
+
+  testWidgets('離線且有待同步 → 仍顯示待同步橫幅而非純離線橫幅', (tester) async {
+    await cache.appendMutation(_mut('1'));
+    await pump(tester);
+    container.read(deviceOnlineProvider.notifier).set(false);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('offline-pending-banner')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('offline-network-banner')), findsNothing);
+  });
+
+  testWidgets('handleNetworkAvailability 會同步 deviceOnlineProvider', (
+    tester,
+  ) async {
+    container
+        .read(offlineSyncControllerProvider.notifier)
+        .handleNetworkAvailability(false);
+    expect(container.read(deviceOnlineProvider), isFalse);
+  });
+
+  testWidgets('離線橫幅文字是 liveRegion', (tester) async {
+    final handle = tester.ensureSemantics();
+    await cache.appendMutation(_mut('1'));
+    await pump(tester);
+    expect(tester.isLiveRegionOf(find.text('1 筆變更待同步')), isTrue);
+    handle.dispose();
   });
 
   testWidgets('有待同步 → 顯示筆數 + 立即重試', (tester) async {

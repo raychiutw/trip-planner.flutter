@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -8,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
+import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/app/app_loading_skeleton.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -220,6 +223,7 @@ Future<void> _pumpAiScreen(
   })
   mocks, {
   bool stubAiState = true,
+  TextScaler? textScaler,
 }) async {
   await tester.pumpWidget(
     _buildScreen(
@@ -227,6 +231,7 @@ Future<void> _pumpAiScreen(
       repo: mocks.repo,
       requestsRepo: mocks.requestsRepo,
       stubAiState: stubAiState,
+      textScaler: textScaler,
     ),
   );
   await tester.pumpAndSettle();
@@ -254,6 +259,7 @@ Widget _buildScreen(
   Stream<TripNotes> Function(Ref ref, String tripId)? notesBuilder,
   ThemeData? theme,
   TextScaler? textScaler,
+  bool disableAnimations = false,
   bool stubAiState = true,
 }) {
   // ai-state 對絕大多數測試是背景雜訊:預設成功回空,只有專門測隔離的那條
@@ -279,10 +285,13 @@ Widget _buildScreen(
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.light(),
-      builder: textScaler == null
+      builder: textScaler == null && !disableAnimations
           ? null
           : (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              data: MediaQuery.of(context).copyWith(
+                textScaler: textScaler,
+                disableAnimations: disableAnimations,
+              ),
               child: child!,
             ),
       home: const TripNotesScreen(tripId: 'trip-1'),
@@ -495,13 +504,22 @@ void main() {
     // 航班預設展開（mobile 行為）
     expect(find.text('長榮航空 BR112'), findsOneWidget);
     expect(find.text('TPE → OKA'), findsOneWidget);
-    expect(find.text('2026-04-01 08:30'), findsOneWidget);
+    // 日期時間走 formatAppDateTime（裝置 locale），不顯示後端原字串
+    final context = tester.element(find.byType(Scaffold).first);
+    String fmt(DateTime d) => formatAppDateTime(context, d);
+    expect(find.text(fmt(DateTime(2026, 4, 1, 8, 30))), findsOneWidget);
+    expect(find.text('2026-04-01 08:30'), findsNothing);
 
     // 展開住宿：name、checkInAt~checkOutAt、address
     await tester.tap(find.text('住宿'));
     await tester.pumpAndSettle();
     expect(find.text('那霸海濱飯店'), findsOneWidget);
-    expect(find.text('2026-04-01 15:00 ~ 2026-04-03 10:00'), findsOneWidget);
+    expect(
+      find.text(
+        '${fmt(DateTime(2026, 4, 1, 15))} ~ ${fmt(DateTime(2026, 4, 3, 10))}',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('沖繩縣那霸市西1-2-1'), findsOneWidget);
 
     // 展開預訂：kind chip + title + reservedAt
@@ -514,7 +532,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('餐廳'), findsOneWidget);
     expect(find.text('燒肉乃我那霸 新館'), findsOneWidget);
-    expect(find.text('2026-04-01 19:00'), findsOneWidget);
+    expect(find.text(fmt(DateTime(2026, 4, 1, 19))), findsOneWidget);
   });
 
   testWidgets('展開緊急聯絡：name + kind + phone', (tester) async {
@@ -620,6 +638,49 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('系統要求減少動態效果時,筆記區塊展開不跑過場', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), disableAnimations: true),
+    );
+    await tester.pumpAndSettle();
+    final tile = tester.widget<ExpansionTile>(
+      find.descendant(
+        of: find.byKey(const ValueKey('notes-section-flights')),
+        matching: find.byType(ExpansionTile),
+      ),
+    );
+    expect(tile.expansionAnimationStyle?.duration, Duration.zero);
+  });
+
+  testWidgets('刪除筆記的確認對話框具名:顯示該筆內容而非區名', (tester) async {
+    final repo = _MockTripRepository();
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const ValueKey('note-dismiss-flights-1')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey<Object>((
+          'swipe-delete-action',
+          ValueKey('note-dismiss-flights-1'),
+        )),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.textContaining('長榮航空 BR112'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('點「新增航班」→ 開 create sheet', (tester) async {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();
@@ -704,6 +765,7 @@ void main() {
   });
 
   testWidgets('展開行前須知後可觸發一般 AI 生成並顯示 pending 狀態', (tester) async {
+    final semantics = tester.ensureSemantics();
     final repo = _MockTripRepository();
     final requestsRepo = _MockRequestsRepository();
     when(
@@ -743,6 +805,19 @@ void main() {
     await tester.pump();
     expect(find.byKey(const ValueKey('notes-ai-pending')), findsOneWidget);
     expect(find.textContaining('行前須知'), findsWidgets);
+    expect(
+      tester.isLiveRegionOf(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('notes-ai-pending')),
+              matching: find.byType(Text),
+            )
+            .first,
+      ),
+      isTrue,
+      reason: 'AI 進行中文字要向讀屏宣告',
+    );
+    semantics.dispose();
   });
 
   testWidgets('沒有住宿時住宿 AI 生成保持 disabled 並說明原因', (tester) async {
@@ -1295,6 +1370,7 @@ void main() {
   });
 
   testWidgets('生成完成後重讀狀態,把摘要用中文句子講出來', (tester) async {
+    final semantics = tester.ensureSemantics();
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
     var call = 0;
@@ -1347,10 +1423,23 @@ void main() {
               .first,
         )
         .data!;
+    expect(
+      tester.isLiveRegionOf(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('notes-ai-summary')),
+              matching: find.byType(Text),
+            )
+            .first,
+      ),
+      isTrue,
+      reason: 'AI 完成摘要要向讀屏宣告',
+    );
     expect(summary, contains('2'), reason: '新增 2 則');
     expect(summary, contains('5'), reason: '替換 5 則');
     expect(summary, contains('3'), reason: '保留 3 則人工');
     expect(summary, isNot(contains('抑制 0')), reason: '缺漏或為零的 count 要略過');
+    semantics.dispose();
   });
 
   testWidgets('逾時走既有進度通道抵達,有自己的面板與重試', (tester) async {
@@ -1682,6 +1771,41 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('排除清單載入中用列表骨架,不是單一 spinner', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 2,
+          ),
+        ],
+      ),
+    );
+    final gate = Completer<List<TripNoteExclusion>>();
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: any(named: 'tripId')),
+    ).thenAnswer((_) => gate.future);
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-tips')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(AppListLoadingSkeleton), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.bySemanticsLabel('正在載入'), findsOneWidget);
+    gate.complete(const []);
+    await tester.pump();
+  });
+
   testWidgets('窄螢幕大字級仍能分別開啟一般與住宿排除清單', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
@@ -1884,6 +2008,26 @@ void main() {
 
     expect(find.bySemanticsLabel('AI 產生'), findsOneWidget);
     semantics.dispose();
+  });
+
+  testWidgets('AI 進行中面板在 AX 字級把停止鈕排到訊息下方,不擠在同一列', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    await _pumpAiScreen(tester, mocks, textScaler: const TextScaler.linear(3));
+    await _startTips(tester);
+
+    final panel = find.byKey(const ValueKey('notes-ai-pending-tips'));
+    final stop = find.byKey(const ValueKey('notes-ai-stop-tips'));
+    expect(panel, findsOneWidget);
+    final message = find.descendant(
+      of: panel,
+      matching: find.textContaining('行前須知'),
+    );
+    expect(
+      tester.getTopLeft(stop).dy,
+      greaterThanOrEqualTo(tester.getBottomLeft(message.first).dy),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('生成中可以停止等待,只停這一種、不連坐另一種', (tester) async {

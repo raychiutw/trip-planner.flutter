@@ -19,6 +19,7 @@ import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../../ui/tp_compact_time_field.dart';
 import '../../../ui/tp_state_view.dart';
@@ -27,6 +28,7 @@ import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
 import '../explore/explore_controller.dart' show poiRepositoryProvider;
 import '../favorites_providers.dart';
+import '../../../models/display_format.dart';
 
 /// 時間區間有效性：結束須晚於開始。抽為頂層純函式以利單元測試。
 bool isAddToTripTimeValid(TimeOfDay start, TimeOfDay end) =>
@@ -299,6 +301,24 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
+        if (_submitting) ...[
+          Semantics(
+            key: const ValueKey('add-to-trip-progress'),
+            label: '正在加入行程',
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TpProgressBar(semanticLabel: null),
+                SizedBox(height: TpSpacing.s2),
+                Text('正在加入行程…'),
+              ],
+            ),
+          ),
+          const SizedBox(height: TpSpacing.s4),
+        ],
         if (tripsError)
           _RetryState(
             title: '無法載入行程清單',
@@ -322,7 +342,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           daysAsync.when(
             skipLoadingOnReload: daysAsync.retrying,
             skipError: daysAsync.hasValue,
-            loading: () => const LinearProgressIndicator(),
+            loading: () => const TpProgressBar(),
             error: (e, _) => _RetryState(
               key: ValueKey(tripId),
               title: '無法載入日期',
@@ -345,7 +365,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                     for (final d in days)
                       (
                         value: d.dayNum,
-                        label: 'DAY ${d.dayNum} · ${d.displayTitle}',
+                        label: dayLabel(d.dayNum, title: d.displayTitle),
                       ),
                   ],
                   onChanged: (v) => setState(() {
@@ -379,11 +399,15 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
         if (!_timeValid)
           Padding(
             padding: const EdgeInsets.only(top: TpSpacing.s2),
-            child: Text(
-              '結束時間需晚於開始時間',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 11,
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                '結束時間需晚於開始時間',
+                key: const ValueKey('add-to-trip-time-error'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 11,
+                ),
               ),
             ),
           ),

@@ -27,6 +27,7 @@ import 'google_poi_accessory_card.dart';
 import 'selected_day_provider.dart';
 import 'trip_days_lookup.dart';
 import 'trip_providers.dart';
+import '../../models/display_format.dart';
 
 /// 行程地圖：Header 行程 action + 全部／DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerStatefulWidget {
@@ -354,6 +355,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   bool _initialFocusApplied = false;
   List<_RouteSegment> _routeSegments = const [];
   bool _loadingRoutes = false;
+  bool _routeLoadFailed = false;
   int _routeLoadGeneration = 0;
 
   @override
@@ -562,6 +564,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         setState(() {
           _routeSegments = const [];
           _loadingRoutes = false;
+          _routeLoadFailed = false;
         });
       }
       return;
@@ -569,7 +572,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     setState(() {
       _routeSegments = const [];
       _loadingRoutes = true;
+      _routeLoadFailed = false;
     });
+    var anyFailed = false;
     final repository = ref.read(mapRepositoryProvider);
     final segments = await Future.wait([
       for (final (index, pair) in pairs.indexed)
@@ -596,6 +601,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             // 單段失敗只略過該段（spec：保留 marker／卡片）。這裡必須攔下 Error
             // 而不只是 Exception —— Future.wait 是 fail-fast，漏出去會讓整趟路線
             // 全滅且 _loadingRoutes 永遠卡在 true。
+            anyFailed = true;
             return null;
           }
         }(),
@@ -604,6 +610,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     setState(() {
       _routeSegments = segments.whereType<_RouteSegment>().toList();
       _loadingRoutes = false;
+      _routeLoadFailed = anyFailed;
     });
   }
 
@@ -832,9 +839,45 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           Positioned(
             left: TpSpacing.s4,
             top: TpRootGeometry.headerBottom(context) + TpSpacing.s3,
-            child: const SizedBox.square(
-              dimension: 24,
-              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+            child: Semantics(
+              label: '路線載入中',
+              liveRegion: true,
+              child: SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (_routeLoadFailed)
+          Positioned(
+            top:
+                TpRootGeometry.headerBottom(context) +
+                TpSpacing.s2 +
+                _daySelectorHeight +
+                TpSpacing.s2,
+            left: TpSpacing.s4,
+            right: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s2,
+            child: Semantics(
+              key: const ValueKey('trip-map-route-error'),
+              liveRegion: true,
+              container: true,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '部分路線無法載入',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    key: const ValueKey('trip-map-route-retry'),
+                    onPressed: () => unawaited(_loadRoutes()),
+                    child: const Text('重試'),
+                  ),
+                ],
+              ),
             ),
           ),
         Positioned(
@@ -853,7 +896,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               for (final (index, day) in widget.index.days.indexed)
                 TpScopeOption(
                   value: index + 1,
-                  label: 'Day ${day.dayNum}',
+                  label: dayLabel(day.dayNum),
                   semanticsLabel:
                       '第 ${day.dayNum} 天，共 ${widget.index.days.length} 天',
                   key: ValueKey('trip-map-day-${day.dayNum}'),
@@ -914,7 +957,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       color: pin.color,
       style: style,
       title: '$number. ${pin.entry.title}',
-      snippet: 'DAY ${pin.dayNum}',
+      snippet: dayLabel(pin.dayNum),
       glyph: '$number',
       onTap: () => _selectStop(pin, animatePage: true),
       zIndex: _activeEntryId == pin.entry.id ? 1000 : 100 - pin.dayIndex,
@@ -1024,9 +1067,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     final endTime = stop.entry.endTime?.trim();
     final timeLabel = startTime == null || startTime.isEmpty
         ? '時間未設定'
-        : endTime == null || endTime.isEmpty
-        ? startTime
-        : '$startTime–$endTime';
+        : formatTimeRange(startTime, endTime);
     final isActive = _activeEntryId == stop.entry.id;
     final isPreview = _previewEntryId == stop.entry.id;
     final category = stop.entry.master?.category?.trim();
@@ -1065,14 +1106,15 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: const BorderRadius.all(Radius.circular(15)),
+              // 選取態用 tint 2pt 框（對比 >= 3:1）；原本只調 onSurface alpha，
+              // 淺色模式下與未選取卡片幾乎無差。
               border: Border.all(
-                color: theme.colorScheme.onSurface.withValues(
-                  alpha: isActive
-                      ? 0.30
-                      : isPreview
-                      ? 0.20
-                      : 0.10,
-                ),
+                width: isActive ? 2 : 1,
+                color: isActive
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(
+                        alpha: isPreview ? 0.20 : 0.10,
+                      ),
               ),
               boxShadow: isPreview
                   ? [
@@ -1085,7 +1127,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                   : null,
             ),
             child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s2),
+              // 選取框多 1pt，內縮同量讓卡片內容不位移。
+              padding: EdgeInsets.all(TpSpacing.s2 - (isActive ? 1 : 0)),
               child: Row(
                 children: [
                   Container(

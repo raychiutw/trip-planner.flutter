@@ -63,6 +63,19 @@ void main() {
               const Scaffold(body: Text('login-destination')),
         ),
         GoRoute(
+          path: '/invite',
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'invite-destination:${state.uri.queryParameters['token']}',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) =>
+              const Scaffold(body: Text('home-destination')),
+        ),
+        GoRoute(
           path: '/trips',
           builder: (context, state) => Scaffold(
             body: Text('trips:${state.uri.queryParameters['selected'] ?? ''}'),
@@ -87,6 +100,21 @@ void main() {
     await tester.pumpAndSettle();
     return router;
   }
+
+  testWidgets('Auth 卡片品牌標題是 VoiceOver header', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    expect(
+      tester
+          .getSemantics(find.text('Tripline'))
+          .getSemanticsData()
+          .flagsCollection
+          .isHeader,
+      isTrue,
+    );
+    handle.dispose();
+  });
 
   testWidgets('註冊欄位提供同組姓名、Email 與新密碼 AutoFill 語意', (tester) async {
     await pumpAuthRoutes(tester, initialLocation: '/signup');
@@ -411,6 +439,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('login-destination'), findsOneWidget);
+  });
+
+  testWidgets('帶邀請的 Signup 返回會回到邀請頁而非 Login', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup?invitation=tok-1');
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('invite-destination:tok-1'), findsOneWidget);
+    expect(find.text('login-destination'), findsNothing);
+  });
+
+  testWidgets('Signup 返回優先 pop 既有 route stack', (tester) async {
+    final router = await pumpAuthRoutes(tester, initialLocation: '/home');
+    unawaited(router.push('/signup'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('home-destination'), findsOneWidget);
+    expect(find.text('login-destination'), findsNothing);
   });
 
   testWidgets('Auth 表單在 320pt Accessibility Size 可捲動完成', (tester) async {
@@ -990,6 +1040,17 @@ void main() {
       () => mockAuthRepository.requestPasswordReset('traveler@example.com'),
     ).called(1);
 
+    // 送出中改 readOnly 而非 disabled：欄位不失焦，鍵盤才不會收起又彈出
+    await tester.pump();
+    final inner = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('forgot-password-email-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(inner.readOnly, isTrue);
+    expect(inner.enabled, isTrue);
+
     pending.complete(null);
     await tester.pumpAndSettle();
   });
@@ -1070,7 +1131,7 @@ void main() {
 
   for (final (code, message) in [
     ('RESET_TOKEN_INVALID', '重設連結無效或已過期'),
-    ('RESET_TOKEN_MISSING', '重設連結缺少 token'),
+    ('RESET_TOKEN_MISSING', '重設連結不完整，請重新申請'),
   ]) {
     testWidgets('$code 保留輸入並可重新申請，不重送也不返回失效頁', (tester) async {
       when(

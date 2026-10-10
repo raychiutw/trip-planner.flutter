@@ -148,6 +148,34 @@ void main() {
     );
   });
 
+  testWidgets('載入失敗顯示可重試錯誤頁，不渲染表單與儲存鈕，重試成功後出現表單', (tester) async {
+    var calls = 0;
+    when(() => tripRepo.fetchTrip(any())).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('boom-internal');
+      return _trip;
+    });
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('edit-trip-load-error')), findsOneWidget);
+    expect(find.text('無法載入行程'), findsOneWidget);
+    expect(find.textContaining('boom-internal'), findsNothing);
+    expect(find.byKey(const ValueKey('edit-title')), findsNothing);
+    expect(find.byKey(const ValueKey('edit-save')), findsNothing);
+    final live = tester.getSemantics(
+      find.byKey(const ValueKey('edit-trip-load-error')),
+    );
+    expect(live.flagsCollection.isLiveRegion, isTrue);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('edit-trip-load-error')), findsNothing);
+    expect(find.byKey(const ValueKey('edit-title')), findsOneWidget);
+    expect(find.text('原標題'), findsOneWidget);
+  });
+
   testWidgets('改標題後取消會確認捨棄未儲存變更', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -788,8 +816,8 @@ void main() {
 
     expect(
       find.text(
-        '確定要刪除「DAY 3・2026-04-25（六）」嗎？'
-        '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
+        '確定要刪除「Day 3 · 2026-04-25（六）」嗎？'
+        '這會刪除當天所有停留點，並重新編號後續行程日。此動作無法復原。',
       ),
       findsOneWidget,
     );
@@ -903,7 +931,7 @@ void main() {
     expect(find.text('2026-04-25（六）'), findsOneWidget);
     expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
     expect(
-      find.text('無法確認「DAY 2・2026-04-25（六）」已刪除；重新整理後仍找到同一個行程日'),
+      find.text('無法確認「Day 2 · 2026-04-25（六）」已刪除；重新整理後仍找到同一個行程日'),
       findsOneWidget,
     );
 
@@ -915,8 +943,8 @@ void main() {
     expect(find.text('刪除行程日'), findsOneWidget);
     expect(
       find.text(
-        '確定要刪除「DAY 2・2026-04-25（六）」嗎？'
-        '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
+        '確定要刪除「Day 2 · 2026-04-25（六）」嗎？'
+        '這會刪除當天所有停留點，並重新編號後續行程日。此動作無法復原。',
       ),
       findsOneWidget,
     );
@@ -1007,8 +1035,8 @@ void main() {
     expect(deletedDayNums, [3]);
     expect(
       find.text(
-        '確定要刪除「DAY 4・2026-04-25（六）」嗎？'
-        '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
+        '確定要刪除「Day 4 · 2026-04-25（六）」嗎？'
+        '這會刪除當天所有停留點，並重新編號後續行程日。此動作無法復原。',
       ),
       findsOneWidget,
     );
@@ -1176,7 +1204,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('無法確認「DAY 3・2026-04-25（六）」是否已刪除，請重試確認'), findsOneWidget);
+    expect(find.text('無法確認「Day 3 · 2026-04-25（六）」是否已刪除，請重試確認'), findsOneWidget);
 
     await tester.tap(find.text('重試'));
     await tester.pump();
@@ -1238,7 +1266,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('「DAY 3・2026-04-25（六）」已刪除，但無法重新整理行程日'), findsOneWidget);
+    expect(find.text('「Day 3 · 2026-04-25（六）」已刪除，但無法重新整理行程日'), findsOneWidget);
     expect(
       tester
           .widget<IconButton>(find.byKey(const ValueKey('edit-delete-day-3')))

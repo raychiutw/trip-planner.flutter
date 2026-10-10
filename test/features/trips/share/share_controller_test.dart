@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -152,5 +153,35 @@ void main() {
     final s = c.read(shareControllerProvider('t'));
     expect(s.lastCreated!.token, 'newtok');
     expect(s.lastCreated!.url, '/s/newtok');
+  });
+
+  test('rotate 回傳明確結果:成功 true', () async {
+    when(() => repo.rotateShare(any(), any())).thenAnswer(
+      (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),
+    );
+    final ctrl = await loaded(makeC());
+    expect(await ctrl.rotate(1), isTrue);
+  });
+
+  test('rotate 回傳明確結果:失敗 false 且 rotateFailedId 標記', () async {
+    when(() => repo.rotateShare(any(), any())).thenThrow(Exception('offline'));
+    final c = makeC();
+    final ctrl = await loaded(c);
+    expect(await ctrl.rotate(1), isFalse);
+    expect(c.read(shareControllerProvider('t')).rotateFailedId, 1);
+  });
+
+  test('rotate 防重入:進行中再呼叫回 false、不再打 API、不留下失敗標記', () async {
+    final gate = Completer<RotatedShareLink>();
+    when(() => repo.rotateShare(any(), any())).thenAnswer((_) => gate.future);
+    final c = makeC();
+    final ctrl = await loaded(c);
+
+    final first = ctrl.rotate(1);
+    expect(await ctrl.rotate(1), isFalse);
+    expect(c.read(shareControllerProvider('t')).rotateFailedId, isNull);
+    gate.complete(const RotatedShareLink(token: 'newtok', url: '/s/newtok'));
+    expect(await first, isTrue);
+    verify(() => repo.rotateShare('t', 1)).called(1);
   });
 }

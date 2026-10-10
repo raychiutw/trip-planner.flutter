@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,6 +111,30 @@ void main() {
     ).thenAnswer((_) async => const <ConnectedApp>[]);
   });
 
+  testWidgets('下拉更新會等資料回來才收起轉圈', (tester) async {
+    await pumpScreen(tester);
+    final pending = Completer<AccountSessionsPage>();
+    when(
+      () => mockAccountRepository.fetchAccountSessions(),
+    ).thenAnswer((_) => pending.future);
+
+    await tester.drag(find.byType(ListView), const Offset(0, 400));
+    await tester.pump(const Duration(milliseconds: 100));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.byType(RefreshProgressIndicator), findsOneWidget);
+
+    pending.complete(
+      const AccountSessionsPage(
+        currentSid: 'sid-current',
+        sessions: [currentSession],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(RefreshProgressIndicator), findsNothing);
+  });
+
   testWidgets('裝置列表不直接鋪 destructive action，詳情才顯示登出', (tester) async {
     await pumpScreen(tester);
 
@@ -128,7 +154,7 @@ void main() {
     );
     expect(
       find.byKey(const Key('account-sessions-revoke-others')),
-      findsOneWidget,
+      findsNothing,
     );
 
     await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
@@ -253,7 +279,7 @@ void main() {
     expect(tester.widget<FilledButton>(revokeFinder).onPressed, isNotNull);
   });
 
-  testWidgets('批次登出受限時說明逐一登出路徑，確認後失敗仍可重試', (tester) async {
+  testWidgets('不提供死按鈕的批次登出，逐一登出失敗仍可重試', (tester) async {
     var attempts = 0;
     when(
       () => mockAccountRepository.revokeAccountSession('sid-phone'),
@@ -269,25 +295,14 @@ void main() {
     );
     await pumpScreen(tester);
 
-    await tester.tap(find.byKey(const Key('account-sessions-revoke-others')));
-    await tester.pumpAndSettle();
-
     expect(
-      find.byKey(const ValueKey('revoke-other-sessions-blocked-dialog')),
-      findsOneWidget,
+      find.byKey(const Key('account-sessions-revoke-others')),
+      findsNothing,
     );
-    expect(find.text('目前無法一次登出其他裝置'), findsOneWidget);
-    expect(
-      find.text('目前無法驗證身分以一次登出其他裝置。請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('伺服器'), findsNothing);
-    expect(find.textContaining('綁定'), findsNothing);
+    expect(find.byTooltip('登出其他裝置'), findsNothing);
     verifyNever(() => mockAccountRepository.revokeOtherAccountSessions());
     verifyNever(() => mockAccountRepository.revokeAccountSession(any()));
 
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '返回裝置清單'));
-    await tester.pumpAndSettle();
     expect(find.text('目前裝置'), findsOneWidget);
     await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
     await tester.pumpAndSettle();

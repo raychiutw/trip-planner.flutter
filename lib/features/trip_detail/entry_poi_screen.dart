@@ -17,6 +17,9 @@ import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_progress_bar.dart';
+import '../../ui/tp_picker_field.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/swipe_to_delete.dart';
 import '../../ui/tp_app_bar.dart';
 import '../favorites/explore/explore_controller.dart'
@@ -109,7 +112,22 @@ class EntryPoiScreen extends ConsumerWidget {
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('無法載入地點:$error', textAlign: TextAlign.center),
+            child: Semantics(
+              key: const ValueKey('entry-poi-load-error'),
+              liveRegion: true,
+              container: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('無法載入地點，請稍後再試', textAlign: TextAlign.center),
+                  const SizedBox(height: TpSpacing.s2),
+                  TextButton(
+                    onPressed: () => ref.invalidate(entryDetailProvider(_key)),
+                    child: const Text('重試'),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         data: (entry) => _body(context, ref, entry),
@@ -202,8 +220,8 @@ class EntryPoiScreen extends ConsumerWidget {
                       children: [
                         IconButton(
                           key: ValueKey('alt-move-up-${alt.poiId}'),
-                          tooltip: '上移',
-                          icon: const Icon(Icons.keyboard_arrow_up),
+                          tooltip: '上移${alt.name ?? '備選地點'}',
+                          icon: const Icon(CupertinoIcons.chevron_up),
                           onPressed: index == 0
                               ? null
                               : () => _moveAlternate(
@@ -216,8 +234,8 @@ class EntryPoiScreen extends ConsumerWidget {
                         ),
                         IconButton(
                           key: ValueKey('alt-move-down-${alt.poiId}'),
-                          tooltip: '下移',
-                          icon: const Icon(Icons.keyboard_arrow_down),
+                          tooltip: '下移${alt.name ?? '備選地點'}',
+                          icon: const Icon(CupertinoIcons.chevron_down),
                           onPressed: index == entry.alternates.length - 1
                               ? null
                               : () => _moveAlternate(
@@ -239,7 +257,10 @@ class EntryPoiScreen extends ConsumerWidget {
                         alt,
                         sameDayEntries,
                       ),
-                      child: const Text('設為正選'),
+                      child: Text(
+                        '設為正選',
+                        semanticsLabel: '將${alt.name ?? '備選地點'}設為正選',
+                      ),
                     ),
                   ],
                 ),
@@ -546,7 +567,7 @@ class _PoiCard extends StatelessWidget {
                       height: TpSpacing.tapMin,
                     ),
                     iconSize: 18,
-                    icon: const Icon(Icons.open_in_new_rounded),
+                    icon: const Icon(CupertinoIcons.arrow_up_right_square),
                     onPressed: () => _openReservationUrl(
                       context,
                       reservationUrlLauncher,
@@ -746,13 +767,13 @@ class _PoiInfoFormState extends State<_PoiInfoForm> {
               spacing: TpSpacing.s2,
               children: [
                 for (final e in kPoiTypeLabels.entries)
-                  ChoiceChip(
+                  TpChip(
                     key: ValueKey('poi-type-${e.key}'),
-                    label: Text(e.value),
+                    label: e.value,
                     selected: _type == e.key,
-                    onSelected: _submitting
+                    onPressed: _submitting
                         ? null
-                        : (_) {
+                        : () {
                             setState(() {
                               _type = e.key;
                             });
@@ -773,8 +794,9 @@ class _PoiInfoFormState extends State<_PoiInfoForm> {
               Semantics(
                 liveRegion: true,
                 label: '正在儲存地點資訊',
-                child: const LinearProgressIndicator(
+                child: const TpProgressBar(
                   key: ValueKey('poi-info-progress'),
+                  semanticLabel: null,
                 ),
               ),
             ],
@@ -825,11 +847,15 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   List<PoiFavorite> _favorites = const [];
   bool _searching = false;
   int _searchRequest = 0;
+  bool _searchFailed = false;
+  bool _searchedEmpty = false;
   bool _favoritesLoaded = false;
   bool _favoritesLoading = false;
   String? _favoritesError;
   String _customPoiType = 'attraction';
   String? _customError;
+  String? _latError;
+  String? _lngError;
   bool _submitting = false;
   String? _submitError;
   bool _customDirty = false;
@@ -851,22 +877,33 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
         setState(() {
           _results = const [];
           _searching = false;
+          _searchFailed = false;
+          _searchedEmpty = false;
         });
       }
       return;
     }
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchFailed = false;
+    });
     try {
       final results = await ref.read(poiRepositoryProvider).searchPois(q: q);
       if (mounted && request == _searchRequest) {
         setState(() {
           _results = results;
           _searching = false;
+          _searchedEmpty = results.isEmpty;
         });
       }
     } on Exception {
       if (mounted && request == _searchRequest) {
-        setState(() => _searching = false);
+        setState(() {
+          _searching = false;
+          _searchFailed = true;
+          _searchedEmpty = false;
+          _results = const [];
+        });
       }
     }
   }
@@ -913,17 +950,23 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   }) {
     final selected = _tab == tab;
     return Expanded(
-      child: selected
-          ? FilledButton(
-              key: key,
-              onPressed: () => _selectTab(tab),
-              child: Text(label),
-            )
-          : OutlinedButton(
-              key: key,
-              onPressed: () => _selectTab(tab),
-              child: Text(label),
-            ),
+      // 自製分段以填色區分選取，語意要同步帶 selected。
+      child: MergeSemantics(
+        child: Semantics(
+          selected: selected,
+          child: selected
+              ? FilledButton(
+                  key: key,
+                  onPressed: () => _selectTab(tab),
+                  child: Text(label),
+                )
+              : OutlinedButton(
+                  key: key,
+                  onPressed: () => _selectTab(tab),
+                  child: Text(label),
+                ),
+        ),
+      ),
     );
   }
 
@@ -958,8 +1001,16 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
     final name = _customNameCtrl.text.trim();
     final lat = double.tryParse(_customLatCtrl.text.trim());
     final lng = double.tryParse(_customLngCtrl.text.trim());
-    if (name.isEmpty || lat == null || lng == null) {
-      setState(() => _customError = '請輸入名稱與有效座標');
+    final latOk = lat != null && lat >= -90 && lat <= 90;
+    final lngOk = lng != null && lng >= -180 && lng <= 180;
+    if (name.isEmpty || !latOk || !lngOk) {
+      setState(() {
+        _customError = name.isEmpty ? '請輸入名稱' : null;
+        _latError = latOk ? null : (lat == null ? '請輸入有效緯度' : '緯度需介於 -90 到 90');
+        _lngError = lngOk
+            ? null
+            : (lng == null ? '請輸入有效經度' : '經度需介於 -180 到 180');
+      });
       return;
     }
     _submitPick(
@@ -1005,9 +1056,10 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 Semantics(
                   liveRegion: true,
                   label: '正在儲存地點',
-                  child: const LinearProgressIndicator(
+                  child: const TpProgressBar(
                     key: ValueKey('poi-picker-submit-progress'),
-                    minHeight: 2,
+                    height: 2,
+                    semanticLabel: null,
                   ),
                 ),
                 const SizedBox(height: TpSpacing.s2),
@@ -1036,9 +1088,32 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 ),
                 if (_searching) ...[
                   const SizedBox(height: TpSpacing.s1),
-                  const LinearProgressIndicator(minHeight: 2),
+                  const TpProgressBar(height: 2, semanticLabel: '搜尋中'),
                 ],
                 const SizedBox(height: TpSpacing.s3),
+                if (_searchFailed || (_searchedEmpty && !_searching))
+                  Semantics(
+                    key: const ValueKey('poi-picker-search-status'),
+                    liveRegion: true,
+                    container: true,
+                    child: Padding(
+                      padding: const EdgeInsets.all(TpSpacing.s3),
+                      child: Column(
+                        children: [
+                          Text(
+                            _searchFailed ? '搜尋失敗，請稍後再試' : '找不到符合的地點',
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_searchFailed)
+                            TextButton(
+                              key: const ValueKey('poi-picker-search-retry'),
+                              onPressed: () => unawaited(_search()),
+                              child: const Text('重試'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 320),
                   child: ListView(
@@ -1070,9 +1145,23 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                     ),
                   )
                 else if (_favoritesError != null)
-                  Padding(
-                    padding: const EdgeInsets.all(TpSpacing.s4),
-                    child: Text(_favoritesError!),
+                  Semantics(
+                    key: const ValueKey('poi-picker-favorites-error'),
+                    liveRegion: true,
+                    container: true,
+                    child: Padding(
+                      padding: const EdgeInsets.all(TpSpacing.s4),
+                      child: Column(
+                        children: [
+                          Text(_favoritesError!),
+                          TextButton(
+                            key: const ValueKey('poi-picker-favorites-retry'),
+                            onPressed: () => unawaited(_loadFavorites()),
+                            child: const Text('重試'),
+                          ),
+                        ],
+                      ),
+                    ),
                   )
                 else if (_favoritesLoaded && _favorites.isEmpty)
                   const Padding(
@@ -1121,22 +1210,13 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                   },
                 ),
                 const SizedBox(height: TpSpacing.s2),
-                DropdownButtonFormField<String>(
+                TpPickerField<String>(
                   key: const ValueKey('poi-picker-custom-type'),
-                  initialValue: _customPoiType,
-                  decoration: const InputDecoration(
-                    labelText: '類型',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final entry in kPoiTypeLabels.entries)
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(entry.value),
-                      ),
-                  ],
+                  label: '類型',
+                  value: _customPoiType,
+                  options: kPoiTypeLabels,
                   onChanged: (value) {
-                    setState(() => _customPoiType = value ?? _customPoiType);
+                    setState(() => _customPoiType = value);
                     _syncCustomDirty();
                   },
                 ),
@@ -1151,14 +1231,18 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                           signed: true,
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: '緯度',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          errorText: _latError,
                         ),
                         onChanged: (_) {
                           _syncCustomDirty();
-                          if (_customError != null) {
-                            setState(() => _customError = null);
+                          if (_customError != null || _latError != null) {
+                            setState(() {
+                              _customError = null;
+                              _latError = null;
+                            });
                           }
                         },
                       ),
@@ -1172,14 +1256,18 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                           signed: true,
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: '經度',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          errorText: _lngError,
                         ),
                         onChanged: (_) {
                           _syncCustomDirty();
-                          if (_customError != null) {
-                            setState(() => _customError = null);
+                          if (_customError != null || _lngError != null) {
+                            setState(() {
+                              _customError = null;
+                              _lngError = null;
+                            });
                           }
                         },
                       ),
@@ -1188,10 +1276,14 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 ),
                 if (_customError != null) ...[
                   const SizedBox(height: TpSpacing.s2),
-                  Text(
-                    _customError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      _customError!,
+                      key: const ValueKey('poi-custom-error'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 ],

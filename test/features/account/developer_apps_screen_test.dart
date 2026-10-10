@@ -126,6 +126,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('下拉更新會等資料回來才收起轉圈', (tester) async {
+    await pumpList(tester);
+    final pending = Completer<List<DeveloperApp>>();
+    when(
+      () => mockAccountRepository.fetchDeveloperApps(),
+    ).thenAnswer((_) => pending.future);
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, 400));
+    await tester.pump(const Duration(milliseconds: 100));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.byType(RefreshProgressIndicator), findsOneWidget);
+
+    pending.complete(const <DeveloperApp>[]);
+    await tester.pumpAndSettle();
+    expect(find.byType(RefreshProgressIndicator), findsNothing);
+  });
+
   testWidgets('列出 developer apps 並顯示新增入口', (tester) async {
     await pumpList(tester);
 
@@ -397,7 +416,7 @@ void main() {
     expect(find.byType(DeveloperAppEditScreen), findsOneWidget);
   });
 
-  testWidgets('刪除 developer app 需說明影響與不可復原，成功後才返回', (tester) async {
+  testWidgets('停用 developer app 需說明影響與不可復原，成功後才返回', (tester) async {
     final semantics = tester.ensureSemantics();
     final deleteCompleter = Completer<String>();
     when(
@@ -411,19 +430,20 @@ void main() {
     await tester.tap(deleteButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('刪除 Dev App？'), findsOneWidget);
+    expect(find.text('停用 Dev App？'), findsOneWidget);
+    expect(find.text('刪除應用程式'), findsNothing);
     expect(find.textContaining('無法復原'), findsOneWidget);
     verifyNever(() => mockAccountRepository.suspendDeveloperApp(any()));
     expect(
       tester
           .widget<CupertinoDialogAction>(
-            find.widgetWithText(CupertinoDialogAction, '刪除'),
+            find.widgetWithText(CupertinoDialogAction, '停用'),
           )
           .isDestructiveAction,
       isTrue,
     );
 
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '停用'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -439,7 +459,7 @@ void main() {
         tester.view.physicalSize.height / tester.view.devicePixelRatio;
     expect(progressRect.top, greaterThanOrEqualTo(0));
     expect(progressRect.bottom, lessThanOrEqualTo(viewportHeight));
-    final deleteProgressSemantics = find.bySemanticsLabel('正在刪除應用程式');
+    final deleteProgressSemantics = find.bySemanticsLabel('正在停用應用程式');
     expect(deleteProgressSemantics, findsOneWidget);
     expect(
       tester
@@ -455,7 +475,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('刪除後在同一個 ProviderScope 重新開啟不會重現舊 detail', (tester) async {
+  testWidgets('停用後在同一個 ProviderScope 重新開啟不會重現舊 detail', (tester) async {
     var deleted = false;
     when(() => mockAccountRepository.fetchDeveloperApp('tp_dev')).thenAnswer((
       _,
@@ -473,7 +493,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('developer-app-delete')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '停用'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('developer-app-row-tp_dev')));
     await tester.pumpAndSettle();
@@ -485,7 +505,35 @@ void main() {
     ).called(greaterThanOrEqualTo(2));
   });
 
-  testWidgets('刪除 developer app 失敗會保留應用、頁面與重試操作', (tester) async {
+  testWidgets('編輯模式的按鈕文案與實際的停用行為一致', (tester) async {
+    await pumpEditForm(tester);
+
+    final button = find.byKey(const Key('developer-app-delete'));
+    await tester.ensureVisible(button);
+    expect(
+      find.descendant(of: button, matching: find.text('停用應用程式')),
+      findsOneWidget,
+    );
+    expect(find.text('刪除應用程式'), findsNothing);
+  });
+
+  testWidgets('編輯模式停用 Public／Confidential 時說明無法變更', (tester) async {
+    await pumpEditForm(tester);
+    final note = find.byKey(const Key('developer-app-client-type-note'));
+    await tester.ensureVisible(note);
+    expect(note, findsOneWidget);
+    expect(find.textContaining('建立後無法變更'), findsOneWidget);
+  });
+
+  testWidgets('新增模式不顯示類型無法變更說明', (tester) async {
+    await pumpForm(tester);
+    expect(
+      find.byKey(const Key('developer-app-client-type-note')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('停用 developer app 失敗會保留應用、頁面與重試操作', (tester) async {
     when(
       () => mockAccountRepository.suspendDeveloperApp('tp_dev'),
     ).thenThrow(Exception('offline'));
@@ -493,10 +541,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('developer-app-delete')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '停用'));
     await tester.pumpAndSettle();
 
-    expect(find.text('刪除應用程式失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('停用應用程式失敗，請稍後再試'), findsOneWidget);
     expect(find.byType(DeveloperAppEditScreen), findsOneWidget);
     expect(find.byKey(const Key('developer-app-delete')), findsOneWidget);
   });
@@ -534,6 +582,24 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     semantics.dispose();
+  });
+
+  testWidgets('URL 欄位關閉自動修正與建議', (tester) async {
+    await pumpForm(tester);
+
+    for (final key in [
+      'developer-app-homepage',
+      'developer-app-redirect-uris',
+    ]) {
+      final editable = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(editable.autocorrect, isFalse, reason: key);
+      expect(editable.enableSuggestions, isFalse, reason: key);
+    }
   });
 
   testWidgets('軟體鍵盤 Next/Done 依表單順序移動焦點', (tester) async {
@@ -744,6 +810,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('請立即複製 client_secret'), findsOneWidget);
+    expect(find.byTooltip('複製 Client ID'), findsOneWidget);
+    expect(find.byTooltip('複製 Client Secret'), findsOneWidget);
     expect(find.textContaining('不會再顯示'), findsOneWidget);
     expect(
       find.byKey(const Key('developer-app-copy-client-id')),

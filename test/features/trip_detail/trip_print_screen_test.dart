@@ -27,17 +27,24 @@ class FakeTripPrintActions implements TripPrintActions {
   int sharePdfCalls = 0;
   TripPrintData? printedData;
   TripPrintData? sharedData;
+  bool printResult = true;
+  bool shareResult = true;
+  Object? error;
 
   @override
-  Future<void> print(TripPrintData data) async {
+  Future<bool> print(TripPrintData data) async {
     printCalls++;
     printedData = data;
+    if (error != null) throw error!;
+    return printResult;
   }
 
   @override
-  Future<void> sharePdf(TripPrintData data) async {
+  Future<bool> sharePdf(TripPrintData data) async {
     sharePdfCalls++;
     sharedData = data;
+    if (error != null) throw error!;
+    return shareResult;
   }
 }
 
@@ -744,7 +751,46 @@ void main() {
       printActions.sharedData?.pdfFileName(now: DateTime(2026, 7, 8)),
       '沖繩家族旅行-2026-07-08.pdf',
     );
-    expect(find.text('PDF 已建立'), findsOneWidget);
+    expect(find.text('已開啟分享選單'), findsOneWidget);
+    // printing 的 sharePdf 在 iOS 固定回 true、偵測不到取消，不得宣稱已分享／已建立。
+    expect(find.text('PDF 已建立'), findsNothing);
+    expect(find.textContaining('已分享'), findsNothing);
+  });
+
+  testWidgets('使用者取消列印不顯示「已送出列印」', (tester) async {
+    printActions.printResult = false;
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-print-do')));
+    await tester.pumpAndSettle();
+
+    expect(printActions.printCalls, 1);
+    expect(find.text('已送出列印'), findsNothing);
+    expect(find.text('列印失敗，請稍後再試'), findsNothing);
+  });
+
+  testWidgets('分享 PDF 回 false（取消）不顯示分享選單訊息', (tester) async {
+    printActions.shareResult = false;
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-print-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-print-pdf')));
+    await tester.pumpAndSettle();
+
+    expect(printActions.sharePdfCalls, 1);
+    expect(find.text('已開啟分享選單'), findsNothing);
+  });
+
+  testWidgets('離線字型下載失敗：訊息指出需要網路', (tester) async {
+    printActions.error = const TripPdfOfflineException();
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-print-do')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('需要網路'), findsOneWidget);
+    expect(find.text('列印失敗，請稍後再試'), findsNothing);
   });
 
   testWidgets('notes 載入失敗顯示 partial-data notice 且可重試', (tester) async {

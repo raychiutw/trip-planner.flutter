@@ -10,6 +10,9 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_progress_bar.dart';
+import '../../../ui/tp_chip.dart';
+import '../../../ui/dynamic_type.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'explore_controller.dart';
@@ -37,9 +40,13 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final controller = ref.read(exploreControllerProvider.notifier);
       await controller.ensureSavedLoaded();
+      if (!mounted) return;
       final state = ref.read(exploreControllerProvider);
       if (!state.hasSearched) {
-        await controller.search(state.region != '全部地區' ? state.region : '東京');
+        final query = state.region != '全部地區' ? state.region : '東京';
+        // 自動搜尋也要回填搜尋框,否則空欄位配上「沒有找到『東京』」會對不起來。
+        if (_searchController.text.isEmpty) _searchController.text = query;
+        await controller.search(query);
       }
     });
   }
@@ -144,13 +151,13 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   ),
                   if (state.searching) ...[
                     const SizedBox(height: TpSpacing.s1),
-                    const LinearProgressIndicator(minHeight: 2),
+                    const TpProgressBar(height: 2, semanticLabel: '搜尋中'),
                   ],
                 ],
               ),
             ),
             SizedBox(
-              height: TpSpacing.tapMin,
+              height: scaledTapMin(context),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
@@ -163,7 +170,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   if (index == 0) {
                     return _categoryChip(
                       key: const ValueKey('explore-category-all'),
-                      label: '為你推薦',
+                      label: '全部',
                       count: state.results.length,
                       selected: state.category == 'all',
                       onSelected: () => ref
@@ -205,26 +212,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     required bool selected,
     required VoidCallback onSelected,
   }) {
-    final theme = Theme.of(context);
-    return ChoiceChip(
+    return TpChip(
       key: key,
-      label: Text(count == null ? label : '$label  $count'),
+      label: count == null ? label : '$label  $count',
       selected: selected,
-      showCheckmark: false,
-      backgroundColor: theme.colorScheme.surfaceContainerHigh,
-      selectedColor: theme.colorScheme.primaryContainer,
-      side: BorderSide(
-        color: selected
-            ? theme.colorScheme.primary
-            : theme.colorScheme.outlineVariant,
-      ),
-      labelStyle: theme.textTheme.labelLarge?.copyWith(
-        color: selected
-            ? theme.colorScheme.onPrimaryContainer
-            : theme.colorScheme.onSurface,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-      ),
-      onSelected: (_) => onSelected(),
+      onPressed: onSelected,
     );
   }
 
@@ -320,7 +312,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「為你推薦」。',
+              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「全部」。',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
@@ -329,7 +321,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               onPressed: () => ref
                   .read(exploreControllerProvider.notifier)
                   .setCategory('all'),
-              child: const Text('回到為你推薦'),
+              child: const Text('回到全部'),
             ),
           ],
         ),

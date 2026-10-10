@@ -11,7 +11,9 @@ import 'package:go_router/go_router.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_chip.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_segmented_control.dart';
 import '../../account/ai_authorize_card.dart';
 import '../trips_list_screen.dart';
 import '../widgets/destination_picker.dart';
@@ -125,6 +127,12 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
                       const SizedBox(height: TpSpacing.s5),
                       ExpansionTile(
                         key: const ValueKey('create-more-needs'),
+                        expansionAnimationStyle: AnimationStyle(
+                          duration: TpMotion.resolve(
+                            context,
+                            const Duration(milliseconds: 200),
+                          ),
+                        ),
                         tilePadding: EdgeInsets.zero,
                         childrenPadding: const EdgeInsets.only(
                           bottom: TpSpacing.s2,
@@ -189,11 +197,15 @@ class _DateModeSection extends StatelessWidget {
     final first = isStart
         ? now
         : (state.fixedStart != null ? DateTime.parse(state.fixedStart!) : now);
+    // 結束日上限 = 開始日 + 29 天（含頭尾共 30 天），不讓使用者選到「新增」會靜默停用的日期。
+    final lastDate = !isStart && state.fixedStart != null
+        ? DateTime.parse(state.fixedStart!).add(const Duration(days: 29))
+        : now.add(const Duration(days: 730));
     final picked = await showAppDatePicker(
       context,
       initialDate: first,
       firstDate: first,
-      lastDate: now.add(const Duration(days: 730)),
+      lastDate: lastDate,
     );
     if (picked == null) return;
     if (isStart) {
@@ -208,15 +220,13 @@ class _DateModeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<TripDateMode>(
-          segments: const [
-            ButtonSegment(value: TripDateMode.fixed, label: Text('固定日期')),
-            ButtonSegment(value: TripDateMode.flexible, label: Text('大概時間')),
-          ],
-          selected: {state.dateMode},
-          onSelectionChanged: !ctrl.editingEnabled
-              ? null
-              : (s) => ctrl.setDateMode(s.first),
+        TpSegmentedControl<TripDateMode>(
+          value: state.dateMode,
+          options: const {
+            TripDateMode.fixed: '固定日期',
+            TripDateMode.flexible: '大概時間',
+          },
+          onChanged: !ctrl.editingEnabled ? null : ctrl.setDateMode,
         ),
         const SizedBox(height: TpSpacing.s3),
         if (state.dateMode == TripDateMode.fixed)
@@ -245,6 +255,20 @@ class _DateModeSection extends StatelessWidget {
           )
         else
           _FlexibleDate(state: state, ctrl: ctrl),
+        if (state.dateError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s2),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                state.dateError!,
+                key: const ValueKey('create-date-error'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -271,6 +295,7 @@ class _FlexibleDate extends StatelessWidget {
             const Spacer(),
             IconButton(
               key: const ValueKey('create-flex-minus'),
+              tooltip: '減少天數',
               onPressed: !ctrl.editingEnabled
                   ? null
                   : () => ctrl.setFlexDayCount(state.flexDayCount - 1),
@@ -283,6 +308,7 @@ class _FlexibleDate extends StatelessWidget {
             ),
             IconButton(
               key: const ValueKey('create-flex-plus'),
+              tooltip: '增加天數',
               onPressed: !ctrl.editingEnabled
                   ? null
                   : () => ctrl.setFlexDayCount(state.flexDayCount + 1),
@@ -294,13 +320,13 @@ class _FlexibleDate extends StatelessWidget {
           spacing: TpSpacing.s2,
           children: [
             for (final m in months)
-              ChoiceChip(
-                label: Text('${m.year}/${m.month}'),
+              TpChip(
+                label: '${m.year}/${m.month}',
                 selected:
                     state.flexYear == m.year && state.flexMonth == m.month,
-                onSelected: !ctrl.editingEnabled
+                onPressed: !ctrl.editingEnabled
                     ? null
-                    : (_) => ctrl.setFlexMonth(m.year, m.month),
+                    : () => ctrl.setFlexMonth(m.year, m.month),
               ),
           ],
         ),
@@ -324,6 +350,7 @@ class _DayQuotaSection extends StatelessWidget {
             children: [
               Expanded(child: Text(state.destinations[i].name)),
               IconButton(
+                tooltip: '減少${state.destinations[i].name}天數',
                 onPressed: !ctrl.editingEnabled
                     ? null
                     : () => ctrl.setQuota(
@@ -334,6 +361,7 @@ class _DayQuotaSection extends StatelessWidget {
               ),
               Text('${state.destinations[i].dayQuota ?? 1}'),
               IconButton(
+                tooltip: '增加${state.destinations[i].name}天數',
                 onPressed: !ctrl.editingEnabled
                     ? null
                     : () => ctrl.setQuota(

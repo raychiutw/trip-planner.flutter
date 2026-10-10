@@ -182,7 +182,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
               focusColor: Theme.of(context).colorScheme.primary,
               isFocused: false,
             ),
-            title: '${item.members.length} 個景點',
+            title: '${item.members.length} 個停留點',
             glyph: item.glyph,
             clusterable: false,
             zIndex: 900,

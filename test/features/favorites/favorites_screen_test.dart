@@ -7,7 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_selection_circle.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/app/app_loading_skeleton.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/favorites/poi_favorite_card.dart';
@@ -77,6 +80,26 @@ Future<void> _openFavoritesFilter(WidgetTester tester) async {
 
 void main() {
   group('FavoritesScreen', () {
+    testWidgets('載入中用列表骨架並保留可朗讀標籤,不是單一 spinner', (tester) async {
+      final handle = tester.ensureSemantics();
+      final controller = StreamController<List<PoiFavorite>>();
+      addTearDown(controller.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => controller.stream),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(AppListLoadingSkeleton), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.bySemanticsLabel('正在載入收藏'), findsOneWidget);
+      handle.dispose();
+    });
+
     testWidgets('header 的排序與新增共用一片玻璃，中間只有間距、沒有分隔線', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -210,8 +233,8 @@ void main() {
       );
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
-      expect(find.byType(FilterChip), findsNothing);
-      expect(find.byType(Checkbox), findsNothing);
+      expect(find.byType(TpChip), findsNothing);
+      expect(find.byType(TpSelectionCircle), findsNothing);
       expect(
         find.byKey(const ValueKey('favorites-search-action')),
         findsNothing,
@@ -867,10 +890,21 @@ void main() {
       );
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .selected,
         isTrue,
         reason: '「⋯」的選取與長按選單結果相同',
+      );
+      expect(
+        tester
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .semanticLabel,
+        startsWith('選取'),
+        reason: '選取模式勾選圓 要有名稱',
       );
       semantics.dispose();
     });
@@ -1074,8 +1108,10 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .selected,
         isTrue,
       );
       expect(find.text('無法刪除「美麗海水族館」，收藏仍保留。'), findsOneWidget);
@@ -1242,8 +1278,10 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-7')),
+            )
+            .selected,
         isTrue,
       );
       semantics.dispose();
@@ -1334,8 +1372,10 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-8')), findsOneWidget);
       expect(
         tester
-            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-8')))
-            .value,
+            .widget<TpSelectionCircle>(
+              find.byKey(const ValueKey('favorite-select-8')),
+            )
+            .selected,
         isTrue,
       );
       expect(find.text('已選 1 個'), findsOneWidget);
@@ -1430,6 +1470,11 @@ void main() {
         expect(tester.getSemantics(summary).label, contains('第 1 / 9 頁'));
         await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
         await tester.pump();
+        // 翻頁後回到頂端,要再捲回分頁列才讀得到摘要。
+        for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+          await tester.drag(scrollView, const Offset(0, -500));
+          await tester.pump();
+        }
 
         expect(tester.getSemantics(summary).label, contains('第 2 / 9 頁'));
         expect(tester.getSemantics(summary).label, contains('顯示第 25 至 48 個'));
@@ -1441,6 +1486,35 @@ void main() {
       } finally {
         semantics.dispose();
       }
+    });
+
+    testWidgets('翻頁後回到清單頂端', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith(
+              (ref) => Stream.value(_manyFavorites()),
+            ),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      final pagination = find.byKey(const ValueKey('favorites-pagination'));
+      final scrollView = find.byType(CustomScrollView);
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(scrollView, const Offset(0, -500));
+        await tester.pump();
+      }
+      ScrollPosition position() =>
+          tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+      expect(position().pixels, greaterThan(0));
+
+      await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
+      await tester.pumpAndSettle();
+
+      expect(position().pixels, 0, reason: '翻頁後內容換了一批,視線不該停在舊的捲動位置');
     });
 
     testWidgets('篩選零筆時宣告結果數並保留清除操作', (tester) async {
@@ -1505,6 +1579,10 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
       await tester.pump();
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(scrollView, const Offset(0, -500));
+        await tester.pump();
+      }
 
       expect(find.text('25-48 / 200'), findsOneWidget);
       expect(find.text('第 2 / 9 頁'), findsOneWidget);

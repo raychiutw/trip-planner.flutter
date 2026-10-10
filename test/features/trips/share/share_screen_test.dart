@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/ui/tp_segmented_control.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/share_repository.dart';
@@ -166,7 +169,7 @@ void main() {
     );
     expect(
       tester
-          .widget<FilterChip>(
+          .widget<TpChip>(
             find.byKey(const ValueKey('share-section-reservations')),
           )
           .selected,
@@ -216,9 +219,156 @@ void main() {
               ),
             ).captured.single
             as List<String>;
-    expect(captured, ['flights', 'lodgings', 'pretrip']);
+    expect(captured, isEmpty, reason: '預設不公開任何敏感區段，由使用者勾選');
     expect(find.textContaining('/s/tok'), findsOneWidget);
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
+  });
+
+  testWidgets('自訂到期日未選日期時建立停用並提示，不呼叫 create', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('請選擇到期日'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('請選擇到期日')).style?.color,
+      Theme.of(tester.element(find.text('請選擇到期日'))).colorScheme.onSurface,
+      reason: '錯誤文字用 onSurface 達 4.5:1，不用紅字',
+    );
+    final create = find.byKey(const ValueKey('share-create'));
+    await tester.ensureVisible(create);
+    expect(tester.widget<FilledButton>(create).onPressed, isNull);
+    await tester.tap(create, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    verifyNever(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        expiresAt: any(named: 'expiresAt'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    );
+  });
+
+  testWidgets('建立成功後捲到結果卡，結果卡為 liveRegion 且在可視範圍', (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(() => repo.fetchShares(any())).thenAnswer(
+      (_) async => [
+        for (var i = 1; i <= 8; i++) TripShare(id: i, label: '連結$i'),
+      ],
+    );
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(id: 99, token: 'tk', url: '/s/tk'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final create = find.byKey(const ValueKey('share-create'));
+    await tester.scrollUntilVisible(
+      create,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(create);
+    await tester.pumpAndSettle();
+
+    final card = find.byKey(const ValueKey('share-created-card'));
+    expect(card, findsOneWidget);
+    final rect = tester.getRect(card);
+    expect(rect.top, greaterThanOrEqualTo(0));
+    expect(rect.bottom, lessThanOrEqualTo(600));
+    expect(tester.widget<Semantics>(card).properties.liveRegion, isTrue);
+  });
+
+  testWidgets('重新產生失敗：錯誤就地顯示於該列，重試重做重新產生', (tester) async {
+    var calls = 0;
+    when(() => repo.rotateShare(any(), any())).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return const RotatedShareLink(token: 'newtok', url: '/s/newtok');
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '重新產生'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-error')), findsNothing);
+    final inline = find.descendant(
+      of: find.byKey(const ValueKey('share-1')),
+      matching: find.byKey(const ValueKey('share-row-error-1')),
+    );
+    expect(inline, findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('share-row-retry-1')));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    verify(() => repo.rotateShare('t', 1)).called(2);
+    expect(find.textContaining('/s/newtok'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-row-error-1')), findsNothing);
+  });
+
+  testWidgets('撤銷失敗不在底部建立表單顯示錯誤', (tester) async {
+    when(
+      () => repo.revokeShare(any(), any()),
+    ).thenAnswer((_) async => throw Exception('offline'));
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-revoke-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '撤銷'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-error')), findsNothing);
+    expect(find.text('撤銷失敗，原連結已保留'), findsOneWidget);
+  });
+
+  testWidgets('建立失敗的重試重做建立而非只重載清單', (tester) async {
+    var calls = 0;
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return const ShareLink(id: 5, token: 't5', url: '/s/t5');
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.textContaining('/s/t5'), findsOneWidget);
   });
 
   testWidgets('建立 → 可展開 QR code', (tester) async {
@@ -310,7 +460,7 @@ void main() {
               ),
             ).captured.single
             as List<String>;
-    expect(captured, ['flights', 'lodgings', 'reservations', 'pretrip']);
+    expect(captured, ['reservations']);
   });
 
   testWidgets('建立期限 → 7 天 preset 送 expiresAt', (tester) async {
@@ -696,7 +846,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('share-edit-expiry-7d')));
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(TpSegmentedControl<String>).last,
+            matching: find.text('7 天'),
+          )
+          .last,
+    );
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('share-edit-submit')));
     await tester.pumpAndSettle();
@@ -737,10 +894,51 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
     await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '重新產生'));
+    await tester.pumpAndSettle();
 
     verify(() => repo.rotateShare('t', 1)).called(1);
     expect(find.textContaining('/s/newtok'), findsOneWidget);
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
+  });
+
+  testWidgets('重新產生前先確認舊連結會失效，取消不呼叫 API', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.textContaining('舊連結'), findsOneWidget);
+    await tester.tap(
+      find.widgetWithText(CupertinoActionSheetAction, '取消').last,
+    );
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repo.rotateShare(any(), any()));
+  });
+
+  testWidgets('新建分享表單預設不勾選任何公開區塊', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    for (final s in [
+      'flights',
+      'lodgings',
+      'reservations',
+      'pretrip',
+      'emergency',
+    ]) {
+      expect(
+        tester
+            .widget<TpChip>(find.byKey(ValueKey('share-section-$s')))
+            .selected,
+        isFalse,
+        reason: s,
+      );
+    }
   });
 
   testWidgets('非 write 權限(403)→ 提示', (tester) async {
@@ -810,5 +1008,81 @@ void main() {
       );
     }
     semantics.dispose();
+  });
+
+  testWidgets('2.0 倍字級:有效期限五個選項都可見,標籤欄提示不被截成「給爸…」', (tester) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      buildApp(theme: AppTheme.dark(), textScaler: const TextScaler.linear(2)),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find.byType(Scrollable).first;
+    for (final label in ['永久', '24 小時', '7 天', '30 天', '自訂']) {
+      final finder = find
+          .descendant(
+            of: find.byType(TpSegmentedControl<String>).first,
+            matching: find.text(label),
+          )
+          .first;
+      await tester.scrollUntilVisible(finder, 200, scrollable: scrollable);
+      expect(
+        tester.getRect(finder).right,
+        lessThanOrEqualTo(393),
+        reason: label,
+      );
+    }
+    final hint = find.textContaining('給爸媽」');
+    expect(hint, findsOneWidget);
+    expect(
+      tester.renderObject<RenderParagraph>(hint).didExceedMaxLines,
+      isFalse,
+      reason: '提示文字要換行完整顯示',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('建立成功後結果卡與「使用中的連結」標題之間要有間距', (tester) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(id: 99, token: 'tk', url: '/s/tk'),
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+    final card = tester.getRect(
+      find.byKey(const ValueKey('share-created-card')),
+    );
+    final title = tester.getRect(find.textContaining('使用中的連結'));
+    expect(title.top - card.bottom, greaterThanOrEqualTo(12));
+  });
+
+  testWidgets('未選到期日的提示帶警示圖示與粗體,不只靠顏色', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+    final text = tester.widget<Text>(find.text('請選擇到期日'));
+    expect(text.style?.fontWeight, FontWeight.w600);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('share-expiry-required-row')),
+        matching: find.byIcon(CupertinoIcons.exclamationmark_circle),
+      ),
+      findsOneWidget,
+    );
   });
 }

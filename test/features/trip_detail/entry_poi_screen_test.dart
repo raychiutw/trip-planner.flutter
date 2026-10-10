@@ -1,3 +1,4 @@
+import '../../helpers/semantics_flags.dart';
 import 'dart:async';
 import 'dart:ui' show SemanticsAction;
 
@@ -102,15 +103,18 @@ Future<void> _pump(
   TimelineEntry entry = _entry,
   List<TripDay> tripDays = const <TripDay>[],
   ReservationUrlLauncher reservationUrlLauncher = launchReservationUrl,
+  Object? entryError,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
+      retry: entryError != null ? (_, _) => null : null,
       overrides: [
         tripRepositoryProvider.overrideWithValue(repo),
-        entryDetailProvider((
-          tripId: 't1',
-          entryId: 11,
-        )).overrideWith((ref) => Stream.value(entry)),
+        entryDetailProvider((tripId: 't1', entryId: 11)).overrideWith(
+          (ref) => entryError != null
+              ? Stream<TimelineEntry>.error(entryError)
+              : Stream.value(entry),
+        ),
         tripDaysProvider('t1').overrideWith((ref) => Stream.value(tripDays)),
         if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
         if (favoritesRepo != null)
@@ -563,6 +567,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final upTooltip = tester
+          .widget<IconButton>(find.byKey(const ValueKey('alt-move-up-502')))
+          .tooltip;
+      expect(upTooltip, startsWith('上移'));
+      expect(upTooltip, hasLength(greaterThan(2)), reason: '要帶備選地點名稱');
       final nameNodeId = tester.getSemantics(find.text('玉陵')).id;
       final up = find.byKey(const ValueKey('alt-move-up-502'));
       final upNodeId = tester.getSemantics(up).id;
@@ -794,6 +803,107 @@ void main() {
     expect(find.text('捨棄未儲存的變更？'), findsNothing);
   });
 
+  testWidgets('地點載入失敗顯示人話錯誤頁（liveRegion）與重試，不外洩例外字串', (tester) async {
+    final repo = _MockTripRepository();
+    await _pump(tester, repo, entryError: Exception('SECRET-internal-trace'));
+
+    expect(find.textContaining('SECRET-internal-trace'), findsNothing);
+    expect(find.text('無法載入地點，請稍後再試'), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('entry-poi-load-error')))
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+  });
+
+  Future<_MockPoiRepository> openPickerSearch(
+    WidgetTester tester,
+    Future<List<PoiSearchResult>> Function() answer,
+  ) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) => answer());
+    await _pump(tester, repo, poiRepo: poiRepo);
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('alt-search-field')),
+      '拉麵',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    return poiRepo;
+  }
+
+  testWidgets('POI 選擇搜尋失敗顯示人話文案與重試，重試成功後出現結果', (tester) async {
+    var calls = 0;
+    await openPickerSearch(tester, () async {
+      calls++;
+      if (calls == 1) throw Exception('SECRET-search');
+      return const [PoiSearchResult(placeId: 'p9', name: '通堂拉麵')];
+    });
+
+    expect(find.textContaining('SECRET-search'), findsNothing);
+    expect(find.text('搜尋失敗，請稍後再試'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('poi-picker-search-status')))
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-picker-search-retry')));
+    await tester.pumpAndSettle();
+    expect(find.text('搜尋失敗，請稍後再試'), findsNothing);
+    expect(find.byKey(const ValueKey('alt-result-p9')), findsOneWidget);
+  });
+
+  testWidgets('POI 選擇搜尋查無結果顯示空狀態文案', (tester) async {
+    await openPickerSearch(tester, () async => const <PoiSearchResult>[]);
+    expect(find.text('找不到符合的地點'), findsOneWidget);
+  });
+
+  testWidgets('POI 選擇收藏載入失敗顯示重試，重試成功後出現收藏', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    var calls = 0;
+    when(favoritesRepo.fetchFavorites).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('SECRET-fav');
+      return const [_favorite];
+    });
+    await _pump(tester, repo, favoritesRepo: favoritesRepo);
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-favorites')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('載入收藏失敗，請稍後再試'), findsOneWidget);
+    expect(find.textContaining('SECRET-fav'), findsNothing);
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(const ValueKey('poi-picker-favorites-error')),
+          )
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-picker-favorites-retry')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('poi-picker-favorite-7')), findsOneWidget);
+  });
+
   testWidgets('加入備選 → 搜尋選結果 → addEntryAlternate', (tester) async {
     final repo = _MockTripRepository();
     final poiRepo = _MockPoiRepository();
@@ -1009,6 +1119,49 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('自訂地點座標超出範圍：不送出，錯誤就地顯示在對應欄位', (tester) async {
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-name')),
+      '火星基地',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lat')),
+      '91',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lng')),
+      '181',
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-picker-custom-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('緯度需介於 -90 到 90'), findsOneWidget);
+    expect(find.text('經度需介於 -180 到 180'), findsOneWidget);
+    verifyNever(
+      () => repo.addEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        customPoi: any(named: 'customPoi'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    );
+
+    // 邊界值合法
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lat')),
+      '90',
+    );
+    await tester.pump();
+    expect(find.text('緯度需介於 -90 到 90'), findsNothing);
+  });
+
   testWidgets('加入備選 → 自訂地點 → addEntryAlternate(customPoi)', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -1053,6 +1206,32 @@ void main() {
     expect(customPoi.name, '秘密觀景台');
     expect(customPoi.lat, 26.2);
     expect(customPoi.lng, 127.6);
+  });
+
+  testWidgets('POI 選擇 sheet 的分段帶 selected 語意，座標錯誤是 liveRegion', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    final search = find.byKey(const ValueKey('poi-picker-tab-search'));
+    final custom = find.byKey(const ValueKey('poi-picker-tab-custom'));
+    expect(tester.isSelectedOf(search), isTrue);
+    expect(tester.isSelectedOf(custom), isFalse);
+
+    await tester.tap(custom);
+    await tester.pumpAndSettle();
+    expect(tester.isSelectedOf(search), isFalse);
+    expect(tester.isSelectedOf(custom), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('poi-picker-custom-submit')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.isLiveRegionOf(find.byKey(const ValueKey('poi-custom-error'))),
+      isTrue,
+    );
+    semantics.dispose();
   });
 
   testWidgets('自訂地點已修改時取消會先確認捨棄', (tester) async {

@@ -173,6 +173,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - Widget 取色只走 `Theme.of(context).colorScheme`。
 - **不得直接引用 `TpSystemColorsLight` / `TpSystemColorsDark`**（`lib/theme/tokens.dart:4`、`:37`）。這兩組常數只供 `AppTheme` 工廠建立 Light／Dark／High Contrast 三套主題（`lib/theme/app_theme.dart:14-16`）。
 - 柔褐 tint 是唯一品牌強調色，且**只上前景** —— 文字、字符、選取指示。不得把 tint 畫成框線或選取膠囊的底色；膠囊本身走中性語意層，tint 上在字符與標籤。
+  - **登記例外（僅此兩項，不得擴大）**：① `TpChip`（`lib/ui/tp_chip.dart`）選中態用 `primaryContainer` 填色加 `primary` 邊框，這是使用者決定保留的設計，未選用中性 `surfaceContainerHigh` 加 `outlineVariant`；其他元件的選取膠囊仍須走中性層。② `TpTapTarget`（`lib/ui/tp_tap_target.dart`）的鍵盤焦點框用 `primary` 2pt 外框，只在鍵盤操作時出現，屬焦點指示而非選取表達。
 - sheet 子樹的 `colorScheme` 由 `lib/app/adaptive.dart` 的兩個共用 host（compact `GlassModalSheetScaffold`、regular `GlassContainer`）各換成一次 `AppTheme.elevated(...)`（深色 palette 三階上移一階、淺色不變，`lib/theme/app_theme.dart`）。sheet 內的畫面照常取 `colorScheme.surface`／`surfaceContainerLow`，**不得**自己再算 elevated 色、再包一層 `AppTheme.elevated` 或寫死 `#1C1C1E`；sheet 以外的畫面不得引用 `AppTheme.elevated`。
 - 唯一的 rainbow 例外是地圖逐日 pin／route 的 `kDayPinPalette`（`lib/features/map/map_style.dart:16`），取色一律經 `dayPinColor(dayNum)`（同檔 `:34`），不得自行 index。這是資料視覺化，不是 UI 分類色 —— 停留點卡片、收藏、設定列都不得靠彩色分類。
 - 顏色不得是唯一資訊來源。階層用字重、留白與 separator 建立。
@@ -289,7 +290,25 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 內容卡與內容列上的「⋯」用 `TpMoreMenuButton(plain: true)`(`lib/ui/tp_more_menu.dart`),長按同一張卡以 `TpMoreMenuController.open` 開同一份選單;適用行程卡、收藏卡、停留點卡、共編成員列、分享連結列與筆記列。feature 不得自組 `IconButton` 開 `showAppActionSheet` 當卡片選單;也不得為了有東西可錨定而放看不見但可聚焦的空按鈕 —— 沒有動作的對象就不放入口。
 - 自訂觸發器(`triggerBuilder`)可以是 chip 等需要 `Material` 的元件;overlay 內的複本由 `TpMoreMenuButton` 固定成頁面觸發器的尺寸並提供透明 `Material`,feature 不必自己包。
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:666`、`lib/features/trips/collab/collab_screen.dart:230`、`lib/features/favorites/favorites_screen.dart:469`)。
-- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存唯一例:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off)。
+- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存例外:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off;`travel_pill.dart` 的交通工具圖示〔步行、開車、計程車、公車、火車、電車、飛機、船、單車、路線〕,Cupertino 沒有成套對應,整組維持 Material 以免同一排風格混用)。`test/ui/material_residue_guard_test.dart` 守住已收斂的檔案與例外清單。進度指示器一律 `CircularProgressIndicator.adaptive()`。
+- **Material 控制項改走 Tp 元件**(`lib/ui/`;`test/ui/material_residue_guard_test.dart` 守住全 `lib/` 不得再出現原生版本):
+
+  | 不得使用 | 改用 | 備註 |
+  | --- | --- | --- |
+  | `Checkbox` | `TpSelectionCircle` | 選取模式的圓形勾選,語意 checked,點擊區 44pt |
+  | `FilterChip`／`ChoiceChip`／`ActionChip` | `TpChip` | 選中以 `primaryContainer` 填色加 `primary` 邊框(見「取色與視覺階層」登記例外),無勾選圖示 |
+  | 唯讀資訊標籤(狀態、數量、時間、分類)拿 `TpChip(onPressed: null)` 充數 | `TpTag` | 非互動:語意為純文字(非 button、無停用狀態)、文字不降透明度、可換行;`emphasized: true` 為重點(`primaryContainer` 底、無 `primary` 邊框)。可點或可選取才用 `TpChip` |
+  | `SegmentedButton` | `TpSegmentedControl` | 自繪 sliding 樣式(軌道加滑動 thumb),每段 44pt、可聚焦、減少動態效果時 thumb 不滑動,僅限 2~4 項互斥選項 |
+  | `DropdownButton`／`DropdownButtonFormField` | `TpPickerField` | 點擊開 action sheet,目前值打勾;行內用 `compact: true`;`value` 不在選項內時顯示 `placeholder` |
+  | `LinearProgressIndicator` | `TpProgressBar` | Cupertino 沒有線性進度,以 `colorScheme` 自繪;外層已有標籤或緊鄰文字時 `semanticLabel: null` |
+  | `TpStateView`／衝突解決 sheet 的 `FilledButton` | `TpFilledButton` | 底層 `CupertinoButton`;`tonal: true` 為次要選項 |
+  | 設定／清單類頁面自組 `Card` | `TpGroupedSurface` | 登入裝置、已連結應用、開發者應用三頁已收斂;錯誤面板用 `color: errorContainer` |
+
+  **Tp 控制項的共同契約**：`TpChip`／`TpSelectionCircle`／`TpPickerField`／`TpSegmentedControl` 的點擊、鍵盤焦點（Enter／Space 啟動）、selected／checked／enabled 語意與 44pt 最小點擊區一律走共用的 `TpTapTarget`，不得各自複製 `Semantics`＋`GestureDetector`。停用靠 `onTap == null` 讓語意回報 `enabled: false`，視覺變淡用 `TpDisabled`（`lib/theme/tokens.dart`）的 alpha，不得只靠 `Opacity`＋`IgnorePointer`。動畫在 `MediaQuery.disableAnimationsOf` 為 true 時必須關閉，`AnimationController` 的啟停放在 `didChangeDependencies`／`didUpdateWidget`，不在 `build` 內產生副作用。這些元件不得為測試額外開 key 參數，測試以文字或語意定位。
+
+  **登記例外(Cupertino 沒有合理對應,不硬換)**:`CheckboxListTile`(分享的「匿名分享」新增與編輯各一、註冊的隱私同意、開發者應用的 scope 勾選,共 4 處)是表單內的獨立 opt-in 選項,不是選取模式;iOS 的對應是 `Switch`,但語意由「勾選同意」變成「開關」,需產品決定,故維持原樣。其餘頁面的 `FilledButton`／`Card` 由 `AppTheme` 的 `filledButtonTheme`／`cardTheme` 統一外觀,尚未逐頁遷移。
+
+  **固定色碼例外**：分享頁 QR code（`lib/features/trips/share/share_screen.dart` 的 `_ShareQrCode`）使用固定的深色前景（`0xFF1D1813`）與白色底，不隨 `colorScheme` 或深色模式變化。掃描器需要穩定的高對比，反色或套 tint 會降低辨識率；這是唯一允許在 widget 內寫死色碼的位置之一（另一處為地圖 pin palette）。
 
 ## 測試規範
 

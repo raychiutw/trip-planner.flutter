@@ -175,12 +175,15 @@ class _TpCompactTimeFieldState extends State<TpCompactTimeField> {
                   start: TpSpacing.s2,
                   top: TpSpacing.s1,
                 ),
-                child: Text(
-                  error,
-                  key: widget.errorKey,
-                  style: TextStyle(
-                    color: theme.colorScheme.error,
-                    fontSize: 11,
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    error,
+                    key: widget.errorKey,
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ),

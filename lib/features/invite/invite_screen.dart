@@ -3,14 +3,17 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/logout_confirm.dart';
 import '../../models/trip_member.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import 'invite_controller.dart';
 
@@ -65,6 +68,10 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                   onLogin: _goLogin,
                   onSignup: _goSignup,
                   onSwitchAccount: () => unawaited(_switchAccount()),
+                  onRetry: () => ref
+                      .read(inviteControllerProvider(_token).notifier)
+                      .retry(),
+                  onBackToLogin: _goLogin,
                   onAccept:
                       inviteState.canAccept(user, authLoading: authLoading)
                       ? () => unawaited(_accept())
@@ -90,6 +97,14 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
 
   Future<void> _switchAccount() async {
     if (_token.isEmpty) return;
+    final ok = await confirmLogout(
+      context,
+      ref,
+      alwaysAsk: false,
+      title: '切換帳號',
+      confirmLabel: '切換帳號',
+    );
+    if (!ok || !mounted) return;
     await ref.read(authStateProvider.notifier).logout();
     if (!mounted) return;
     context.go(_loginLocation);
@@ -112,6 +127,8 @@ class _InviteBody extends StatelessWidget {
     required this.onLogin,
     required this.onSignup,
     required this.onSwitchAccount,
+    required this.onRetry,
+    required this.onBackToLogin,
     required this.onAccept,
   });
 
@@ -121,13 +138,20 @@ class _InviteBody extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onSignup;
   final VoidCallback onSwitchAccount;
+  final VoidCallback onRetry;
+  final VoidCallback onBackToLogin;
   final VoidCallback? onAccept;
 
   @override
   Widget build(BuildContext context) {
     if (state.loading) return const _LoadingView();
     if (state.error != null || state.invitation == null) {
-      return _ErrorView(message: state.error ?? '邀請連結無效，請聯絡邀請者重寄。');
+      return _ErrorView(
+        message: state.error ?? '邀請連結無效，請聯絡邀請者重寄。',
+        retryable: state.retryable,
+        onRetry: onRetry,
+        onBackToLogin: onBackToLogin,
+      );
     }
 
     final invitation = state.invitation!;
@@ -195,7 +219,13 @@ class _InviteHero extends StatelessWidget {
               ),
             ),
             const SizedBox(height: TpSpacing.s2),
-            Text(invitation.tripTitle, style: theme.textTheme.headlineSmall),
+            Semantics(
+              header: true,
+              child: Text(
+                invitation.tripTitle,
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
             const SizedBox(height: TpSpacing.s3),
             Text(
               '$inviter 邀請 ${invitation.invitedEmail} 加入此行程。',
@@ -253,7 +283,7 @@ class _ChecklistCard extends StatelessWidget {
             _SummaryRow(
               title: '邀請連結有效',
               body: _expiryLabel(context, invitation.expiresAt),
-              trailing: Icons.check_rounded,
+              trailing: CupertinoIcons.checkmark,
               tone: _SummaryTone.success,
             ),
             divider,
@@ -366,7 +396,11 @@ class _AccountStatusBlock extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.manage_accounts_outlined, color: tone, size: 22),
+                  Icon(
+                    CupertinoIcons.person_crop_circle,
+                    color: tone,
+                    size: 22,
+                  ),
                   const SizedBox(width: TpSpacing.s3),
                   Expanded(
                     child: Column(
@@ -439,37 +473,40 @@ class _AccountEmailLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final labelText = Text(
+      label,
+      style: theme.textTheme.labelMedium?.copyWith(
+        color: colors.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    final emailText = Text(
+      email,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: colors.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: TpSpacing.s3,
         vertical: TpSpacing.s2,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 68,
-            child: Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-              ),
+      child: isLargeTextScale(context)
+          // AX 字級固定寬度的標籤欄會把標籤擠成多行,改上下堆疊。
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [labelText, emailText],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 68, child: labelText),
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(child: emailText),
+              ],
             ),
-          ),
-          const SizedBox(width: TpSpacing.s3),
-          Expanded(
-            child: Text(
-              email,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -500,14 +537,14 @@ class _PrimaryAction extends StatelessWidget {
           FilledButton.icon(
             key: const ValueKey('invite-signup'),
             onPressed: onSignup,
-            icon: const Icon(Icons.person_add_alt_1_outlined),
+            icon: const Icon(CupertinoIcons.person_add),
             label: const Text('註冊並加入'),
           ),
           const SizedBox(height: TpSpacing.s2),
           OutlinedButton.icon(
             key: const ValueKey('invite-login'),
             onPressed: onLogin,
-            icon: const Icon(Icons.login_outlined),
+            icon: const Icon(CupertinoIcons.arrow_right_square),
             label: const Text('登入並加入'),
           ),
         ],
@@ -518,24 +555,24 @@ class _PrimaryAction extends StatelessWidget {
         icon: accepting
             ? const SizedBox.square(
                 dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator.adaptive(strokeWidth: 2),
               )
-            : const Icon(Icons.check_circle_outline),
-        label: Text(accepting ? '接受中...' : '接受邀請'),
+            : const Icon(CupertinoIcons.check_mark_circled),
+        label: Text(accepting ? '接受中…' : '接受邀請'),
       ),
       InviteAccountStatus.mismatch => FilledButton.icon(
         key: const ValueKey('invite-switch-account'),
         onPressed: onSwitchAccount,
-        icon: const Icon(Icons.switch_account_outlined),
+        icon: const Icon(CupertinoIcons.person_2),
         label: const Text('切換帳號'),
       ),
       InviteAccountStatus.checking => OutlinedButton.icon(
         onPressed: null,
         icon: const SizedBox.square(
           dimension: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator.adaptive(strokeWidth: 2),
         ),
-        label: const Text('確認帳號中...'),
+        label: const Text('確認帳號中…'),
       ),
     };
   }
@@ -569,7 +606,7 @@ class _ProblemPanel extends StatelessWidget {
               Text(
                 title,
                 style: theme.textTheme.titleSmall?.copyWith(
-                  color: colors.error,
+                  color: colors.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -600,9 +637,9 @@ class _LoadingView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(),
+              const CircularProgressIndicator.adaptive(),
               const SizedBox(height: TpSpacing.s4),
-              Text('載入邀請資料...', style: Theme.of(context).textTheme.bodyLarge),
+              Text('載入邀請資料…', style: Theme.of(context).textTheme.bodyLarge),
             ],
           ),
         ),
@@ -612,9 +649,17 @@ class _LoadingView extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message});
+  const _ErrorView({
+    required this.message,
+    required this.retryable,
+    required this.onRetry,
+    required this.onBackToLogin,
+  });
 
   final String message;
+  final bool retryable;
+  final VoidCallback onRetry;
+  final VoidCallback onBackToLogin;
 
   @override
   Widget build(BuildContext context) {
@@ -626,6 +671,18 @@ class _ErrorView extends StatelessWidget {
           title: '邀請無效',
           message: _errorMessageWithRecovery(message),
         ),
+        const SizedBox(height: TpSpacing.s3),
+        retryable
+            ? FilledButton(
+                key: const ValueKey('invite-retry'),
+                onPressed: onRetry,
+                child: const Text('重試'),
+              )
+            : OutlinedButton(
+                key: const ValueKey('invite-back-to-login'),
+                onPressed: onBackToLogin,
+                child: const Text('回到登入'),
+              ),
       ],
     );
   }
@@ -681,10 +738,10 @@ String _accountBody(
 
 IconData _accountIcon(InviteAccountStatus status) {
   return switch (status) {
-    InviteAccountStatus.checking => Icons.more_horiz,
-    InviteAccountStatus.anonymous => Icons.arrow_forward_rounded,
-    InviteAccountStatus.matching => Icons.check_rounded,
-    InviteAccountStatus.mismatch => Icons.arrow_forward_rounded,
+    InviteAccountStatus.checking => CupertinoIcons.ellipsis,
+    InviteAccountStatus.anonymous => CupertinoIcons.arrow_right,
+    InviteAccountStatus.matching => CupertinoIcons.checkmark,
+    InviteAccountStatus.mismatch => CupertinoIcons.arrow_right,
   };
 }
 

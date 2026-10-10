@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart';
@@ -51,6 +52,36 @@ void main() {
     ],
     child: MaterialApp(theme: AppTheme.light(), home: const ExploreScreen()),
   );
+
+  testWidgets('AX 字級分類 chip 列高度跟著字級放大,文字不被裁切', (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          poiRepositoryProvider.overrideWithValue(poi),
+          favoritesRepositoryProvider.overrideWithValue(fav),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(3)),
+            child: child!,
+          ),
+          home: const ExploreScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final chip = find.byKey(const ValueKey('explore-category-all'));
+    final row = find.ancestor(of: chip, matching: find.byType(ListView));
+    expect(tester.getSize(row.first).height, greaterThanOrEqualTo(44 * 3));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('地區選單朗讀目前選取並用新地區搜尋', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -323,7 +354,7 @@ void main() {
     await tester.tap(find.text('地鐵站  1'));
     await tester.pumpAndSettle();
 
-    final selectedMore = tester.widget<ChoiceChip>(more);
+    final selectedMore = tester.widget<TpChip>(more);
     expect(selectedMore.selected, isTrue);
     expect(find.byType(PoiSearchCard), findsOneWidget);
     expect(find.text('車站'), findsOneWidget);
@@ -520,5 +551,12 @@ void main() {
 
     expect(find.text('搜尋失敗,請稍後再試'), findsNothing);
     expect(find.text('沒有找到「東京」的結果。換個關鍵字試試?'), findsOneWidget);
+  });
+
+  testWidgets('進頁自動搜尋預設地區時,搜尋框同步回填關鍵字', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final field = tester.widget<EditableText>(find.byType(EditableText).first);
+    expect(field.controller.text, '東京');
   });
 }

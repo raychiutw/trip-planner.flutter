@@ -31,15 +31,22 @@ class MockAccountRepository extends Mock implements AccountRepository {}
 class FakeTripPrintActions implements TripPrintActions {
   final printed = <TripPrintData>[];
   final shared = <TripPrintData>[];
+  bool printResult = true;
+  bool shareResult = true;
+  Object? error;
 
   @override
-  Future<void> print(TripPrintData data) async {
+  Future<bool> print(TripPrintData data) async {
     printed.add(data);
+    if (error != null) throw error!;
+    return printResult;
   }
 
   @override
-  Future<void> sharePdf(TripPrintData data) async {
+  Future<bool> sharePdf(TripPrintData data) async {
     shared.add(data);
+    if (error != null) throw error!;
+    return shareResult;
   }
 }
 
@@ -118,6 +125,11 @@ void main() {
           path: '/s/:token',
           builder: (context, state) =>
               PublicShareScreen(token: state.pathParameters['token']!),
+        ),
+        GoRoute(
+          path: '/',
+          builder: (context, state) =>
+              const Scaffold(body: Text('app-home-destination')),
         ),
         GoRoute(
           path: '/login',
@@ -390,8 +402,8 @@ void main() {
     expect(find.text('沖繩家族旅行'), findsOneWidget);
     expect(find.text('2026/10/1 · 那霸 · 1 天'), findsOneWidget);
     expect(find.text('Day 1'), findsOneWidget);
-    expect(find.textContaining('9:00'), findsOneWidget);
-    expect(find.textContaining('10:30'), findsOneWidget);
+    expect(find.textContaining('9：00'), findsOneWidget);
+    expect(find.textContaining('10：30'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
     expect(find.text('高鐵 · 18 分 · 0.9km'), findsOneWidget);
     expect(find.text('不需計算路程'), findsOneWidget);
@@ -411,7 +423,7 @@ void main() {
 
     expect(find.text('10/1/2026 · 那霸 · 1 天'), findsOneWidget);
     expect(find.textContaining('10/1/2026'), findsNWidgets(2));
-    expect(find.text('9:00 AM–10:30 AM'), findsOneWidget);
+    expect(find.text('9：00 AM - 10：30 AM'), findsOneWidget);
   });
 
   for (final user in [
@@ -455,6 +467,26 @@ void main() {
       }
     });
   }
+
+  testWidgets('已登入冷啟動進公開分享頁有返回與帳號入口', (tester) async {
+    await pumpScreen(
+      tester,
+      user: const UserInfo(id: 'user-1', email: 'ray@example.com'),
+    );
+
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('app-home-destination'), findsOneWidget);
+  });
+
+  testWidgets('未登入的公開分享頁不顯示返回與帳號入口', (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+  });
 
   testWidgets('未登入點複製會前往 login', (tester) async {
     await pumpScreen(tester);
@@ -533,6 +565,19 @@ void main() {
     );
   });
 
+  testWidgets('公開分享：取消列印不顯示成功；離線字型失敗指出需要網路', (tester) async {
+    printActions.printResult = false;
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(find.text('已送出列印'), findsNothing);
+
+    printActions.error = const TripPdfOfflineException();
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('需要網路'), findsOneWidget);
+  });
+
   testWidgets('點 PDF 會用公開分享資料分享 PDF', (tester) async {
     await pumpScreen(tester);
 
@@ -541,6 +586,8 @@ void main() {
 
     expect(printActions.shared, hasLength(1));
     expect(printActions.shared.single.destinationsLabel, '那霸');
+    expect(find.text('已開啟分享選單'), findsOneWidget);
+    expect(find.text('PDF 已建立'), findsNothing);
   });
 
   testWidgets('公開分享逾時可原地重試', (tester) async {
@@ -640,9 +687,9 @@ void main() {
     expect(find.text('沖繩家族旅行'), findsOneWidget);
   });
 
-  testWidgets('大字級失效說明可捲動到重試並恢復內容', (tester) async {
+  testWidgets('大字級載入失敗說明可捲動到重試並恢復內容', (tester) async {
     when(() => repository.fetchPublicTripShare(any())).thenThrow(
-      const ApiError(status: 404, code: 'NOT_FOUND', message: 'NOT_FOUND'),
+      const ApiError(status: 500, code: 'INTERNAL', message: 'INTERNAL'),
     );
     await pumpScreen(tester, size: const Size(320, 568), textScale: 3.2);
 
@@ -668,6 +715,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('public-share-notfound')), findsOneWidget);
     expect(find.text('連結已失效'), findsOneWidget);
+    expect(find.text('重試'), findsNothing, reason: '連結不存在,重試只會再得到 404');
     expect(
       tester
           .getSemantics(find.byKey(const ValueKey('public-share-notfound')))

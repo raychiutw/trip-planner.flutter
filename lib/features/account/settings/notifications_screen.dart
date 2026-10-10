@@ -8,7 +8,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../api/api_error.dart';
+import '../../../app/error_message.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
@@ -206,10 +206,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     await _syncPermissionStatus();
   }
 
-  String _errorMessage(Object error) {
-    if (error is ApiError) return error.detail ?? error.message;
-    return '更新通知設定失敗，請稍後再試';
-  }
+  String _errorMessage(Object error) =>
+      userFacingApiError(error, fallback: '更新通知設定失敗，請稍後再試');
 }
 
 class _NotificationsList extends StatelessWidget {
@@ -334,7 +332,13 @@ class _PermissionDeniedPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('通知權限尚未開啟', style: Theme.of(context).textTheme.titleMedium),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                '通知權限尚未開啟',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
             const SizedBox(height: TpSpacing.s1),
             const Text('Tripline 不會重複顯示系統提示；你可從系統設定開啟通知。'),
             Align(
@@ -426,9 +430,12 @@ class _InlineErrorPanel extends StatelessWidget {
             ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onErrorContainer),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  message,
+                  style: TextStyle(color: colorScheme.onErrorContainer),
+                ),
               ),
             ),
             TextButton(

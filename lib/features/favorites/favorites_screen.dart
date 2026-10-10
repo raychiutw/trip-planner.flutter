@@ -12,9 +12,11 @@ import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_chip.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../ui/swipe_to_delete.dart';
 import '../../ui/tp_settings_group.dart';
 import 'favorites_providers.dart';
@@ -62,6 +64,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   bool _confirmingSelected = false;
   bool _deletingSelected = false;
   int _page = 1;
+  final ScrollController _scrollController = ScrollController();
   _FavoriteSort _sort = _FavoriteSort.newest;
 
   /// 每張卡一份，讓「⋯」與長按開同一份選單。
@@ -70,6 +73,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -83,6 +87,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         actions: _buildHeaderActions(context),
       ),
       body: TpRootScrollView(
+        controller: _scrollController,
         onRefresh: () => ref.refresh(favoritesProvider.future),
         slivers: [
           SliverToBoxAdapter(
@@ -128,10 +133,16 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 ),
               ),
             ],
-            loading: () => const [
+            loading: () => [
               SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator.adaptive()),
+                // 骨架需要有界高度（Column + Expanded），故 hasScrollBody 為 true。
+                child: Semantics(
+                  liveRegion: true,
+                  label: '正在載入收藏',
+                  child: const ExcludeSemantics(
+                    child: AppListLoadingSkeleton(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -378,17 +389,19 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 start: (page - 1) * _favoritesPageSize + 1,
                 end: (page - 1) * _favoritesPageSize + visibleFavorites.length,
                 total: filteredFavorites.length,
-                onPrevious: page <= 1
-                    ? null
-                    : () => setState(() => _page = page - 1),
-                onNext: page >= totalPages
-                    ? null
-                    : () => setState(() => _page = page + 1),
+                onPrevious: page <= 1 ? null : () => _goToPage(page - 1),
+                onNext: page >= totalPages ? null : () => _goToPage(page + 1),
               ),
           ]),
         ),
       ),
     ];
+  }
+
+  /// 翻頁後內容整批換掉,視線回到清單頂端才不會停在新一頁的中段。
+  void _goToPage(int page) {
+    setState(() => _page = page);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
   bool get _hasActiveFilters => _typeFilter != 'all' || _regionFilter != 'all';
@@ -743,11 +756,11 @@ class _FavoritesFilterFormState extends State<_FavoritesFilterForm> {
             runSpacing: TpSpacing.s2,
             children: [
               for (final option in _typeFilterOptions)
-                FilterChip(
+                TpChip(
                   key: ValueKey('favorites-type-${option.key}'),
-                  label: Text(option.label),
+                  label: option.label,
                   selected: _pendingType == option.key,
-                  onSelected: (_) => _select(type: option.key),
+                  onPressed: () => _select(type: option.key),
                 ),
             ],
           ),
@@ -759,18 +772,18 @@ class _FavoritesFilterFormState extends State<_FavoritesFilterForm> {
               spacing: TpSpacing.s2,
               runSpacing: TpSpacing.s2,
               children: [
-                FilterChip(
+                TpChip(
                   key: const ValueKey('favorites-region-all'),
-                  label: Text('全部 ${widget.regionCounts['all'] ?? 0}'),
+                  label: '全部 ${widget.regionCounts['all'] ?? 0}',
                   selected: _pendingRegion == 'all',
-                  onSelected: (_) => _select(region: 'all'),
+                  onPressed: () => _select(region: 'all'),
                 ),
                 for (final region in widget.regionOptions)
-                  FilterChip(
+                  TpChip(
                     key: ValueKey('favorites-region-$region'),
-                    label: Text('$region ${widget.regionCounts[region] ?? 0}'),
+                    label: '$region ${widget.regionCounts[region] ?? 0}',
                     selected: _pendingRegion == region,
-                    onSelected: (_) => _select(region: region),
+                    onPressed: () => _select(region: region),
                   ),
               ],
             ),
@@ -979,9 +992,9 @@ class _BulkToolbar extends StatelessWidget {
               icon: deleting
                   ? const SizedBox.square(
                       dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.delete_outline),
+                  : const Icon(CupertinoIcons.delete),
               label: Text(deleting ? '刪除中' : '刪除'),
             ),
           ],
@@ -1021,7 +1034,7 @@ class _PaginationControls extends StatelessWidget {
             key: const ValueKey('favorites-page-prev'),
             tooltip: '上一頁',
             onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left),
+            icon: const Icon(CupertinoIcons.chevron_left),
           ),
           Expanded(
             child: Semantics(
@@ -1043,7 +1056,7 @@ class _PaginationControls extends StatelessWidget {
             key: const ValueKey('favorites-page-next'),
             tooltip: '下一頁',
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right),
+            icon: const Icon(CupertinoIcons.chevron_right),
           ),
         ],
       ),

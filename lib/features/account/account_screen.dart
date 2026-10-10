@@ -4,13 +4,15 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/auth_repository.dart';
 import '../../api/providers.dart';
+import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_version.dart';
 import '../../app/external_links.dart';
@@ -93,13 +95,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
   /// 登出前確認，確認才呼叫 authStateProvider.logout()。
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final ok = await showAppDestructiveConfirm(
-      context,
-      source: TpDestructiveConfirmSource.direct,
-      title: '登出帳號',
-      message: '確定要登出嗎？',
-      confirmLabel: '登出',
-    );
+    final ok = await confirmLogout(context, ref);
     if (ok) {
       await ref.read(authStateProvider.notifier).logout();
     }
@@ -125,9 +121,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         if (viewHelp) unawaited(openAccountDeletionHelp());
         return;
       }
-      final deleted = await showDialog<bool>(
+      final deleted = await showCupertinoDialog<bool>(
         context: context,
-        barrierDismissible: false,
         builder: (context) => _DeleteAccountDialog(
           preview: preview,
           onDelete: (confirmation) => repository.deleteAccount(
@@ -142,9 +137,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       if (!mounted) return;
       Navigator.of(context).pop();
       router?.go('/welcome');
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) return;
-      await showAppAlert(context, title: '無法載入刪除資訊', message: '請檢查網路連線後再試一次。');
+      await showAppAlert(
+        context,
+        title: '無法載入刪除資訊',
+        message: error is ApiError
+            ? userFacingApiError(error, fallback: '請稍後再試一次。')
+            : '請檢查網路連線後再試一次。',
+      );
     } finally {
       if (mounted) setState(() => _loadingAccountDeletion = false);
     }
@@ -174,7 +175,6 @@ class _VersionFooter extends ConsumerWidget {
         label,
         key: const ValueKey('account-version-footer'),
         textAlign: TextAlign.center,
-        maxLines: 1,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
@@ -279,7 +279,7 @@ class _PrivacyAndAccountGroup extends StatelessWidget {
           leading: loadingDeletion
               ? const SizedBox.square(
                   dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 )
               : const Icon(CupertinoIcons.delete),
           title: '刪除帳號',
@@ -307,9 +307,8 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   bool _submitting = false;
   String? _error;
 
-  bool get _canSubmit => widget.preview.hasPassword
-      ? _controller.text.isNotEmpty
-      : _controller.text == 'DELETE';
+  // 對話框只在帳號有密碼時開啟（無密碼帳號在上游就被擋下），所以只需密碼非空。
+  bool get _canSubmit => _controller.text.isNotEmpty;
 
   @override
   void initState() {
@@ -355,55 +354,54 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   @override
   Widget build(BuildContext context) {
     final preview = widget.preview;
-    return AlertDialog(
+    return CupertinoAlertDialog(
       key: const ValueKey('delete-account-dialog'),
       title: const Text('永久刪除帳號？'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: TpSpacing.s2),
+          Text(
+            '將一併刪除你擁有的 ${preview.tripsOwned} 個行程，'
+            '並影響 ${preview.collaboratorsAffected} 位共編者。此操作無法復原。',
+          ),
+          const SizedBox(height: TpSpacing.s3),
+          CupertinoTextField(
+            key: const ValueKey('delete-account-confirmation-field'),
+            controller: _controller,
+            enabled: !_submitting,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            autofillHints: const [AutofillHints.password],
+            placeholder: '目前密碼（重新驗證）',
+            onSubmitted: (_) => _delete(),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: TpSpacing.s2),
             Text(
-              '將一併刪除你擁有的 ${preview.tripsOwned} 個行程，'
-              '並影響 ${preview.collaboratorsAffected} 位共編者。此操作無法復原。',
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextField(
-              key: const ValueKey('delete-account-confirmation-field'),
-              controller: _controller,
-              enabled: !_submitting,
-              obscureText: preview.hasPassword,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: preview.hasPassword ? '目前密碼（重新驗證）' : '輸入 DELETE 確認',
-                errorText: _error,
+              _error!,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
-              onSubmitted: (_) => _delete(),
             ),
           ],
-        ),
+        ],
       ),
       actions: [
-        TextButton(
-          autofocus: true,
+        CupertinoDialogAction(
           onPressed: _submitting
               ? null
               : () => Navigator.of(context).pop(false),
           child: const Text('取消'),
         ),
-        FilledButton(
+        CupertinoDialogAction(
           key: const ValueKey('delete-account-confirm-button'),
+          isDestructiveAction: true,
           onPressed: _canSubmit && !_submitting ? _delete : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            foregroundColor: Theme.of(context).colorScheme.onError,
-          ),
           child: _submitting
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+              ? const CupertinoActivityIndicator()
               : const Text('永久刪除'),
         ),
       ],

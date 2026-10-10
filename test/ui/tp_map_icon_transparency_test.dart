@@ -33,7 +33,7 @@ void main() {
       );
       for (final icon in [
         CupertinoIcons.person_crop_circle,
-        Icons.my_location,
+        CupertinoIcons.location,
       ]) {
         final finder = find.byIcon(icon);
         final text = tester.renderObject<RenderParagraph>(
@@ -85,7 +85,7 @@ void main() {
   });
   for (final control in [
     (name: '帳號', icon: CupertinoIcons.person_crop_circle),
-    (name: '定位', icon: Icons.my_location),
+    (name: '定位', icon: CupertinoIcons.location),
   ]) {
     testWidgets('${control.name}背景在亮暗圖磚間至少透出一半亮度差，圖示仍清楚', (tester) async {
       for (final brightness in Brightness.values) {
@@ -119,7 +119,7 @@ void main() {
         );
         final rects = [
           tester.getRect(find.byIcon(CupertinoIcons.person_crop_circle)),
-          tester.getRect(find.byIcon(Icons.my_location)),
+          tester.getRect(find.byIcon(CupertinoIcons.location)),
         ];
         samples.add(rects.map(raster.backing).toList());
         for (final rect in rects) {
@@ -154,7 +154,7 @@ void main() {
             );
             final rects = [
               tester.getRect(find.byIcon(CupertinoIcons.person_crop_circle)),
-              tester.getRect(find.byIcon(Icons.my_location)),
+              tester.getRect(find.byIcon(CupertinoIcons.location)),
             ];
             samples.add(rects.map(raster.backing).toList());
             for (final rect in rects) {

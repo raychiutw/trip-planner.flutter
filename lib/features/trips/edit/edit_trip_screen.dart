@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,9 +14,11 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_picker_field.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../widgets/destination_picker.dart';
 import 'edit_trip_controller.dart';
+import '../../../models/display_format.dart';
 
 const _langs = {'zh-TW': '繁體中文', 'en': 'English', 'ja': '日本語'};
 
@@ -42,22 +45,26 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
       dismissalEnabled: !state.saving,
       child: Scaffold(
         appBar: TpAppBar(
-          role: TpAppBarRole.modalForm,
+          role: state.loadFailed
+              ? TpAppBarRole.modalContent
+              : TpAppBarRole.modalForm,
           title: const Text('編輯行程'),
-          onCancel: _dismissController.requestPop,
-          primaryActionLabel: '儲存',
+          onCancel: state.loadFailed ? null : _dismissController.requestPop,
+          primaryActionLabel: state.loadFailed ? null : '儲存',
           primaryActionKey: const ValueKey('edit-save'),
           primaryActionEnabled: ctrl.hasChanges && !state.saving,
-          onPrimaryAction: () async {
-            final saved = await ctrl.save();
-            if (!mounted || saved == null) return;
-            HapticFeedback.lightImpact();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && ctrl.canFinish(saved)) {
-                closeAppRouteOrSheet(context);
-              }
-            });
-          },
+          onPrimaryAction: state.loadFailed
+              ? null
+              : () async {
+                  final saved = await ctrl.save();
+                  if (!mounted || saved == null) return;
+                  HapticFeedback.lightImpact();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && ctrl.canFinish(saved)) {
+                      closeAppRouteOrSheet(context);
+                    }
+                  });
+                },
         ),
         bottomNavigationBar: state.saving
             ? Padding(
@@ -78,6 +85,8 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
             : null,
         body: state.loading
             ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
+            : state.loadFailed
+            ? _LoadError(onRetry: ctrl.retryLoad)
             : ListView(
                 padding: const EdgeInsets.all(TpSpacing.s4),
                 children: [
@@ -160,20 +169,12 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     onChanged: ctrl.setDescription,
                   ),
                   const SizedBox(height: TpSpacing.s4),
-                  DropdownButtonFormField<String>(
+                  TpPickerField<String>(
                     key: const ValueKey('edit-lang'),
-                    initialValue: state.lang,
-                    decoration: const InputDecoration(
-                      labelText: '顯示語言',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final e in _langs.entries)
-                        DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) ctrl.setLang(v);
-                    },
+                    label: '顯示語言',
+                    value: state.lang,
+                    options: _langs,
+                    onChanged: ctrl.setLang,
                   ),
                   const SizedBox(height: TpSpacing.s2),
                   SwitchListTile.adaptive(
@@ -215,7 +216,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     TripDay day, {
     bool requiresConfirmation = true,
   }) async {
-    final label = 'DAY ${day.dayNum}・${day.displayTitle}';
+    final label = dayLabel(day.dayNum, title: day.displayTitle);
     if (requiresConfirmation) {
       final confirmed = await showAppDestructiveConfirm(
         context,
@@ -223,7 +224,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
         title: '刪除行程日',
         message:
             '確定要刪除「$label」嗎？'
-            '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
+            '這會刪除當天所有停留點，並重新編號後續行程日。此動作無法復原。',
         confirmLabel: '刪除',
       );
       if (!confirmed || !mounted) return;
@@ -247,7 +248,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     TripDay day,
     DayDeletionResult result,
   ) {
-    final label = 'DAY ${day.dayNum}・${day.displayTitle}';
+    final label = dayLabel(day.dayNum, title: day.displayTitle);
     switch (result.resolution) {
       case DayDeletionResolution.committed:
         showAppNotice(
@@ -257,7 +258,10 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
         return;
       case DayDeletionResolution.targetStillPresent:
         final latestDay = controller.dayById(day.id) ?? day;
-        final latestLabel = 'DAY ${latestDay.dayNum}・${latestDay.displayTitle}';
+        final latestLabel = dayLabel(
+          latestDay.dayNum,
+          title: latestDay.displayTitle,
+        );
         showAppError(
           context,
           '無法確認「$latestLabel」已刪除；重新整理後仍找到同一個行程日',
@@ -323,8 +327,8 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
 
   String _dayDeletedMessage(TripDay day, int? removedEntryCount) =>
       removedEntryCount != null && removedEntryCount > 0
-      ? 'Day ${day.dayNum} 已刪除（連同 $removedEntryCount 個景點）'
-      : 'Day ${day.dayNum} 已刪除';
+      ? '${dayLabel(day.dayNum)} 已刪除（連同 $removedEntryCount 個停留點）'
+      : '${dayLabel(day.dayNum)} 已刪除';
 }
 
 class _DayManagementSection extends StatelessWidget {
@@ -364,13 +368,13 @@ class _DayManagementSection extends StatelessWidget {
               OutlinedButton.icon(
                 key: const ValueKey('edit-add-day-start'),
                 onPressed: mutating ? null : onAddStart,
-                icon: const Icon(Icons.first_page_outlined),
+                icon: const Icon(CupertinoIcons.chevron_left_2),
                 label: const Text('加到最前'),
               ),
               OutlinedButton.icon(
                 key: const ValueKey('edit-add-day-end'),
                 onPressed: mutating ? null : onAddEnd,
-                icon: const Icon(Icons.last_page_outlined),
+                icon: const Icon(CupertinoIcons.chevron_right_2),
                 label: const Text('加到最後'),
               ),
             ],
@@ -446,7 +450,11 @@ class _MissingDayRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: TpSpacing.s2),
       child: Row(
         children: [
-          Icon(Icons.more_horiz, color: colorScheme.onSurfaceVariant, size: 18),
+          Icon(
+            CupertinoIcons.ellipsis,
+            color: colorScheme.onSurfaceVariant,
+            size: 18,
+          ),
           const SizedBox(width: TpSpacing.s2),
           Expanded(
             child: Text(
@@ -459,7 +467,7 @@ class _MissingDayRow extends StatelessWidget {
           TextButton.icon(
             key: ValueKey('edit-create-missing-day-$date'),
             onPressed: mutating ? null : onCreate,
-            icon: const Icon(Icons.add),
+            icon: const Icon(CupertinoIcons.add),
             label: const Text('新增缺少日期'),
           ),
         ],
@@ -490,7 +498,7 @@ class _DaySummaryRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'DAY ${day.dayNum}',
+                dayLabel(day.dayNum),
                 style: textTheme.labelMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -504,7 +512,7 @@ class _DaySummaryRow extends StatelessWidget {
           key: ValueKey('edit-delete-day-${day.dayNum}'),
           tooltip: '刪除 Day ${day.dayNum}',
           onPressed: mutating ? null : onDelete,
-          icon: const Icon(Icons.delete_outline),
+          icon: const Icon(CupertinoIcons.delete),
         ),
       ],
     );
@@ -558,9 +566,9 @@ class _ShiftDateSection extends StatelessWidget {
               icon: shifting
                   ? const SizedBox.square(
                       dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.event_repeat_outlined),
+                  : const Icon(CupertinoIcons.calendar),
               label: const Text('平移日期'),
             ),
           ),
@@ -640,4 +648,42 @@ String _formatIsoDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '$year-$month-$day';
+}
+
+/// 初始載入失敗:持續可見的錯誤頁與重試,不給可儲存的空表單(儲存會用空清單覆蓋真實資料)。
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s6),
+        child: Semantics(
+          key: const ValueKey('edit-trip-load-error'),
+          liveRegion: true,
+          container: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('無法載入行程', style: theme.textTheme.titleMedium),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                '請檢查網路後再試一次。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s4),
+              FilledButton(onPressed: onRetry, child: const Text('重試')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

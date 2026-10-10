@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart'
     show CupertinoIcons, CupertinoSearchTextField;
+import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,6 +84,13 @@ void main() {
     );
   }
 
+  testWidgets('純圖示的搜尋與天數 stepper 有 tooltip', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('搜尋地點'), findsOneWidget);
+  });
+
   Future<void> completeBasics(WidgetTester tester) async {
     await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
     await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
@@ -92,6 +100,25 @@ void main() {
     await tester.tap(find.text('大概時間'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('結束日期選擇器上限不超過開始日 + 29 天（30 天上限）', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('固定日期'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('create-date-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('create-date-end')));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<CalendarDatePicker>(
+      find.byType(CalendarDatePicker),
+    );
+    expect(picker.lastDate.difference(picker.firstDate).inDays, 29);
+  });
 
   testWidgets('目的地空 → 送出鈕 disabled', (tester) async {
     await tester.pumpWidget(buildApp());
@@ -321,7 +348,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await completeBasics(tester);
-    await tester.tap(find.widgetWithText(ActionChip, '京都'));
+    await tester.tap(find.widgetWithText(TpChip, '京都'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('create-flex-plus')));
     await tester.pump();
@@ -343,9 +370,7 @@ void main() {
       isFalse,
     );
     expect(
-      tester
-          .widget<ActionChip>(find.widgetWithText(ActionChip, '京都'))
-          .onPressed,
+      tester.widget<TpChip>(find.widgetWithText(TpChip, '京都')).onPressed,
       isNull,
     );
     await tester.tap(find.text('取消'));
@@ -400,7 +425,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await completeBasics(tester);
-    await tester.tap(find.widgetWithText(ActionChip, '京都'));
+    await tester.tap(find.widgetWithText(TpChip, '京都'));
     await tester.pumpAndSettle();
     Future<void> moveFirstAfterSecond(
       String firstName,
@@ -457,7 +482,7 @@ void main() {
     expect(find.byKey(const ValueKey('create-flex-count')), findsNothing);
     expect(
       tester
-          .widget<ActionChip>(find.byKey(const ValueKey('dest-recent-東京')))
+          .widget<TpChip>(find.byKey(const ValueKey('dest-recent-東京')))
           .onPressed,
       isNull,
     );

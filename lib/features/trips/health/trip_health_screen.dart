@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +19,8 @@ import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_tag.dart';
+import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../requests/request_lifecycle.dart';
 
@@ -201,7 +204,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
             key: const ValueKey('trip-health-refresh-button'),
             tooltip: '重新整理',
             onPressed: _loading || _starting ? null : _load,
-            icon: Icons.refresh,
+            icon: CupertinoIcons.refresh,
           ),
         ],
       ),
@@ -241,7 +244,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
                               key: const ValueKey('trip-health-refreshing'),
                               liveRegion: true,
                               label: '正在更新健檢資料',
-                              child: const LinearProgressIndicator(),
+                              child: const TpProgressBar(semanticLabel: null),
                             ),
                             const SizedBox(height: TpSpacing.s3),
                           ],
@@ -304,7 +307,6 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
     final completedAt = report?.completedAt ?? report?.createdAt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,26 +317,10 @@ class _Header extends StatelessWidget {
           spacing: TpSpacing.s2,
           runSpacing: TpSpacing.s2,
           children: [
-            Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: Icon(
-                _statusIcon(report?.status),
-                size: 16,
-                color: colorScheme.primary,
-              ),
-              label: Text(_statusLabel(report?.status)),
-            ),
-            Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: const Icon(Icons.place_outlined, size: 16),
-              label: Text('$entryCount 個停留點'),
-            ),
+            TpTag(label: _statusLabel(report?.status)),
+            TpTag(label: '$entryCount 個停留點'),
             if (completedAt != null)
-              Chip(
-                visualDensity: VisualDensity.compact,
-                avatar: const Icon(Icons.schedule, size: 16),
-                label: Text(_formatTimestamp(completedAt)),
-              ),
+              TpTag(label: _formatTimestamp(completedAt)),
           ],
         ),
       ],
@@ -363,9 +349,11 @@ class _StartButton extends StatelessWidget {
       icon: starting
           ? const SizedBox.square(
               dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             )
-          : Icon(report == null ? Icons.auto_awesome : Icons.refresh),
+          : Icon(
+              report == null ? CupertinoIcons.sparkles : CupertinoIcons.refresh,
+            ),
       label: Text(_buttonLabel(report, starting)),
     );
   }
@@ -391,14 +379,14 @@ class _PoiHealthCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.location_searching, color: colorScheme.primary),
+                Icon(CupertinoIcons.location, color: colorScheme.primary),
                 const SizedBox(width: TpSpacing.s2),
-                Text('POI 狀態', style: Theme.of(context).textTheme.titleMedium),
+                Text('景點狀態', style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: TpSpacing.s3),
             if (!report.hasIssues)
-              const Text('POI 狀態看起來正常。')
+              const Text('景點狀態看起來正常。')
             else ...[
               Text('已歇業 ${report.closed} · 缺少資料 ${report.missing}'),
               const SizedBox(height: TpSpacing.s3),
@@ -410,8 +398,8 @@ class _PoiHealthCard extends StatelessWidget {
                     children: [
                       Icon(
                         item.status == TripPoiHealthStatus.closed
-                            ? Icons.block
-                            : Icons.help_outline,
+                            ? CupertinoIcons.nosign
+                            : CupertinoIcons.question_circle,
                         size: 18,
                         color: colorScheme.error,
                       ),
@@ -426,9 +414,9 @@ class _PoiHealthCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (item.reason != null)
+                            if (_poiReasonLabel(item) case final reason?)
                               Text(
-                                item.reason!,
+                                reason,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                           ],
@@ -491,7 +479,7 @@ class _EmptyReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _StatePanel(
       key: ValueKey('trip-health-empty'),
-      icon: Icons.auto_awesome,
+      icon: CupertinoIcons.sparkles,
       title: '尚未健檢過此行程',
       message: '由 AI 檢視時間衝突、距離過遠、餐飲空窗與漏排行程。',
     );
@@ -507,7 +495,7 @@ class _PendingReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return _StatePanel(
       key: const ValueKey('trip-health-pending'),
-      icon: Icons.hourglass_top,
+      icon: CupertinoIcons.hourglass,
       title: 'AI 健檢進行中',
       message: '通常 3-7 分鐘完成。你可以先離開，稍後回來查看結果。',
       liveRegion: true,
@@ -540,7 +528,7 @@ class _StalledReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _StatePanel(
       key: ValueKey('trip-health-stalled'),
-      icon: Icons.hourglass_disabled,
+      icon: CupertinoIcons.hourglass,
       title: '這次健檢已經停止',
       message: '報告不會再更新了。可以重新健檢一次。',
       liveRegion: true,
@@ -557,7 +545,7 @@ class _FailedReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return _StatePanel(
       key: const ValueKey('trip-health-failed'),
-      icon: Icons.error_outline,
+      icon: CupertinoIcons.exclamationmark_circle,
       title: '健檢失敗',
       message: message ?? 'AI 處理時發生錯誤，可重新生成再試。',
       liveRegion: true,
@@ -572,7 +560,7 @@ class _NoIssuesReport extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _StatePanel(
       key: ValueKey('trip-health-no-issues'),
-      icon: Icons.check_circle_outline,
+      icon: CupertinoIcons.check_mark_circled,
       title: '看起來沒有問題',
       message: 'AI 沒有找到需要修正的地方。行程安排良好。',
     );
@@ -631,10 +619,7 @@ class _FindingCard extends StatelessWidget {
               children: [
                 _SeverityChip(severity: finding.severity),
                 if (finding.dimension != null)
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(_dimensionLabel(finding.dimension!)),
-                  ),
+                  TpTag(label: _dimensionLabel(finding.dimension!)),
               ],
             ),
             const SizedBox(height: TpSpacing.s2),
@@ -676,7 +661,7 @@ class _FindingCard extends StatelessWidget {
                       ).toString(),
                     );
                   },
-                  icon: const Icon(Icons.arrow_forward),
+                  icon: const Icon(CupertinoIcons.arrow_right),
                   label: Text(_entryTargetLabel(target)),
                 ),
               ),
@@ -694,29 +679,10 @@ class _SeverityChip extends StatelessWidget {
   final TripHealthSeverity severity;
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final (bg, fg) = switch (severity) {
-      TripHealthSeverity.high => (
-        colorScheme.errorContainer,
-        colorScheme.onErrorContainer,
-      ),
-      TripHealthSeverity.medium => (
-        colorScheme.tertiaryContainer,
-        colorScheme.onTertiaryContainer,
-      ),
-      TripHealthSeverity.low => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
-      ),
-    };
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      backgroundColor: bg,
-      labelStyle: TextStyle(color: fg, fontWeight: FontWeight.w700),
-      label: Text(_severityLabel(severity)),
-    );
-  }
+  Widget build(BuildContext context) => TpTag(
+    label: _severityLabel(severity),
+    emphasized: severity == TripHealthSeverity.high,
+  );
 }
 
 class _StatePanel extends StatelessWidget {
@@ -782,7 +748,7 @@ class _EmptyTripGuard extends StatelessWidget {
         borderRadius: BorderRadius.circular(TpRadius.md),
       ),
       child: Text(
-        '此行程尚無景點，請先加入景點再執行健檢。',
+        '此行程尚無停留點，請先加入停留點再執行健檢。',
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: colorScheme.onErrorContainer),
@@ -864,15 +830,6 @@ String _statusLabel(TripHealthStatus? status) {
   };
 }
 
-IconData _statusIcon(TripHealthStatus? status) {
-  if (status == null) return Icons.auto_awesome;
-  return switch (status) {
-    TripHealthStatus.pending => Icons.hourglass_top,
-    TripHealthStatus.completed => Icons.check_circle_outline,
-    TripHealthStatus.failed => Icons.error_outline,
-  };
-}
-
 String _severityLabel(TripHealthSeverity severity) => switch (severity) {
   TripHealthSeverity.high => '高風險',
   TripHealthSeverity.medium => '中風險',
@@ -894,7 +851,7 @@ String _dimensionLabel(TripHealthDimension dimension) => switch (dimension) {
 };
 
 String _entryTargetLabel(TripHealthActionTarget? target) =>
-    target?.entryId != null ? '前往景點' : '前往 Day ${target?.day ?? ''}';
+    target?.entryId != null ? '前往停留點' : '前往第 ${target?.day ?? ''} 天';
 
 String _formatTimestamp(String value) {
   if (value.length >= 16) {
@@ -906,8 +863,22 @@ String _formatTimestamp(String value) {
 String _healthErrorMessage(Object error, String fallback) {
   if (error is ApiError) {
     if (hasCjk(error.message)) return error.message;
-    if (error.code == 'TRIP_EMPTY') return '此行程尚無景點，請先加入景點再執行健檢';
+    if (error.code == 'TRIP_EMPTY') return '此行程尚無停留點，請先加入停留點再執行健檢';
     return fallback;
   }
   return fallback;
+}
+
+/// 後端的 reason 可能是代碼（如 `CLOSED_PERMANENTLY`）；已含中文的原樣顯示，
+/// 已知代碼轉人話，其餘不外洩原始字串。
+String? _poiReasonLabel(TripPoiHealthItem item) {
+  final reason = item.reason;
+  if (reason == null || reason.trim().isEmpty) return null;
+  if (hasCjk(reason)) return reason;
+  return switch (reason.toUpperCase()) {
+    'CLOSED_PERMANENTLY' => '已永久歇業',
+    'CLOSED_TEMPORARILY' => '暫時歇業',
+    'NO_HOURS_DATA' || 'MISSING_HOURS' => '缺少營業資料',
+    _ => item.status == TripPoiHealthStatus.closed ? '店家可能已歇業' : '店家資料不完整',
+  };
 }

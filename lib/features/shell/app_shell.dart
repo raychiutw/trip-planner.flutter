@@ -13,6 +13,7 @@ import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/tp_state_view.dart';
 import '../account/account_sheet.dart';
 import '../offline/offline_status_banner.dart';
 import '../trips/current_trip_provider.dart';
@@ -214,9 +215,7 @@ class _TripRegularSidebar extends ConsumerWidget {
               child: ref
                   .watch(myTripsProvider)
                   .when(
-                    loading: () => const Center(
-                      child: CircularProgressIndicator.adaptive(),
-                    ),
+                    loading: () => const TpLoadingIndicator(label: '正在載入行程'),
                     error: (error, stackTrace) => Center(
                       child: TextButton(
                         onPressed: () => ref.invalidate(myTripsProvider),
@@ -264,31 +263,25 @@ class _TripRegularList extends ConsumerWidget {
           context.go('/trips/${Uri.encodeComponent(trip.tripId)}');
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: selectTrip,
-          child: Semantics(
-            key: ValueKey('trip-sidebar-item-${trip.tripId}'),
-            container: true,
-            selected: selected,
-            button: true,
-            label: displayTitle,
-            onTap: selectTrip,
-            child: ExcludeSemantics(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: ListTile(
-                  selected: selected,
-                  title: Text(displayTitle),
-                  leading: const Icon(CupertinoIcons.briefcase),
-                  trailing: selected
-                      ? Icon(
-                          CupertinoIcons.check_mark,
-                          color: theme.colorScheme.primary,
-                        )
-                      : null,
-                ),
-              ),
+        // ListTile 自帶 button 語意與 focus,外接鍵盤／Full Keyboard Access
+        // 才能聚焦並以 Enter 選取;外層 Semantics 只補 key 與選取狀態。
+        return Semantics(
+          key: ValueKey('trip-sidebar-item-${trip.tripId}'),
+          container: true,
+          selected: selected,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: ListTile(
+              selected: selected,
+              onTap: selectTrip,
+              title: Text(displayTitle),
+              leading: const Icon(CupertinoIcons.briefcase),
+              trailing: selected
+                  ? Icon(
+                      CupertinoIcons.check_mark,
+                      color: theme.colorScheme.primary,
+                    )
+                  : null,
             ),
           ),
         );

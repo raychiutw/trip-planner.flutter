@@ -47,7 +47,7 @@ Future<void> confirmAndRunIrreversibleAction(
               children: [
                 const SizedBox.square(
                   dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 ),
                 const SizedBox(width: TpSpacing.s3),
                 Expanded(child: Text(progressLabel)),

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'dynamic_type.dart';
 
 class TpSettingsGroup extends StatelessWidget {
   const TpSettingsGroup({super.key, this.title, required this.children});
@@ -55,17 +56,21 @@ class TpGroupedSurface extends StatelessWidget {
     required this.children,
     this.separatorIndent = TpSpacing.s4,
     this.separatorEndIndent = TpSpacing.s4,
+    this.color,
   });
 
   final List<Widget> children;
   final double separatorIndent;
   final double separatorEndIndent;
 
+  /// 覆寫 surface 底色(例如錯誤面板用 `errorContainer`);預設 `surfaceContainerLow`。
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerLow,
+      color: color ?? theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(TpRadius.lg),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -119,6 +124,8 @@ class TpSettingsRow extends StatelessWidget {
     final titleColor = destructive
         ? theme.colorScheme.error
         : theme.colorScheme.onSurface;
+    // AX 字級下標題與 value 各佔一半寬只會互相截斷;value 改疊到標題下方。
+    final stackValue = value != null && isLargeTextScale(context);
     final content = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
       child: Padding(
@@ -155,10 +162,19 @@ class TpSettingsRow extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (stackValue) ...[
+                    const SizedBox(height: TpSpacing.s1),
+                    Text(
+                      value!,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            if (value != null) ...[
+            if (value != null && !stackValue) ...[
               const SizedBox(width: TpSpacing.s3),
               // 必須是 Expanded(tight):與 title 同為 loose 時 Row 會留下未分配
               // 空間,把 value 與 chevron 一起往左推,右緣就對不齊隔壁列。

@@ -39,11 +39,22 @@ class OfflineStatusBanner extends ConsumerWidget {
         key: const ValueKey('offline-pending-banner'),
         background: colorScheme.secondaryContainer,
         foreground: colorScheme.onSecondaryContainer,
-        icon: Icons.cloud_off_outlined,
+        icon: CupertinoIcons.wifi_slash,
         text: '$pending 筆變更待同步',
         busy: syncing,
         actionLabel: syncing ? null : '立即重試',
         onAction: () => ref.read(offlineSyncControllerProvider.notifier).sync(),
+      );
+    }
+
+    // 純離線：沒有待同步也沒有衝突時，仍告知目前離線（讀的是快取）。
+    if (!ref.watch(deviceOnlineProvider)) {
+      return _Bar(
+        key: const ValueKey('offline-network-banner'),
+        background: colorScheme.secondaryContainer,
+        foreground: colorScheme.onSecondaryContainer,
+        icon: CupertinoIcons.wifi_slash,
+        text: '目前離線，變更會在連線後同步',
       );
     }
 
@@ -87,11 +98,14 @@ class _Bar extends StatelessWidget {
               Icon(icon, size: 18, color: foreground),
               const SizedBox(width: TpSpacing.s2),
               Expanded(
-                child: Text(
-                  text,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: foreground),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    text,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: foreground),
+                  ),
                 ),
               ),
               if (busy)

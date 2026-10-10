@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../app/error_message.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
@@ -19,6 +20,7 @@ import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_more_menu.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/tp_segmented_control.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'current_trip_provider.dart';
 import 'trip_card.dart';
@@ -365,20 +367,16 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     TpSpacing.s4,
                     TpSpacing.s2,
                   ),
-                  child: SegmentedButton<TripFilter>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                      ButtonSegment(value: TripFilter.mine, label: Text('我的')),
-                      ButtonSegment(
-                        value: TripFilter.shared,
-                        label: Text('共編'),
-                      ),
-                    ],
-                    selected: {_filterTab},
-                    onSelectionChanged: (selection) {
+                  child: TpSegmentedControl<TripFilter>(
+                    value: _filterTab,
+                    options: const {
+                      TripFilter.all: '全部',
+                      TripFilter.mine: '我的',
+                      TripFilter.shared: '共編',
+                    },
+                    onChanged: (value) {
                       setState(() {
-                        _filterTab = selection.first;
+                        _filterTab = value;
                       });
                     },
                   ),
@@ -507,7 +505,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       _showImportError('不是有效的 JSON 檔');
     } on ApiError catch (error) {
       if (!mounted) return;
-      _showImportError(error.detail ?? error.message);
+      _showImportError(userFacingApiError(error, fallback: '匯入失敗，請稍後再試'));
     } on Exception {
       if (!mounted) return;
       _showImportError('匯入失敗，請稍後再試');
@@ -558,10 +556,25 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 
   Widget _buildNoResults(ThemeData theme) {
     return Center(
-      child: Text(
-        '找不到符合的行程',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+      child: Semantics(
+        key: const ValueKey('trips-no-results'),
+        container: true,
+        liveRegion: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '找不到符合的行程',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (_query.trim().isNotEmpty)
+              TextButton(
+                onPressed: _searchController.clear,
+                child: const Text('清除搜尋'),
+              ),
+          ],
         ),
       ),
     );
@@ -733,7 +746,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       title: '刪除行程',
       message:
           '確定要刪除「${trip.displayTitle}」嗎？'
-          '這會刪除其中所有行程日與景點。此動作無法復原。',
+          '這會刪除其中所有行程日與停留點。此動作無法復原。',
       confirmLabel: '刪除',
     );
     if (!confirmedDelete || !context.mounted) return;

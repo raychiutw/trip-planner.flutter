@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/tp_state_view.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trips_list_screen.dart';
@@ -87,10 +88,8 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
       _renderedTripId = selectedAsync.value;
     }
     return tripsAsync.when(
-      loading: () => _rootState(
-        context,
-        const Center(child: CircularProgressIndicator.adaptive()),
-      ),
+      loading: () =>
+          _rootState(context, const TpLoadingIndicator(label: '正在載入行程')),
       error: (error, stackTrace) => _rootState(
         context,
         _MapState(
@@ -118,10 +117,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
         if ((selectedAsync.isLoading && _pendingRouteTripId == null) ||
             (_pendingRouteTripId != null &&
                 !trips.any((trip) => trip.tripId == _pendingRouteTripId))) {
-          return _rootState(
-            context,
-            const Center(child: CircularProgressIndicator.adaptive()),
-          );
+          return _rootState(context, const TpLoadingIndicator(label: '正在載入行程'));
         }
         final selected = resolveCurrentTrip(
           trips,

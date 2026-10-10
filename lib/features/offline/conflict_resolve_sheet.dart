@@ -8,6 +8,8 @@ import '../../api/cache/cache_store.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_filled_button.dart';
+import '../../ui/tp_settings_group.dart';
 import '../trip_detail/entry_mutations.dart';
 import 'offline_sync.dart';
 
@@ -173,78 +175,79 @@ class _ConflictCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final conflict = this.conflict;
-    return Card(
+    return TpGroupedSurface(
       key: ValueKey('conflict-card-${conflict.id}'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _conflictTitle(conflict),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            for (final field in conflict.conflictFields) ...[
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                _fieldLabel(field),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+                _conflictTitle(conflict),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: TpSpacing.s1),
+              const SizedBox(height: TpSpacing.s3),
+              for (final field in conflict.conflictFields) ...[
+                Text(
+                  _fieldLabel(field),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s1),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _SideValue(
+                        label: '你的',
+                        value: _displayValue(conflict.ours[field]),
+                      ),
+                    ),
+                    const SizedBox(width: TpSpacing.s2),
+                    Expanded(
+                      child: _SideValue(
+                        label: '對方',
+                        value: _displayValue(conflict.theirs[field]),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: TpSpacing.s3),
+              ],
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: _SideValue(
-                      label: '你的',
-                      value: _displayValue(conflict.ours[field]),
+                  MergeSemantics(
+                    child: Semantics(
+                      selected: choice == _ConflictChoice.theirs,
+                      child: TpFilledButton(
+                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
+                        tonal: choice != _ConflictChoice.theirs,
+                        onPressed: () => onSelected(_ConflictChoice.theirs),
+                        label: '用對方的',
+                      ),
                     ),
                   ),
                   const SizedBox(width: TpSpacing.s2),
-                  Expanded(
-                    child: _SideValue(
-                      label: '對方',
-                      value: _displayValue(conflict.theirs[field]),
+                  MergeSemantics(
+                    child: Semantics(
+                      selected: choice == _ConflictChoice.ours,
+                      child: TpFilledButton(
+                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
+                        tonal: choice != _ConflictChoice.ours,
+                        onPressed: () => onSelected(_ConflictChoice.ours),
+                        label: '保留你的',
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: TpSpacing.s3),
             ],
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                choice == _ConflictChoice.theirs
-                    ? FilledButton(
-                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.theirs),
-                        child: const Text('用對方的'),
-                      )
-                    : OutlinedButton(
-                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.theirs),
-                        child: const Text('用對方的'),
-                      ),
-                const SizedBox(width: TpSpacing.s2),
-                choice == _ConflictChoice.ours
-                    ? FilledButton(
-                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.ours),
-                        child: const Text('保留你的'),
-                      )
-                    : OutlinedButton(
-                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
-                        onPressed: () => onSelected(_ConflictChoice.ours),
-                        child: const Text('保留你的'),
-                      ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
