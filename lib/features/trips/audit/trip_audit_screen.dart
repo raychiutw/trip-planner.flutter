@@ -13,7 +13,7 @@ import '../../../app/error_message.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
-import '../../../ui/tp_chip.dart';
+import '../../../ui/tp_tag.dart';
 import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 
@@ -180,7 +180,7 @@ class _Header extends StatelessWidget {
         Wrap(
           spacing: TpSpacing.s2,
           runSpacing: TpSpacing.s2,
-          children: [TpChip(label: '$count 筆')],
+          children: [TpTag(label: '$count 筆')],
         ),
         const SizedBox(height: TpSpacing.s2),
         Text('顯示最近最多 $_auditLimit 筆異動', style: textTheme.bodyMedium),
@@ -213,11 +213,11 @@ class _AuditCard extends StatelessWidget {
               runSpacing: TpSpacing.s2,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                TpChip(
+                TpTag(
                   label: _actionLabel(row.action),
-                  selected: row.action != TripAuditAction.unknown,
+                  emphasized: row.action != TripAuditAction.unknown,
                 ),
-                TpChip(label: _tableLabel(row.tableName)),
+                TpTag(label: _tableLabel(row.tableName)),
               ],
             ),
             const SizedBox(height: TpSpacing.s2),

@@ -10,6 +10,8 @@ import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_chip.dart';
+import 'package:tripline/ui/tp_tag.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -90,6 +92,10 @@ void main() {
     expect(find.text('ray@example.com'), findsOneWidget);
     expect(find.textContaining('標題'), findsOneWidget);
     expect(find.textContaining('首里城 → 首里城公園'), findsOneWidget);
+    // 動作、資料表、筆數是唯讀資訊,不得用按鈕語意的 TpChip。
+    expect(find.byType(TpChip), findsNothing);
+    expect(find.widgetWithText(TpTag, '更新'), findsOneWidget);
+    expect(find.widgetWithText(TpTag, '停留點'), findsOneWidget);
   });
 
   testWidgets('不對使用者顯示內部 id、Request/Record 編號與 system 字樣', (tester) async {

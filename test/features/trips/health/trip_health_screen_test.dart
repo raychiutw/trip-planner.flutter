@@ -17,6 +17,8 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_chip.dart';
+import 'package:tripline/ui/tp_tag.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
@@ -193,6 +195,9 @@ void main() {
     expect(find.textContaining('刪減一個停留點。'), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-health-poi-card')), findsOneWidget);
     expect(find.text('已歇業餐廳'), findsOneWidget);
+    // 狀態、數量、嚴重度、面向都是唯讀資訊,不得用按鈕語意的 TpChip。
+    expect(find.byType(TpChip), findsNothing);
+    expect(find.byType(TpTag), findsAtLeastNWidgets(4));
   });
 
   testWidgets('用詞人話化:不外洩 POI／Day／原始代碼', (tester) async {

@@ -297,6 +297,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   | --- | --- | --- |
   | `Checkbox` | `TpSelectionCircle` | 選取模式的圓形勾選,語意 checked,點擊區 44pt |
   | `FilterChip`／`ChoiceChip`／`ActionChip` | `TpChip` | 選中以 `primaryContainer` 填色加 `primary` 邊框(見「取色與視覺階層」登記例外),無勾選圖示 |
+  | 唯讀資訊標籤(狀態、數量、時間、分類)拿 `TpChip(onPressed: null)` 充數 | `TpTag` | 非互動:語意為純文字(非 button、無停用狀態)、文字不降透明度、可換行;`emphasized: true` 為重點(`primaryContainer` 底、無 `primary` 邊框)。可點或可選取才用 `TpChip` |
   | `SegmentedButton` | `TpSegmentedControl` | 自繪 sliding 樣式(軌道加滑動 thumb),每段 44pt、可聚焦、減少動態效果時 thumb 不滑動,僅限 2~4 項互斥選項 |
   | `DropdownButton`／`DropdownButtonFormField` | `TpPickerField` | 點擊開 action sheet,目前值打勾;行內用 `compact: true`;`value` 不在選項內時顯示 `placeholder` |
   | `LinearProgressIndicator` | `TpProgressBar` | Cupertino 沒有線性進度,以 `colorScheme` 自繪;外層已有標籤或緊鄰文字時 `semanticLabel: null` |

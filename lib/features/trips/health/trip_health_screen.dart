@@ -19,7 +19,7 @@ import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
 import '../../../theme/tokens.dart';
-import '../../../ui/tp_chip.dart';
+import '../../../ui/tp_tag.dart';
 import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../requests/request_lifecycle.dart';
@@ -317,10 +317,10 @@ class _Header extends StatelessWidget {
           spacing: TpSpacing.s2,
           runSpacing: TpSpacing.s2,
           children: [
-            TpChip(label: _statusLabel(report?.status)),
-            TpChip(label: '$entryCount 個停留點'),
+            TpTag(label: _statusLabel(report?.status)),
+            TpTag(label: '$entryCount 個停留點'),
             if (completedAt != null)
-              TpChip(label: _formatTimestamp(completedAt)),
+              TpTag(label: _formatTimestamp(completedAt)),
           ],
         ),
       ],
@@ -619,7 +619,7 @@ class _FindingCard extends StatelessWidget {
               children: [
                 _SeverityChip(severity: finding.severity),
                 if (finding.dimension != null)
-                  TpChip(label: _dimensionLabel(finding.dimension!)),
+                  TpTag(label: _dimensionLabel(finding.dimension!)),
               ],
             ),
             const SizedBox(height: TpSpacing.s2),
@@ -679,9 +679,9 @@ class _SeverityChip extends StatelessWidget {
   final TripHealthSeverity severity;
 
   @override
-  Widget build(BuildContext context) => TpChip(
+  Widget build(BuildContext context) => TpTag(
     label: _severityLabel(severity),
-    selected: severity == TripHealthSeverity.high,
+    emphasized: severity == TripHealthSeverity.high,
   );
 }
 
