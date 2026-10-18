@@ -31,7 +31,11 @@ void main() {
         }
         if (insideFence) continue;
 
-        for (final match in _linkPattern.allMatches(line)) {
+        final matches = [
+          ..._linkPattern.allMatches(line),
+          ..._imgSrcPattern.allMatches(line),
+        ];
+        for (final match in matches) {
           final target = _fileTargetOf(match.group(1)!);
           if (target == null) continue;
 
@@ -61,6 +65,9 @@ void main() {
 
 /// `[顯示文字](路徑)` 或 `[顯示文字](路徑 "title")` 的路徑部分。
 final _linkPattern = RegExp(r'\[[^\]]*\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)');
+
+/// README 用 HTML `<img src="…">` 排版截圖，markdown 連結語法抓不到，另外守。
+final _imgSrcPattern = RegExp(r'<img\b[^>]*\bsrc="([^"]+)"');
 
 final _fencePattern = RegExp(r'^\s{0,3}(?:```|~~~)');
 

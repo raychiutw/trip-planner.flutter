@@ -1,89 +1,73 @@
-# Tripline Flutter
+# Tripline App
 
-[trip-planner](https://github.com/raychiutw/trip-planner) React SPA 的 **iOS / Android 移植版**。後端共用同一套 Cloudflare Pages Functions API（`https://trip-planner-dby.pages.dev/api`），本 repo 只是另一個 client。
+[Tripline](https://github.com/raychiutw/trip-planner) 旅遊行程規劃的 iOS / Android App。和網站版共用同一個帳號與行程（App 目前以 Email 與密碼登入），在電腦上排好的行程，出門時用手機看。
 
-## 功能狀態
+🌐 **網站版**：[https://trip-planner-dby.pages.dev/](https://trip-planner-dby.pages.dev/)
 
-**P0（已完成）**
-- 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
-- 4-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏）— go_router StatefulShellRoute + auth redirect；帳號由各內容頁 Header 開啟獨立 Navigation Stack sheet
-- 行程清單（中性 grouped surface、pull-to-refresh、尾端左滑刪除，並保留長按操作）
-- 行程時間軸（單層 day selector、D1 單 rail、單行起訖時間、Google 分類、travel pill）
-- 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
-- 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
-- 帳號（profile、通知、登入裝置、隱私權政策、不可復原刪除與登出；外觀可選跟隨系統／淺色／深色並在本機保存）
-- 未登入首頁（功能導覽、隱私權政策入口與登入後開始使用）
+<table>
+  <tr>
+    <td align="center"><img src="docs/readme/trips-list.png" width="200" alt="我的行程清單"><br>我的行程</td>
+    <td align="center"><img src="docs/readme/trip-timeline.png" width="200" alt="每日時間軸"><br>每日時間軸</td>
+    <td align="center"><img src="docs/readme/chat.png" width="200" alt="AI 聊天"><br>問 AI 改行程</td>
+    <td align="center"><img src="docs/readme/trip-notes.png" width="200" alt="行程筆記"><br>行程筆記</td>
+  </tr>
+</table>
 
-**P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
-**P2（已完成）**：分享/列印/匯入、設定子頁、通知偏好 toggle、OAuth PKCE Bearer 認證 client、離線快取。現行發布工作流未傳入 `TRIPLINE_OAUTH_CLIENT_ID`，依該工作流建置時 OAuth 登入入口不顯示；正式 HTTPS callback 尚未由 Flutter 處理。
+## 功能特色
 
-## 開發
+### 💬 用說的就能改行程
 
-```bash
-flutter pub get
-flutter test       # 全部測試
-flutter analyze
-flutter run        # 連 prod API（注意：請用測試帳號）
-```
+在聊天分頁輸入或用語音說「第二天下雨怎麼辦？」，AI 會依照你的行程給建議，也能直接幫你調整停留點。
 
-完整測試包含真正 PDF 內容驗證；平台工具需求見 [CONTRIBUTING 的環境說明](CONTRIBUTING.md#環境)。
+### 🗓️ 每天去哪裡一目了然
 
-## 架構
+- **每日時間軸**：每個停留點的時間、停留多久與類型排得清清楚楚，一鍵在 Google 地圖查看地點（iPhone 也能用 Apple 地圖開啟）
+- **每日路線地圖**：原生地圖上標出每天的停留點與路線，地圖和下方的停留點卡片同步捲動
+- **隨手調整**：新增、編輯、刪除停留點；點「調整順序」後拖曳就能改變先後
 
-```
-lib/
-  theme/        # iOS 系統語意色 tokens + Light／Dark／High Contrast ThemeData
-  models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson + 純 Dart 唯讀筆記內容投影
-  api/          # dio 封裝（Bearer／cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
-    cache/      # drift 永續快取、離線佇列、樂觀更新與 rebase 合併
-  ui/           # Tp* 共用 widget（TpAppBar／TpGlassSurface／TpStateView…）
-  app/          # go_router（4-tab StatefulShellRoute、Account sheet + auth redirect）
-  features/     # account / auth / chat / favorites / invite / map / offline
-                # / share / shell / trip_detail（timeline·map·notes）/ trips
-docs/
-  adr/          # 架構決策與被拒方案（13 份）
-  agents/       # agent 用的 issue tracker／triage labels／domain docs 設定
-  research/     # 套件選擇、Apple HIG 與後端契約查核紀錄
-  evidence/     # 指定議題的畫面證據
-  verification/ # 互動與輔助使用驗證紀錄
-  liquid-glass-1.4.1-migration.md # 1.4.1 遷移去留、真機驗收紀錄與未完成缺口
-  mobile-e2e.md # Patrol／Firebase Test Lab 與發布 runbook
-  navigation-glass-semantic-validation.md # 導覽玻璃語意與平台驗證紀錄
-```
+### 🧳 出發前準備好
 
-## 文件
+- **行程筆記**：航班、住宿、預訂、行前須知與緊急聯絡分成五類，可以新增、編輯與排序
+- **探索與收藏**：搜尋景點與餐廳，先收藏起來，之後再加進行程
+- **建立行程**：選目的地與日期，就能開始安排
 
-| 想做什麼 | 看哪份 |
-|---|---|
-| 貢獻流程、環境設定與 PR 規矩 | [CONTRIBUTING](CONTRIBUTING.md) |
-| **程式碼該怎麼寫（全部規範）** | **[CODING_STANDARDS](CODING_STANDARDS.md)** |
-| 懂分層與依賴方向 | [CODING_STANDARDS § 分層與依賴方向](CODING_STANDARDS.md#分層與依賴方向) |
-| 新增 API endpoint | [CODING_STANDARDS § API 層規範](CODING_STANDARDS.md#api-層規範) |
-| 查 model 欄位與 fromJson 解析規則 | [CODING_STANDARDS § Model 與 fromJson 解析規則](CODING_STANDARDS.md#model-與-fromjson-解析規則) |
-| 新增畫面、導覽玻璃與鍵盤 | [CODING_STANDARDS § 畫面撰寫規範](CODING_STANDARDS.md#畫面撰寫規範) · [§ 導覽玻璃與鍵盤](CODING_STANDARDS.md#導覽玻璃與鍵盤) |
-| 寫測試（provider override、不可假綠） | [CODING_STANDARDS § Provider 與測試 seam](CODING_STANDARDS.md#provider-與測試-seam) · [§ 測試規範](CODING_STANDARDS.md#測試規範) · [§ 測試不可假綠](CODING_STANDARDS.md#測試不可假綠) |
-| 查 UI／UX 規範（iOS HIG） | [DESIGN.md](DESIGN.md) · [CODING_STANDARDS § UI 規範](CODING_STANDARDS.md#ui-規範) |
-| 查領域詞彙（停留點、正選／備選 POI、工單） | [CONTEXT.md](CONTEXT.md) |
-| 理解架構決策與被拒方案 | [docs/adr/](docs/adr/)（13 份） |
-| 查 Liquid Glass 1.4.1 遷移去留、真機驗收紀錄與未完成缺口 | [docs/liquid-glass-1.4.1-migration.md](docs/liquid-glass-1.4.1-migration.md) |
-| 查導覽玻璃語意與平台驗證紀錄 | [docs/navigation-glass-semantic-validation.md](docs/navigation-glass-semantic-validation.md) |
-| 查議題畫面證據與互動驗證紀錄 | [docs/evidence/](docs/evidence/) · [docs/verification/](docs/verification/) |
-| 查 Apple HIG 與後端契約研究 | [docs/research/](docs/research/) |
-| 跑 Patrol／Firebase Test Lab、發布 TestFlight／Google Play | [docs/mobile-e2e.md](docs/mobile-e2e.md) |
-| 設定 agent 的 issue tracker／triage labels／domain docs | [docs/agents/](docs/agents/) |
-| 看變更紀錄 | [CHANGELOG](CHANGELOG.md) |
-| 找待辦、spec 與 PRD | [GitHub Issues](https://github.com/raychiutw/trip-planner.flutter/issues) |
+<table>
+  <tr>
+    <td align="center"><img src="docs/readme/favorites.png" width="200" alt="收藏"><br>收藏</td>
+    <td align="center"><img src="docs/readme/share-manage.png" width="200" alt="建立分享連結"><br>建立分享連結</td>
+    <td align="center"><img src="docs/readme/trip-print.png" width="200" alt="列印預覽"><br>列印預覽</td>
+  </tr>
+</table>
 
-技術棧：Flutter 3.44.7 stable / Dart 3.12.2（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、google_navigation_flutter 0.10。
+### 👫 和旅伴一起
 
-## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
+- **共同編輯**：邀請旅伴加入同一份行程
+- **分享連結**：產生唯讀連結，可設定有效期限、要公開哪些筆記，也能匿名分享；旅伴用瀏覽器開啟就能看，不用登入
+- **列印與匯入**：整份行程輸出成列印文件或 PDF，也能匯入從 Tripline 匯出的行程檔
 
-- 雙軌認證：有 Bearer access token 就走 Bearer 模式（帶 `Authorization: Bearer …`，不送 Cookie／Origin，後端對此跳過 CSRF 檢查）；否則走 cookie 模式，帶 `Cookie: tripline_session=…`
-- cookie 模式的 mutating request 一律帶 `Origin`，值為 `kTriplineOrigin`（`String.fromEnvironment('TRIPLINE_API_ORIGIN')`，預設 `https://trip-planner-dby.pages.dev`）—— 後端 CSRF Origin allowlist，缺少 → 403
-- Bearer 模式收到 401 會先嘗試 refresh，成功才用同參數重送一次
-- 429 與 edge block page 只 retry GET／HEAD 一次；Bearer 401 refresh 成功後則不分 method，以同參數重送一次
-- 錯誤 shape `{error:{code,message,detail}}`；204 → null
+### 📶 沒有網路也能用
 
-## 設計
+看過的行程會存在手機裡，在國外沒有網路時照樣能看。離線時新增或修改停留點，以及新增、修改、刪除行程筆記，都會先保留，連上網路後自動同步；刪除停留點、調整順序等其他操作需要連上網路。
 
-Flutter 的互動與版型以根目錄 [`DESIGN.md`](DESIGN.md) 為唯一設計 SOT，[CODING_STANDARDS § UI 規範](CODING_STANDARDS.md#ui-規範)只補充實作方式。方向是保留單一柔褐 tint，內容使用 iOS 系統語意 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例；舊三色內容分類已退場。
+### 🌙 舒服好讀
+
+- **深色模式**：跟隨系統、淺色或深色
+- **大字級與高對比**：支援系統的文字大小設定；iPhone 另支援「增加對比」
+- **iOS 風格的介面**：iPhone 與 Android 都使用 Liquid Glass 風格的導覽列與 iOS 的操作習慣
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/readme/trips-list-dark.png" width="200" alt="深色模式：我的行程"></td>
+    <td align="center"><img src="docs/readme/trip-timeline-dark.png" width="200" alt="深色模式：每日時間軸"></td>
+    <td align="center"><img src="docs/readme/chat-dark.png" width="200" alt="深色模式：AI 聊天"></td>
+    <td align="center"><img src="docs/readme/trip-notes-dark.png" width="200" alt="深色模式：行程筆記"></td>
+  </tr>
+</table>
+
+### 🔒 帳號與隱私
+
+- 查看登入過的裝置，可以登出單一裝置
+- 隨時可以在 App 內永久刪除帳號
+
+> 截圖使用範例資料。
+
