@@ -35,7 +35,6 @@
   <tr>
     <td align="center"><img src="docs/readme/favorites.png" width="200" alt="收藏"><br>收藏</td>
     <td align="center"><img src="docs/readme/share-manage.png" width="200" alt="建立分享連結"><br>建立分享連結</td>
-    <td align="center"><img src="docs/readme/public-share.png" width="200" alt="分享頁預覽"><br>分享頁預覽</td>
     <td align="center"><img src="docs/readme/trip-print.png" width="200" alt="列印預覽"><br>列印預覽</td>
   </tr>
 </table>
@@ -48,7 +47,7 @@
 
 ### 📶 沒有網路也能用
 
-看過的行程會存在手機裡，在國外沒有網路時照樣能看。離線時新增或修改停留點、行程筆記會先保留，連上網路後自動同步；刪除停留點、調整順序等其他操作需要連上網路。
+看過的行程會存在手機裡，在國外沒有網路時照樣能看。離線時新增或修改停留點，以及新增、修改、刪除行程筆記，都會先保留，連上網路後自動同步；刪除停留點、調整順序等其他操作需要連上網路。
 
 ### 🌙 舒服好讀
 
@@ -72,6 +71,3 @@
 
 > 截圖使用範例資料。
 
-## 開發者
-
-開發環境、專案結構與文件索引請看 [CONTRIBUTING.md](CONTRIBUTING.md)。
