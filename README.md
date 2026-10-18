@@ -53,7 +53,7 @@
 
 - **深色模式**：跟隨系統、淺色或深色
 - **大字級與高對比**：支援系統的文字大小設定；iPhone 另支援「增加對比」
-- **符合 iOS 的操作習慣**：iOS 上採用 Liquid Glass 風格的導覽列與原生互動
+- **iOS 風格的介面**：iPhone 與 Android 都使用 Liquid Glass 風格的導覽列與 iOS 的操作習慣
 
 <table>
   <tr>
