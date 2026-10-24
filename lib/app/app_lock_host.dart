@@ -45,6 +45,8 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
   }
 
   Future<void> _resumed() async {
+    // 使用者可能剛去系統設定登錄或移除生物辨識，設定列與鎖定畫面要讀到新狀態。
+    ref.invalidate(appLockKindProvider);
     final disabled = await ref
         .read(appLockProvider.notifier)
         .onResumed(ref.read(appLockClockProvider)());

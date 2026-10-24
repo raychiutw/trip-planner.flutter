@@ -217,6 +217,10 @@ class AppLockController extends Notifier<AppLockState> {
     final hiddenAt = _hiddenAt;
     _hiddenAt = null;
     if (!state.enabled || _inFlight) return false;
+    // 先同步上鎖，再查裝置狀態：不能讓內容在 await 期間露出一格。
+    if (hiddenAt != null && now.difference(hiddenAt) > appLockAfterBackground) {
+      state = state.copyWith(locked: true);
+    }
     final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
     if (!state.enabled) return false;
     if (kind == null) {
@@ -224,9 +228,6 @@ class AppLockController extends Notifier<AppLockState> {
       await _write(_enabledKey, '0');
       state = state.copyWith(enabled: false, locked: false);
       return true;
-    }
-    if (hiddenAt != null && now.difference(hiddenAt) > appLockAfterBackground) {
-      state = state.copyWith(locked: true);
     }
     return false;
   }
