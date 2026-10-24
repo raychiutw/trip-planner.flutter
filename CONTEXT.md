@@ -60,6 +60,12 @@ _避免_: title button、trip picker
 地圖頁的 bottom accessory:一列橫向捲動的行程 POI 卡片,與地圖 marker 雙向連動。
 _避免_: bottom sheet、POI carousel、卡片抽屜
 
+## 安全
+
+**App 鎖**:
+本機生物辨識解鎖(Face ID / Touch ID,可退回裝置密碼)。純 client,不涉及後端或 session;鎖定時蓋住整個 App,驗證失敗只留在鎖定畫面,不登出。
+_避免_: 生物辨識登入、passkey(那是用生物辨識取代密碼,需要後端,本 App 不做)
+
 ## 視覺語彙
 
 **tint**:

@@ -15,6 +15,8 @@ import 'api/cache/cache_migration.dart';
 import 'api/cache/drift_cache_store.dart';
 import 'api/providers.dart';
 import 'app/accessibility_scope.dart';
+import 'app/app_lock.dart';
+import 'app/app_lock_host.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
 import 'app/shared_preferences_settings_store.dart';
@@ -69,6 +71,8 @@ Future<void> main() async {
   await LiquidGlassWidgets.initialize();
   final settingsStore = SharedPreferencesSettingsStore();
   final initialThemeMode = await loadInitialThemeMode(settingsStore);
+  // 冷啟動第一幀就要知道有沒有開 App 鎖，才不會先閃出內容再鎖。
+  final initialAppLock = await loadInitialAppLockEnabled(settingsStore);
   // 開永續離線快取 DB（目錄取 app documents），override 預設的記憶體版。
   // 開啟失敗(磁碟/權限/檔案損毀)時退回預設 InMemory,不阻擋 app 啟動。
   DriftCacheStore? cacheStore;
@@ -94,6 +98,9 @@ Future<void> main() async {
             settingsStoreProvider.overrideWithValue(settingsStore),
             themeModeProvider.overrideWith(
               () => ThemeModeController(initialMode: initialThemeMode),
+            ),
+            appLockProvider.overrideWith(
+              () => AppLockController(initialEnabled: initialAppLock),
             ),
             if (cacheStore != null)
               cacheStoreProvider.overrideWithValue(cacheStore),
@@ -157,11 +164,13 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),
-      builder: (context, child) => TpAccountActionScope(
-        onOpen: (buttonContext) => unawaited(showAccountSheet(buttonContext)),
-        child: AppKeyboardDismissRegion(
-          child: SlidableAutoCloseBehavior(
-            child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => AppLockHost(
+        child: TpAccountActionScope(
+          onOpen: (buttonContext) => unawaited(showAccountSheet(buttonContext)),
+          child: AppKeyboardDismissRegion(
+            child: SlidableAutoCloseBehavior(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
       ),

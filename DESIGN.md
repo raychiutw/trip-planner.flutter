@@ -118,6 +118,19 @@ iPhone 固定四個 root tabs：
 - **HIG 建議**：需要帳號時優先提供 Sign in with Apple，並清楚說明用途與權益。
 - **HIG 必須**：關閉 Account sheet 後回到原頁，保留 Day、捲動位置、表單與未送出的聊天草稿。
 
+### 5.1 App 鎖
+
+- **Tripline 決策**：提供本機 App 鎖（Face ID／Touch ID，可退回裝置密碼），**預設關閉**，使用者在 Account →「安全性」開啟。純 client：不改後端、不改 session，驗證失敗或取消不登出、不清 session 與離線資料。
+- **Tripline 決策（對 §5「不得重複實作系統認證偏好」的明確取捨）**：App 鎖不是重做系統的解鎖偏好，而是 App 層級的資料保護 —— 手機已解鎖時，別人仍看不到行程與旅伴資料。因為會與該條字面衝突，所以預設關閉、由使用者主動開啟，並用裝置實際的驗證方式命名（「Face ID 解鎖」「Touch ID 解鎖」「生物辨識 解鎖」「裝置密碼 解鎖」），不使用籠統字眼。
+- **Tripline 決策**：鎖定時機是冷啟動，以及離開前景超過 1 分鐘再回來；短暫切 App 不鎖。1 分鐘為固定值，不開放設定。
+- **Tripline 決策**：鎖定畫面蓋住所有路由與 sheet，一出現就自動喚起系統驗證；取消或失敗後留在鎖定畫面，提供「使用 … 解鎖」重試與「登出」。登出前確認，並明講未同步變更會遺失。
+- **Tripline 決策**：開啟與關閉都要先通過一次驗證，避免別人代為關閉。
+- **Tripline 決策**：每次**新登入**成功後（含註冊後登入、OAuth）主動詢問是否開啟，每台裝置只問一次，選「開啟」或「稍後再說」都不再問；冷啟動還原既有 session 不問；裝置不可用時不問也不記為已問過。
+- **Tripline 決策**：登出清除「是否開啟」（App 鎖屬於這台裝置上這個登入），保留「已問過」，避免登出再登入又被問。
+- **HIG 必須**：裝置不再有生物辨識與密碼時自動關閉並簡短告知，不得把使用者鎖在 App 外。
+- **HIG 必須**：Face ID 權限在詢問框說明價值之後才由系統請求（§15 just-in-time）；鎖定畫面、開關與詢問框須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
+- **Tripline 決策**：不遮蔽 App 切換器截圖；若之後要做，需另行評估。材質與 Face ID 實際流程須真機驗收。
+
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。
 
 ## 6. Search
