@@ -430,7 +430,7 @@ class TpNavigationGlassTitleSurface extends StatelessWidget {
   }
 }
 
-/// 獨立導覽按鈕的 production 角色；兩者保留既有的圓角差異。
+/// 獨立導覽按鈕的 production 角色；兩者都是圓形（圓角 = 邊長一半）。
 enum TpNavigationGlassButtonRole { barButton, floatingControl }
 
 /// 將獨立圖示按鈕的材質、媒體前景與無障礙降級成套組裝。
@@ -460,8 +460,8 @@ class TpNavigationGlassButton extends StatelessWidget {
       role: _TpNavigationGlassRole.mediaIcon,
     );
     final radius = switch (role) {
-      TpNavigationGlassButtonRole.barButton => 22.0,
-      TpNavigationGlassButtonRole.floatingControl => TpRadius.sm,
+      TpNavigationGlassButtonRole.barButton ||
+      TpNavigationGlassButtonRole.floatingControl => TpSpacing.tapMin / 2,
     };
 
     final Widget control;

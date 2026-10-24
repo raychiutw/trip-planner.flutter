@@ -1908,6 +1908,24 @@ void main() {
     expect(poi.bottom, lessThanOrEqualTo(rootTab.top - TpSpacing.s1));
   });
 
+  testWidgets('定位鈕是圓形玻璃按鈕且點擊範圍不小於 44pt', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final locate = find.byKey(const ValueKey('trip-map-locate-button'));
+    final size = tester.getSize(locate);
+    expect(size.width, greaterThanOrEqualTo(TpSpacing.tapMin));
+    expect(size.height, greaterThanOrEqualTo(TpSpacing.tapMin));
+    expect(size.width, size.height);
+
+    final button = tester.widget<GlassButton>(
+      find.descendant(of: locate, matching: find.byType(GlassButton)),
+    );
+    final shape = button.shape as LiquidRoundedSuperellipse;
+    // 圓角 = 邊長一半 → 圓形，與 header 圓鈕同族。
+    expect(shape.borderRadius, size.width / 2);
+  });
+
   testWidgets('320×568 與 135% 文字使用 accessibility rail 且 selector 不撞定位鈕', (
     tester,
   ) async {
