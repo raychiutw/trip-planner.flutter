@@ -373,7 +373,12 @@ class _EntryRow extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_timeLine(entry).isNotEmpty) Text(_timeLine(entry)),
+          if (formatEntryTime(
+            entry.startTime,
+            entry.endTime,
+            entry.time,
+          ).isNotEmpty)
+            Text(formatEntryTime(entry.startTime, entry.endTime, entry.time)),
           if (entry.description?.trim().isNotEmpty == true)
             Text(entry.description!.trim()),
           if (entry.note?.trim().isNotEmpty == true) Text(entry.note!.trim()),
@@ -565,12 +570,4 @@ class _PartialDataNotice extends StatelessWidget {
       ),
     );
   }
-}
-
-String _timeLine(TimelineEntry entry) {
-  final start = entry.startTime?.trim() ?? '';
-  final end = entry.endTime?.trim() ?? '';
-  if (start.isNotEmpty && end.isNotEmpty) return formatTimeRange(start, end);
-  if (entry.time?.trim().isNotEmpty == true) return entry.time!.trim();
-  return start.isNotEmpty ? start : end;
 }

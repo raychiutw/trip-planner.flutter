@@ -186,7 +186,13 @@ class _PdfDaySection extends pw.StatelessWidget {
                 for (final entry in day.timeline)
                   pw.TableRow(
                     children: [
-                      _cell(_timeLine(entry)),
+                      _cell(
+                        formatEntryTime(
+                          entry.startTime,
+                          entry.endTime,
+                          entry.time,
+                        ),
+                      ),
                       _entryCell(entry),
                       _cell(formatTravelLine(entry.travel)),
                     ],
@@ -321,12 +327,4 @@ Iterable<pw.Widget> _noteWidgets(List<NoteContentSection> sections) sync* {
     }
     yield pw.SizedBox(height: 8);
   }
-}
-
-String _timeLine(TimelineEntry entry) {
-  final start = entry.startTime?.trim() ?? '';
-  final end = entry.endTime?.trim() ?? '';
-  if (start.isNotEmpty && end.isNotEmpty) return formatTimeRange(start, end);
-  if (entry.time?.trim().isNotEmpty == true) return entry.time!.trim();
-  return start.isNotEmpty ? start : end;
 }

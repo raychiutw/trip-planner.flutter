@@ -15,6 +15,17 @@ String formatTimeRange(String? start, String? end) {
   return '$from - $to';
 }
 
+/// 停留點的時間欄：起訖都有顯示範圍；只有一端時優先用自由文字 [time]，
+/// 沒有才退回該端。列印與 PDF 共用，兩邊不各寫一套。
+String formatEntryTime(String? start, String? end, String? time) {
+  final from = (start ?? '').trim();
+  final to = (end ?? '').trim();
+  if (from.isNotEmpty && to.isNotEmpty) return formatTimeRange(from, to);
+  final free = (time ?? '').trim();
+  if (free.isNotEmpty) return free;
+  return from.isNotEmpty ? from : to;
+}
+
 String _normalizeTime(String? value) =>
     (value ?? '').trim().replaceAll('：', ':');
 

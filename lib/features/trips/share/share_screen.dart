@@ -480,6 +480,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             dense: true,
                             visualDensity: VisualDensity.compact,
                             title: const Text('匿名分享'),
+                            subtitle: const Text('不顯示你的名字，對方只會看到「有人分享了一份行程給你」'),
                           ),
                           const SizedBox(height: TpSpacing.s2),
                           if (state.error != null)
@@ -1078,6 +1079,7 @@ class _EditShareFormState extends State<_EditShareForm> {
           dense: true,
           visualDensity: VisualDensity.compact,
           title: const Text('匿名分享'),
+          subtitle: const Text('不顯示你的名字，對方只會看到「有人分享了一份行程給你」'),
         ),
         if (_error != null)
           Semantics(
