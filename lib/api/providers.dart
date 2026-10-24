@@ -9,6 +9,7 @@ import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
 import 'collab_repository.dart';
+import 'credential_store.dart';
 import 'map_repository.dart';
 import 'oauth/id_token.dart';
 import 'oauth/oauth_config.dart';
@@ -155,7 +156,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 帳號已由後端刪除，只清本機認證與離線資料，不再呼叫 logout API。
-  Future<void> accountDeleted() => _clearLocalAuth();
+  Future<void> accountDeleted() async {
+    // 帳號已不存在，存下的生物辨識登入帳密也要一併清掉。
+    await ref.read(credentialStoreProvider).clear();
+    await _clearLocalAuth();
+  }
 
   Future<void> _clearLocalAuth() async {
     if (OAuthConfig.isConfigured) {

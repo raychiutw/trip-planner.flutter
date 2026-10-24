@@ -134,6 +134,15 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：Face ID 權限在詢問框說明價值之後才由系統請求（§15 just-in-time）；鎖定畫面、開關與詢問框須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
 - **Tripline 決策**：App 鎖開啟時，離開前景（inactive）就以純色加鎖頭蓋住內容，App 切換器截圖不會露出行程與旅伴資料；未開啟不遮蔽。此條取代先前「不遮蔽」的決定，對應 #462 故事 14。材質與 Face ID 實際流程須真機驗收。
 
+### 5.2 生物辨識登入
+
+- **Tripline 決策**：密碼登入成功後（每台裝置問一次，在 App 鎖的詢問之後）詢問是否開啟「Face ID／Touch ID 登入」。同意就把 email 與密碼存進這台裝置的 Keychain（僅限本機、不進備份、不遷移），之後在登入頁按「使用 … 登入」，通過驗證才讀出並走一般密碼登入。純 client，不改後端。
+- **Tripline 決策**：登出保留存下的帳密（這是功能的目的）；刪除帳號時清除。與 App 鎖互相獨立：登出會關掉 App 鎖，不影響這裡。
+- **Tripline 決策**：只適用 email＋密碼；Google／OAuth 登入沒有密碼可存，不適用。
+- **Tripline 決策**：存下的密碼被後端拒絕（`LOGIN_INVALID`，例如在別處改過密碼）時清掉帳密，回到手動輸入；網路等一般失敗保留。已開啟時用新密碼手動登入成功，靜默更新存下的密碼。
+- **Tripline 決策**：開啟只能在登入後的詢問進行（要有密碼才存得進去）；設定列「安全性」只在已開啟時出現，用來關閉，關閉要先通過一次驗證。
+- **Tripline 決策**：登入頁的生物辨識按鈕以裝置實際方式命名（「Face ID」「Touch ID」「生物辨識」），不使用籠統字眼；取消或失敗只留在登入頁，不阻擋手動輸入。
+
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。
 
 ## 6. Search

@@ -23,6 +23,7 @@ import 'account_sessions_screen.dart';
 import 'connected_apps_screen.dart';
 import 'developer_apps_screen.dart';
 import 'settings/app_lock_row.dart';
+import 'settings/biometric_login_row.dart';
 import 'settings/appearance_screen.dart';
 import 'settings/notifications_screen.dart';
 import 'settings/profile_edit_screen.dart';
@@ -227,6 +228,7 @@ class _SettingsGroup extends ConsumerWidget {
           title: '安全性',
           children: [
             const AppLockRow(),
+            const BiometricLoginRow(),
             TpSettingsRow(
               key: const ValueKey('settings-sessions'),
               leading: const Icon(CupertinoIcons.device_phone_portrait),
