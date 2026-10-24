@@ -122,5 +122,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
+    // App 鎖(local_auth)的 BiometricPrompt 需要 AppCompat 主題資源。
+    implementation("androidx.appcompat:appcompat:1.7.0")
     androidTestUtil("androidx.test:orchestrator:1.5.1")
 }

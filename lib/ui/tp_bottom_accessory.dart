@@ -31,7 +31,8 @@ class TpBottomAccessory extends StatelessWidget {
         height: accessoryHeight,
         child: TpGlassSurface(
           platformViewBackdrop: TpMediaBackdropScope.of(context),
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          // 與 root tab bar 膠囊同心。
+          borderRadius: const BorderRadius.all(Radius.circular(TpSpacing.s7)),
           child: child,
         ),
       ),

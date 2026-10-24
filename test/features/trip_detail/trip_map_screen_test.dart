@@ -876,35 +876,50 @@ void main() {
     expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
   });
 
-  testWidgets('選取的卡片以 tint 粗框標示，未選取卡片維持淡框', (tester) async {
-    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('entry-card-21')));
+  testWidgets('POI 卡片透明：只有目前卡有中性選取底，且沒有外框、陰影與 tint', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
     await tester.pumpAndSettle();
 
-    Border borderOf(String id) =>
-        (tester
-                        .widget<DecoratedBox>(
-                          find.byKey(ValueKey('entry-card-$id')),
-                        )
-                        .decoration
-                    as BoxDecoration)
-                .border!
-            as Border;
     final scheme = Theme.of(
-      tester.element(find.byKey(const ValueKey('entry-card-21'))),
+      tester.element(find.byKey(const ValueKey('entry-card-11'))),
     ).colorScheme;
+    final cards = tester
+        .widgetList<DecoratedBox>(
+          find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                w.key is ValueKey<String> &&
+                RegExp(
+                  r'^entry-card-\d+$',
+                ).hasMatch((w.key! as ValueKey<String>).value),
+          ),
+        )
+        .map((w) => w.decoration as BoxDecoration)
+        .toList();
 
-    final active = borderOf('21');
-    expect(active.top.color, scheme.primary);
-    expect(active.top.width, greaterThanOrEqualTo(2));
-    // 對照：未選取卡片不使用 tint。
-    final inactive = find.byKey(const ValueKey('entry-card-22'));
-    if (inactive.evaluate().isNotEmpty) {
-      expect(borderOf('22').top.color, isNot(scheme.primary));
+    // 至少露出下一張卡，才有「未選取」可對照。
+    expect(cards.length, greaterThanOrEqualTo(2));
+    for (final d in cards) {
+      expect(d.border, isNull, reason: '不畫外框（含 tint 選取框）');
+      expect(d.boxShadow, isNull, reason: '不畫陰影');
+      expect(d.color, isNot(scheme.primary));
     }
+    expect(cards.where((d) => d.color != null), hasLength(1));
+  });
+
+  testWidgets('編號徽章用當日 pin 色 16% 填色加 1.5pt 圓環', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final badge =
+        tester
+                .widget<Container>(find.byKey(const ValueKey('poi-number-11')))
+                .decoration!
+            as BoxDecoration;
+    final border = badge.border! as Border;
+    expect(border.top.width, 1.5);
+    expect(badge.color!.a, closeTo(0.16, 0.01));
+    expect(badge.shape, BoxShape.circle);
   });
 
   testWidgets('Google POI 關閉後還原 Day、卡片索引與 marker 聚焦', (tester) async {
@@ -1908,6 +1923,24 @@ void main() {
     expect(poi.bottom, lessThanOrEqualTo(rootTab.top - TpSpacing.s1));
   });
 
+  testWidgets('定位鈕是圓形玻璃按鈕且點擊範圍不小於 44pt', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final locate = find.byKey(const ValueKey('trip-map-locate-button'));
+    final size = tester.getSize(locate);
+    expect(size.width, greaterThanOrEqualTo(TpSpacing.tapMin));
+    expect(size.height, greaterThanOrEqualTo(TpSpacing.tapMin));
+    expect(size.width, size.height);
+
+    final button = tester.widget<GlassButton>(
+      find.descendant(of: locate, matching: find.byType(GlassButton)),
+    );
+    final shape = button.shape as LiquidRoundedSuperellipse;
+    // 圓角 = 邊長一半 → 圓形，與 header 圓鈕同族。
+    expect(shape.borderRadius, size.width / 2);
+  });
+
   testWidgets('320×568 與 135% 文字使用 accessibility rail 且 selector 不撞定位鈕', (
     tester,
   ) async {
@@ -1974,7 +2007,7 @@ void main() {
     expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
   });
 
-  testWidgets('長行程 page indicator 不會水平溢出', (tester) async {
+  testWidgets('長行程不顯示頁碼計數也不會水平溢出', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -1999,8 +2032,21 @@ void main() {
     await tester.pumpWidget(_buildScreen([manyStops]));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 / 40'), findsOneWidget);
+    expect(find.text('1 / 40'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('POI 卡片列下方沒有頁碼點那一排', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final accessory = tester.getRect(
+      find.byKey(const ValueKey('tp-bottom-accessory')),
+    );
+    final card = tester.getRect(find.byKey(const ValueKey('entry-card-11')));
+    // 卡片與 accessory 底緣只剩 pager 的垂直 padding，不再為頁碼點多留一排。
+    expect(accessory.bottom - card.bottom, lessThanOrEqualTo(TpSpacing.s1));
+    expect(find.text('1 / 1'), findsNothing);
   });
 
   testWidgets('地圖維持單一路線圖，不顯示舊圖層選單', (tester) async {

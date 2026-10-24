@@ -118,6 +118,19 @@ iPhone 固定四個 root tabs：
 - **HIG 建議**：需要帳號時優先提供 Sign in with Apple，並清楚說明用途與權益。
 - **HIG 必須**：關閉 Account sheet 後回到原頁，保留 Day、捲動位置、表單與未送出的聊天草稿。
 
+### 5.1 App 鎖
+
+- **Tripline 決策**：提供本機 App 鎖（Face ID／Touch ID，可退回裝置密碼），**預設關閉**，使用者在 Account →「安全性」開啟。純 client：不改後端、不改 session，驗證失敗或取消不登出、不清 session 與離線資料。
+- **Tripline 決策（對 §5「不得重複實作系統認證偏好」的明確取捨）**：App 鎖不是重做系統的解鎖偏好，而是 App 層級的資料保護 —— 手機已解鎖時，別人仍看不到行程與旅伴資料。因為會與該條字面衝突，所以預設關閉、由使用者主動開啟，並用裝置實際的驗證方式命名（「Face ID 解鎖」「Touch ID 解鎖」「生物辨識 解鎖」「裝置密碼 解鎖」），不使用籠統字眼。
+- **Tripline 決策**：鎖定時機是冷啟動，以及離開前景超過 1 分鐘再回來；短暫切 App 不鎖。1 分鐘為固定值，不開放設定。
+- **Tripline 決策**：鎖定畫面蓋住所有路由與 sheet，一出現就自動喚起系統驗證；取消或失敗後留在鎖定畫面，提供「使用 … 解鎖」重試與「登出」。登出前確認，並明講未同步變更會遺失。
+- **Tripline 決策**：開啟與關閉都要先通過一次驗證，避免別人代為關閉。
+- **Tripline 決策**：每次**新登入**成功後（含註冊後登入、OAuth）主動詢問是否開啟，每台裝置只問一次，選「開啟」或「稍後再說」都不再問；冷啟動還原既有 session 不問；裝置不可用時不問也不記為已問過。
+- **Tripline 決策**：登出清除「是否開啟」（App 鎖屬於這台裝置上這個登入），保留「已問過」，避免登出再登入又被問。
+- **HIG 必須**：裝置不再有生物辨識與密碼時自動關閉並簡短告知，不得把使用者鎖在 App 外。
+- **HIG 必須**：Face ID 權限在詢問框說明價值之後才由系統請求（§15 just-in-time）；鎖定畫面、開關與詢問框須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
+- **Tripline 決策**：不遮蔽 App 切換器截圖；若之後要做，需另行評估。材質與 Face ID 實際流程須真機驗收。
+
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。
 
 ## 6. Search
@@ -191,6 +204,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：點行程 marker 時，卡片列捲到對應 POI；滑動卡片時，地圖聚焦對應 marker。
 - **Tripline 決策**：卡片列水平滑動，不循環、不製造假資料，並露出下一張卡作為滑動提示。
 - **Tripline 決策**：行程 POI accessory 沒有垂直拖曳、detent 或 grabber。
+- **Tripline 決策**：行程 POI accessory 只有外層**單一玻璃表面**（圓角與 root tab bar 同心）；卡片本身透明，不填色、不畫外框與陰影，避免玻璃內再巢狀實心卡（§16）。設計稿見 [poi-accessory-glass](docs/design/poi-accessory-glass.html)（[預覽圖](docs/design/poi-accessory-glass.png)）。
+- **Tripline 決策**：目前選取的卡使用與 root tab bar、Day selector 相同的中性選取底（品牌 tint 只上前景）；未選取的卡不畫底色、外框或分隔線，只靠間距區隔（同時最多看到目前卡與露出的下一張，分隔線不會有出現的位置）。
+- **Tripline 決策**：不顯示頁碼點，也不顯示 `N / M` 計數；位置資訊由「露出下一張卡」、編號徽章與 semantics（第 N 個，共 M 個）承擔。編號徽章為當日 pin 色 16% 填色加 1.5pt 圓環（地圖逐日色是既有 rainbow 例外）。
 - **Tripline 決策**：選取外部 POI 時，以外部 POI compact card 暫時取代行程 POI 列；關閉後恢復原本 Day、卡片位置與 marker 狀態。
 - **HIG 必須**：卡片需顯示名稱、時間與本地化類型；缺位置時明確顯示「尚無位置」。
 - **HIG 必須**：卡片高度隨 Dynamic Type 增加，不裁切必要內容。

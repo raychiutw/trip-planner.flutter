@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>地圖 POI Glass 設計圖</title>
+<style>
+:root{--bg:#eceff3;--fg:#1c1c1e;--mut:#6b6b70}
+@media (prefers-color-scheme:dark){:root{--bg:#161618;--fg:#f2f2f7;--mut:#9a9aa0}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,"SF Pro Text","PingFang TC",sans-serif;padding:24px 16px 48px}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:var(--mut);margin-bottom:24px}
+.row{display:flex;gap:32px;flex-wrap:wrap;justify-content:center}
+figure{display:flex;flex-direction:column;align-items:center;gap:10px}
+figcaption{color:var(--mut);font-size:13px}
+
+/* ---- 手機框 ---- */
+.phone{position:relative;width:390px;height:760px;border-radius:44px;overflow:hidden;
+  box-shadow:0 0 0 8px #000,0 20px 50px rgba(0,0,0,.3);font-family:-apple-system,"SF Pro Text","PingFang TC",sans-serif}
+.light{--map-sea:#a5d6ea;--map-land:#f1efe9;--map-road:#fff;--map-hwy:#8fb4e6;
+  --g-fill:rgba(255,255,255,.42);--g-edge:rgba(255,255,255,.7);--g-edge2:rgba(255,255,255,.12);
+  --t1:#1c1c1e;--t2:rgba(60,60,67,.62);--sel:rgba(255,255,255,.62);--sel-edge:rgba(255,255,255,.9);
+  --tint:#8a6a4a;--div:rgba(60,60,67,.14)}
+.dark{--map-sea:#2c4a5c;--map-land:#2b2d31;--map-road:#3a3d43;--map-hwy:#4b6fa8;
+  --g-fill:rgba(255,255,255,.08);--g-edge:rgba(255,255,255,.34);--g-edge2:rgba(255,255,255,.05);
+  --t1:#fff;--t2:rgba(235,235,245,.6);--sel:rgba(255,255,255,.16);--sel-edge:rgba(255,255,255,.3);
+  --tint:#d3b48f;--div:rgba(255,255,255,.12)}
+.map{position:absolute;inset:0;background:var(--map-land)}
+.map svg{width:100%;height:100%;display:block}
+.status{position:absolute;top:14px;left:0;right:0;display:flex;justify-content:space-between;padding:0 32px;
+  font-weight:600;font-size:15px;color:var(--t1)}
+
+/* ---- 共用玻璃 ---- */
+.glass{position:absolute;backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
+  background:var(--g-fill);
+  box-shadow:inset 0 0.5px 0 var(--g-edge),inset 0 -0.5px 0 var(--g-edge2),inset 0.5px 0 var(--g-edge2),inset -0.5px 0 var(--g-edge2),0 6px 24px rgba(0,0,0,.10)}
+
+/* header(不改,僅作脈絡) */
+.title{top:52px;left:14px;right:70px;height:46px;border-radius:23px;padding:0 18px;display:flex;align-items:center;
+  color:var(--t1);font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct{top:52px;right:14px;width:46px;height:46px;border-radius:23px}
+.days{top:106px;left:14px;right:14px;height:44px;border-radius:22px;display:flex;align-items:center;padding:4px;gap:2px;color:var(--t2);font-weight:600;font-size:14px}
+.days span{flex:1;text-align:center;line-height:36px}
+.days .on{background:var(--sel);box-shadow:inset 0 0.5px 0 var(--sel-edge);border-radius:18px;color:var(--tint)}
+
+/* ---- 重點:POI accessory ---- */
+.poi{left:14px;right:14px;bottom:90px;height:96px;border-radius:28px;overflow:hidden}
+.track{position:absolute;inset:0;display:flex;align-items:center;gap:0;padding:8px}
+.card{flex:0 0 76%;height:80px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 14px;position:relative}
+.card.active{background:var(--sel);box-shadow:inset 0 0.5px 0 var(--sel-edge)}
+.num{flex:0 0 36px;height:36px;border-radius:18px;display:grid;place-items:center;font-weight:700;font-size:16px;
+  color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 70%,transparent)}
+.txt{min-width:0}
+.nm{font-weight:600;font-size:16px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm{font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums}
+.cat{font-size:12px;color:var(--t2)}
+
+/* 底部 tab bar(不改,僅作脈絡) */
+.tabbar{left:14px;right:14px;bottom:14px;height:64px;border-radius:32px;display:flex;align-items:center;padding:5px}
+.tab{flex:1;height:54px;border-radius:27px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;color:var(--t2)}
+.tab i{width:22px;height:20px;border-radius:6px;background:currentColor;opacity:.75}
+.tab.on{background:var(--sel);box-shadow:inset 0 0.5px 0 var(--sel-edge);color:var(--tint)}
+
+/* 標註 */
+.pin{position:absolute;width:30px;height:30px;border-radius:15px 15px 15px 2px;transform:rotate(-45deg);border:2px solid #fff}
+.legend{max-width:820px;margin:32px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px 32px}
+.legend h2{font-size:15px;margin:0 0 6px}
+.legend ul{padding-left:18px;color:var(--mut)}
+.legend li{margin:3px 0}
+.legend b{color:var(--fg)}
+</style>
+</head>
+<body>
+<h1>地圖 POI accessory — Glass 版</h1>
+<p class="sub">單一玻璃表面、無頁碼點、無黑色卡底。左:淺色;右:深色。</p>
+
+<div class="row">
+<!-- ========== 淺色 ========== -->
+<figure>
+<div class="phone light">
+  <div class="map"><svg viewBox="0 0 390 760" preserveAspectRatio="xMidYMid slice">
+    <rect width="390" height="760" fill="var(--map-land)"/>
+    <path d="M0 0H390V250C330 270 300 330 210 330C140 330 110 380 0 400Z" fill="var(--map-sea)"/>
+    <g stroke="var(--map-road)" stroke-width="5" fill="none"><path d="M0 470C120 440 220 520 390 470"/><path d="M60 330L130 760"/><path d="M250 340L330 760"/><path d="M0 600L390 560"/></g>
+    <path d="M0 520C110 420 200 470 390 380" stroke="var(--map-hwy)" stroke-width="7" fill="none"/>
+  </svg>
+  <div class="pin" style="left:120px;top:360px;background:#2f80ed"></div>
+  <div class="pin" style="left:250px;top:420px;background:#2f80ed"></div>
+  </div>
+  <div class="status"><span>09:10</span><span>●●●</span></div>
+  <div class="glass title">2026 沖繩五日自駕遊行程</div>
+  <div class="glass acct"></div>
+  <div class="glass days"><span>全部</span><span class="on">Day 1</span><span>Day 2</span><span>Day 3</span><span>Day 4</span></div>
+
+  <div class="glass poi"><div class="track">
+    <div class="card active"><div class="num" style="--c:#2f80ed">1</div><div class="txt"><div class="nm">那霸機場</div><div class="tm">10:45</div><div class="cat">轉運站</div></div></div>
+    <div class="card"><div class="num" style="--c:#2f80ed">2</div><div class="txt"><div class="nm">OTS 租車(那霸)</div><div class="tm">12:00</div><div class="cat">租車</div></div></div>
+    <div class="card"><div class="num" style="--c:#2f80ed">3</div><div class="txt"><div class="nm">美國村</div><div class="tm">14:30</div></div></div>
+  </div></div>
+
+  <div class="glass tabbar">
+    <div class="tab"><i></i>聊天</div><div class="tab"><i></i>行程</div><div class="tab on"><i></i>地圖</div><div class="tab"><i></i>收藏</div>
+  </div>
+</div>
+<figcaption>Light</figcaption>
+</figure>
+
+<!-- ========== 深色 ========== -->
+<figure>
+<div class="phone dark">
+  <div class="map"><svg viewBox="0 0 390 760" preserveAspectRatio="xMidYMid slice">
+    <rect width="390" height="760" fill="var(--map-land)"/>
+    <path d="M0 0H390V250C330 270 300 330 210 330C140 330 110 380 0 400Z" fill="var(--map-sea)"/>
+    <g stroke="var(--map-road)" stroke-width="5" fill="none"><path d="M0 470C120 440 220 520 390 470"/><path d="M60 330L130 760"/><path d="M250 340L330 760"/><path d="M0 600L390 560"/></g>
+    <path d="M0 520C110 420 200 470 390 380" stroke="var(--map-hwy)" stroke-width="7" fill="none"/>
+  </svg>
+  <div class="pin" style="left:120px;top:360px;background:#4b9bff"></div>
+  <div class="pin" style="left:250px;top:420px;background:#4b9bff"></div>
+  </div>
+  <div class="status"><span>09:10</span><span>●●●</span></div>
+  <div class="glass title">2026 沖繩五日自駕遊行程</div>
+  <div class="glass acct"></div>
+  <div class="glass days"><span>全部</span><span class="on">Day 1</span><span>Day 2</span><span>Day 3</span><span>Day 4</span></div>
+
+  <div class="glass poi"><div class="track">
+    <div class="card active"><div class="num" style="--c:#4b9bff">1</div><div class="txt"><div class="nm">那霸機場</div><div class="tm">10:45</div><div class="cat">轉運站</div></div></div>
+    <div class="card"><div class="num" style="--c:#4b9bff">2</div><div class="txt"><div class="nm">OTS 租車(那霸)</div><div class="tm">12:00</div><div class="cat">租車</div></div></div>
+    <div class="card"><div class="num" style="--c:#4b9bff">3</div><div class="txt"><div class="nm">美國村</div><div class="tm">14:30</div></div></div>
+  </div></div>
+
+  <div class="glass tabbar">
+    <div class="tab"><i></i>聊天</div><div class="tab"><i></i>行程</div><div class="tab on"><i></i>地圖</div><div class="tab"><i></i>收藏</div>
+  </div>
+</div>
+<figcaption>Dark</figcaption>
+</figure>
+</div>
+
+<div class="legend">
+<div><h2>與現況的差異</h2><ul>
+<li><b>移除</b>頁碼點(5pt 圓點 + 14pt 選取膠囊);改由「露出下一張卡」與編號徽章表達位置</li>
+<li><b>移除</b>每張卡的 surface 填色(深色下 0.68–0.86 不透明 → 視覺上是黑底)、1–2pt 外框、預覽陰影</li>
+<li>容器仍是<b>唯一一層玻璃</b>(外圓角 28,與 tab bar 膠囊同心),卡片本身透明,符合 §16「glass 內不巢狀 glass」</li>
+</ul></div>
+<div><h2>HIG 對應</h2><ul>
+<li><b>選取態</b>:沿用 tab bar／segmented 的中性選取底(白 16%~62% + 0.5pt 高光邊),不用 tint 框;品牌 tint 只留在前景</li>
+<li><b>未選取卡</b>:沒有底色、外框與分隔線,只靠間距區隔(實機同時只會看到目前卡與露出的下一張)</li>
+<li><b>編號徽章</b>:當日 pin 色 16% 填 + 1.5pt 環(地圖逐日色為既有的 rainbow 例外),≥44pt 觸控區由整張卡負責</li>
+<li>文字:標題 16/semibold、時間 13 tabular、類型 12;皆跟隨 Dynamic Type,卡高隨之增加</li>
+<li>內容可讀性:深色玻璃白 8% + blur 22,淺色白 42%;提高對比／降低透明度時退回 <code>surfaceContainerHigh</code> 不透明底</li>
+</ul></div>
+</div>
+</body>
+</html>

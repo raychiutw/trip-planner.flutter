@@ -163,6 +163,8 @@ void main() {
     expect(find.text('帳號資訊與個人資料'), findsOneWidget);
     expect(find.text('偏好'), findsOneWidget);
     expect(find.text('安全性'), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-app-lock')), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('版本 0.9.1（12）'), 200);
     expect(find.text('版本 0.9.1（12）'), findsOneWidget);
     expect(find.text('行程數'), findsNothing);
     expect(find.text('旅程天數'), findsNothing);
