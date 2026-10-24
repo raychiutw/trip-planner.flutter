@@ -317,6 +317,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **HIG 必須**：背景、surface、文字、separator、disabled 與語意狀態使用 dynamic system colors，不維護暖白／暖褐完整自訂 palette。
 - **Tripline 決策**：保留一個可適應 Light、Dark 與 Increased Contrast 的暖褐 app tint，只用於選取、link 與主要動作。
+- **Tripline 決策**：淺色次要文字（`secondaryLabel`）不採 iOS 系統值（#3C3C43 @60%，對白底 3.44:1、對 #F2F2F7 3.29:1），改為 @75%，在白、secondary、tertiary 三層底色上都達 WCAG AA 4.5:1；深色維持系統值。由 `app_theme_test` 守門。destructive 紅字（對白底 3.55:1）維持系統值，未調整。
 - **HIG 必須**：destructive、warning、success 使用系統語意色，不套品牌 tint。
 - **Tripline 決策**：地圖 Day marker／route 可使用資料編碼色，但必須搭配編號或線型。
 - **Tripline 決策**：App Icon 保留現有座標圖釘識別。

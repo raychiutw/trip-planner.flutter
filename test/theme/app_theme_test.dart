@@ -3,7 +3,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
+import '../helpers/contrast.dart';
+
 void main() {
+  test('淺色次要文字在三層底色上都達 WCAG AA 4.5:1', () {
+    final scheme = AppTheme.light().colorScheme;
+    for (final bg in [
+      TpSystemColorsLight.background,
+      TpSystemColorsLight.secondary,
+      TpSystemColorsLight.tertiary,
+    ]) {
+      expect(
+        wcagContrast(
+          scheme.onSurfaceVariant,
+          const Color(0x00000000),
+          under: bg,
+        ),
+        greaterThanOrEqualTo(4.5),
+        reason: '底色 $bg',
+      );
+    }
+  });
+
   group('HIG 系統主題', () {
     test('淺色使用 system surfaces、labels 與單一 tint', () {
       final theme = AppTheme.light();

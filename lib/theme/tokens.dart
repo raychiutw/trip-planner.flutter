@@ -20,7 +20,8 @@ abstract final class TpSystemColorsLight {
   static const hover = Color(0x0F000000);
 
   static const label = Color(0xFF000000);
-  static const secondaryLabel = Color(0x993C3C43);
+  /// iOS 系統值是 60%（對白底 3.44:1），Tripline 提高到 75% 以達 WCAG AA 4.5:1。
+  static const secondaryLabel = Color(0xBF3C3C43);
   static const separator = Color(0x493C3C43);
   static const opaqueSeparator = Color(0x5C3C3C43);
 
