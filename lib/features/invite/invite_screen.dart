@@ -72,6 +72,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                       .read(inviteControllerProvider(_token).notifier)
                       .retry(),
                   onBackToLogin: _goLogin,
+                  onDismiss: _dismiss,
                   onAccept:
                       inviteState.canAccept(user, authLoading: authLoading)
                       ? () => unawaited(_accept())
@@ -90,6 +91,13 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
     context.go(_loginLocation);
   }
 
+  /// 暫不加入：已登入回行程列表，未登入回歡迎頁。
+  void _dismiss() {
+    context.go(
+      ref.read(authStateProvider).value != null ? '/trips' : '/welcome',
+    );
+  }
+
   void _goSignup() {
     if (_token.isEmpty) return;
     context.go(_signupLocation);
@@ -103,6 +111,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       alwaysAsk: false,
       title: '切換帳號',
       confirmLabel: '切換帳號',
+      message: '切換帳號會先登出目前帳號，再前往登入。',
     );
     if (!ok || !mounted) return;
     await ref.read(authStateProvider.notifier).logout();
@@ -129,6 +138,7 @@ class _InviteBody extends StatelessWidget {
     required this.onSwitchAccount,
     required this.onRetry,
     required this.onBackToLogin,
+    required this.onDismiss,
     required this.onAccept,
   });
 
@@ -140,6 +150,7 @@ class _InviteBody extends StatelessWidget {
   final VoidCallback onSwitchAccount;
   final VoidCallback onRetry;
   final VoidCallback onBackToLogin;
+  final VoidCallback onDismiss;
   final VoidCallback? onAccept;
 
   @override
@@ -151,6 +162,7 @@ class _InviteBody extends StatelessWidget {
         retryable: state.retryable,
         onRetry: onRetry,
         onBackToLogin: onBackToLogin,
+        onDismiss: onDismiss,
       );
     }
 
@@ -183,6 +195,12 @@ class _InviteBody extends StatelessWidget {
             message: state.acceptError!,
           ),
         ],
+        const SizedBox(height: TpSpacing.s2),
+        TextButton(
+          key: const ValueKey('invite-dismiss'),
+          onPressed: onDismiss,
+          child: const Text('暫不加入'),
+        ),
       ],
     );
   }
@@ -654,12 +672,14 @@ class _ErrorView extends StatelessWidget {
     required this.retryable,
     required this.onRetry,
     required this.onBackToLogin,
+    required this.onDismiss,
   });
 
   final String message;
   final bool retryable;
   final VoidCallback onRetry;
   final VoidCallback onBackToLogin;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -668,7 +688,8 @@ class _ErrorView extends StatelessWidget {
       children: [
         _ProblemPanel(
           key: const ValueKey('invite-error'),
-          title: '邀請無效',
+          // 可重試的失敗不是邀請本身有問題，不能叫「無效」。
+          title: retryable ? '無法載入邀請' : '邀請無效',
           message: _errorMessageWithRecovery(message),
         ),
         const SizedBox(height: TpSpacing.s3),
@@ -683,6 +704,11 @@ class _ErrorView extends StatelessWidget {
                 onPressed: onBackToLogin,
                 child: const Text('回到登入'),
               ),
+        TextButton(
+          key: const ValueKey('invite-dismiss'),
+          onPressed: onDismiss,
+          child: const Text('暫不加入'),
+        ),
       ],
     );
   }

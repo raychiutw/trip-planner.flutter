@@ -14,6 +14,7 @@ Future<bool> confirmLogout(
   bool alwaysAsk = true,
   String title = '登出帳號',
   String confirmLabel = '登出',
+  String? message,
 }) async {
   final pending = (await ref.read(cacheStoreProvider).readQueue()).length;
   if (!context.mounted) return false;
@@ -22,7 +23,9 @@ Future<bool> confirmLogout(
     context,
     source: TpDestructiveConfirmSource.direct,
     title: title,
-    message: pending == 0 ? '確定要登出嗎？' : '還有 $pending 筆變更尚未同步，登出後會遺失。確定要登出嗎？',
+    message: message != null
+        ? (pending == 0 ? message : '$message還有 $pending 筆變更尚未同步，登出後會遺失。')
+        : (pending == 0 ? '確定要登出嗎？' : '還有 $pending 筆變更尚未同步，登出後會遺失。確定要登出嗎？'),
     confirmLabel: confirmLabel,
   );
 }
