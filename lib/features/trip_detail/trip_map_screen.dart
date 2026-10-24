@@ -1043,13 +1043,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               : category,
         ) ??
         (stop.point == null ? '尚無位置' : '未分類');
-    // accessory host 是唯一玻璃表面，內容卡只用語意填色，避免巢狀玻璃。
-    // 原生地圖走套件公開共存路徑，不表示 shader 能折射地圖圖磚。
-    final cardColor = theme.colorScheme.surface.withValues(
-      alpha: isPreview
-          ? (theme.brightness == Brightness.dark ? 0.86 : 0.90)
-          : (theme.brightness == Brightness.dark ? 0.68 : 0.74),
-    );
+    // accessory host 是唯一玻璃表面，卡片本身透明，避免巢狀玻璃（DESIGN §9.2）。
+    // 目前卡（選取或預覽）用中性選取底，與 root tab bar／Day selector 同一語彙；
+    // 品牌 tint 只上前景，不畫框。
+    final selectionColor = theme.brightness == Brightness.dark
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.16)
+        : theme.colorScheme.surface.withValues(alpha: 0.62);
 
     return KeyedSubtree(
       key: ValueKey(
@@ -1069,31 +1068,11 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           child: DecoratedBox(
             key: ValueKey('entry-card-${stop.entry.id}'),
             decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: const BorderRadius.all(Radius.circular(15)),
-              // 選取態用 tint 2pt 框（對比 >= 3:1）；原本只調 onSurface alpha，
-              // 淺色模式下與未選取卡片幾乎無差。
-              border: Border.all(
-                width: isActive ? 2 : 1,
-                color: isActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withValues(
-                        alpha: isPreview ? 0.20 : 0.10,
-                      ),
-              ),
-              boxShadow: isPreview
-                  ? [
-                      BoxShadow(
-                        color: theme.colorScheme.shadow.withValues(alpha: 0.14),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
+              color: isActive || isPreview ? selectionColor : null,
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
             ),
             child: Padding(
-              // 選取框多 1pt，內縮同量讓卡片內容不位移。
-              padding: EdgeInsets.all(TpSpacing.s2 - (isActive ? 1 : 0)),
+              padding: const EdgeInsets.all(TpSpacing.s2),
               child: Row(
                 children: [
                   Container(
@@ -1101,10 +1080,11 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                     width: TpSpacing.tapMin,
                     height: TpSpacing.tapMin,
                     decoration: BoxDecoration(
-                      color: stop.color.withValues(alpha: 0.20),
+                      color: stop.color.withValues(alpha: 0.16),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: stop.color.withValues(alpha: 0.72),
+                        width: 1.5,
+                        color: stop.color.withValues(alpha: 0.70),
                       ),
                     ),
                     alignment: Alignment.center,

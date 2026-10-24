@@ -49,10 +49,6 @@ figcaption{color:var(--mut);font-size:13px}
 .track{position:absolute;inset:0;display:flex;align-items:center;gap:0;padding:8px}
 .card{flex:0 0 76%;height:80px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 14px;position:relative}
 .card.active{background:var(--sel);box-shadow:inset 0 0.5px 0 var(--sel-edge)}
-/* 非選取卡之間只用細分隔線,不再各自有底色/外框 */
-.card:not(.active)::before{content:"";position:absolute;left:-1px;top:22px;bottom:22px;width:.5px;background:var(--div)}
-.card.active + .card::before{display:none}
-.card.active::before{display:none}
 .num{flex:0 0 36px;height:36px;border-radius:18px;display:grid;place-items:center;font-weight:700;font-size:16px;
   color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);
   box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 70%,transparent)}
@@ -150,7 +146,7 @@ figcaption{color:var(--mut);font-size:13px}
 </ul></div>
 <div><h2>HIG 對應</h2><ul>
 <li><b>選取態</b>:沿用 tab bar／segmented 的中性選取底(白 16%~62% + 0.5pt 高光邊),不用 tint 框;品牌 tint 只留在前景</li>
-<li><b>未選取卡</b>:只靠 0.5pt 細分隔線切開,沒有底色</li>
+<li><b>未選取卡</b>:沒有底色、外框與分隔線,只靠間距區隔(實機同時只會看到目前卡與露出的下一張)</li>
 <li><b>編號徽章</b>:當日 pin 色 16% 填 + 1.5pt 環(地圖逐日色為既有的 rainbow 例外),≥44pt 觸控區由整張卡負責</li>
 <li>文字:標題 16/semibold、時間 13 tabular、類型 12;皆跟隨 Dynamic Type,卡高隨之增加</li>
 <li>內容可讀性:深色玻璃白 8% + blur 22,淺色白 42%;提高對比／降低透明度時退回 <code>surfaceContainerHigh</code> 不透明底</li>

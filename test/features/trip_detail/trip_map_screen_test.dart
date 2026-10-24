@@ -876,35 +876,50 @@ void main() {
     expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
   });
 
-  testWidgets('選取的卡片以 tint 粗框標示，未選取卡片維持淡框', (tester) async {
-    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('entry-card-21')));
+  testWidgets('POI 卡片透明：只有目前卡有中性選取底，且沒有外框、陰影與 tint', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
     await tester.pumpAndSettle();
 
-    Border borderOf(String id) =>
-        (tester
-                        .widget<DecoratedBox>(
-                          find.byKey(ValueKey('entry-card-$id')),
-                        )
-                        .decoration
-                    as BoxDecoration)
-                .border!
-            as Border;
     final scheme = Theme.of(
-      tester.element(find.byKey(const ValueKey('entry-card-21'))),
+      tester.element(find.byKey(const ValueKey('entry-card-11'))),
     ).colorScheme;
+    final cards = tester
+        .widgetList<DecoratedBox>(
+          find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                w.key is ValueKey<String> &&
+                RegExp(
+                  r'^entry-card-\d+$',
+                ).hasMatch((w.key! as ValueKey<String>).value),
+          ),
+        )
+        .map((w) => w.decoration as BoxDecoration)
+        .toList();
 
-    final active = borderOf('21');
-    expect(active.top.color, scheme.primary);
-    expect(active.top.width, greaterThanOrEqualTo(2));
-    // 對照：未選取卡片不使用 tint。
-    final inactive = find.byKey(const ValueKey('entry-card-22'));
-    if (inactive.evaluate().isNotEmpty) {
-      expect(borderOf('22').top.color, isNot(scheme.primary));
+    // 至少露出下一張卡，才有「未選取」可對照。
+    expect(cards.length, greaterThanOrEqualTo(2));
+    for (final d in cards) {
+      expect(d.border, isNull, reason: '不畫外框（含 tint 選取框）');
+      expect(d.boxShadow, isNull, reason: '不畫陰影');
+      expect(d.color, isNot(scheme.primary));
     }
+    expect(cards.where((d) => d.color != null), hasLength(1));
+  });
+
+  testWidgets('編號徽章用當日 pin 色 16% 填色加 1.5pt 圓環', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final badge =
+        tester
+                .widget<Container>(find.byKey(const ValueKey('poi-number-11')))
+                .decoration!
+            as BoxDecoration;
+    final border = badge.border! as Border;
+    expect(border.top.width, 1.5);
+    expect(badge.color!.a, closeTo(0.16, 0.01));
+    expect(badge.shape, BoxShape.circle);
   });
 
   testWidgets('Google POI 關閉後還原 Day、卡片索引與 marker 聚焦', (tester) async {
