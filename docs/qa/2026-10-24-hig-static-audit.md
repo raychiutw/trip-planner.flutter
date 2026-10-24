@@ -101,3 +101,13 @@ account-delete-dialog、account-settings-appearance、account-settings-notificat
 ### 仍然沒涵蓋
 
 玻璃材質、動態效果、VoiceOver、手勢與觸覺（需真機，#461）。
+
+## 第三輪：#469 覆核結果
+
+| 項目 | 結果 | 處理 |
+| --- | --- | --- |
+| 邀請無出口、暫時性失敗標題、切換帳號用詞 | 屬實 | 已修（#472） |
+| 分享頁 chip、錯誤列、「匿名分享」無說明 | 屬實 | chip 與錯誤列已修（#468、#474）；「匿名分享」已補說明。後端語意查證自 trip-planner `migrations/0077_trip_shares_anonymous.sql` 與 `functions/api/_share.ts`：`anonymous=1` 時公開頁不帶分享者名字，改顯「有人分享了一份行程給你」 |
+| 載入失敗只顯示 spinner | 屬實，但原因是 Riverpod 預設自動重試約 92 秒，不是截圖時機 | 已修（#471） |
+| explore-search-failed 多約 65pt 空白 | 屬實。橫幅貼在 shell Scaffold 最上緣、已讓出狀態列，內層頁面 app bar 的 SafeArea 仍讀到完整 `padding.top`，量測重現 71pt | 已修：橫幅顯示期間 shell 內容區移除頂部 padding，關閉後恢復 |
+| 淺色模式對比偏低 | 屬實，已量測。`secondaryLabel`（#3C3C43 @60%）對白底 3.44:1、對 #F2F2F7 為 3.29:1；`destructive` 文字對白底 3.55:1；success／warning 作文字僅約 2:1 | **未改。** 這些是 iOS 系統色原值，Increased Contrast 時已切到高對比主題；要不要偏離系統色加深（例如 secondaryLabel alpha 提到 0.75 約 5.15:1）是品牌取捨，需決策者定奪。success／warning 目前沒有當文字用的地方需再 grep 確認 |

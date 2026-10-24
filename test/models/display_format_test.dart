@@ -37,4 +37,18 @@ void main() {
       expect(dayLabel(2, title: '  '), 'Day 2');
     });
   });
+
+  group('formatEntryTime', () {
+    test('起訖都有 → 範圍，忽略 time', () {
+      expect(formatEntryTime('09:00', '10:30', '早上'), '09:00 - 10:30');
+    });
+    test('只有一端 → 優先用 time，沒有才退回該端', () {
+      expect(formatEntryTime('09:00', null, '早上'), '早上');
+      expect(formatEntryTime('09:00', '', null), '09:00');
+      expect(formatEntryTime(null, '10:30', ' '), '10:30');
+    });
+    test('全空 → 空字串', () {
+      expect(formatEntryTime(null, null, null), '');
+    });
+  });
 }

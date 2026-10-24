@@ -459,6 +459,13 @@ void main() {
     expect(sharedUrls.single, contains('/s/tokshare'));
   });
 
+  testWidgets('匿名分享勾選項說明對方看到什麼', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('不顯示你的名字，對方只會看到「有人分享了一份行程給你」'), findsOneWidget);
+  });
+
   testWidgets('建立選項 → 切換公開區塊與匿名設定', (tester) async {
     when(
       () => repo.createShare(

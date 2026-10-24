@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
@@ -119,7 +120,7 @@ class _AppShellState extends State<AppShell> {
                     key: const ValueKey('app-shell-content'),
                     child: KeyedSubtree(
                       key: const ValueKey('app-shell-detail'),
-                      child: widget.navigationShell,
+                      child: AppErrorBannerInset(child: widget.navigationShell),
                     ),
                   ),
                   const OfflineStatusBanner(),

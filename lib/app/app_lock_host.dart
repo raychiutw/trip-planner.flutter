@@ -16,6 +16,7 @@ import '../api/providers.dart';
 import '../theme/tokens.dart';
 import '../ui/tp_filled_button.dart';
 import 'app_lock.dart';
+import 'biometric_login.dart';
 
 class AppLockHost extends ConsumerStatefulWidget {
   const AppLockHost({super.key, required this.child});
@@ -31,14 +32,21 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
   Timer? _noticeTimer;
   bool _showDisabledNotice = false;
 
+  /// 離開前景時蓋住內容，App 切換器的截圖才不會露出行程與旅伴資料。
+  bool _inactive = false;
+
   @override
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(
+      onInactive: () => setState(() => _inactive = true),
       onHide: () => ref
           .read(appLockProvider.notifier)
           .onHidden(ref.read(appLockClockProvider)()),
-      onResume: () => unawaited(_resumed()),
+      onResume: () {
+        setState(() => _inactive = false);
+        unawaited(_resumed());
+      },
     );
     // 冷啟動也對帳一次：關掉生物辨識的裝置不該卡在 App 鎖。
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_resumed()));
@@ -88,9 +96,29 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
             ),
           ),
         ),
-        if (showLock) const Positioned.fill(child: AppLockScreen()),
+        if (showLock)
+          const Positioned.fill(child: AppLockScreen())
+        else if (_inactive && lock.enabled && signedIn)
+          Positioned.fill(
+            child: ColoredBox(
+              key: const ValueKey('app-lock-privacy-cover'),
+              color: scheme.surface,
+              child: Center(
+                child: Icon(
+                  CupertinoIcons.lock_fill,
+                  size: 48,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         if (lock.promptPending && signedIn && !showLock)
           Positioned.fill(child: _EnablePrompt()),
+        if (ref.watch(biometricLoginProvider).promptPending &&
+            signedIn &&
+            !showLock &&
+            !lock.promptPending)
+          const Positioned.fill(child: _BiometricLoginPrompt()),
         if (_showDisabledNotice)
           Positioned(
             top: MediaQuery.paddingOf(context).top + TpSpacing.s2,
@@ -180,6 +208,27 @@ class _EnablePrompt extends ConsumerWidget {
       dialogKey: const ValueKey('app-lock-prompt'),
       title: '要用 $label 解鎖 Tripline 嗎？',
       message: '開啟後，每次打開 App 都要先通過 $label，別人拿到你的手機也看不到行程。之後可以在「帳號 → 安全性」變更。',
+      cancelLabel: '稍後再說',
+      confirmLabel: '開啟',
+      onCancel: () => unawaited(controller.answerPrompt(enable: false)),
+      onConfirm: () => unawaited(controller.answerPrompt(enable: true)),
+    );
+  }
+}
+
+/// 密碼登入成功後詢問是否開啟生物辨識登入（排在 App 鎖的詢問之後）。
+class _BiometricLoginPrompt extends ConsumerWidget {
+  const _BiometricLoginPrompt();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = ref.watch(appLockKindProvider).value.lockLabel;
+    final controller = ref.read(biometricLoginProvider.notifier);
+    return _HostDialog(
+      dialogKey: const ValueKey('bio-login-prompt'),
+      title: '要用 $label 登入 Tripline 嗎？',
+      message:
+          '開啟後，登出再回來可以直接用 $label 登入，不必輸入密碼。帳號與密碼只存在這支手機的鑰匙圈。之後可以在「帳號 → 安全性」關閉。',
       cancelLabel: '稍後再說',
       confirmLabel: '開啟',
       onCancel: () => unawaited(controller.answerPrompt(enable: false)),

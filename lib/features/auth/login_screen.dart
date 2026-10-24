@@ -14,6 +14,8 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
+import '../../app/app_lock.dart';
+import '../../app/biometric_login.dart';
 import '../../app/error_message.dart';
 import '../../theme/tokens.dart';
 
@@ -53,6 +55,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     setState(() => _loginAttempted = true);
+    ref
+        .read(biometricLoginProvider.notifier)
+        .rememberAttempt(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
     // 失敗訊息由 authStateProvider 的 AsyncError 呈現，不在此 throw
     await ref
         .read(authStateProvider.notifier)
@@ -62,6 +70,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!ref.read(authStateProvider).hasError) {
       TextInput.finishAutofillContext();
     }
+  }
+
+  /// 生物辨識登入：驗證通過後由 controller 用存下的帳密走一般登入。
+  /// 取消或失敗只留在登入頁，使用者仍可手動輸入。
+  Future<void> _biometricLogin() async {
+    if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
+    setState(() => _loginAttempted = true);
+    await ref.read(biometricLoginProvider.notifier).loginWithBiometric();
   }
 
   /// OAuth PKCE 登入(系統瀏覽器 + loopback);成功後 invalidate authState → router 跳轉。
@@ -108,6 +124,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authStateProvider);
     final isSubmitting = authState.isLoading;
     final isBusy = isSubmitting || _oauthLoading;
+    final biometricKind = ref.watch(appLockKindProvider).value;
+    final showBiometric =
+        ref.watch(biometricLoginProvider).hasSaved && biometricKind != null;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
@@ -286,6 +305,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               )
                             : const Text('登入'),
                       ),
+                      if (showBiometric) ...[
+                        const SizedBox(height: TpSpacing.s4),
+                        OutlinedButton.icon(
+                          key: const ValueKey('login-biometric-button'),
+                          onPressed: isBusy ? null : _biometricLogin,
+                          icon: Icon(
+                            biometricKind == BiometricKind.faceId
+                                ? CupertinoIcons.person_crop_square
+                                : CupertinoIcons.lock_shield,
+                          ),
+                          label: Text('使用 ${biometricKind.lockLabel} 登入'),
+                        ),
+                      ],
                       if (ref.watch(oauthEnabledProvider)) ...[
                         const SizedBox(height: TpSpacing.s4),
                         if (_oauthError != null) ...[

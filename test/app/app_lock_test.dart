@@ -109,6 +109,35 @@ void main() {
     expect(rig.bio.authenticateCalls, 0);
   });
 
+  group('App 切換器截圖遮蔽', () {
+    final cover = find.byKey(const ValueKey('app-lock-privacy-cover'));
+
+    testWidgets('已開啟：離開前景（inactive）時蓋住內容，回前景後移除', (tester) async {
+      final rig = _Rig(enabled: true);
+      await tester.pumpWidget(rig.build());
+      await tester.pumpAndSettle();
+      expect(cover, findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(cover, findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(cover, findsNothing);
+    });
+
+    testWidgets('未開啟：inactive 不遮蔽', (tester) async {
+      final rig = _Rig();
+      await tester.pumpWidget(rig.build());
+      await tester.pumpAndSettle();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(cover, findsNothing);
+    });
+  });
+
   testWidgets('開啟後冷啟動鎖定，自動喚起驗證，成功才解鎖', (tester) async {
     final rig = _Rig(enabled: true);
     await tester.pumpWidget(rig.build());
