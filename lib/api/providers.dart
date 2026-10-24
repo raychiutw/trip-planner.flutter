@@ -158,7 +158,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   /// 帳號已由後端刪除，只清本機認證與離線資料，不再呼叫 logout API。
   Future<void> accountDeleted() async {
     // 帳號已不存在，存下的生物辨識登入帳密也要一併清掉。
-    await ref.read(credentialStoreProvider).clear();
+    try {
+      await ref.read(credentialStoreProvider).clear();
+    } catch (_) {
+      // Keychain 清不掉也不能擋住本機登入狀態的清除。
+    }
     await _clearLocalAuth();
   }
 

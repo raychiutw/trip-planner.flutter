@@ -31,12 +31,22 @@ class _FakeAuth extends AuthNotifier {
   Future<void> logout() async => state = const AsyncData(null);
 }
 
+class _FlakyStore extends InMemoryCredentialStore {
+  bool failReads = false;
+
+  @override
+  Future<SavedCredentials?> read() async {
+    if (failReads) throw StateError('keychain');
+    return super.read();
+  }
+}
+
 class _Rig {
   _Rig({this.kind = BiometricKind.faceId, List<BiometricOutcome>? outcomes})
     : bio = FakeBiometricAuthenticator(kind: kind, outcomes: outcomes);
   final BiometricKind? kind;
   final FakeBiometricAuthenticator bio;
-  final store = InMemoryCredentialStore();
+  final store = _FlakyStore();
   final settings = InMemorySettingsStore();
   final auth = _FakeAuth();
 
@@ -214,5 +224,62 @@ void main() {
     await rig.passwordLogin();
     expect(rig.state.promptPending, isFalse);
     expect(await rig.store.read(), isNull);
+  });
+
+  test('換成別的 email 手動登入：不覆蓋前一位的帳密，清掉並重新詢問', () async {
+    final rig = _Rig();
+    await rig.start();
+    await rig.passwordLogin();
+    await rig.ctl.answerPrompt(enable: true);
+    await rig.auth.logout();
+
+    rig.ctl.rememberAttempt('b@example.com', 'pwB');
+    await rig.auth.login('b@example.com', 'pwB');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(await rig.store.read(), isNull, reason: 'A 的帳密不留給 B');
+    expect(rig.state.hasSaved, isFalse);
+    expect(rig.state.promptPending, isTrue, reason: '對新帳號再問一次');
+    await rig.ctl.answerPrompt(enable: true);
+    expect((await rig.store.read())?.email, 'b@example.com');
+  });
+
+  test('詢問框待答時登出：待存帳密與詢問都作廢', () async {
+    final rig = _Rig();
+    await rig.start();
+    await rig.passwordLogin();
+    expect(rig.state.promptPending, isTrue);
+
+    await rig.auth.logout();
+    await Future<void>.delayed(Duration.zero);
+    expect(rig.state.promptPending, isFalse);
+    await rig.ctl.answerPrompt(enable: true);
+    expect(await rig.store.read(), isNull);
+  });
+
+  test('登出時重新對帳：Keychain 已被清掉（例如刪除帳號）就不再顯示已開啟', () async {
+    final rig = _Rig();
+    await rig.start();
+    await rig.passwordLogin();
+    await rig.ctl.answerPrompt(enable: true);
+    expect(rig.state.hasSaved, isTrue);
+
+    await rig.store.clear();
+    await rig.auth.logout();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(rig.state.hasSaved, isFalse);
+  });
+
+  test('Keychain 讀取拋例外：回失敗而不是未處理錯誤', () async {
+    final rig = _Rig();
+    await rig.start();
+    await rig.passwordLogin();
+    await rig.ctl.answerPrompt(enable: true);
+    await rig.auth.logout();
+    rig.store.failReads = true;
+
+    expect(await rig.ctl.loginWithBiometric(), BiometricOutcome.failed);
   });
 }

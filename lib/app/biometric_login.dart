@@ -40,6 +40,9 @@ class BiometricLoginState {
 
 class BiometricLoginController extends Notifier<BiometricLoginState> {
   SavedCredentials? _attempt;
+
+  /// 詢問框待答時暫存的帳密，答「開啟」才寫進 Keychain。
+  SavedCredentials? _pendingSave;
   bool _attemptFromSaved = false;
   bool _inFlight = false;
 
@@ -53,9 +56,7 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
   Future<void> _loadSaved() async {
     try {
       final saved = await ref.read(credentialStoreProvider).read();
-      if (saved != null && ref.mounted) {
-        state = state.copyWith(hasSaved: true);
-      }
+      if (ref.mounted) state = state.copyWith(hasSaved: saved != null);
     } catch (_) {
       // Keychain 讀不到就當作沒有，登入頁維持手動輸入。
     }
@@ -68,6 +69,13 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
   }
 
   void _onAuth(AsyncValue<UserInfo?> next) {
+    if (next is AsyncData<UserInfo?> && next.value == null) {
+      // 登出：待答的詢問與待存的帳密都作廢（不能存到下一位使用者名下），
+      // 並重新對帳 Keychain（帳號被刪除時帳密已被清掉）。
+      _pendingSave = null;
+      if (state.promptPending) state = state.copyWith(promptPending: false);
+      unawaited(_loadSaved());
+    }
     final attempt = _attempt;
     if (attempt == null) return;
     if (next is AsyncData<UserInfo?> && next.value != null) {
@@ -87,18 +95,24 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
 
   Future<void> _afterPasswordLogin(SavedCredentials attempt) async {
     final store = ref.read(credentialStoreProvider);
+    var otherAccount = false;
     if (state.hasSaved) {
-      // 已開啟：靜默跟上新密碼。
       try {
         final saved = await store.read();
-        if (saved?.email != attempt.email ||
-            saved?.password != attempt.password) {
-          await store.write(attempt);
+        if (saved?.email == attempt.email) {
+          // 同一帳號：靜默跟上新密碼。
+          if (saved?.password != attempt.password) await store.write(attempt);
+          return;
         }
-      } catch (_) {}
-      return;
+        // 換成別的帳號手動登入：前一位的帳密不留給這一位，重新詢問。
+        otherAccount = true;
+        await store.clear();
+        if (ref.mounted) state = state.copyWith(hasSaved: false);
+      } catch (_) {
+        return;
+      }
     }
-    if (await _read(_promptedKey) == '1') return;
+    if (!otherAccount && await _read(_promptedKey) == '1') return;
     // 裝置不可用時不問、也不記已問過，等之後可用再問一次。
     if (await ref.read(biometricAuthenticatorProvider).availableKind() ==
         null) {
@@ -107,8 +121,6 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     _pendingSave = attempt;
     if (ref.mounted) state = state.copyWith(promptPending: true);
   }
-
-  SavedCredentials? _pendingSave;
 
   /// 回答登入後的詢問；不論選哪個都記為已問過。
   Future<void> answerPrompt({required bool enable}) async {
@@ -119,7 +131,7 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     if (!enable || toSave == null) return;
     try {
       await ref.read(credentialStoreProvider).write(toSave);
-      state = state.copyWith(hasSaved: true);
+      if (ref.mounted) state = state.copyWith(hasSaved: true);
     } catch (_) {
       // 存不進 Keychain：維持關閉，下次登入頁仍是手動輸入。
     }
@@ -134,7 +146,12 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
           .read(biometricAuthenticatorProvider)
           .authenticate(reason: '登入 Tripline');
       if (outcome != BiometricOutcome.success) return outcome;
-      final saved = await ref.read(credentialStoreProvider).read();
+      SavedCredentials? saved;
+      try {
+        saved = await ref.read(credentialStoreProvider).read();
+      } catch (_) {
+        return BiometricOutcome.failed;
+      }
       if (saved == null) {
         state = state.copyWith(hasSaved: false);
         return BiometricOutcome.failed;
@@ -159,9 +176,6 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     await _clear();
     return true;
   }
-
-  /// 帳號被刪除時用：不需要驗證。
-  Future<void> clearSaved() => _clear();
 
   Future<void> _clear() async {
     try {
