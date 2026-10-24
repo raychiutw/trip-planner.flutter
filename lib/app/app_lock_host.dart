@@ -179,7 +179,7 @@ class _EnablePrompt extends ConsumerWidget {
     return _HostDialog(
       dialogKey: const ValueKey('app-lock-prompt'),
       title: '要用 $label 解鎖 Tripline 嗎？',
-      message: '開啟後，每次打開 App 都要先通過 $label，別人拿到你的手機也看不到行程。之後可以在「帳號 → 設定」變更。',
+      message: '開啟後，每次打開 App 都要先通過 $label，別人拿到你的手機也看不到行程。之後可以在「帳號 → 安全性」變更。',
       cancelLabel: '稍後再說',
       confirmLabel: '開啟',
       onCancel: () => unawaited(controller.answerPrompt(enable: false)),
