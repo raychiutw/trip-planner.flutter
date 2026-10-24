@@ -10,6 +10,7 @@ import '../../../app/adaptive.dart';
 import '../../../models/destination_input.dart';
 import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/dynamic_type.dart';
 import '../../../ui/tp_chip.dart';
 import '../../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
@@ -110,7 +111,8 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                 fieldKey: const ValueKey('dest-poi-search'),
                 enabled: widget.enabled,
                 controller: _search,
-                placeholder: '搜尋地點（城市、景點）',
+                // 大字級下單行放不下括號補充，縮短提示而不是截斷。
+                placeholder: isLargeTextScale(context) ? '搜尋地點' : '搜尋地點（城市、景點）',
                 onSubmitted: (_) => _run(),
               ),
             ),
