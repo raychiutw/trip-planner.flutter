@@ -612,7 +612,8 @@ void main() {
 
     final surface = find.byKey(const ValueKey('chat-send-surface'));
     expect(tester.getSize(surface), const Size(32, 32));
-    final box = tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
+    final box =
+        tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
     expect(box.shape, BoxShape.circle);
     expect(box.color, scheme.primary);
     final icon = tester.widget<Icon>(
