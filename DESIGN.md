@@ -74,7 +74,7 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：Account sheet 本身、登入／註冊流程與系統 modal 不重複顯示帳號 icon。
 - **HIG 必須**：帳號 icon 的可點區至少 44×44pt，VoiceOver label 為「帳號」。
 - **Tripline 決策**：帳號左側最多直接顯示一個當頁主要動作；其他動作進入 system `…` menu。
-- **HIG 必須**：`完成`、`取消`、`儲存`等動作用文字按鈕；只有語意明確的動作使用 SF Symbol。
+- **Tripline 決策**：`完成`、`取消`、`儲存`等動作用文字按鈕；只有語意明確的動作使用 SF Symbol。（[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)，2025-12-16："Prefer simple, recognizable symbols for items instead of text, except for actions like edit that aren't well-represented by symbols."；[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)，2026-03-24，只規定 Cancel 在 leading、Done 在 trailing，沒有規定一定用文字；原標「HIG 必須」查無原文，已改標。）
 - **HIG 必須**：disabled action 保留位置並降低強調，不造成 toolbar 跳動。
 - **Tripline 決策**：固定 bar 由 `GlassAppBar` 量測 leading／actions 與標題避讓；相關動作採 `GlassButtonGroup(showDividers: false)`，群組內按鈕用透明樣式，不再自算 slot、文字寬度或左右補償。
 - **Tripline 決策**：浮動 header 保留返回與任意標題 widget 共用膠囊、帳號另組及 safe area 的薄組裝；各動作採自然寬度，bar button 的手勢、鍵盤與動畫交給公開 `GlassButton`。
@@ -113,7 +113,7 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：compact Account sheet 由下往上進場、向下退場，不做從帳號 icon 放大的 morph；展開後接近全高，頂緣停在狀態列 safe area 之下、與浮動 header 同一道 8pt 溝槽，內容底色是實色語意 `surface` 的 **elevated 層級**（`AppTheme.elevated`：深色由 base 黑上移為 `#1C1C1E`、grouped 卡片同步上移一階；淺色 base 與 elevated 同色）。占比由實際 safe area 推導，不寫死單一機型的像素或比例（#317 對照 Apple Music 帳號影片；#319 真機發現 base 黑在黑頁面上沒有可辨識邊界，參考影片是 elevated 深灰面板，依 iOS Dark Mode 的 base／elevated 語意更正）。
 - **HIG 必須**：Account 使用 grouped list、inset separator、system controls 與標準 navigation。
 - **HIG 必須**：一般、低頻設定集中在 Account；只影響目前任務的選項留在相關畫面。
-- **HIG 必須**：不得重複實作系統已有的 Dynamic Type、accessibility、鍵盤、捲動或認證偏好。
+- **HIG 建議**：避免在 App 內重複實作系統已有的全域設定。出處是 [Settings](https://developer.apple.com/design/human-interface-guidelines/settings)（頁面日期 2024-06-10）："Respect people's systemwide settings and avoid including redundant versions of them in your custom settings area."，強度為 avoid，不是 must；原文列舉的全域選項是 accessibility accommodations、scrolling behavior、authentication methods。Dynamic Type 與鍵盤不在原文列舉內，屬 Tripline 沿用的延伸範圍（§16.3 另有 Dynamic Type 要求）。
 - **Tripline 決策**：App appearance 預設跟隨系統；使用者可在 Account 選擇「跟隨系統／淺色／深色」。選擇立即套用全 App、只保存在本機，登出不清除。
 - **HIG 建議**：需要帳號時優先提供 Sign in with Apple，並清楚說明用途與權益。
 - **HIG 必須**：關閉 Account sheet 後回到原頁，保留 Day、捲動位置、表單與未送出的聊天草稿。
@@ -121,7 +121,10 @@ iPhone 固定四個 root tabs：
 ### 5.1 App 鎖
 
 - **Tripline 決策**：提供本機 App 鎖（Face ID／Touch ID，可退回裝置密碼），**預設關閉**，使用者在 Account →「安全性」開啟。純 client：不改後端、不改 session，驗證失敗或取消不登出、不清 session 與離線資料。
-- **Tripline 決策（對 §5「不得重複實作系統認證偏好」的明確取捨）**：App 鎖不是重做系統的解鎖偏好，而是 App 層級的資料保護 —— 手機已解鎖時，別人仍看不到行程與旅伴資料。因為會與該條字面衝突，所以預設關閉、由使用者主動開啟，並用裝置實際的驗證方式命名（「Face ID 解鎖」「Touch ID 解鎖」「生物辨識 解鎖」「裝置密碼 解鎖」），不使用籠統字眼。
+- **Tripline 決策（對 §5「避免重複系統認證偏好」與 Managing accounts 一句的明確取捨）**：App 鎖不是重做系統的解鎖偏好，而是 App 層級的資料保護 —— 手機已解鎖時，別人仍看不到行程與旅伴資料。因為字面上有歧義，所以預設關閉、由使用者主動開啟，並用裝置實際的驗證方式命名（「Face ID 解鎖」「Touch ID 解鎖」「生物辨識 解鎖」「裝置密碼 解鎖」），不使用籠統字眼。
+  - 歧義的來源：[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)（頁面未標日期）："In general, avoid offering an app-specific setting for opting in to biometric authentication. People turn on biometric authentication at the system level, so presenting an in-app setting is redundant and could be confusing."。強度是 avoid 且帶 "In general"，不是 must；脈絡是帳號登入的認證方式（opting in），App 鎖處理的是「冷啟動是否再驗證一次」，HIG 沒有明確區分兩者，因此判定為字面有歧義、傾向容許，不是違規。
+  - 支持的一手句：[Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy)（2023-06-21）："To further protect access to apps that people keep logged in on their device, use biometric identification like Face ID, Optic ID, or Touch ID."。Tripline 的 session 長期存在 secure storage，屬於這個情境；該句沒有要求預設開啟，也沒有禁止提供開關。
+  - 取捨：預設關閉、使用者主動開啟是 Tripline 的做法，HIG 原文並無「預設關閉」的要求。
 - **Tripline 決策**：鎖定時機是冷啟動，以及離開前景超過 1 分鐘再回來；短暫切 App 不鎖。1 分鐘為固定值，不開放設定。
 - **Tripline 決策**：鎖定畫面蓋住所有路由與 sheet，一出現就自動喚起系統驗證；取消或失敗後留在鎖定畫面，提供「使用 … 解鎖」重試與「登出」。登出前確認，並明講未同步變更會遺失。
 - **Tripline 決策**：開啟與關閉都要先通過一次驗證，避免別人代為關閉。
@@ -148,7 +151,7 @@ iPhone 固定四個 root tabs：
 ## 7. Bottom accessory
 
 - **HIG 必須**：bottom accessory 與 root tab bar 是兩個層級；展開時允許形成兩排。
-- **HIG 必須**：同一畫面同時最多一個 bottom accessory。
+- **Tripline 決策**：同一畫面同時最多一個 bottom accessory。（[Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)，2026-06-08，只描述單一 attached accessory 的情境，如 Music 的 MiniPlayer，沒有「最多一個」的條文；原標「HIG 必須」查無原文，已改標。）
 - **HIG 建議**：有可捲動內容時，可依系統 tab-bar minimization 在向下捲動後把目前 tab 與 accessory 移到同一排；捲回頂端或點目前 tab 時恢復。
 - **Tripline 決策**：不得因畫面存在一般表單欄位就縮小 tab bar。
 - **HIG 必須**：鍵盤開啟後，輸入 accessory 移到鍵盤上方；root tab bar 隱藏。
@@ -186,7 +189,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **Tripline 決策**：地圖頁不提供搜尋。
 - **HIG 必須**：保留地圖原生 pan、pinch zoom、rotate、double-tap 與 POI 手勢；上層控制不得攔截地圖空白區。
-- **HIG 必須**：定位使用獨立 floating control，首次點擊才請求位置權限。
+- **Tripline 決策**：定位使用獨立 floating control。（Maps 與 Privacy 頁查無此句；原標「HIG 必須」，已改標。）
+- **HIG 建議**：首次點擊定位控制才請求位置權限。[Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy)（2023-06-21）："Ideally, wait to request permission until people actually use an app feature that requires access."，強度是 ideally／should；另 Core Location 的 location button 首次點擊才顯示標準 alert。
 - **HIG 必須**：地圖控制元件、標記與文字在 App 的 Light／Dark appearance 下維持對比。
 - **Tripline 決策**：App appearance 只切換地圖上的控制元件與 overlay；地圖 provider 圖磚維持既有日間樣式。
 - **Tripline 決策**：地圖玻璃沿用套件公開 `platformViewBackdrop` 共存路徑及媒體暗化／前景語意；這不表示 shader 能折射原生圖磚。全範圍去留與裝置驗收缺口見[1.4.1 遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。
@@ -330,7 +334,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
   4. 深色導覽玻璃 `edgeAbsorption` 0.3（`tpNavigationDarkEdgeAbsorption`；淺色維持套件預設 0）。浮動 header 的標題膠囊、「⋯」與帳號圓鈕的 `GlassContainer`／`GlassButton` 品質 fallback 是 `standard`，App 沒有提供 premium scope，因此不論 thermal 狀態都走 lightweight shader（同一畫面 standard 窗與 premium 窗都量到 +57～+65，tab bar 則是 +61 對 +110）；該 shader 的環由寫死的 `kRimAlphaBase 0.65`／`kMinRimVisibility 0.35` 主導，第 3 項對它只由 +59 → +57。`edgeAbsorption` 是該路徑末端唯一公開的 rim 壓低參數（`rim × (1 − 0.3 × dirScale)`，對側壓得比主光側多），預期 header 頂／左 +57 → 約 +42、右／下 → 約 +30，並讓 root tab bar 再降到約 +58／+44。0.3 是套件文件「明顯 rim 暗化」的值，也是 Tripline 對照 HIG 參考選的產品取值，不是 Apple 的固定數值；0.12（「輕微」）推估只降 −6～−11，不足以稱為收斂。只在深色套用：premium 的 absorption 先乘在折射體色再 mix 高光，淺色白底若套 0.3 推估相對白底 −40／−78，會刻出暗框。
   第 3、4 項原為公開公式與修正前量測推導的預期效果；0.26.8（`816ef76`，run 34591742975）同裝置重量測結果如下：header 圓鈕 +47／+33／+43／+32、標題膠囊 +45／+43／+30、root tab bar +71／+68／+52（高於推估的 +58／+44，最亮側已落到參考頂緣量級），全周白光減弱並轉為方向性、無黑框；側邊細環是套件公開能力極限，已接受，不再加光照修正；淺色白底 +1～+4 不變。細節見 [1.4.1 遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。不強制 header 走 premium（同裝置已有 thermalDegradation 紀錄）、不改 shader、不動 `refractiveIndex`、不加各 feature 參數；媒體 frosted 路徑不讀 `edgeAbsorption`，無障礙降級仍歸零。
 - **Tripline 決策**：tab bar、toolbar、menu、sheet、floating controls、composer 與 POI accessory 可使用 Glass；列表、表單、卡片與主要內容使用 system surface。
-- **HIG 必須**：避免 glass 內再巢狀 glass；內容卡不得重複 blur 或 refraction。
+- **HIG 建議**：避免 glass 內再巢狀 glass。[Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)（頁面未標 alert-date）："avoid overcrowding or layering Liquid Glass elements on top of each other."，強度是 avoid；原標「HIG 必須」，Materials、Tab bars 等頁查無 must 句。
+- **Tripline 決策**：內容卡不得重複 blur 或 refraction。最接近的原文是 [Materials](https://developer.apple.com/design/human-interface-guidelines/materials)（2025-09-09）："Don't use Liquid Glass in the content layer."（該句另有「暫態互動元件」例外），但「重複 blur 或 refraction」不是原文用語。
 - **HIG 必須**：Reduce Transparency 使用不透明 system fallback；Increase Contrast 提高邊界與文字對比。
 - **HIG 建議**：Glass 一般不著色，只在選取或主要強調使用暖褐 tint。
 
@@ -342,7 +347,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：支援全部 Dynamic Type 尺寸，包括 Accessibility Sizes 與 Bold Text。
 - **HIG 必須**：一般內容可換行；只有 toolbar、tab label 與短識別文字可合理截斷。
 - **HIG 必須**：POI 卡、表單、聊天訊息與設定 row 隨文字增高，不以固定高度裁切。
-- **HIG 必須**：時間、數量與日期需要對齊時可使用 tabular figures。
+- **Tripline 決策**：時間、數量與日期需要對齊時可使用 tabular figures。（[Typography](https://developer.apple.com/design/human-interface-guidelines/typography) 全頁沒有 tabular figures 的敘述，且本條本身是「可」；原標「HIG 必須」，已改標。）
 - **Tripline 決策**：不使用 Large Title。
 - **Tripline 決策（縮字例外）**：起訖時間（停留點卡與逐日標頭的 `09:30 - 11:00`，半形冒號與等寬數字；原 D1 定版的全形冒號因字距過寬於 0.33.0 改回半形）維持單行，AX 字級撐破卡片寬度時才以 `FittedBox.scaleDown` 等比縮小。這是全 App 唯一允許的縮字處；其餘一律換行、重排或增高，不得縮字。
 

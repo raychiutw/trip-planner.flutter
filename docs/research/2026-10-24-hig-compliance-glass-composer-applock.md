@@ -336,3 +336,7 @@ DESIGN.md §1 自己聲明「『HIG 必須』代表 Tripline 的內部強制等�
 10. **圖像內容**：HIG 頁面插圖與圖說不在 JSON 文字內；若某些規則只出現在圖中（例如 accessory 的尺寸或間距），本次未涵蓋。
 
 本次僅新增本研究文件，未修改 production、DESIGN.md、ADR 或其他檔案，未 commit。
+
+## 修訂紀錄
+
+- 2026-10-24（#466）：依本文 §3 的建議修正 [DESIGN.md](../../DESIGN.md) 的標示與出處，並在 [10-09 筆記](2026-10-09-apple-hig-app-guidelines.md) 的生物辨識句下加註修訂（保留原句）。修正前已重新抓取 Settings、Managing accounts、Privacy、Tab bars、Maps、Materials、Adopting Liquid Glass、Typography、Toolbars、Sheets 的 DocC JSON 逐句核對，結論與本文一致，另補充兩點：(1) Privacy 的位置權限句強度是 "Ideally"，故 DESIGN §9.1 拆出的後半標「HIG 建議」；(2) Materials 有 "Don't use Liquid Glass in the content layer."，是「內容卡不得重複 blur 或 refraction」最接近的原文，但用語不同，該條標 Tripline 決策並附此句。本文原段落未改動。
