@@ -90,7 +90,23 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/trips/:tripId',
+          path: '/trips',
+          builder: (context, state) => const Scaffold(body: Text('trips-list')),
+          routes: [
+            GoRoute(
+              path: ':tripId',
+              builder: (context, state) => Scaffold(
+                body: Text('trip ${state.pathParameters['tripId']}'),
+              ),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/welcome',
+          builder: (context, state) => const Scaffold(body: Text('welcome')),
+        ),
+        GoRoute(
+          path: '/_unused/:tripId',
           builder: (context, state) =>
               Scaffold(body: Text('trip ${state.pathParameters['tripId']}')),
         ),
@@ -404,5 +420,73 @@ void main() {
           .isLiveRegion,
       isTrue,
     );
+  });
+
+  group('出口與文案', () {
+    final queued = QueuedMutation(
+      id: 'm2',
+      method: 'PATCH',
+      path: '/trips/t/entries/1',
+      type: 'entry.patch',
+      cacheKey: 'k',
+      args: const {},
+      createdAt: '2026-10-24T00:00:00.000Z',
+    );
+
+    testWidgets('已登入且帳號相符：有「暫不加入」，點了回行程列表且不接受邀請', (tester) async {
+      await pumpInvite(tester, user: _traveler);
+      await tester.ensureVisible(find.byKey(const ValueKey('invite-dismiss')));
+      await tester.tap(find.byKey(const ValueKey('invite-dismiss')));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.acceptInvitation(any()));
+      expect(find.text('trips-list'), findsOneWidget);
+    });
+
+    testWidgets('未登入：有「暫不加入」，點了回歡迎頁', (tester) async {
+      await pumpInvite(tester);
+      await tester.ensureVisible(find.byKey(const ValueKey('invite-dismiss')));
+      await tester.tap(find.byKey(const ValueKey('invite-dismiss')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('welcome'), findsOneWidget);
+    });
+
+    testWidgets('暫時性失敗用「無法載入邀請」，不叫「邀請無效」', (tester) async {
+      when(
+        () => repo.fetchInvitation(any()),
+      ).thenAnswer((_) async => throw const SocketException('offline'));
+      await pumpInvite(tester);
+
+      expect(find.text('無法載入邀請'), findsOneWidget);
+      expect(find.text('邀請無效'), findsNothing);
+    });
+
+    testWidgets('確定失效的邀請仍叫「邀請無效」', (tester) async {
+      when(() => repo.fetchInvitation(any())).thenThrow(
+        const ApiError(
+          status: 410,
+          code: 'INVITATION_EXPIRED',
+          message: 'expired',
+        ),
+      );
+      await pumpInvite(tester);
+
+      expect(find.text('邀請無效'), findsOneWidget);
+    });
+
+    testWidgets('切換帳號的確認內文說明會登出目前帳號', (tester) async {
+      final cache = InMemoryCacheStore();
+      await cache.appendMutation(queued);
+      await pumpInvite(tester, user: _otherUser, cache: cache);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('invite-switch-account')),
+      );
+      await tester.tap(find.byKey(const ValueKey('invite-switch-account')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('切換帳號會先登出目前帳號'), findsOneWidget);
+      expect(find.textContaining('確定要登出嗎'), findsNothing);
+    });
   });
 }

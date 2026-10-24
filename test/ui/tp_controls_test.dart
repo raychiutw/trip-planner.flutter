@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/ui/tp_filled_button.dart';
 import 'package:tripline/ui/tp_picker_field.dart';
@@ -261,6 +262,40 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('大字級下標籤會換行，改圓角矩形與較寬內距，文字不貼圓角', (tester) async {
+      BoxDecoration surface() =>
+          tester
+                  .widget<DecoratedBox>(
+                    find.descendant(
+                      of: find.byType(TpChip),
+                      matching: find.byKey(const ValueKey('tp-chip-surface')),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration;
+
+      await tester.pumpWidget(_host(TpChip(label: '景點', onPressed: () {})));
+      expect(surface().borderRadius, BorderRadius.circular(TpRadius.pill));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, app) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: app!,
+          ),
+          home: Scaffold(
+            body: Center(
+              child: TpChip(label: '景點', onPressed: () {}),
+            ),
+          ),
+        ),
+      );
+      expect(surface().borderRadius, BorderRadius.circular(TpRadius.xl));
+    });
+
     testWidgets('停用:語意為停用、點擊與鍵盤都不觸發,且不是 Material chip', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_host(const TpChip(label: '停用')));
@@ -382,6 +417,82 @@ void main() {
         inInclusiveRange(44, 60),
       );
     });
+
+    // sheet 內的 elevated 配色會把 surfaceContainerHigh 上移一階，thumb 仍要比軌道亮。
+    final darkElevated = AppTheme.dark().copyWith(
+      colorScheme: AppTheme.elevated(AppTheme.dark().colorScheme),
+    );
+    for (final (name, theme) in [
+      ('light', AppTheme.light()),
+      ('dark', AppTheme.dark()),
+      ('dark elevated sheet', darkElevated),
+    ]) {
+      testWidgets('$name：選取 thumb 比軌道亮（iOS 慣例）', (tester) async {
+        await tester.pumpWidget(_host(segmented(), theme: theme));
+        await tester.pumpAndSettle();
+
+        Color fillOf(Finder f) =>
+            (tester.widget<DecoratedBox>(f).decoration as BoxDecoration).color!;
+        final thumb = find.descendant(
+          of: find.byKey(const ValueKey('tp-segment-thumb')),
+          matching: find.byType(DecoratedBox),
+        );
+        final track = find
+            .ancestor(
+              of: find.byKey(const ValueKey('tp-segment-thumb')),
+              matching: find.byType(DecoratedBox),
+            )
+            .first;
+        expect(
+          fillOf(thumb).computeLuminance(),
+          greaterThan(fillOf(track).computeLuminance()),
+        );
+      });
+
+      testWidgets('$name：大字級堆疊版的選取列比軌道亮', (tester) async {
+        await tester.pumpWidget(
+          _host(
+            Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(3)),
+                child: TpSegmentedControl<String>(
+                  value: 'a',
+                  options: const {'a': '甲甲甲甲甲甲', 'b': '乙乙乙乙乙乙', 'c': '丙丙丙丙丙丙'},
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+            theme: theme,
+          ),
+        );
+        await tester.pumpAndSettle();
+        // 堆疊版沒有滑動 thumb，確認真的走到堆疊分支。
+        expect(find.byKey(const ValueKey('tp-segment-thumb')), findsNothing);
+
+        final control = find.byType(TpSegmentedControl<String>);
+        final fills = tester
+            .widgetList<DecoratedBox>(
+              find.descendant(of: control, matching: find.byType(DecoratedBox)),
+            )
+            .map((w) => (w.decoration as BoxDecoration).color)
+            .whereType<Color>()
+            .toList();
+        // 軌道一個、被選列一個；被選列要比軌道亮。
+        expect(fills.length, 2);
+        expect(
+          fills
+              .map((c) => c.computeLuminance())
+              .reduce((a, b) => a > b ? a : b),
+          greaterThan(
+            fills
+                .map((c) => c.computeLuminance())
+                .reduce((a, b) => a < b ? a : b),
+          ),
+        );
+      });
+    }
 
     testWidgets('鍵盤:Tab 聚焦後 Enter／Space 觸發該段回呼', (tester) async {
       final picked = <String>[];

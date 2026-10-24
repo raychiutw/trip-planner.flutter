@@ -327,6 +327,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(_prompt, findsOneWidget);
       expect(find.text('要用 Face ID 解鎖 Tripline 嗎？'), findsOneWidget);
+      // 開關實際在「帳號 → 安全性」群組，文案指的路徑必須存在。
+      expect(find.textContaining('帳號 → 安全性'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('app-lock-dialog-cancel')));
       await tester.pumpAndSettle();

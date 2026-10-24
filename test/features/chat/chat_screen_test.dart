@@ -296,7 +296,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    final banner = find.text('登入已過期,請重新登入後再試。');
+    final banner = find.text('登入已過期，請重新登入後再試。');
     expect(banner, findsOneWidget);
     expect(tester.isLiveRegionOf(banner), isTrue);
     final context = tester.element(find.byType(TpRootScaffold));
@@ -570,6 +570,57 @@ void main() {
     final input = tester.getRect(find.byKey(const ValueKey('chat-input')));
     expect(input.left - composer.left, closeTo(TpSpacing.s2, 1));
     semantics.dispose();
+  });
+
+  testWidgets('composer 輸入區沒有內層填色與邊框，文字直接寫在玻璃上', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final decoration = tester
+        .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+        .decoration!;
+    expect(decoration.filled, isNot(true));
+    expect(decoration.border, InputBorder.none);
+    expect(decoration.enabledBorder, InputBorder.none);
+    expect(decoration.focusedBorder, InputBorder.none);
+    // 玻璃表面只有一層：輸入區裡沒有第二個 TpGlassSurface。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('chat-composer-glass')),
+        matching: find.byType(TpGlassSurface),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('有文字時送出鈕是實心 tint 圓形，點擊區 ≥44pt；麥克風點擊區也 ≥44pt', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final mic = tester.getSize(find.byKey(const ValueKey('chat-mic-button')));
+    expect(mic.width, greaterThanOrEqualTo(44));
+    expect(mic.height, greaterThanOrEqualTo(44));
+
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '改午餐');
+    await tester.pump();
+
+    final scheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('chat-send'))),
+    ).colorScheme;
+    final send = tester.getSize(find.byKey(const ValueKey('chat-send')));
+    expect(send.width, greaterThanOrEqualTo(44));
+    expect(send.height, greaterThanOrEqualTo(44));
+
+    final surface = find.byKey(const ValueKey('chat-send-surface'));
+    expect(tester.getSize(surface), const Size(32, 32));
+    final box =
+        tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
+    expect(box.shape, BoxShape.circle);
+    expect(box.color, scheme.primary);
+    final icon = tester.widget<Icon>(
+      find.descendant(of: surface, matching: find.byType(Icon)),
+    );
+    expect(icon.icon, CupertinoIcons.arrow_up);
+    expect(icon.color, scheme.onPrimary);
   });
 
   testWidgets('composer 由一行長到四行後停止增高，並依有無文字切換麥克風／送出', (tester) async {
@@ -1238,7 +1289,7 @@ void main() {
       await tester.pump();
     }
     expect(loads, 1);
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     expect(find.text('重試'), findsOneWidget);
     expect(find.byKey(const ValueKey('chat-input')), findsNothing);
 
@@ -1248,7 +1299,7 @@ void main() {
     recoveredTrips.add(_trips);
     await tester.pumpAndSettle();
 
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
     expect(find.text('沖繩'), findsWidgets);
     expect(find.byKey(const ValueKey('chat-input')), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 300));
@@ -1330,7 +1381,7 @@ void main() {
       for (var i = 0; i < 5; i++) {
         await tester.pump();
       }
-      expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+      expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
       expect(find.text('重試中…'), findsNothing);
       expect(find.text('重試'), findsOneWidget);
       await tester.tap(find.text('重試'));
@@ -1338,7 +1389,7 @@ void main() {
       expect(loads, 3);
       recovered.add(_trips);
       await tester.pumpAndSettle();
-      expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+      expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
       final input = find.byKey(const ValueKey('chat-input'));
       expect(input, findsOneWidget);
       if (hasStaleTrips) {
@@ -1468,7 +1519,7 @@ void main() {
     pending.add(_trips);
     await pending.close();
     await tester.pumpAndSettle();
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
     expect(find.text('跨畫面草稿'), findsOneWidget);
     expect(loads, 2);
     expect(tester.takeException(), isNull);
@@ -1492,7 +1543,7 @@ void main() {
       await tester.pump();
     }
     expect(loads, 2);
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     expect(find.byKey(const ValueKey('chat-input')), findsNothing);
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
@@ -1515,7 +1566,7 @@ void main() {
     for (var i = 0; i < 5; i++) {
       await tester.pump();
     }
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     expect(find.text('重試'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
@@ -1557,14 +1608,14 @@ void main() {
     await tester.pump();
     expect(input, findsOneWidget);
     expect(tester.widget<TextField>(input).controller!.text, '京都晚餐草稿');
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     await tester.tap(find.text('重試'));
     await tester.pump();
     expect(tester.widget<TextField>(input).controller!.text, '京都晚餐草稿');
     recovered.add(trips);
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(input).controller!.text, '京都晚餐草稿');
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
     await tester.pumpAndSettle();
@@ -1611,7 +1662,7 @@ void main() {
     initial.addError(Exception('network unavailable'));
     await tester.pump();
     await tester.pump();
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     expect(tester.widget<TextField>(input).controller!.value, editing);
 
     await tester.tap(find.text('重試'));
@@ -1621,7 +1672,7 @@ void main() {
     expect(tester.widget<TextField>(input).controller!.value, committedEditing);
     recovered.add(_trips);
     await tester.pumpAndSettle();
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
     expect(tester.widget<TextField>(input).controller!.value, committedEditing);
 
     harnessKey.currentState!.showTrip('okinawa', prefill: '新的深連結指令');
@@ -1667,7 +1718,7 @@ void main() {
     expect(
       find.descendant(
         of: errorAnnouncement,
-        matching: find.text('無法取得行程清單,請稍後再試。'),
+        matching: find.text('無法取得行程清單，請稍後再試。'),
       ),
       findsOneWidget,
     );
@@ -1711,14 +1762,14 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(tester.takeException(), isNull);
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     expect(tester.widget<TextField>(input).controller!.text, '沖繩早餐草稿');
     await tester.tap(find.text('重試'));
     await tester.pump();
     await tester.pump();
     expect(loads, 2);
     await tester.pumpAndSettle();
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
     expect(tester.widget<TextField>(input).controller!.text, '沖繩早餐草稿');
     await tester.enterText(input, '繼續編輯早餐草稿');
     expect(find.text('繼續編輯早餐草稿'), findsOneWidget);
@@ -1743,10 +1794,10 @@ void main() {
     initial.addError(Exception('network unavailable'));
     await tester.pump();
     await tester.pump();
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsOneWidget);
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
-    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('無法取得行程清單，請稍後再試。'), findsNothing);
     expect(find.text('新增行程'), findsOneWidget);
     expect(loads, 2);
   });

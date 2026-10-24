@@ -49,6 +49,37 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('大字級下搜尋提示縮短，不被截成「搜尋地點（城」', (tester) async {
+    Future<void> pump(double scale) => tester.pumpWidget(
+      ProviderScope(
+        overrides: [poiRepositoryProvider.overrideWithValue(poiRepo)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: DestinationPicker(
+              destinations: const [],
+              onAdd: (_) {},
+              onRemove: (_) {},
+              onReorder: (_, _) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await pump(1.0);
+    expect(find.text('搜尋地點（城市、景點）'), findsOneWidget);
+    await pump(2.0);
+    expect(find.text('搜尋地點（城市、景點）'), findsNothing);
+    expect(find.text('搜尋地點'), findsOneWidget);
+  });
+
   testWidgets('搜尋失敗顯示人話文案（liveRegion），不外洩例外字串', (tester) async {
     stubSearch(() async => throw Exception('SECRET-trace'));
     await search(tester);

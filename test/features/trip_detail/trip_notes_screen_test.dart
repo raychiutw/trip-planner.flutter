@@ -393,6 +393,22 @@ void main() {
     );
   });
 
+  testWidgets('大字級下日期與時間分兩行，不在「星期／日」中間斷行', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), textScaler: const TextScaler.linear(2)),
+    );
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(Scaffold).first);
+    final stamp = DateTime(2026, 4, 1, 8, 30);
+    expect(find.text(formatAppFullDate(context, stamp)), findsOneWidget);
+    expect(
+      find.text(TimeOfDay.fromDateTime(stamp).format(context)),
+      findsOneWidget,
+    );
+    expect(find.text(formatAppDateTime(context, stamp)), findsNothing);
+  });
+
   testWidgets('筆記載入失敗顯示易懂訊息且可重試', (tester) async {
     var attempts = 0;
     final firstAttempt = StreamController<TripNotes>();

@@ -17,6 +17,7 @@ import 'api/providers.dart';
 import 'app/accessibility_scope.dart';
 import 'app/app_lock.dart';
 import 'app/app_lock_host.dart';
+import 'app/provider_retry.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
 import 'app/shared_preferences_settings_store.dart';
@@ -94,6 +95,7 @@ Future<void> main() async {
       adaptiveQuality: true,
       child: AppAccessibilityScope(
         child: ProviderScope(
+          retry: appProviderRetry,
           overrides: [
             settingsStoreProvider.overrideWithValue(settingsStore),
             themeModeProvider.overrideWith(

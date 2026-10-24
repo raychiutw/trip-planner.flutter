@@ -21,6 +21,7 @@ class ShareState {
     this.error,
     this.creating = false,
     this.createFailed = false,
+    this.loadFailed = false,
     this.rotateFailedId,
     this.updatingId,
     this.revokingId,
@@ -37,6 +38,9 @@ class ShareState {
 
   /// 本次 [error] 來自建立(重試要重做建立,而非只重載清單)。
   final bool createFailed;
+
+  /// 清單載入失敗:此時 [shares] 是「不知道」而非「確實為空」。
+  final bool loadFailed;
 
   /// 重新產生失敗的連結 id → 錯誤就地顯示於該列,重試重做重新產生。
   final int? rotateFailedId;
@@ -55,6 +59,7 @@ class ShareState {
     Object? error = _sentinel,
     bool? creating,
     bool? createFailed,
+    bool? loadFailed,
     Object? rotateFailedId = _sentinel,
     Object? updatingId = _sentinel,
     Object? revokingId = _sentinel,
@@ -69,6 +74,7 @@ class ShareState {
       error: error == _sentinel ? this.error : error as String?,
       creating: creating ?? this.creating,
       createFailed: createFailed ?? this.createFailed,
+      loadFailed: loadFailed ?? this.loadFailed,
       rotateFailedId: rotateFailedId == _sentinel
           ? this.rotateFailedId
           : rotateFailedId as int?,
@@ -118,15 +124,24 @@ class ShareController extends Notifier<ShareState> {
         canManage: true,
         shares: shares,
         error: null,
+        loadFailed: false,
       );
     } on ApiError catch (e) {
       if (_disposed) return;
       state = e.status == 403
           ? state.copyWith(loading: false, canManage: false)
-          : state.copyWith(loading: false, error: '載入失敗,請稍後再試');
+          : state.copyWith(
+              loading: false,
+              error: '載入失敗，請稍後再試',
+              loadFailed: true,
+            );
     } on Exception {
       if (_disposed) return;
-      state = state.copyWith(loading: false, error: '載入失敗,請稍後再試');
+      state = state.copyWith(
+        loading: false,
+        error: '載入失敗，請稍後再試',
+        loadFailed: true,
+      );
     }
   }
 

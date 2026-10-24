@@ -48,6 +48,13 @@ class NoteContentSection {
   final List<NoteContentRow> rows;
 }
 
+/// 後端日期時間字串（`2026-11-01T09:00`）轉成可讀形式；不是 ISO 的原樣保留。
+String _dateTime(String raw) =>
+    raw.replaceFirstMapped(RegExp(r'^(\d{4}-\d{2}-\d{2})T'), (m) => '${m[1]} ');
+
+NoteContentField _timeField(String label, String raw, {String prefix = ''}) =>
+    NoteContentField(label, _dateTime(raw), prefix: prefix);
+
 List<NoteContentField> _fields(List<NoteContentField> fields) =>
     List.unmodifiable(fields.where((field) => field.value.trim().isNotEmpty));
 
@@ -64,9 +71,9 @@ List<NoteContentSection> projectTripNotes(TripNotes notes) => List.unmodifiable(
             ]),
             details: _fields([
               NoteContentField('出發機場', flight.departAirport),
-              NoteContentField('出發時間', flight.departAt),
+              _timeField('出發時間', flight.departAt),
               NoteContentField('抵達機場', flight.arriveAirport, prefix: '→ '),
-              NoteContentField('抵達時間', flight.arriveAt),
+              _timeField('抵達時間', flight.arriveAt),
               NoteContentField('艙等', flight.cabinClass),
               NoteContentField('備註', flight.note),
             ]),
@@ -78,8 +85,8 @@ List<NoteContentSection> projectTripNotes(TripNotes notes) => List.unmodifiable(
           NoteContentRow(
             heading: _fields([NoteContentField('住宿名稱', lodging.name)]),
             details: _fields([
-              NoteContentField('入住時間', lodging.checkInAt),
-              NoteContentField('退房時間', lodging.checkOutAt),
+              _timeField('入住時間', lodging.checkInAt, prefix: '入住 '),
+              _timeField('退房時間', lodging.checkOutAt, prefix: '退房 '),
               NoteContentField('地址', lodging.address),
               _phoneField(lodging.phone),
               NoteContentField('訂房編號', lodging.bookingNo),
@@ -93,7 +100,7 @@ List<NoteContentSection> projectTripNotes(TripNotes notes) => List.unmodifiable(
           NoteContentRow(
             heading: _fields([NoteContentField('預訂名稱', reservation.title)]),
             details: _fields([
-              NoteContentField('預訂時間', reservation.reservedAt),
+              _timeField('預訂時間', reservation.reservedAt),
               if (reservation.partySize > 0)
                 NoteContentField('人數', '${reservation.partySize} 位'),
               NoteContentField('訂位編號', reservation.reservationNo),

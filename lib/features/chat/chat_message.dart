@@ -43,7 +43,7 @@ const Map<String, String> _prefixSummaries = {
   '[行程筆記-emergency]': '已觸發 AI 行程筆記生成（緊急聯絡）',
 };
 
-const String kGarbledPlaceholder = '訊息含編碼錯誤,無法顯示';
+const String kGarbledPlaceholder = '訊息含編碼錯誤，無法顯示';
 
 /// 連續 3+ Latin-1 補充區（U+0080–U+00FF）字元 → mojibake 特徵。
 final RegExp _latin1Run = RegExp(r'[\u0080-\u00FF]{3,}');
@@ -69,7 +69,7 @@ String _displayUserText(String message) {
 /// 後端 `raychiutw/trip-planner` 的 `docs/adr/0007` 明文不得寫成「已中止」。
 ///
 /// `error` 與缺漏共用通用文案:後端把細節寫進 `reply`,那條在上面的 reply
-/// 分支就被接走了,走不到這裡。
+/// 分支就被接走了，走不到這裡。
 String terminationText(TerminalReason? reason) => switch (reason) {
   TerminalReason.cancelled => '已停止等待。AI 若仍在處理，完成後的回報還是會出現在這裡，行程也可能已被更動。',
   TerminalReason.timedOut => 'AI 一直沒有回應，已自動停止。可以重新送出這則訊息。',

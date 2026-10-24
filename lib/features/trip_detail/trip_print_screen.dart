@@ -570,7 +570,7 @@ class _PartialDataNotice extends StatelessWidget {
 String _timeLine(TimelineEntry entry) {
   final start = entry.startTime?.trim() ?? '';
   final end = entry.endTime?.trim() ?? '';
-  if (start.isNotEmpty && end.isNotEmpty) return '$start-$end';
+  if (start.isNotEmpty && end.isNotEmpty) return formatTimeRange(start, end);
   if (entry.time?.trim().isNotEmpty == true) return entry.time!.trim();
   return start.isNotEmpty ? start : end;
 }

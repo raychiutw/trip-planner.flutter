@@ -903,7 +903,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
         TpSpacing.s3,
         0,
         TpSpacing.s3,
-        TpSpacing.s1,
+        _selectorGap,
       ),
       child: TpHorizontalSelector<int>(
         key: const ValueKey('trip-timeline-view-day-selector'),
@@ -928,8 +928,11 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   double _selectorTop(BuildContext context) =>
       TpRootGeometry.headerBottom(context) + TpSpacing.s2;
 
+  /// 選擇器與下方第一個 Day 標題之間的留白。
+  static const _selectorGap = TpSpacing.s4;
+
   double _selectorExtent(BuildContext context) =>
-      TpHorizontalSelector.preferredHeight(context) + TpSpacing.s1;
+      TpHorizontalSelector.preferredHeight(context) + _selectorGap;
 }
 
 class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>聊天 Composer Glass 設計圖</title>
+<style>
+:root{--bg:#eceff3;--fg:#1c1c1e;--mut:#6b6b70}
+@media (prefers-color-scheme:dark){:root{--bg:#161618;--fg:#f2f2f7;--mut:#9a9aa0}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,"PingFang TC",sans-serif;padding:24px 16px 48px}
+h1{font-size:20px;margin-bottom:4px}.sub{color:var(--mut);margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:28px 20px;max-width:1500px;margin:auto}
+h2{font-size:14px;margin:0 0 8px;color:var(--mut);font-weight:600}
+.screen{position:relative;height:330px;border-radius:28px;overflow:hidden;box-shadow:0 0 0 6px #000,0 14px 36px rgba(0,0,0,.28);font-family:-apple-system,"PingFang TC",sans-serif}
+.light{--page:#fff;--g-fill:rgba(255,255,255,.55);--edge:rgba(255,255,255,.8);--edge2:rgba(255,255,255,.15);--t1:#1c1c1e;--t2:rgba(60,60,67,.6);--sel:rgba(120,120,128,.16);--tint:#8a6a4a;--bub:#f2f2f7;--me:#efe7dd}
+.dark{--on-tint:#1c1c1e;--page:#000;--g-fill:rgba(255,255,255,.08);--edge:rgba(255,255,255,.3);--edge2:rgba(255,255,255,.05);--t1:#fff;--t2:rgba(235,235,245,.6);--sel:rgba(255,255,255,.16);--tint:#d3b48f;--bub:#2c2c2e;--me:#3a3128}
+.screen{background:var(--page);color:var(--t1)}
+.msg{position:absolute;left:14px;right:14px;top:18px;display:flex;flex-direction:column;gap:8px;font-size:15px}
+.b{max-width:80%;padding:9px 13px;border-radius:18px;background:var(--bub)}.me{align-self:flex-end;background:var(--me)}
+/* 單一玻璃 composer：輸入框就是玻璃本身,沒有內層填色 */
+.comp{position:absolute;left:12px;right:12px;bottom:12px;border-radius:26px;padding:6px 6px 6px 16px;display:flex;align-items:flex-end;gap:6px;
+ backdrop-filter:blur(22px) saturate(180%);background:var(--g-fill);
+ box-shadow:inset 0 .5px 0 var(--edge),inset 0 -.5px 0 var(--edge2),inset .5px 0 var(--edge2),inset -.5px 0 var(--edge2),0 6px 24px rgba(0,0,0,.10)}
+.field{flex:1;min-height:32px;padding:7px 0;font-size:16px;line-height:1.35;color:var(--t1)}
+.field.ph{color:var(--t2)}
+.btn{flex:0 0 44px;height:44px;margin:-6px -6px -6px 0;display:grid;place-items:center;color:var(--t2)}
+.btn .dot{width:32px;height:32px;border-radius:16px;display:grid;place-items:center}
+.btn.send .dot{background:var(--tint);color:#fff}
+.dark .btn.send .dot{color:#1c1c1e}
+.btn.mic{color:var(--t2)}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.caret{display:inline-block;width:2px;height:18px;background:var(--tint);vertical-align:-3px;margin-left:1px}
+ul{padding-left:18px;color:var(--mut)}li{margin:3px 0}b.k{color:var(--fg)}
+.legend{max-width:900px;margin:32px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px 32px}
+.legend h3{font-size:15px;margin-bottom:6px}
+</style></head><body>
+<h1>聊天 Composer — 單一玻璃版</h1>
+<p class="sub">拿掉玻璃裡面的填色膠囊輸入框:玻璃本身就是輸入框。上排淺色、下排深色;左到右:空白、輸入中、多行(上限 4 行)。</p>
+<div class="grid">
+<div><h2>淺色・空白</h2><div class="screen light"><div class="msg"><div class="b me">第二天下雨怎麼辦？</div><div class="b">建議改去<b>美麗海水族館</b>，室內行程不怕雨。</div></div><div class="comp"><div class="field ph">輸入訊息或語音指令</div><div class="btn mic"><div class="dot"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div></div></div></div></div><div><h2>淺色・輸入中</h2><div class="screen light"><div class="msg"><div class="b me">第二天下雨怎麼辦？</div><div class="b">建議改去<b>美麗海水族館</b>，室內行程不怕雨。</div></div><div class="comp"><div class="field">下午改成國際通逛街<span class="caret"></span></div><div class="btn send"><div class="dot"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div></div></div></div></div><div><h2>淺色・多行</h2><div class="screen light"><div class="msg"><div class="b me">第二天下雨怎麼辦？</div><div class="b">建議改去<b>美麗海水族館</b>，室內行程不怕雨。</div></div><div class="comp"><div class="field">第二天改去美麗海水族館，<br>早上 9 點出發，<br>中午在附近吃午餐，<br>下午回飯店休息<span class="caret"></span></div><div class="btn send"><div class="dot"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div></div></div></div></div><div><h2>深色・空白</h2><div class="screen dark"><div class="msg"><div class="b me">第二天下雨怎麼辦？</div><div class="b">建議改去<b>美麗海水族館</b>，室內行程不怕雨。</div></div><div class="comp"><div class="field ph">輸入訊息或語音指令</div><div class="btn mic"><div class="dot"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div></div></div></div></div><div><h2>深色・輸入中</h2><div class="screen dark"><div class="msg"><div class="b me">第二天下雨怎麼辦？</div><div class="b">建議改去<b>美麗海水族館</b>，室內行程不怕雨。</div></div><div class="comp"><div class="field">下午改成國際通逛街<span class="caret"></span></div><div class="btn send"><div class="dot"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div></div></div></div></div><div><h2>深色・多行</h2><div class="screen dark"><div class="msg"><div class="b me">第二天下雨怎麼辦？</div><div class="b">建議改去<b>美麗海水族館</b>，室內行程不怕雨。</div></div><div class="comp"><div class="field">第二天改去美麗海水族館，<br>早上 9 點出發，<br>中午在附近吃午餐，<br>下午回飯店休息<span class="caret"></span></div><div class="btn send"><div class="dot"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div></div></div></div></div></div>
+<div class="legend">
+<div><h3>與現況的差異</h3><ul>
+<li><b class="k">移除</b>玻璃裡面那顆填色膠囊輸入框(目前用 surfaceContainerHighest 填色),玻璃表面本身就是輸入區,符合 §16「glass 內不巢狀 glass」</li>
+<li>文字直接寫在玻璃上,placeholder 用次要文字色;游標用 tint(前景)</li>
+<li>外圓角 26 與 tab bar 膠囊同心;輸入多行時向上長高,最多 4 行後內部捲動(維持 §7.1)</li>
+</ul></div>
+<div><h3>按鈕</h3><ul>
+<li><b class="k">空白時</b>:麥克風是純圖示(無底),44pt 點擊區</li>
+<li><b class="k">有文字</b>:送出鈕是 32pt <b>實心 tint 圓形</b>,箭頭用反白前景(HIG Color:強調主要動作時把顏色套在背景而非符號);點擊區 ≥44pt</li>
+<li>鈕貼右緣、底對齊最後一行,多行時不跟著置中</li>
+</ul></div>
+<div><h3>HIG／無障礙</h3><ul>
+<li>輸入區與按鈕都 ≥44pt;placeholder 對比用 secondaryLabel,不低於系統值</li>
+<li>提高對比／降低透明度:玻璃退回 surfaceContainerHigh 不透明底,文字色不變</li>
+<li>Dynamic Type:行高隨字級增長,不縮字;Return 換行、⌘Return 送出不變</li>
+</ul></div>
+<div><h3>決定紀錄</h3><ul>
+<li>輸入區要不要保留細描邊提示「這裡可以打字」?我預設<b class="k">不要</b>(玻璃邊緣光已足夠,placeholder 也說明了)</li>
+<li>(已定案)送出鈕採實心 tint 圓鈕</li>
+</ul></div>
+</div></body></html>

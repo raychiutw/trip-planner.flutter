@@ -282,6 +282,7 @@ iOS／iPadOS Dynamic Type 數值（pt，size／leading；來源同 Typography �
 
 - 只索取必要資料；"wait to request permission until people actually use an app feature that requires access"；啟動時除非功能明顯需要否則不要請求（導航 app 要定位是例外）；purpose string 寫成簡短完整的主動句，說明用途。
 - 帳號：只在核心功能需要時才要求；說明好處；**盡量延後登入**；沒用 Sign in with Apple 時偏好 **passkey**；認證方式的按鈕要明說（"Sign In with Face ID"）；避免做 app 內的生物辨識開關（系統層級已設定）；避免用 "passcode" 指帳號密碼。
+  - **修訂（2026-10-24，#466）**：上一行「避免做 app 內的生物辨識開關（系統層級已設定）」省略了原文的限定語，保留原句不覆寫，更正如下。Managing accounts（頁面未標日期）原文："In general, avoid offering an app-specific setting for opting in to biometric authentication. People turn on biometric authentication at the system level, so presenting an in-app setting is redundant and could be confusing."，強度為 avoid 並帶 "In general"，脈絡是登入時 opt in 生物辨識，不是 must。同為一手來源的 Privacy（2023-06-21）另有 "To further protect access to apps that people keep logged in on their device, use biometric identification like Face ID, Optic ID, or Touch ID."，本筆記原先未提；兩句合讀不能推出「HIG 反對 App 鎖」。詳見 [2026-10-24 查核](2026-10-24-hig-compliance-glass-composer-applock.md) §2.3.2、§3。
 - 建立帳號就必須能刪除帳號（不只停用）；無法在 app 內完成時需直接連到網頁；用 Sign in with Apple 建立的帳號刪除時要撤銷 token；告知刪除何時完成並在完成時通知。
 
 ## 11. HIG 原文與 Tripline 決策的張力點

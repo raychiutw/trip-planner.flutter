@@ -5,7 +5,7 @@ import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
 import '../../../models/display_format.dart';
 
-/// 計算當日時間範圍字串「HH：MM - HH：MM」（D1 定版）。
+/// 計算當日時間範圍字串「HH:MM - HH:MM」。
 ///
 /// 每筆 start 候選 = startTime ?? time、end 候選 = endTime ?? startTime ?? time;
 /// HH:MM 字典序取 min/max。timeline 無任何時間 → 回 null。

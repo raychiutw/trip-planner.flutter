@@ -17,6 +17,7 @@ import 'package:tripline/api/cache/cache_store.dart' show QueuedMutation;
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/share_repository.dart';
+import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/app_version.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
@@ -66,6 +67,11 @@ class HigFakes {
 
   /// 預設 offline 假訊號；情境可改成 false 觸發「目前離線」橫幅。
   Stream<bool> network = const Stream<bool>.empty();
+
+  /// App 鎖情境：非 null 時以此初始狀態啟動；[biometric] 預設永不回應，
+  /// 畫面才會停在鎖定頁而不是自動解鎖。
+  bool? appLockEnabled;
+  BiometricAuthenticator biometric = _PendingBiometric();
 
   MockAuthRepositoryAlias get auth => fixture.auth;
   MockTripRepository get trips => fixture.trips;
@@ -236,7 +242,14 @@ class HigFakes {
     final f = fixture;
     final app = ProviderScope(
       key: UniqueKey(),
+      // 與 widget test 慣例相同:關掉自動 retry,才拍得到真正的錯誤態
+      // (產品行為見 #471)。
+      retry: (retryCount, error) => null,
       overrides: [
+        biometricAuthenticatorProvider.overrideWithValue(biometric),
+        appLockProvider.overrideWith(
+          () => AppLockController(initialEnabled: appLockEnabled ?? false),
+        ),
         apiClientProvider.overrideWithValue(f.apiClient),
         authRepositoryProvider.overrideWithValue(f.auth),
         tripRepositoryProvider.overrideWithValue(f.trips),
@@ -270,6 +283,23 @@ class HigFakes {
 }
 
 typedef MockAuthRepositoryAlias = MockAuthRepository;
+
+/// 永遠等待使用者操作的驗證器(Face ID 裝置)。
+class _PendingBiometric implements BiometricAuthenticator {
+  @override
+  Future<BiometricKind?> availableKind() async => BiometricKind.faceId;
+
+  @override
+  Future<BiometricOutcome> authenticate({required String reason}) =>
+      Completer<BiometricOutcome>().future;
+}
+
+/// 立刻回報成功的驗證器(登入後詢問、設定頁情境)。
+class _OkBiometric extends _PendingBiometric {
+  @override
+  Future<BiometricOutcome> authenticate({required String reason}) async =>
+      BiometricOutcome.success;
+}
 
 class _TextScaled extends StatelessWidget {
   const _TextScaled({required this.scale, required this.child});
@@ -872,6 +902,127 @@ List<HigScene> higScenes() => [
     '#422',
     location: '/trips',
     textScale: 3.0,
+  ),
+
+  // ── App 鎖 ──
+  HigScene(
+    'app-lock-locked',
+    '#462',
+    location: '/trips',
+    stub: (f) => f.appLockEnabled = true,
+    settle: false,
+  ),
+  HigScene(
+    'app-lock-locked-ax-2x',
+    '#462 #422',
+    location: '/trips',
+    stub: (f) => f.appLockEnabled = true,
+    textScale: 2.0,
+    settle: false,
+  ),
+  HigScene(
+    'app-lock-enable-prompt',
+    '#462',
+    loggedIn: false,
+    location: '/login',
+    stub: (f) {
+      f.biometric = _OkBiometric();
+      var signedIn = false;
+      when(
+        () => f.auth.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async {
+        signedIn = true;
+        return higUser;
+      });
+      when(
+        f.auth.currentUser,
+      ).thenAnswer((_) async => signedIn ? higUser : null);
+    },
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('login-email-field')),
+        'ray@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('login-password-field')),
+        'secret-password',
+      );
+      await _tapKey(tester, 'login-submit-button');
+    },
+  ),
+  HigScene(
+    'account-home-security',
+    '#462 #425',
+    location: '/trips?account=home',
+    act: (tester, f) async => _scrollDown(tester, -400),
+  ),
+  HigScene(
+    'ax-account-home-2x-bottom',
+    '#422 #462',
+    location: '/trips?account=home',
+    textScale: 2.0,
+    act: (tester, f) async => _scrollDown(tester, -1200),
+  ),
+
+  // ── 更多大字級畫面 ──
+  const HigScene(
+    'ax-trip-map-2x',
+    '#422',
+    location: '/trips/okinawa/map',
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-trip-notes-2x',
+    '#422',
+    location: '/trips/okinawa/notes',
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-trip-print-2x',
+    '#422',
+    location: '/trips/okinawa/print',
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-favorites-2x',
+    '#422',
+    location: '/favorites',
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-explore-2x',
+    '#422',
+    location: '/favorites/explore',
+    textScale: 2.0,
+  ),
+  const HigScene('ax-chat-2x', '#422', location: '/chat', textScale: 2.0),
+  const HigScene(
+    'ax-public-share-2x',
+    '#422',
+    location: '/s/demo-token-0123456789',
+    loggedIn: false,
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-trip-create-2x',
+    '#422',
+    location: '/new-trip',
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-account-appearance-2x',
+    '#422',
+    location: '/trips?account=appearance',
+    textScale: 2.0,
+  ),
+  const HigScene(
+    'ax-account-notifications-2x',
+    '#422',
+    location: '/trips?account=notifications',
+    textScale: 2.0,
   ),
 ];
 

@@ -1,6 +1,6 @@
 /// AI 聊天狀態機:state = `List<TripRequest>`(工單,asc);送訊息走樂觀更新 →
 /// POST 換真 row → 工單 lifecycle 等到 terminal;completed 後 invalidate 行程相關 providers
-/// （AI 會直接改行程,畫面要重抓才看得到）。per-trip autoDispose family。
+/// （AI 會直接改行程，畫面要重抓才看得到）。per-trip autoDispose family。
 library;
 
 import 'dart:async';
@@ -134,7 +134,7 @@ class ChatController extends Notifier<ChatState> {
       if (_disposed) return;
       state = (e is ApiError && e.status == 401)
           ? state.copyWith(initialLoading: false, authExpired: true)
-          : state.copyWith(initialLoading: false, error: '載入失敗,請稍後再試');
+          : state.copyWith(initialLoading: false, error: '載入失敗，請稍後再試');
     }
   }
 
@@ -147,9 +147,9 @@ class ChatController extends Notifier<ChatState> {
 
   /// 回到最新那一端時重抓最新一頁(離開又回來就是最新的)。
   ///
-  /// 與 [reload] 的差別:不進 `initialLoading`、不清空畫面,已經捲上去載入的更舊
+  /// 與 [reload] 的差別:不進 `initialLoading`、不清空畫面，已經捲上去載入的更舊
   /// 訊息也留著 —— 只把最新一頁併回去(同 id 以新抓到的為準)。重入由 [_refreshing]
-  /// 擋掉;失敗靜默(既有內容續留,不打斷閱讀)。
+  /// 擋掉;失敗靜默(既有內容續留，不打斷閱讀)。
   Future<void> refreshLatest() async {
     if (_refreshing) return;
     _refreshing = true;
@@ -187,7 +187,7 @@ class ChatController extends Notifier<ChatState> {
         if (!r.status.isTerminal) _watch(r.id);
       }
     } on Exception {
-      // 重拉失敗不擋畫面:維持既有訊息,也不覆蓋既有錯誤狀態。
+      // 重拉失敗不擋畫面:維持既有訊息，也不覆蓋既有錯誤狀態。
     } finally {
       _refreshing = false;
     }
@@ -268,7 +268,7 @@ class ChatController extends Notifier<ChatState> {
             if (r.id != temp.id) r,
         ],
         sending: false,
-        error: (e is ApiError && e.status == 403) ? '沒有權限傳訊息' : '送出失敗,請稍後再試',
+        error: (e is ApiError && e.status == 403) ? '沒有權限傳訊息' : '送出失敗，請稍後再試',
       );
     }
   }

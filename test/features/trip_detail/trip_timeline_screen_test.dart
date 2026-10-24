@@ -509,6 +509,21 @@ void main() {
     }
   });
 
+  testWidgets('Day selector 與下方第一個 Day 標題之間留有呼吸空間', (tester) async {
+    await _pumpTimeline(tester);
+
+    final selector = tester.getRect(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    );
+    final dayHeaderTime = tester.getRect(
+      find.byKey(const ValueKey('day-time-scale')).first,
+    );
+    expect(
+      dayHeaderTime.top - selector.bottom,
+      greaterThanOrEqualTo(TpSpacing.s4),
+    );
+  });
+
   testWidgets('前景分支：目前 DAY 寫入共用選取日', (tester) async {
     await _pumpTimeline(tester);
     await tester.pumpAndSettle();

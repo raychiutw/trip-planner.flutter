@@ -67,6 +67,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **overrides 一律以 list literal inline 傳入 `ProviderScope`**：`overrides: [xxxProvider.overrideWithValue(mock)]`。flutter_riverpod 3.x 未匯出 `Override` 型別，不得宣告 `List<Override> overrides = ...` 抽成變數。實測全 repo 零 `List<Override>` / `<Override>[`。
 - **只驗證靜態 provider error 呈現時，關掉自動重試**：`ProviderScope(retry: (retryCount, error) => null, overrides: [...], child: ...)`。少了它，error 態會被自動重試蓋掉而 flake。驗證自動重試或手動／自動重試互動時，保留被測的 retry 政策，以可控制的來源事件及讀取次數驗證行為。
   範例：`test/features/trips/collab/collab_screen_test.dart:34`、`test/features/favorites/favorites_screen_test.dart:446`、`test/features/trip_detail/trip_timeline_screen_test.dart:294`。
+- **產品的自動重試政策是 `appProviderRetry`（`lib/app/provider_retry.dart`）**：最多重試兩次、約 2 秒內交給使用者原地重試，4xx 不重試；根 `ProviderScope` 必須帶它（`test/app/provider_retry_test.dart` 守門）。不要讓畫面在失敗後長時間停在載入中。
 - 只 override 到 repository 層，`api/` 測試用 `http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 
 ## API 層規範
