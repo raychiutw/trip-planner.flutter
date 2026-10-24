@@ -383,6 +383,32 @@ void main() {
       );
     });
 
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      testWidgets('${theme.brightness.name}：選取 thumb 比軌道亮（iOS 慣例）', (
+        tester,
+      ) async {
+        await tester.pumpWidget(_host(segmented(), theme: theme));
+        await tester.pumpAndSettle();
+
+        Color fillOf(Finder f) =>
+            (tester.widget<DecoratedBox>(f).decoration as BoxDecoration).color!;
+        final thumb = find.descendant(
+          of: find.byKey(const ValueKey('tp-segment-thumb')),
+          matching: find.byType(DecoratedBox),
+        );
+        final track = find
+            .ancestor(
+              of: find.byKey(const ValueKey('tp-segment-thumb')),
+              matching: find.byType(DecoratedBox),
+            )
+            .first;
+        expect(
+          fillOf(thumb).computeLuminance(),
+          greaterThan(fillOf(track).computeLuminance()),
+        );
+      });
+    }
+
     testWidgets('鍵盤:Tab 聚焦後 Enter／Space 觸發該段回呼', (tester) async {
       final picked = <String>[];
       await tester.pumpWidget(_host(segmented(onChanged: picked.add)));

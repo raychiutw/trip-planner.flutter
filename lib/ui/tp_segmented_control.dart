@@ -83,6 +83,12 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
       ),
     );
 
+    // 選取 thumb 要比軌道亮：淺色是白（surface），深色 surface 是純黑、反而比軌道暗，
+    // 改用再高一階的填充層（與 tab bar 選取膠囊同一語彙）。
+    final thumbColor = theme.brightness == Brightness.dark
+        ? scheme.surfaceContainerHighest
+        : scheme.surface;
+
     Widget track(Widget child) => DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHigh,
@@ -144,8 +150,8 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: enabled
-                              ? scheme.surface
-                              : scheme.surface.withAlpha(
+                              ? thumbColor
+                              : thumbColor.withAlpha(
                                   (TpDisabled.controlOpacity * 255).round(),
                                 ),
                           borderRadius: BorderRadius.circular(TpRadius.sm),
