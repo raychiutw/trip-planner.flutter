@@ -492,8 +492,16 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                   bottom: TpSpacing.s2,
                                 ),
                                 child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
+                                    Icon(
+                                      CupertinoIcons.exclamationmark_circle,
+                                      size: 18,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                                    const SizedBox(width: TpSpacing.s1),
                                     Expanded(
                                       child: Text(
                                         state.error!,

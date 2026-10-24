@@ -132,6 +132,14 @@ void main() {
 
     expect(find.byKey(const ValueKey('share-error')), findsOneWidget);
     expect(find.textContaining('載入失敗，請稍後再試'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('share-error')),
+        matching: find.byIcon(CupertinoIcons.exclamationmark_circle),
+      ),
+      findsOneWidget,
+      reason: '錯誤不只靠顏色，要有圖示',
+    );
     expect(find.textContaining('使用中的連結'), findsNothing);
     expect(find.text('目前沒有使用中的分享連結。'), findsNothing);
 
