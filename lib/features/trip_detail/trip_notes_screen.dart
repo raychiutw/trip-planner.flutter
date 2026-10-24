@@ -1184,12 +1184,26 @@ class _TimeText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final stacked = isLargeTextScale(context);
+    final style = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    if (stacked && formatAsDateTime && values.length == 1) {
+      final parsed = DateTime.tryParse(values.single);
+      if (parsed != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(formatAppFullDate(context, parsed), style: style),
+            Text(TimeOfDay.fromDateTime(parsed).format(context), style: style),
+          ],
+        );
+      }
+    }
     return Text(
       values.map((v) => formatAsDateTime ? _format(context, v) : v).join(' ~ '),
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
+      style: style,
     );
   }
 }
