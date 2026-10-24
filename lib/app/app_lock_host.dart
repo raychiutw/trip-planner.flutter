@@ -31,14 +31,21 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
   Timer? _noticeTimer;
   bool _showDisabledNotice = false;
 
+  /// 離開前景時蓋住內容，App 切換器的截圖才不會露出行程與旅伴資料。
+  bool _inactive = false;
+
   @override
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(
+      onInactive: () => setState(() => _inactive = true),
       onHide: () => ref
           .read(appLockProvider.notifier)
           .onHidden(ref.read(appLockClockProvider)()),
-      onResume: () => unawaited(_resumed()),
+      onResume: () {
+        setState(() => _inactive = false);
+        unawaited(_resumed());
+      },
     );
     // 冷啟動也對帳一次：關掉生物辨識的裝置不該卡在 App 鎖。
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_resumed()));
@@ -88,7 +95,22 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
             ),
           ),
         ),
-        if (showLock) const Positioned.fill(child: AppLockScreen()),
+        if (showLock)
+          const Positioned.fill(child: AppLockScreen())
+        else if (_inactive && lock.enabled && signedIn)
+          Positioned.fill(
+            child: ColoredBox(
+              key: const ValueKey('app-lock-privacy-cover'),
+              color: scheme.surface,
+              child: Center(
+                child: Icon(
+                  CupertinoIcons.lock_fill,
+                  size: 48,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         if (lock.promptPending && signedIn && !showLock)
           Positioned.fill(child: _EnablePrompt()),
         if (_showDisabledNotice)

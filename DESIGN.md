@@ -130,9 +130,9 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：開啟與關閉都要先通過一次驗證，避免別人代為關閉。
 - **Tripline 決策**：每次**新登入**成功後（含註冊後登入、OAuth）主動詢問是否開啟，每台裝置只問一次，選「開啟」或「稍後再說」都不再問；冷啟動還原既有 session 不問；裝置不可用時不問也不記為已問過。
 - **Tripline 決策**：登出清除「是否開啟」（App 鎖屬於這台裝置上這個登入），保留「已問過」，避免登出再登入又被問。
-- **HIG 必須**：裝置不再有生物辨識與密碼時自動關閉並簡短告知，不得把使用者鎖在 App 外。
-- **HIG 必須**：Face ID 權限在詢問框說明價值之後才由系統請求（§15 just-in-time）；鎖定畫面、開關與詢問框須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
-- **Tripline 決策**：不遮蔽 App 切換器截圖；若之後要做，需另行評估。材質與 Face ID 實際流程須真機驗收。
+- **Tripline 決策**：裝置不再有生物辨識與密碼時自動關閉並簡短告知，不得把使用者鎖在 App 外。
+- **Tripline 決策**：Face ID 權限在詢問框說明價值之後才由系統請求（§15 just-in-time）；鎖定畫面、開關與詢問框須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
+- **Tripline 決策**：App 鎖開啟時，離開前景（inactive）就以純色加鎖頭蓋住內容，App 切換器截圖不會露出行程與旅伴資料；未開啟不遮蔽。此條取代先前「不遮蔽」的決定，對應 #462 故事 14。材質與 Face ID 實際流程須真機驗收。
 
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。
 
