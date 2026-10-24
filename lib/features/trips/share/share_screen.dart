@@ -279,6 +279,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     });
     final activeShares = state.shares.where((s) => !s.isRevoked).toList();
     final revokedShares = state.shares.where((s) => s.isRevoked).toList();
+    final listUnknown = state.loadFailed && state.shares.isEmpty;
 
     return Scaffold(
       // 本頁在 StatefulShellRoute 之外、沒有 root tab bar，
@@ -315,39 +316,44 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     ),
                   if (state.lastCreated != null)
                     const SizedBox(height: TpSpacing.s3),
-                  Text(
-                    '使用中的連結（${activeShares.length}）',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: TpSpacing.s2),
-                  if (activeShares.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: TpSpacing.s2,
-                      ),
-                      child: Text(
-                        '目前沒有使用中的分享連結。',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  // 載入失敗時清單內容未知，不顯示「(0)」與空狀態。
+                  if (!listUnknown) ...[
+                    Text(
+                      '使用中的連結（${activeShares.length}）',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: TpSpacing.s2),
+                    if (activeShares.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TpSpacing.s2,
+                        ),
+                        child: Text(
+                          '目前沒有使用中的分享連結。',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                    ),
-                  for (final s in activeShares) _shareTile(s, state),
-                  if (revokedShares.isNotEmpty) ...[
-                    const SizedBox(height: TpSpacing.s2),
-                    TextButton.icon(
-                      key: const ValueKey('share-revoked-toggle'),
-                      onPressed: () =>
-                          setState(() => _showRevoked = !_showRevoked),
-                      icon: Icon(
-                        _showRevoked
-                            ? CupertinoIcons.chevron_up
-                            : CupertinoIcons.chevron_down,
+                    for (final s in activeShares) _shareTile(s, state),
+                    if (revokedShares.isNotEmpty) ...[
+                      const SizedBox(height: TpSpacing.s2),
+                      TextButton.icon(
+                        key: const ValueKey('share-revoked-toggle'),
+                        onPressed: () =>
+                            setState(() => _showRevoked = !_showRevoked),
+                        icon: Icon(
+                          _showRevoked
+                              ? CupertinoIcons.chevron_up
+                              : CupertinoIcons.chevron_down,
+                        ),
+                        label: Text('已關閉的連結（${revokedShares.length}）'),
                       ),
-                      label: Text('已關閉的連結（${revokedShares.length}）'),
-                    ),
-                    if (_showRevoked)
-                      for (final s in revokedShares) _shareTile(s, state),
+                      if (_showRevoked)
+                        for (final s in revokedShares) _shareTile(s, state),
+                    ],
                   ],
                   const SizedBox(height: TpSpacing.s5),
                   Text('建立新連結', style: Theme.of(context).textTheme.titleMedium),

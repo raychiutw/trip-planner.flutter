@@ -119,6 +119,28 @@ void main() {
     expect(find.text('重試'), findsOneWidget);
   });
 
+  testWidgets('載入清單失敗：不顯示「(0)」與空狀態，只顯示失敗與重試', (tester) async {
+    var calls = 0;
+    when(() => repo.fetchShares(any())).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return _shares;
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-error')), findsOneWidget);
+    expect(find.textContaining('載入失敗，請稍後再試'), findsOneWidget);
+    expect(find.textContaining('使用中的連結'), findsNothing);
+    expect(find.text('目前沒有使用中的分享連結。'), findsNothing);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('share-error')), findsNothing);
+    expect(find.textContaining('使用中的連結'), findsOneWidget);
+  });
+
   testWidgets('建立中鎖定建立表單且以 live region 宣告進度', (tester) async {
     final completed = Completer<ShareLink>();
     when(
