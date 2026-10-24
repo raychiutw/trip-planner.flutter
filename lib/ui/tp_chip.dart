@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'dynamic_type.dart';
 import 'tp_tap_target.dart';
 
 /// 膠囊選項／快捷鈕,取代 Material 的 `FilterChip`／`ChoiceChip`／`ActionChip`。
@@ -30,6 +31,9 @@ class TpChip extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final enabled = onPressed != null;
+    // 大字級下標籤會換行，膠囊圓角會吃掉文字兩側；改圓角矩形並加寬內距。
+    final multiline = isLargeTextScale(context);
+    final radius = multiline ? TpRadius.xl : TpRadius.pill;
     final foreground = selected ? scheme.onPrimaryContainer : scheme.onSurface;
     final textColor = enabled
         ? foreground
@@ -51,14 +55,14 @@ class TpChip extends StatelessWidget {
             color: selected
                 ? scheme.primaryContainer
                 : scheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(TpRadius.pill),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: selected ? scheme.primary : scheme.outlineVariant,
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: TpSpacing.s3,
+            padding: EdgeInsets.symmetric(
+              horizontal: multiline ? TpSpacing.s4 : TpSpacing.s3,
               vertical: TpSpacing.s2,
             ),
             child: Text(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/ui/tp_filled_button.dart';
 import 'package:tripline/ui/tp_picker_field.dart';
@@ -259,6 +260,40 @@ void main() {
       expect(node.flagsCollection.isSelected, Tristate.isTrue);
       expect(node.flagsCollection.isButton, isTrue);
       handle.dispose();
+    });
+
+    testWidgets('大字級下標籤會換行，改圓角矩形與較寬內距，文字不貼圓角', (tester) async {
+      BoxDecoration surface() =>
+          tester
+                  .widget<DecoratedBox>(
+                    find.descendant(
+                      of: find.byType(TpChip),
+                      matching: find.byKey(const ValueKey('tp-chip-surface')),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration;
+
+      await tester.pumpWidget(_host(TpChip(label: '景點', onPressed: () {})));
+      expect(surface().borderRadius, BorderRadius.circular(TpRadius.pill));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, app) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: app!,
+          ),
+          home: Scaffold(
+            body: Center(
+              child: TpChip(label: '景點', onPressed: () {}),
+            ),
+          ),
+        ),
+      );
+      expect(surface().borderRadius, BorderRadius.circular(TpRadius.xl));
     });
 
     testWidgets('停用:語意為停用、點擊與鍵盤都不觸發,且不是 Material chip', (tester) async {

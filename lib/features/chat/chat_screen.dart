@@ -190,7 +190,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             label: _retryingTrips ? '行程清單重試中…' : null,
             child: _CenteredHint(
               title: '載入失敗',
-              body: '無法取得行程清單,請稍後再試。',
+              body: '無法取得行程清單，請稍後再試。',
               onRetry: _retryTrips,
               retryInProgress: _retryingTrips,
             ),
@@ -201,7 +201,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             return initiallyBelowHeader(
               _CenteredHint(
                 title: '尚無行程',
-                body: '建立行程後,就能在這裡用 AI 助手調整行程。',
+                body: '建立行程後，就能在這裡用 AI 助手調整行程。',
                 actionLabel: '新增行程',
                 onAction: () => context.push('/new-trip'),
               ),
@@ -270,7 +270,7 @@ class _ChatBody extends ConsumerStatefulWidget {
 }
 
 class _ChatBodyState extends ConsumerState<_ChatBody> {
-  /// 距最舊那一端多近就自動載入更舊(iMessage／LINE 的作法,不需手勢)。
+  /// 距最舊那一端多近就自動載入更舊(iMessage／LINE 的作法，不需手勢)。
   static const _loadOlderTrigger = 240.0;
 
   /// 視為「停在最新那一端」的容差。
@@ -286,7 +286,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   bool _sendInProgress = false;
   double _composerHeight = 0;
 
-  /// 目前是否停在最新那一端;同時決定箭頭要不要出現,以及重拉的邊緣觸發。
+  /// 目前是否停在最新那一端;同時決定箭頭要不要出現，以及重拉的邊緣觸發。
   bool _atLatest = true;
 
   @override
@@ -352,7 +352,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     }
     final atLatest = position.pixels <= _latestEdgeSlop;
     // 邊緣觸發:只有「從離開狀態回到最新那一端」的那一次才重拉。回程會連續經過
-    // 多個貼近底部的位置,停在底部也還會有零星通知,靠 _atLatest 閂鎖擋掉重複。
+    // 多個貼近底部的位置，停在底部也還會有零星通知，靠 _atLatest 閂鎖擋掉重複。
     if (atLatest == _atLatest) return;
     if (atLatest) unawaited(controller.refreshLatest());
     setState(() => _atLatest = atLatest);
@@ -498,12 +498,12 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                     liveRegion: true,
                     label: widget.tripsRetryInProgress ? '行程清單重試中…' : null,
                     child: _Banner(
-                      text: '無法取得行程清單,請稍後再試。',
+                      text: '無法取得行程清單，請稍後再試。',
                       onRetry: widget.onTripsRetry,
                       retryInProgress: widget.tripsRetryInProgress,
                     ),
                   ),
-                if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
+                if (state.authExpired) const _Banner(text: '登入已過期，請重新登入後再試。'),
                 // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
                 if (state.error != null && msgs.isNotEmpty)
                   _Banner(text: state.error!),
@@ -518,7 +518,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                       ? initiallyBelowHeader(
                           _CenteredHint(
                             title: '載入失敗',
-                            body: '無法取得對話,請稍後再試。',
+                            body: '無法取得對話，請稍後再試。',
                             onRetry: () => unawaited(controller.reload()),
                           ),
                         )
@@ -740,10 +740,10 @@ class _MessageBubble extends StatelessWidget {
           ),
           const SizedBox(width: TpSpacing.s2),
           Text(message.text),
-          // 次要文字鈕,陪在「思考中…」旁邊 —— 不換掉送出鍵、不進工具列。
-          // 送出鍵在等待時變成停止鍵是 Claude／ChatGPT 的慣例,但那個手勢在
+          // 次要文字鈕，陪在「思考中…」旁邊 —— 不換掉送出鍵、不進工具列。
+          // 送出鍵在等待時變成停止鍵是 Claude／ChatGPT 的慣例，但那個手勢在
           // 那些產品裡是「中止生成」;這裡按下去**不中止 AI**,沿用會騙人。
-          // 而且本 app 的輸入框在等待期間本來就沒鎖,換掉送出鍵是倒退。
+          // 而且本 app 的輸入框在等待期間本來就沒鎖，換掉送出鍵是倒退。
           if (onStopWaiting != null) ...[
             const SizedBox(width: TpSpacing.s2),
             Semantics(
@@ -897,7 +897,7 @@ class _ComposerState extends ConsumerState<_Composer> {
     super.dispose();
   }
 
-  /// lazy init:第一次成功後快取結果,後續沿用不再請求權限。
+  /// lazy init:第一次成功後快取結果，後續沿用不再請求權限。
   Future<bool> _ensureInit() async {
     if (widget.speechAvailable == true) return true;
     final ok = await ref.read(speechServiceProvider).init();
@@ -999,7 +999,7 @@ class _ComposerState extends ConsumerState<_Composer> {
                       textInputAction: TextInputAction.newline,
                       onTapOutside: (_) =>
                           FocusManager.instance.primaryFocus?.unfocus(),
-                      // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
+                      // iMessage 風格:圓角膠囊 + subtle 填色，無硬框(各狀態一致)。
                       decoration: InputDecoration(
                         hintText: '輸入訊息或語音指令',
                         isDense: true,
@@ -1073,7 +1073,7 @@ class _EmptyStatePrompts extends StatelessWidget {
             Text('從一個指令開始', style: theme.textTheme.titleMedium),
             const SizedBox(height: TpSpacing.s2),
             Text(
-              '選一個建議,或直接在下方輸入你想調整的行程。',
+              '選一個建議，或直接在下方輸入你想調整的行程。',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
