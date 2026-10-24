@@ -3,17 +3,17 @@ import 'package:tripline/models/display_format.dart';
 
 void main() {
   group('formatTimeRange', () {
-    test('起訖都有 → D1 定版格式(全形冒號、中間半形連字號)', () {
-      expect(formatTimeRange('09:30', '11:00'), '09：30 - 11：00');
+    test('起訖都有 → 半形冒號、中間半形連字號', () {
+      expect(formatTimeRange('09:30', '11:00'), '09:30 - 11:00');
     });
 
     test('只有起或只有訖 → 單一時間', () {
-      expect(formatTimeRange('09:30', null), '09：30');
-      expect(formatTimeRange('', '11:00'), '11：00');
+      expect(formatTimeRange('09:30', null), '09:30');
+      expect(formatTimeRange('', '11:00'), '11:00');
     });
 
-    test('已是全形冒號的輸入不重複轉換', () {
-      expect(formatTimeRange('09：30', '11：00'), '09：30 - 11：00');
+    test('全形冒號的輸入統一轉成半形', () {
+      expect(formatTimeRange('09：30', '11：00'), '09:30 - 11:00');
     });
 
     test('兩端皆空 → 空字串,由呼叫端決定佔位文字', () {

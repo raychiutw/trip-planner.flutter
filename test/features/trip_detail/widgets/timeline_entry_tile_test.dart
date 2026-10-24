@@ -171,7 +171,7 @@ void main() {
       }
 
       expect(find.text('美麗海水族館'), findsOneWidget);
-      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.text('09:30 - 11:00'), findsOneWidget);
       expect(find.text('景點'), findsOneWidget);
       expect(find.byKey(const ValueKey('test-map-link')), findsOneWidget);
     });
@@ -331,7 +331,7 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('美麗海水族館'), findsOneWidget);
-      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.text('09:30 - 11:00'), findsOneWidget);
       expect(find.byKey(const ValueKey('entry-details-60')), findsNothing);
     });
   });
@@ -356,7 +356,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('09：30'), findsOneWidget);
+      expect(find.text('09:30'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('景點'), findsOneWidget);
       expect(find.text('4.6'), findsOneWidget);
@@ -498,7 +498,7 @@ void main() {
         ),
       );
       expect(dotColor(tester, 3), TpSystemColorsLight.tintDeep);
-      expect(find.text('14：00'), findsOneWidget);
+      expect(find.text('14:00'), findsOneWidget);
     });
 
     testWidgets('rail badge 顯示停留點編號', (tester) async {
@@ -629,8 +629,8 @@ void main() {
         ),
       );
 
-      expect(find.bySemanticsLabel('首里城，09：30，景點'), findsOneWidget);
-      final node = tester.getSemantics(find.bySemanticsLabel('首里城，09：30，景點'));
+      expect(find.bySemanticsLabel('首里城，09:30，景點'), findsOneWidget);
+      final node = tester.getSemantics(find.bySemanticsLabel('首里城，09:30，景點'));
       expect(node.getSemanticsData().hint, '點兩下展開停留點細節');
       expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
       expect(
@@ -656,12 +656,12 @@ void main() {
         ),
       );
 
-      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.text('09:30 - 11:00'), findsOneWidget);
       expect(find.text('09:30'), findsNothing);
       final semanticsNode = tester.getSemantics(
         find.byKey(const ValueKey('timeline-entry-content-40')),
       );
-      expect(semanticsNode.getSemanticsData().label, contains('09：30 - 11：00'));
+      expect(semanticsNode.getSemanticsData().label, contains('09:30 - 11:00'));
       semantics.dispose();
     });
 
@@ -681,7 +681,7 @@ void main() {
         textScaler: const TextScaler.linear(1.25),
       );
 
-      expect(find.text('20：50 - 21：50'), findsOneWidget);
+      expect(find.text('20:50 - 21:50'), findsOneWidget);
       expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 15);
       expect(kTimelineRailWidth, 32);
       expect(
@@ -794,7 +794,7 @@ void main() {
         ),
       );
 
-      expect(find.text('12：00 - 12：45'), findsOneWidget);
+      expect(find.text('12:00 - 12:45'), findsOneWidget);
       expect(find.text('45 min'), findsOneWidget);
     });
 
@@ -894,7 +894,7 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.text('很長但仍需要完整閱讀的景點名稱'), findsOneWidget);
-      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.text('09:30 - 11:00'), findsOneWidget);
     });
 
     testWidgets('maximum accessibility text keeps the time range on one line', (
@@ -919,7 +919,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      final timeFinder = find.text('12：00 - 12：45');
+      final timeFinder = find.text('12:00 - 12:45');
       final timeText = tester.widget<Text>(timeFinder);
       expect(timeText.maxLines, 1);
       expect(timeText.softWrap, isFalse);
@@ -966,7 +966,7 @@ void main() {
         ),
       );
 
-      final node = tester.getSemantics(find.text('09：30 - 11：00'));
+      final node = tester.getSemantics(find.text('09:30 - 11:00'));
       final data = node.getSemanticsData();
       expect(
         data.flagsCollection.isButton,
@@ -1002,7 +1002,7 @@ void main() {
       final timeBox = tester.getRect(
         find.byKey(const ValueKey('entry-time-61')),
       );
-      final timeText = tester.getRect(find.text('09：30 - 11：00'));
+      final timeText = tester.getRect(find.text('09:30 - 11:00'));
       expect(
         timeBox.height,
         closeTo(timeText.height, 1),
@@ -1028,7 +1028,7 @@ void main() {
 
       // 時間是純顯示（不是按鈕、沒有自己的動作），但它就長在卡片上，
       // 點它與點卡片其他地方一樣展開 —— 不留一塊點了沒反應的死區。
-      await tester.tap(find.text('09：30 - 11：00'));
+      await tester.tap(find.text('09:30 - 11:00'));
       await tester.pumpAndSettle();
       expect(find.text('展開後的細節'), findsOneWidget, reason: '點時間應展開');
 

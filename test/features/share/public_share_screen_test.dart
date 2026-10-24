@@ -402,8 +402,8 @@ void main() {
     expect(find.text('沖繩家族旅行'), findsOneWidget);
     expect(find.text('2026/10/1 · 那霸 · 1 天'), findsOneWidget);
     expect(find.text('Day 1'), findsOneWidget);
-    expect(find.textContaining('9：00'), findsOneWidget);
-    expect(find.textContaining('10：30'), findsOneWidget);
+    expect(find.textContaining('9:00'), findsOneWidget);
+    expect(find.textContaining('10:30'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
     expect(find.text('高鐵 · 18 分 · 0.9km'), findsOneWidget);
     expect(find.text('不需計算路程'), findsOneWidget);
@@ -423,7 +423,7 @@ void main() {
 
     expect(find.text('10/1/2026 · 那霸 · 1 天'), findsOneWidget);
     expect(find.textContaining('10/1/2026'), findsNWidgets(2));
-    expect(find.text('9：00 AM - 10：30 AM'), findsOneWidget);
+    expect(find.text('9:00 AM - 10:30 AM'), findsOneWidget);
   });
 
   for (final user in [

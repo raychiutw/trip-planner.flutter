@@ -141,7 +141,7 @@ void main() {
       expect(find.textContaining('2000'), findsNothing);
     });
 
-    testWidgets('當日時間範圍：取 timeline min–max 並使用 D1 定版格式', (tester) async {
+    testWidgets('當日時間範圍：取 timeline min–max 並使用半形冒號格式', (tester) async {
       await pumpHeader(
         tester,
         const TripDay(
@@ -168,9 +168,9 @@ void main() {
           ],
         ),
       );
-      expect(find.text('09：00 - 17：00'), findsOneWidget);
+      expect(find.text('09:00 - 17:00'), findsOneWidget);
       expect(
-        tester.widget<Text>(find.text('09：00 - 17：00')).style?.fontSize,
+        tester.widget<Text>(find.text('09:00 - 17:00')).style?.fontSize,
         13,
       );
     });
@@ -204,7 +204,7 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Day 1'), findsOneWidget);
-      final range = tester.widget<Text>(find.text('09：00 - 17：00'));
+      final range = tester.widget<Text>(find.text('09:00 - 17:00'));
       expect(range.maxLines, 1);
       expect(range.softWrap, isFalse);
       final scaleDown = tester.widget<FittedBox>(
