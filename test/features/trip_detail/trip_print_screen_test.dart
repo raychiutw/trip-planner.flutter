@@ -206,7 +206,7 @@ void main() {
     expect(find.text('沖繩家族旅行'), findsOneWidget);
     expect(find.text('2026-10-01 · 那霸 · 1 天'), findsOneWidget);
     expect(find.text('Day 1'), findsOneWidget);
-    expect(find.text('09:00-10:30'), findsOneWidget);
+    expect(find.text('09:00 - 10:30'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
     expect(find.text('高鐵 · 18 分 · 0.9km'), findsOneWidget);
     expect(find.text('不需計算路程'), findsOneWidget);
