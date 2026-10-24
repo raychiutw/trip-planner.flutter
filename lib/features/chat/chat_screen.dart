@@ -38,12 +38,6 @@ const List<String> _suggestedPrompts = [
   '加入適合親子的水族館行程',
 ];
 
-/// chat composer 的 iMessage 風格圓角膠囊外框(無邊、各狀態一致)。
-const _composerPillBorder = OutlineInputBorder(
-  borderRadius: BorderRadius.all(Radius.circular(20)),
-  borderSide: BorderSide.none,
-);
-
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key, this.initialTripId, this.initialPrefill});
 
@@ -999,41 +993,70 @@ class _ComposerState extends ConsumerState<_Composer> {
                       textInputAction: TextInputAction.newline,
                       onTapOutside: (_) =>
                           FocusManager.instance.primaryFocus?.unfocus(),
-                      // iMessage 風格:圓角膠囊 + subtle 填色，無硬框(各狀態一致)。
+                      // 玻璃本身就是輸入區：沒有內層填色與邊框，文字直接寫在玻璃上，
+                      // 游標用 tint、placeholder 用次要文字色（DESIGN §7.1）。
                       decoration: InputDecoration(
                         hintText: '輸入訊息或語音指令',
+                        hintStyle: TextStyle(color: scheme.onSurfaceVariant),
                         isDense: true,
-                        filled: true,
-                        fillColor: scheme.surfaceContainerHighest,
+                        filled: false,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: TpSpacing.s4,
+                          horizontal: TpSpacing.s3,
                           vertical: TpSpacing.s3,
                         ),
-                        border: _composerPillBorder,
-                        enabledBorder: _composerPillBorder,
-                        focusedBorder: _composerPillBorder,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),
                 if (hasText)
-                  IconButton.filled(
+                  // 實心 tint 圓鈕（HIG Color：強調主要動作時顏色套在背景而非符號）；
+                  // 視覺 32pt，點擊區維持 44pt。
+                  IconButton(
                     key: const ValueKey('chat-send'),
                     tooltip: '送出訊息',
+                    constraints: const BoxConstraints.tightFor(
+                      width: TpSpacing.tapMin,
+                      height: TpSpacing.tapMin,
+                    ),
+                    padding: EdgeInsets.zero,
                     onPressed: widget.sending ? null : widget.onSend,
-                    icon: widget.sending
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: Semantics(
-                              label: '送出中',
-                              child: CircularProgressIndicator.adaptive(
-                                strokeWidth: 2,
-                              ),
-                            ),
-                          )
-                        : const Icon(CupertinoIcons.arrow_up_circle_fill),
+                    icon: DecoratedBox(
+                      key: const ValueKey('chat-send-surface'),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: widget.sending
+                            ? scheme.primary.withValues(alpha: 0.6)
+                            : scheme.primary,
+                      ),
+                      child: SizedBox.square(
+                        dimension: 32,
+                        child: Center(
+                          child: widget.sending
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: Semantics(
+                                    label: '送出中',
+                                    child: CircularProgressIndicator.adaptive(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        scheme.onPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  CupertinoIcons.arrow_up,
+                                  size: 18,
+                                  color: scheme.onPrimary,
+                                ),
+                        ),
+                      ),
+                    ),
                   )
                 else
                   IconButton(

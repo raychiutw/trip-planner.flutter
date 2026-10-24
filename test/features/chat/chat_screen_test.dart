@@ -572,6 +572,56 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('composer 輸入區沒有內層填色與邊框，文字直接寫在玻璃上', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final decoration = tester
+        .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+        .decoration!;
+    expect(decoration.filled, isNot(true));
+    expect(decoration.border, InputBorder.none);
+    expect(decoration.enabledBorder, InputBorder.none);
+    expect(decoration.focusedBorder, InputBorder.none);
+    // 玻璃表面只有一層：輸入區裡沒有第二個 TpGlassSurface。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('chat-composer-glass')),
+        matching: find.byType(TpGlassSurface),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('有文字時送出鈕是實心 tint 圓形，點擊區 ≥44pt；麥克風點擊區也 ≥44pt', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final mic = tester.getSize(find.byKey(const ValueKey('chat-mic-button')));
+    expect(mic.width, greaterThanOrEqualTo(44));
+    expect(mic.height, greaterThanOrEqualTo(44));
+
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '改午餐');
+    await tester.pump();
+
+    final scheme = Theme.of(
+      tester.element(find.byKey(const ValueKey('chat-send'))),
+    ).colorScheme;
+    final send = tester.getSize(find.byKey(const ValueKey('chat-send')));
+    expect(send.width, greaterThanOrEqualTo(44));
+    expect(send.height, greaterThanOrEqualTo(44));
+
+    final surface = find.byKey(const ValueKey('chat-send-surface'));
+    expect(tester.getSize(surface), const Size(32, 32));
+    final box = tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
+    expect(box.shape, BoxShape.circle);
+    expect(box.color, scheme.primary);
+    final icon = tester.widget<Icon>(
+      find.descendant(of: surface, matching: find.byType(Icon)),
+    );
+    expect(icon.icon, CupertinoIcons.arrow_up);
+    expect(icon.color, scheme.onPrimary);
+  });
+
   testWidgets('composer 由一行長到四行後停止增高，並依有無文字切換麥克風／送出', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

@@ -161,7 +161,8 @@ iPhone 固定四個 root tabs：
 
 - **Tripline 決策**：composer 是聊天頁持續存在的 bottom accessory。
 - **Tripline 決策**：composer 沒有左側 `＋`，也沒有附件或新增行程項目入口；輸入框從 leading 起延伸，由 1 行長到最多 4 行，之後內部捲動。新增停留點走時間軸各 Day 的既有入口（#314）。
-- **Tripline 決策**：空白時右側顯示麥克風；有文字時切換為送出。
+- **Tripline 決策**：glass 內不巢狀填色元件。composer 只有單一玻璃表面，輸入區沒有內層填色與邊框，文字直接寫在玻璃上；placeholder 用次要文字色，游標用 tint；外圓角與 root tab bar、POI accessory 共用同一個圓角值。設計稿見 `docs/design/chat-composer-glass.html`。
+- **Tripline 決策**：空白時右側顯示純圖示麥克風（無底）；有文字時切換為實心 tint 圓形送出鈕（視覺 32pt、點擊區 ≥44pt、反白向上箭頭）。依據：HIG Color「強調主要動作時把顏色套在背景而非符號」，屬 HIG 建議；送出中保留進度指示與「送出中」語意。
 - **Tripline 決策**：Return 換行；外接鍵盤使用 Command–Return 送出。
 - **HIG 必須**：切換 tab、開啟 Account 或暫時離開 App 時保留草稿。
 - **HIG 必須**：首次啟動語音時才請求麥克風權限。
