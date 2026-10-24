@@ -1,0 +1,74 @@
+# HIG 靜態稽核(截圖全掃):淺色、深色與大字級
+
+日期:2026-10-24。程式版本:0.33.0 開發中(含 POI 玻璃改版、App 鎖、半形冒號)。
+
+## 方法與限制
+
+- 以 `integration_test/hig_screenshots_test.dart` 在 iPhone 17 模擬器重拍:淺色、深色各 56 張,共 112 張(mock repository,不碰 prod)。
+- 分四批,各由一個審查代理逐張看圖,依 `DESIGN.md`、`CODING_STANDARDS.md` 與 `docs/research/` 的 HIG 筆記判斷,只報看得到的事實。
+- **驗證方式**:代理的結論不直接採信。標「已驗證」的,是我自己再看過原圖;標「待驗證」的,只有代理的說法,尚未覆核。
+
+**這份稽核沒有涵蓋的**
+- **玻璃材質**:模擬器玻璃是扁平的、地圖是 fixture,只能判斷結構(例如巢狀),不能判斷材質觀感。需真機(#461)。
+- **大字級**:只有截圖腳本有的 9 個畫面(歡迎、登入、行程清單 2x/3x、時間軸、分享管理、帳號、邀請、元件)。其他畫面沒有大字級截圖。
+- **新功能畫面**:App 鎖的鎖定畫面、詢問框、聊天 composer 新版不在截圖腳本內。
+- **互動與動態**:VoiceOver 實際朗讀、Reduce Motion、鍵盤、手勢都無法從靜態圖判斷。
+- 量測對比只能目測,「約 3:1」之類的數字都是估計,需用實際色值算。
+
+## 結果摘要
+
+| 批次 | 範圍 | blocker | should | nit |
+|---|---|---|---|---|
+| 1 | account-*、auth-* | 0 | 4 | 7 |
+| 2 | 大字級 9 個畫面 + components/chat/explore/favorites | 0 | 1 | 8 |
+| 3 | invite、share、public-share、offline、explore 錯誤/空狀態 | 0 | 7 | 5 |
+| 4 | trips、timeline、map、notes、print、share 管理 | 0 | 7 | 8 |
+
+**沒有任何 HIG 必須等級(release blocker)的發現。** 以下 should 數量是代理的原始統計,已排除與本輪修復重複者。
+
+## 已驗證(我自己看過原圖)
+
+| # | 畫面 | 發現 | 狀態 |
+|---|---|---|---|
+| V1 | account-developer-app-new(深色)、ax-* 堆疊版 | 深色分段控制選不出選取項。**這是我上一個 commit 造成的回歸**:sheet 的 elevated 配色讓 thumb 與軌道同色;堆疊版選取列是純黑 | **已修**(PR #464,測試涵蓋淺/深/深色 sheet 與大字級堆疊) |
+| V2 | trip-print | 航班顯示 `2026-11-01T09:00 → OKA 2026-11-01T11:30`(ISO 帶 `T`);住宿兩個日期之間沒有分隔或標籤;停留點時間為 `10:00-11:00`(無空格,與時間軸格式不同) | 待處理 |
+| V3 | share-list-load-failed | 同時顯示「使用中的連結(0)」「目前沒有使用中的分享連結」與「載入失敗」,把失敗呈現成「確實為空」;錯誤文字是一般前景色;「重試」沒有與訊息對齊;訊息用半形逗號 | 待處理 |
+
+## 待驗證(僅代理報告)
+
+依建議處理順序:
+
+1. **邀請畫面無出口**(批次 3 F3):所有 invite 畫面只有「邀請確認」標題,沒有返回、取消或「暫不加入」。若路由是 deep link 根頁且靠邊緣返回,風險較低,但畫面上看不出。
+2. **邀請錯誤文案矛盾**(F2):暫時性失敗用「邀請無效」當標題,內文卻說「可以再試一次」。
+3. **「切換帳號」沒說會登出**(F1):按鈕與 alert 標題寫「切換帳號」,內文問「確定要登出嗎」,動詞搖擺。
+4. **分享頁**:公開區塊 chip 看不出選取狀態(F7)、錯誤列沒有 icon 與語意色(F5)、建立後卡片的按鈕對齊與一次性連結缺收尾(F6)、「匿名分享」是方形 checkbox 且沒說明「匿名」的意義。
+5. **公開分享頁筆記區**也有 ISO 時間(F8),與 V2 同一類問題,很可能同一個根因(筆記欄位沒有本地化)。
+6. **對比偏低(淺色,估計)**:POI 編號徽章數字(約 2~2.5:1)、POI 卡次要文字、時間軸未選取的 Day 項、帳號「登入裝置」的提示卡、歡迎與註冊頁的次要字、邀請頁次要字、explore 錯誤 banner 紅字。需用實際色值量測再決定。
+7. **載入失敗場景只顯示 spinner**(trips-list-load-failed、account-sessions-load-failed、trip-map-route-failed):**可能是截圖時機,而不是 App 缺陷**——請先確認 integration test 是否等到錯誤態再下結論。我看過 trips-list-load-failed 的圖,確實只有 spinner,但無法區分兩種原因。
+8. **歡迎頁插圖**:對話泡泡第二行貼著泡泡下緣;泡泡文字固定 15 單位,不隨字級放大(Canvas 繪製,已有 Semantics 替代文字)。
+9. **explore-search-failed**:錯誤 banner 後 header 上方又重複一次 safe-area,多約 65pt 空白。
+
+### nit(選列,不逐項展開)
+
+- 表單欄位用 Material 式外框加浮動標籤,且在 grouped 卡內再套一層框(profile、developer-app-new、login-error);iOS 慣例是列內直接輸入。
+- 深色下 chip 與狀態膠囊失去容器(connected-apps、developer-apps),與淺色不一致。
+- 註冊與忘記密碼的主按鈕在空表單時是 enabled 外觀,其他表單是 disabled。
+- 備註區的項目卡再包一層 section 卡,深色下項目卡比 section 更黑(層級反轉);排序 handle 可點區看起來不到 44pt;12 小時制「上午 9:00」與其他處 24 小時制不一致。
+- 單一停留點的 rail 末端懸空。
+- chip 與小控制項高度約 36pt(可能由外層 padding 撐大,需 widget test 量測)。
+- 中文單字孤行(「料」「好」「旅」)、header 標題 1.3 倍封頂(程式註解說是刻意,DESIGN 沒寫)。
+- 離線 banner 貼著 tab bar 上緣;pending 版只靠 icon 表達離線。
+
+## 乾淨的畫面
+
+account-delete-dialog、account-settings-appearance、account-settings-notifications、auth-login、auth-login-error(除文案偏籠統)、trip-edit-load-failed、trips-list-empty、trips-list、share-manage(僅 checkbox)、invite-signed-in(除缺出口)、share-custom-expiry-missing,以及大字級的帳號、邀請、登入、時間軸、行程清單 2x/3x(重排正常、無水平溢位、必要文字未被裁切)。
+
+全部 112 張都沒有 emoji 當 icon、沒有 gradient 裝飾、沒有發現只靠顏色表達資訊的 map pin。
+
+## 建議後續
+
+1. 把 V2/V3 與待驗證的 1~5 各開票(多數是文案、版型與狀態呈現,不需要新設計)。
+2. 對比類先量實際色值,再決定是調 token 還是只調個別元件。
+3. 載入失敗場景先修截圖時機,避免之後再度誤判。
+4. 補截圖場景:App 鎖鎖定畫面、詢問框、新版聊天 composer、更多畫面的大字級。
+5. 真機驗收(#461)仍是玻璃與 Face ID 的唯一可信驗證。
