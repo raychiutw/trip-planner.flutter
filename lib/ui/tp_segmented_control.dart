@@ -38,6 +38,14 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
     final count = keys.length;
     final trackRadius = TpRadius.sm + _trackInset;
 
+    // 選取 thumb 要比軌道亮：淺色是白（surface）；深色 surface 是純黑、反而比軌道暗，
+    // 而 sheet 的 elevated 配色又把 surfaceContainerHigh 上移成與 Highest 同色，
+    // 所以直接在軌道色上疊一層 onSurface，任何配色下都保證比軌道亮。
+    final trackColor = scheme.surfaceContainerHigh;
+    final thumbColor = theme.brightness == Brightness.dark
+        ? Color.alphaBlend(scheme.onSurface.withValues(alpha: 0.14), trackColor)
+        : scheme.surface;
+
     final labelStyle = theme.textTheme.labelLarge?.copyWith(
       fontWeight: FontWeight.w600,
     );
@@ -53,8 +61,8 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
         decoration: BoxDecoration(
           color: stacked && key == value
               ? (enabled
-                    ? scheme.surface
-                    : scheme.surface.withAlpha(
+                    ? thumbColor
+                    : thumbColor.withAlpha(
                         (TpDisabled.controlOpacity * 255).round(),
                       ))
               : null,
@@ -83,15 +91,9 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
       ),
     );
 
-    // 選取 thumb 要比軌道亮：淺色是白（surface），深色 surface 是純黑、反而比軌道暗，
-    // 改用再高一階的填充層（與 tab bar 選取膠囊同一語彙）。
-    final thumbColor = theme.brightness == Brightness.dark
-        ? scheme.surfaceContainerHighest
-        : scheme.surface;
-
     Widget track(Widget child) => DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
+        color: trackColor,
         borderRadius: BorderRadius.circular(trackRadius),
       ),
       child: Padding(padding: const EdgeInsets.all(_trackInset), child: child),

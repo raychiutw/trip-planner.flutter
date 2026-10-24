@@ -383,10 +383,16 @@ void main() {
       );
     });
 
-    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
-      testWidgets('${theme.brightness.name}：選取 thumb 比軌道亮（iOS 慣例）', (
-        tester,
-      ) async {
+    // sheet 內的 elevated 配色會把 surfaceContainerHigh 上移一階，thumb 仍要比軌道亮。
+    final darkElevated = AppTheme.dark().copyWith(
+      colorScheme: AppTheme.elevated(AppTheme.dark().colorScheme),
+    );
+    for (final (name, theme) in [
+      ('light', AppTheme.light()),
+      ('dark', AppTheme.dark()),
+      ('dark elevated sheet', darkElevated),
+    ]) {
+      testWidgets('$name：選取 thumb 比軌道亮（iOS 慣例）', (tester) async {
         await tester.pumpWidget(_host(segmented(), theme: theme));
         await tester.pumpAndSettle();
 
@@ -405,6 +411,50 @@ void main() {
         expect(
           fillOf(thumb).computeLuminance(),
           greaterThan(fillOf(track).computeLuminance()),
+        );
+      });
+
+      testWidgets('$name：大字級堆疊版的選取列比軌道亮', (tester) async {
+        await tester.pumpWidget(
+          _host(
+            Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(3)),
+                child: TpSegmentedControl<String>(
+                  value: 'a',
+                  options: const {'a': '甲甲甲甲甲甲', 'b': '乙乙乙乙乙乙', 'c': '丙丙丙丙丙丙'},
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+            theme: theme,
+          ),
+        );
+        await tester.pumpAndSettle();
+        // 堆疊版沒有滑動 thumb，確認真的走到堆疊分支。
+        expect(find.byKey(const ValueKey('tp-segment-thumb')), findsNothing);
+
+        final control = find.byType(TpSegmentedControl<String>);
+        final fills = tester
+            .widgetList<DecoratedBox>(
+              find.descendant(of: control, matching: find.byType(DecoratedBox)),
+            )
+            .map((w) => (w.decoration as BoxDecoration).color)
+            .whereType<Color>()
+            .toList();
+        // 軌道一個、被選列一個；被選列要比軌道亮。
+        expect(fills.length, 2);
+        expect(
+          fills
+              .map((c) => c.computeLuminance())
+              .reduce((a, b) => a > b ? a : b),
+          greaterThan(
+            fills
+                .map((c) => c.computeLuminance())
+                .reduce((a, b) => a < b ? a : b),
+          ),
         );
       });
     }
