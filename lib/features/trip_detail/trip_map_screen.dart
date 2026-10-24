@@ -995,64 +995,29 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               ),
             ),
           )
-        : Column(
-            children: [
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  padEnds: false,
-                  pageSnapping: false,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: visibleStops.length,
-                  onPageChanged: (index) => _previewStop(visibleStops[index]),
-                  itemBuilder: (context, index) => Padding(
-                    key: ValueKey(
-                      'trip-map-poi-card-padding-${visibleStops[index].entry.id}',
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TpSpacing.s2,
-                      vertical: TpSpacing.s1,
-                    ),
-                    child: _buildEntryCard(
-                      context,
-                      visibleStops[index],
-                      index: index,
-                      total: visibleStops.length,
-                    ),
-                  ),
-                ),
+        // 不畫頁碼點與 N / M：位置由露出的下一張卡、編號徽章與 Semantics 表達。
+        : PageView.builder(
+            controller: _pageController,
+            padEnds: false,
+            pageSnapping: false,
+            scrollDirection: Axis.horizontal,
+            itemCount: visibleStops.length,
+            onPageChanged: (index) => _previewStop(visibleStops[index]),
+            itemBuilder: (context, index) => Padding(
+              key: ValueKey(
+                'trip-map-poi-card-padding-${visibleStops[index].entry.id}',
               ),
-              SizedBox(
-                height: TpSpacing.s3,
-                child: visibleStops.length <= 12
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (final stop in visibleStops) ...[
-                            Container(
-                              width: stop.entry.id == _previewEntryId ? 14 : 5,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: stop.entry.id == _previewEntryId
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.onSurface
-                                          .withValues(alpha: 0.26),
-                                borderRadius: BorderRadius.circular(99),
-                              ),
-                            ),
-                            const SizedBox(width: TpSpacing.s1),
-                          ],
-                        ],
-                      )
-                    : Text(
-                        '${visibleStops.indexWhere((stop) => stop.entry.id == _previewEntryId) + 1} / ${visibleStops.length}',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: TpSpacing.s2,
+                vertical: TpSpacing.s1,
               ),
-            ],
+              child: _buildEntryCard(
+                context,
+                visibleStops[index],
+                index: index,
+                total: visibleStops.length,
+              ),
+            ),
           );
   }
 

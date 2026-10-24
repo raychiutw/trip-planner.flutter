@@ -1992,7 +1992,7 @@ void main() {
     expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
   });
 
-  testWidgets('長行程 page indicator 不會水平溢出', (tester) async {
+  testWidgets('長行程不顯示頁碼計數也不會水平溢出', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -2017,8 +2017,21 @@ void main() {
     await tester.pumpWidget(_buildScreen([manyStops]));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 / 40'), findsOneWidget);
+    expect(find.text('1 / 40'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('POI 卡片列下方沒有頁碼點那一排', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final accessory = tester.getRect(
+      find.byKey(const ValueKey('tp-bottom-accessory')),
+    );
+    final card = tester.getRect(find.byKey(const ValueKey('entry-card-11')));
+    // 卡片與 accessory 底緣只剩 pager 的垂直 padding，不再為頁碼點多留一排。
+    expect(accessory.bottom - card.bottom, lessThanOrEqualTo(TpSpacing.s1));
+    expect(find.text('1 / 1'), findsNothing);
   });
 
   testWidgets('地圖維持單一路線圖，不顯示舊圖層選單', (tester) async {
