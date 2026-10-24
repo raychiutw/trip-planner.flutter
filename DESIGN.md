@@ -191,6 +191,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：點行程 marker 時，卡片列捲到對應 POI；滑動卡片時，地圖聚焦對應 marker。
 - **Tripline 決策**：卡片列水平滑動，不循環、不製造假資料，並露出下一張卡作為滑動提示。
 - **Tripline 決策**：行程 POI accessory 沒有垂直拖曳、detent 或 grabber。
+- **Tripline 決策**：行程 POI accessory 只有外層**單一玻璃表面**（圓角與 root tab bar 同心）；卡片本身透明，不填色、不畫外框與陰影，避免玻璃內再巢狀實心卡（§16）。設計稿見 [poi-accessory-glass](docs/design/poi-accessory-glass.html)（[預覽圖](docs/design/poi-accessory-glass.png)）。
+- **Tripline 決策**：目前選取的卡使用與 root tab bar、Day selector 相同的中性選取底（品牌 tint 只上前景）；未選取的卡之間只用 0.5pt 細分隔線，選取卡兩側不畫分隔線。
+- **Tripline 決策**：不顯示頁碼點，也不顯示 `N / M` 計數；位置資訊由「露出下一張卡」、編號徽章與 semantics（第 N 個，共 M 個）承擔。編號徽章為當日 pin 色 16% 填色加 1.5pt 圓環（地圖逐日色是既有 rainbow 例外）。
 - **Tripline 決策**：選取外部 POI 時，以外部 POI compact card 暫時取代行程 POI 列；關閉後恢復原本 Day、卡片位置與 marker 狀態。
 - **HIG 必須**：卡片需顯示名稱、時間與本地化類型；缺位置時明確顯示「尚無位置」。
 - **HIG 必須**：卡片高度隨 Dynamic Type 增加，不裁切必要內容。
