@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/credential_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
@@ -11,6 +12,17 @@ import 'package:tripline/features/account/settings/biometric_login_row.dart';
 import 'package:tripline/models/user.dart';
 
 import '../helpers/fake_biometric.dart';
+
+class _StubAuthRepository implements AuthRepository {
+  @override
+  Future<UserInfo> login({
+    required String email,
+    required String password,
+  }) async => _user;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 const _user = UserInfo(id: 'u1', email: 'a@example.com');
 
@@ -41,6 +53,7 @@ void main() {
         container: container = ProviderContainer(
           overrides: [
             authStateProvider.overrideWith(_FakeAuth.new),
+            authRepositoryProvider.overrideWithValue(_StubAuthRepository()),
             settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
             biometricAuthenticatorProvider.overrideWithValue(bio),
             credentialStoreProvider.overrideWithValue(store),
@@ -116,8 +129,34 @@ void main() {
     expect(await store.read(), isNull);
   });
 
-  testWidgets('沒有存帳密時設定列不出現（只能在登入後的詢問開啟）', (tester) async {
+  testWidgets('設定列：沒綁定時是關閉的；開啟要重新輸入帳密，驗證通過才綁定', (tester) async {
     await pump(tester);
+    await passwordLogin(tester);
+    await tester.tap(find.byKey(const ValueKey('app-lock-dialog-cancel')));
+    await settle(tester);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+
+    await tester.tap(find.byType(Switch));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('bio-bind-dialog')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('bio-bind-password')),
+      'pw2',
+    );
+    await tester.tap(find.byKey(const ValueKey('bio-bind-confirm')));
+    await settle(tester);
+
+    expect(find.byKey(const ValueKey('bio-bind-dialog')), findsNothing);
+    expect((await store.read())?.password, 'pw2');
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+  });
+
+  testWidgets('設定列：裝置沒有生物辨識就不出現', (tester) async {
+    await pump(tester);
+    bio.kind = null;
+    container.invalidate(appLockKindProvider);
+    await settle(tester);
     expect(find.byType(Switch), findsNothing);
   });
 }

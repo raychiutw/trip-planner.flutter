@@ -50,7 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool bind = false}) async {
     if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
@@ -60,6 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         .rememberAttempt(
           _emailController.text.trim(),
           _passwordController.text,
+          bind: bind,
         );
     // 失敗訊息由 authStateProvider 的 AsyncError 呈現，不在此 throw
     await ref
@@ -76,8 +77,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// 取消或失敗只留在登入頁，使用者仍可手動輸入。
   Future<void> _biometricLogin() async {
     if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
+    final controller = ref.read(biometricLoginProvider.notifier);
+    if (!ref.read(biometricLoginProvider).hasSaved) {
+      // 第一次：先用帳密驗證，成功後直接綁定。
+      await _submit(bind: true);
+      return;
+    }
     setState(() => _loginAttempted = true);
-    await ref.read(biometricLoginProvider.notifier).loginWithBiometric();
+    await controller.loginWithBiometric();
   }
 
   /// OAuth PKCE 登入(系統瀏覽器 + loopback);成功後 invalidate authState → router 跳轉。
@@ -125,8 +132,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isSubmitting = authState.isLoading;
     final isBusy = isSubmitting || _oauthLoading;
     final biometricKind = ref.watch(appLockKindProvider).value;
-    final showBiometric =
-        ref.watch(biometricLoginProvider).hasSaved && biometricKind != null;
+    final biometricBound = ref.watch(biometricLoginProvider).hasSaved;
+    final showBiometric = biometricKind != null;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
@@ -317,6 +324,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           label: Text('使用 ${biometricKind.lockLabel} 登入'),
                         ),
+                        if (!biometricBound)
+                          Padding(
+                            padding: const EdgeInsets.only(top: TpSpacing.s1),
+                            child: Text(
+                              '第一次請先輸入 Email 與密碼，驗證後綁定 ${biometricKind.lockLabel}',
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
                       ],
                       if (ref.watch(oauthEnabledProvider)) ...[
                         const SizedBox(height: TpSpacing.s4),
