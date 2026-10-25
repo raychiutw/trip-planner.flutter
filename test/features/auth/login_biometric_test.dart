@@ -57,9 +57,39 @@ void main() {
     return ProviderScope.containerOf(tester.element(find.byType(LoginScreen)));
   }
 
-  testWidgets('沒有存帳密：不顯示生物辨識登入', (tester) async {
+  testWidgets('沒有存帳密：仍顯示按鈕，點了先提示輸入帳密、不登入', (tester) async {
     await pump(tester);
-    expect(_button, findsNothing);
+    expect(_button, findsOneWidget);
+
+    await tester.tap(_button);
+    await tester.pumpAndSettle();
+
+    expect(find.text('請輸入 Email'), findsOneWidget);
+    expect(bio.authenticateCalls, 0);
+    verifyNever(
+      () => repo.login(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+      ),
+    );
+  });
+
+  testWidgets('沒有存帳密：填帳密後點按鈕 → 登入並直接綁定，不再詢問', (tester) async {
+    final container = await pump(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'a@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password-field')),
+      'pw1',
+    );
+    await tester.tap(_button);
+    await tester.pumpAndSettle();
+
+    verify(() => repo.login(email: 'a@example.com', password: 'pw1')).called(1);
+    expect((await store.read())?.password, 'pw1');
+    expect(container.read(biometricLoginProvider).promptPending, isFalse);
   });
 
   testWidgets('已存帳密：顯示「使用 Face ID 登入」，點擊驗證後用存下的帳密登入', (tester) async {

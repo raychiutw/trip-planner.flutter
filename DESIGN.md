@@ -140,7 +140,7 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：登出保留存下的帳密（這是功能的目的）；刪除帳號時清除。與 App 鎖互相獨立：登出會關掉 App 鎖，不影響這裡。
 - **Tripline 決策**：只適用 email＋密碼；Google／OAuth 登入沒有密碼可存，不適用。
 - **Tripline 決策**：存下的密碼被後端拒絕（`LOGIN_INVALID`，例如在別處改過密碼）時清掉帳密，回到手動輸入；網路等一般失敗保留。已開啟時用同一個 email 的新密碼手動登入成功，靜默更新存下的密碼；換成別的 email 手動登入，則清掉前一位的帳密並對新帳號重新詢問（不靜默覆蓋）。登出時待答的詢問與待存帳密一律作廢。
-- **Tripline 決策**：開啟只能在登入後的詢問進行（要有密碼才存得進去）；設定列「安全性」只在已開啟時出現，用來關閉，關閉要先通過一次驗證。
+- **Tripline 決策**：開啟有三個入口，都要有密碼才存得進去：① 密碼登入成功後的詢問；② 登入頁的「使用 … 登入」在尚未綁定時仍顯示，點了要求先填 Email 與密碼，登入成功就直接綁定（不再詢問），按鈕下方註明第一次需輸入帳密；③ 設定列「安全性」在裝置支援時一律出現，開啟要重新輸入密碼，通過後端驗證才綁定（只接受目前登入的 email，避免驗證換發 session 把使用者登出）。關閉要先通過一次生物辨識驗證並清掉帳密。
 - **Tripline 決策**：登入頁的生物辨識按鈕以裝置實際方式命名（「Face ID」「Touch ID」「生物辨識」），不使用籠統字眼；取消或失敗只留在登入頁，不阻擋手動輸入。
 
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。

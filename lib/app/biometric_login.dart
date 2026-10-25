@@ -18,6 +18,8 @@ import 'app_lock.dart';
 
 const _promptedKey = 'bio_login_prompted';
 
+enum BindOutcome { bound, wrongAccount }
+
 @immutable
 class BiometricLoginState {
   const BiometricLoginState({
@@ -44,6 +46,9 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
   /// 詢問框待答時暫存的帳密，答「開啟」才寫進 Keychain。
   SavedCredentials? _pendingSave;
   bool _attemptFromSaved = false;
+
+  /// 登入頁尚未綁定時點「使用 Face ID 登入」：密碼登入成功就直接綁定。
+  bool _attemptBinds = false;
   bool _inFlight = false;
 
   @override
@@ -63,9 +68,12 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
   }
 
   /// 登入畫面送出密碼登入前呼叫，登入成功才會用到。
-  void rememberAttempt(String email, String password) {
+  ///
+  /// [bind] 為 true 時，登入成功就直接綁定（不再詢問）。
+  void rememberAttempt(String email, String password, {bool bind = false}) {
     _attempt = SavedCredentials(email: email, password: password);
     _attemptFromSaved = false;
+    _attemptBinds = bind;
   }
 
   void _onAuth(AsyncValue<UserInfo?> next) {
@@ -80,9 +88,15 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     if (attempt == null) return;
     if (next is AsyncData<UserInfo?> && next.value != null) {
       _attempt = null;
-      if (!_attemptFromSaved) unawaited(_afterPasswordLogin(attempt));
+      if (_attemptBinds) {
+        _attemptBinds = false;
+        unawaited(_save(attempt));
+      } else if (!_attemptFromSaved) {
+        unawaited(_afterPasswordLogin(attempt));
+      }
     } else if (next is AsyncError<UserInfo?>) {
       _attempt = null;
+      _attemptBinds = false;
       final error = next.error;
       // 存下的密碼已失效（例如在別處改過密碼）：清掉，回到手動登入。
       if (_attemptFromSaved &&
@@ -129,12 +143,33 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     _pendingSave = null;
     await _write(_promptedKey, '1');
     if (!enable || toSave == null) return;
+    await _save(toSave);
+  }
+
+  Future<void> _save(SavedCredentials credentials) async {
     try {
-      await ref.read(credentialStoreProvider).write(toSave);
+      await ref.read(credentialStoreProvider).write(credentials);
+      await _write(_promptedKey, '1');
       if (ref.mounted) state = state.copyWith(hasSaved: true);
     } catch (_) {
       // 存不進 Keychain：維持關閉，下次登入頁仍是手動輸入。
     }
+  }
+
+  /// 設定頁開啟：重新輸入帳密，驗證通過才綁定。
+  ///
+  /// 只接受目前登入的帳號（驗證會換發 session，換成別人的帳號會把使用者登出）。
+  /// 密碼錯誤等 [ApiError] 直接往上丟給呼叫端顯示。
+  Future<BindOutcome> bind(String email, String password) async {
+    final current = ref.read(authStateProvider).value?.email;
+    if (current == null || current.toLowerCase() != email.toLowerCase()) {
+      return BindOutcome.wrongAccount;
+    }
+    await ref
+        .read(authRepositoryProvider)
+        .login(email: email, password: password);
+    await _save(SavedCredentials(email: email, password: password));
+    return BindOutcome.bound;
   }
 
   /// 登入頁的「使用 Face ID 登入」：驗證通過才讀出帳密並走一般密碼登入。
