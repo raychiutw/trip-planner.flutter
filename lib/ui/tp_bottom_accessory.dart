@@ -28,7 +28,10 @@ class TpBottomAccessory extends StatelessWidget {
     return Positioned(
       left: TpSpacing.s3,
       right: TpSpacing.s3,
-      bottom: TpRootTabGeometry.clearance(context) + TpSpacing.s1,
+      // 浮在底部帶狀遮蔽之上，玻璃下緣才不會被壓出黑帶。
+      bottom:
+          TpRootTabGeometry.clearance(context) +
+          TpRootTabGeometry.bandExtraHeight,
       child: SizedBox(
         key: const ValueKey('tp-bottom-accessory'),
         height: accessoryHeight,

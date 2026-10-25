@@ -1034,9 +1034,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                       key: ValueKey(
                         'poi-divider-${visibleStops[index].entry.id}',
                       ),
-                      width: 0.5,
+                      width: 1,
                       child: ColoredBox(
-                        color: Theme.of(context).colorScheme.outlineVariant,
+                        color: tpBarForeground(
+                          context,
+                          onMedia: TpMediaBackdropScope.of(context),
+                        ).withValues(alpha: 0.3),
                       ),
                     ),
                   ),
@@ -1070,6 +1073,10 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     // accessory host 是唯一玻璃表面，卡片本身完全透明（DESIGN §9.2）：
     // 目前卡（選取或預覽）只用前景表達——實心徽章與粗體標題，不填底色。
     final current = isActive || isPreview;
+    // 卡片在媒體（地圖）上的玻璃裡：淺色模式也用白色前景，與深色一致。
+    final onMedia = TpMediaBackdropScope.of(context);
+    final primaryColor = tpBarForeground(context, onMedia: onMedia);
+    final secondaryColor = tpBarSecondaryForeground(context, onMedia: onMedia);
 
     return KeyedSubtree(
       key: ValueKey(
@@ -1134,6 +1141,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                           stop.entry.title,
                           key: ValueKey('entry-card-title-${stop.entry.id}'),
                           style: theme.textTheme.titleMedium?.copyWith(
+                            color: primaryColor,
                             fontWeight: current
                                 ? FontWeight.w700
                                 : FontWeight.w500,
@@ -1154,7 +1162,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                             ],
                           ),
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: secondaryColor,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),

@@ -1118,7 +1118,8 @@ void main() {
         tester.view.physicalSize.height / tester.view.devicePixelRatio;
     expect(
       screenHeight - tester.getRect(accessory).bottom,
-      TpRootTabGeometry.expandedHeightFor(bottomInset) + TpSpacing.s1,
+      TpRootTabGeometry.expandedHeightFor(bottomInset) +
+          TpRootTabGeometry.bandExtraHeight,
     );
     expect(find.text('horizontal pages'), findsOneWidget);
     expect(

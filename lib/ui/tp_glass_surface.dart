@@ -74,10 +74,11 @@ const double tpMediaScrimOpacity = 0.35;
 
 /// 日期選擇器在媒體上採 70% 中性底，搭配不透明 onSurface 前景。
 /// 這是保留圖磚透出且維持文字對比的產品選擇，不改共用媒體暗化或光學參數。
-Color tpMediaControlBackground(BuildContext context) => Theme.of(context)
-    .colorScheme
-    .surfaceContainerLow
-    .withValues(alpha: _usesOpaqueGlass(context) ? 1 : 0.7);
+Color tpMediaControlBackground(BuildContext context) =>
+    _usesOpaqueGlass(context)
+    ? Theme.of(context).colorScheme.surfaceContainerLow
+    // 媒體上一律用深色系統色（淺色模式也是），與深色模式一致。
+    : TpSystemColorsDark.secondary.withValues(alpha: 0.7);
 
 /// 媒體上的獨立圖示按鈕保留較多背景，白色符號仍達 3:1。
 /// 僅調整產品填色；光學與無障礙降級沿用共用媒體配方。
@@ -122,6 +123,12 @@ Color tpBarForeground(BuildContext context, {required bool onMedia}) =>
     onMedia && !_usesOpaqueGlass(context)
     ? Colors.white
     : Theme.of(context).colorScheme.onSurface;
+
+/// 玻璃上的次要文字：媒體上用白色 65%，其餘沿用 onSurfaceVariant。
+Color tpBarSecondaryForeground(BuildContext context, {required bool onMedia}) =>
+    onMedia && !_usesOpaqueGlass(context)
+    ? Colors.white.withValues(alpha: 0.65)
+    : Theme.of(context).colorScheme.onSurfaceVariant;
 
 /// 一般模式**不描邊**；「提高對比」才補一條明顯的實心邊。
 ///
@@ -225,13 +232,19 @@ class _TpNavigationGlassAppearance {
                 ? TpNavigationGlassRecipe.platformView
                 : TpNavigationGlassRecipe.regular,
           );
+    // 地圖是暗化後的媒體背景：淺色模式也用深色系統色，與深色模式一致。
+    final darkOnMedia = onMedia && !_usesOpaqueGlass(context);
     foreground = dateSelector
         ? onMedia
-              ? scheme.onSurface.withValues(alpha: 1)
+              ? darkOnMedia
+                    ? Colors.white
+                    : scheme.onSurface.withValues(alpha: 1)
               : scheme.onSurfaceVariant
         : tpBarForeground(context, onMedia: onMedia);
-    selectedForeground = scheme.primary;
-    indicatorColor = scheme.surfaceContainerHigh;
+    selectedForeground = darkOnMedia ? TpSystemColorsDark.tint : scheme.primary;
+    indicatorColor = darkOnMedia
+        ? TpSystemColorsDark.tertiary
+        : scheme.surfaceContainerHigh;
     backgroundColor = dateSelector
         ? onMedia
               ? tpMediaControlBackground(context)

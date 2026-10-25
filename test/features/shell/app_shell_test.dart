@@ -840,10 +840,7 @@ void main() {
         map.indicatorSettings?.refractiveIndex,
         map.settings?.refractiveIndex,
       );
-      expect(
-        _selectedPillColor(tester, '地圖'),
-        AppTheme.light().colorScheme.surfaceContainerHigh,
-      );
+      expect(_selectedPillColor(tester, '地圖'), TpSystemColorsDark.tertiary);
     });
 
     testWidgets('Reduce Transparency 使用不透明且無模糊的 root tab 選取底色', (tester) async {
