@@ -17,6 +17,9 @@ class TpBottomAccessory extends StatelessWidget {
   /// 一般文字尺寸的基準高度；放大文字由呼叫端傳入所需高度。
   static const height = 88.0;
 
+  /// 單行精簡內容（行程 POI 卡片列）使用的基準高度。
+  static const compactHeight = 68.0;
+
   final Widget child;
   final double accessoryHeight;
 
