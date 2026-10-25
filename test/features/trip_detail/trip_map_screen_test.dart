@@ -876,7 +876,7 @@ void main() {
     expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
   });
 
-  testWidgets('POI 卡片透明：只有目前卡有中性選取底，且沒有外框、陰影與 tint', (tester) async {
+  testWidgets('POI 卡片完全透明：沒有任何底色、外框與陰影（玻璃只有外層一塊）', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne]));
     await tester.pumpAndSettle();
 
@@ -904,7 +904,32 @@ void main() {
       expect(d.boxShadow, isNull, reason: '不畫陰影');
       expect(d.color, isNot(scheme.primary));
     }
-    expect(cards.where((d) => d.color != null), hasLength(1));
+    expect(cards.where((d) => d.color != null), isEmpty, reason: '目前卡也不填底色');
+  });
+
+  testWidgets('目前卡以實心徽章表示；其餘卡維持 16% 填色加環', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    BoxDecoration badge(int id) =>
+        tester
+                .widget<Container>(find.byKey(ValueKey('poi-number-$id')))
+                .decoration!
+            as BoxDecoration;
+    final active = badge(11);
+    expect(active.color!.a, 1);
+    expect(active.border, isNull);
+    final inactive = badge(12);
+    expect(inactive.color!.a, closeTo(0.16, 0.01));
+    expect((inactive.border! as Border).top.width, 1.5);
+  });
+
+  testWidgets('卡片之間有分隔線，第一張卡前面沒有', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('poi-divider-11')), findsNothing);
+    expect(find.byKey(const ValueKey('poi-divider-12')), findsOneWidget);
   });
 
   testWidgets('編號徽章用當日 pin 色 16% 填色加 1.5pt 圓環', (tester) async {
@@ -913,7 +938,7 @@ void main() {
 
     final badge =
         tester
-                .widget<Container>(find.byKey(const ValueKey('poi-number-11')))
+                .widget<Container>(find.byKey(const ValueKey('poi-number-12')))
                 .decoration!
             as BoxDecoration;
     final border = badge.border! as Border;
@@ -1114,7 +1139,7 @@ void main() {
     expect(selectorRect.top - headerRect.bottom, closeTo(TpSpacing.s2, 1));
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
-      TpBottomAccessory.height,
+      TpBottomAccessory.compactHeight,
     );
     expect(mapConfig?.initialMaxZoom, isNull);
     expect(mapConfig?.initialZoom, 13);
@@ -1208,7 +1233,7 @@ void main() {
     );
   });
 
-  testWidgets('POI 卡片與玻璃膠囊保留水平 8pt、垂直 4pt 空白', (tester) async {
+  testWidgets('POI 卡片與玻璃膠囊保留水平 8pt、垂直 0（精簡單行）', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -1217,10 +1242,7 @@ void main() {
     );
     expect(
       padding.padding,
-      const EdgeInsets.symmetric(
-        horizontal: TpSpacing.s2,
-        vertical: TpSpacing.s1,
-      ),
+      const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
     );
   });
 
@@ -1691,11 +1713,11 @@ void main() {
 
     final card = find.byKey(const ValueKey('entry-card-11'));
     expect(
-      find.descendant(of: card, matching: find.text('09:00 - 10:30')),
+      find.descendant(of: card, matching: find.textContaining('09:00 - 10:30')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: card, matching: find.text('景點')),
+      find.descendant(of: card, matching: find.textContaining('景點')),
       findsOneWidget,
     );
     expect(find.textContaining('停留 1 /'), findsNothing);
@@ -1737,18 +1759,23 @@ void main() {
 
     final card = find.byKey(const ValueKey('entry-card-41'));
     expect(
-      find.descendant(of: card, matching: find.text('時間未設定')),
+      find.descendant(of: card, matching: find.textContaining('時間未設定')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: card, matching: find.text('運動活動')),
+      find.descendant(of: card, matching: find.textContaining('運動活動')),
       findsOneWidget,
     );
     expect(find.text('sports_activity'), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-42')),
-        matching: find.text('餐廳'),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.key == const ValueKey('entry-card-meta-42') &&
+              w.textSpan!.toPlainText().endsWith('餐廳'),
+        ),
       ),
       findsOneWidget,
     );
@@ -1778,14 +1805,14 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-51')),
-        matching: find.text('07:45'),
+        matching: find.textContaining('07:45'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-card-52')),
-        matching: find.text('08:00'),
+        matching: find.textContaining('08:00'),
       ),
       findsOneWidget,
     );
@@ -1884,7 +1911,7 @@ void main() {
     expect(
       mapConfig!.initialPadding.bottom,
       greaterThanOrEqualTo(
-        TpBottomAccessory.height + expectedRootClearance + TpSpacing.s1,
+        TpBottomAccessory.compactHeight + expectedRootClearance + TpSpacing.s1,
       ),
     );
     final drawerRect = tester.getRect(
@@ -1956,7 +1983,7 @@ void main() {
 
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
-      closeTo(130, 0.01),
+      closeTo(110, 0.01),
     );
     final selector = tester.getRect(
       find.byKey(const ValueKey('trip-map-day-selector')),
@@ -1981,11 +2008,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
-    for (final key in [
-      'entry-card-title-11',
-      'entry-card-time-11',
-      'entry-card-category-11',
-    ]) {
+    for (final key in ['entry-card-title-11', 'entry-card-meta-11']) {
       final text = tester.widget<Text>(find.byKey(ValueKey(key)));
       expect(text.maxLines, isNull);
       expect(text.overflow, isNull);

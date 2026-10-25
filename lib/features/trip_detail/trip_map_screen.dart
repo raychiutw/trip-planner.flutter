@@ -322,10 +322,17 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   int? _previewEntryId;
   GoogleMapPoiSelection? _selectedGooglePoi;
 
+  /// 編號徽章直徑；整張卡才是點擊區（≥44pt 高）。
+  static const _badgeSize = 32.0;
+
   double get _poiAccessoryHeight {
     final scale = MediaQuery.textScalerOf(context).scale(1);
     final additionalHeight = ((scale - 1) * 120).clamp(0.0, 220.0);
-    return TpBottomAccessory.height + additionalHeight;
+    // Google POI 卡有兩列（名稱＋開啟按鈕），行程 POI 卡是精簡單行。
+    final base = _selectedGooglePoi == null
+        ? TpBottomAccessory.compactHeight
+        : TpBottomAccessory.height;
+    return base + additionalHeight;
   }
 
   double get _daySelectorHeight =>
@@ -1003,20 +1010,37 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             scrollDirection: Axis.horizontal,
             itemCount: visibleStops.length,
             onPageChanged: (index) => _previewStop(visibleStops[index]),
-            itemBuilder: (context, index) => Padding(
-              key: ValueKey(
-                'trip-map-poi-card-padding-${visibleStops[index].entry.id}',
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: TpSpacing.s2,
-                vertical: TpSpacing.s1,
-              ),
-              child: _buildEntryCard(
-                context,
-                visibleStops[index],
-                index: index,
-                total: visibleStops.length,
-              ),
+            itemBuilder: (context, index) => Stack(
+              children: [
+                Padding(
+                  key: ValueKey(
+                    'trip-map-poi-card-padding-${visibleStops[index].entry.id}',
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+                  child: _buildEntryCard(
+                    context,
+                    visibleStops[index],
+                    index: index,
+                    total: visibleStops.length,
+                  ),
+                ),
+                // 卡片之間的 0.5pt 分隔線；第一張卡前面不畫。
+                if (index > 0)
+                  Positioned(
+                    left: 0,
+                    top: TpSpacing.s4,
+                    bottom: TpSpacing.s4,
+                    child: SizedBox(
+                      key: ValueKey(
+                        'poi-divider-${visibleStops[index].entry.id}',
+                      ),
+                      width: 0.5,
+                      child: ColoredBox(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           );
   }
@@ -1043,12 +1067,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               : category,
         ) ??
         (stop.point == null ? '尚無位置' : '未分類');
-    // accessory host 是唯一玻璃表面，卡片本身透明，避免巢狀玻璃（DESIGN §9.2）。
-    // 目前卡（選取或預覽）用中性選取底，與 root tab bar／Day selector 同一語彙；
-    // 品牌 tint 只上前景，不畫框。
-    final selectionColor = theme.brightness == Brightness.dark
-        ? theme.colorScheme.onSurface.withValues(alpha: 0.16)
-        : theme.colorScheme.surface.withValues(alpha: 0.62);
+    // accessory host 是唯一玻璃表面，卡片本身完全透明（DESIGN §9.2）：
+    // 目前卡（選取或預覽）只用前景表達——實心徽章與粗體標題，不填底色。
+    final current = isActive || isPreview;
 
     return KeyedSubtree(
       key: ValueKey(
@@ -1067,37 +1088,43 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           onTap: () => _selectStop(stop),
           child: DecoratedBox(
             key: ValueKey('entry-card-${stop.entry.id}'),
-            decoration: BoxDecoration(
-              color: isActive || isPreview ? selectionColor : null,
-              borderRadius: const BorderRadius.all(Radius.circular(20)),
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(20)),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s2),
+              padding: const EdgeInsets.symmetric(
+                horizontal: TpSpacing.s1,
+                vertical: TpSpacing.s2,
+              ),
               child: Row(
                 children: [
                   Container(
                     key: ValueKey('poi-number-${stop.entry.id}'),
-                    width: TpSpacing.tapMin,
-                    height: TpSpacing.tapMin,
+                    width: _badgeSize,
+                    height: _badgeSize,
                     decoration: BoxDecoration(
-                      color: stop.color.withValues(alpha: 0.16),
+                      color: current
+                          ? stop.color
+                          : stop.color.withValues(alpha: 0.16),
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        width: 1.5,
-                        color: stop.color.withValues(alpha: 0.70),
-                      ),
+                      border: current
+                          ? null
+                          : Border.all(
+                              width: 1.5,
+                              color: stop.color.withValues(alpha: 0.70),
+                            ),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       '${index + 1}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: stop.color,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: current ? Colors.white : stop.color,
                         fontWeight: FontWeight.w800,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
-                  const SizedBox(width: TpSpacing.s3),
+                  const SizedBox(width: TpSpacing.s2),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1106,23 +1133,29 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                         Text(
                           stop.entry.title,
                           key: ValueKey('entry-card-title-${stop.entry.id}'),
-                          style: theme.textTheme.titleMedium,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: current
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
                         ),
-                        Text(
-                          timeLabel,
-                          key: ValueKey('entry-card-time-${stop.entry.id}'),
+                        // 時間與類型併成一行（精簡單行版型）。
+                        Text.rich(
+                          key: ValueKey('entry-card-meta-${stop.entry.id}'),
+                          TextSpan(
+                            children: [
+                              TextSpan(text: '$timeLabel · '),
+                              TextSpan(
+                                text: categoryLabel,
+                                style: stop.point == null
+                                    ? TextStyle(color: theme.colorScheme.error)
+                                    : null,
+                              ),
+                            ],
+                          ),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        Text(
-                          categoryLabel,
-                          key: ValueKey('entry-card-category-${stop.entry.id}'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: stop.point == null
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
