@@ -13,7 +13,9 @@ void main() {
     expect(yml, contains('actions: write'));
     expect(
       yml,
-      contains('gh workflow run mobile.yml --ref master -f release_target=both'),
+      contains(
+        'gh workflow run mobile.yml --ref master -f release_target=both',
+      ),
     );
   });
 
