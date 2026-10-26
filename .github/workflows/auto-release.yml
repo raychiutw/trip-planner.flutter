@@ -1,0 +1,22 @@
+name: Auto release
+
+# VERSION 變動合進 master 後，自動 dispatch mobile.yml 發佈 TestFlight 與
+# Google Play 內部測試。上傳前仍由 `mobile-release` 環境審核把關（見 ADR-0002）。
+on:
+  push:
+    branches: [master]
+    paths: [VERSION]
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    name: Dispatch store release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch mobile release for both stores
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mobile.yml --ref master -f release_target=both --repo "$GITHUB_REPOSITORY"
