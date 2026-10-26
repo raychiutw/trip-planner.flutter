@@ -218,7 +218,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：點行程 marker 時，卡片列捲到對應 POI；滑動卡片時，地圖聚焦對應 marker。
 - **Tripline 決策**：卡片列水平滑動，不循環、不製造假資料，並露出下一張卡作為滑動提示。
 - **Tripline 決策**：行程 POI accessory 沒有垂直拖曳、detent 或 grabber。
-- **Tripline 決策**：行程 POI accessory 只有外層**單一玻璃表面**（圓角與 root tab bar 同心）；卡片本身完全透明，不填色（目前卡也不填底色）、不畫外框與陰影，避免玻璃內再巢狀一塊亮底（§16）。版型是精簡單行：玻璃高 68pt、編號徽章 32pt、標題下一行是「時間 · 類型」；卡片之間以 0.5pt 分隔線區隔（第一張前不畫），間距緊湊。目前卡只用前景表達：徽章變實心（白字）、標題加粗；其餘卡徽章維持 16% 填色加 1.5pt 環。Google POI 卡有兩列，仍用 88pt。設計稿見 [poi-accessory-single-glass](docs/design/poi-accessory-single-glass.html)（[預覽圖](docs/design/poi-accessory-single-glass.png)，方案 C＋分隔線）。
+- **Tripline 決策**：行程 POI accessory 只有外層**單一玻璃表面**（圓角與 root tab bar 同心）；卡片本身完全透明，不填色（目前卡也不填底色）、不畫外框與陰影，避免玻璃內再巢狀一塊亮底（§16）。版型是精簡單行：玻璃高 68pt、編號徽章 32pt、標題下一行是「時間 · 類型」；卡片之間以 1pt、前景色 30% 的分隔線區隔（第一張前不畫；0.5pt 在玻璃上看不見），間距緊湊。accessory 浮在底部帶狀遮蔽之上（距 tab bar 16pt），否則帶狀遮蔽會在玻璃下緣壓出一條黑帶。目前卡只用前景表達：徽章變實心（白字）、標題加粗；其餘卡徽章維持 16% 填色加 1.5pt 環。Google POI 卡有兩列，仍用 88pt。設計稿見 [poi-accessory-single-glass](docs/design/poi-accessory-single-glass.html)（[預覽圖](docs/design/poi-accessory-single-glass.png)，方案 C＋分隔線）。
+- **Tripline 決策**：地圖是暗化後的媒體背景，媒體上的導覽控制項（日期選擇器、root tab 選取底與選取前景、POI 卡片文字）淺色模式也一律用深色系統色與白色前景，與深色模式外觀一致；無障礙降級（提高對比、降低透明度）仍走不透明的 system surface。
 - **Tripline 決策**：目前選取的卡使用與 root tab bar、Day selector 相同的中性選取底（品牌 tint 只上前景）；未選取的卡不畫底色、外框或分隔線，只靠間距區隔（同時最多看到目前卡與露出的下一張，分隔線不會有出現的位置）。
 - **Tripline 決策**：不顯示頁碼點，也不顯示 `N / M` 計數；位置資訊由「露出下一張卡」、編號徽章與 semantics（第 N 個，共 M 個）承擔。編號徽章為當日 pin 色 16% 填色加 1.5pt 圓環（地圖逐日色是既有 rainbow 例外）。
 - **Tripline 決策**：選取外部 POI 時，以外部 POI compact card 暫時取代行程 POI 列；關閉後恢復原本 Day、卡片位置與 marker 狀態。

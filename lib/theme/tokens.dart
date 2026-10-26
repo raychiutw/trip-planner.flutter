@@ -131,6 +131,10 @@ abstract final class TpRootTabGeometry {
         : expandedBarHeight;
   }
 
+  /// 底部帶狀遮蔽比 tab bar 多出的高度；浮在 tab 上方的元件要避開它，
+  /// 否則玻璃下緣會被遮蔽層壓出一條黑帶。
+  static const bandExtraHeight = TpSpacing.s4;
+
   static const bottomSpacing = 16.0;
   static const safeAreaOverlap = 24.0;
 

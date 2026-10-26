@@ -86,12 +86,16 @@ class TpRootScaffold extends StatelessWidget {
             bottom: 0,
             left: 0,
             right: 0,
-            height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+            height:
+                TpRootTabGeometry.clearance(context) +
+                TpRootTabGeometry.bandExtraHeight,
             child: _TpRootBand(
               key: const ValueKey('tp-root-tab-band'),
               edge: _TpBandEdge.bottom,
               onMedia: onMedia,
-              solidExtent: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+              solidExtent:
+                  TpRootTabGeometry.clearance(context) +
+                  TpRootTabGeometry.bandExtraHeight,
               featherExtent: 0,
             ),
           ),
@@ -296,7 +300,9 @@ class _TpRootScrollViewState extends State<TpRootScrollView> {
         SliverToBoxAdapter(
           child: SizedBox(
             key: const ValueKey('root-scroll-bottom-inset'),
-            height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+            height:
+                TpRootTabGeometry.clearance(context) +
+                TpRootTabGeometry.bandExtraHeight,
           ),
         ),
       ],

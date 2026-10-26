@@ -924,6 +924,46 @@ void main() {
     expect((inactive.border! as Border).top.width, 1.5);
   });
 
+  testWidgets('POI accessory 不壓在 tab 帶狀遮蔽上（否則玻璃下緣出現黑帶）', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], viewPadding: const EdgeInsets.only(bottom: 34)),
+    );
+    await tester.pumpAndSettle();
+
+    final drawer = tester.getRect(
+      find.byKey(const ValueKey('trip-map-poi-drawer')),
+    );
+    final band = tester.getRect(find.byKey(const ValueKey('tp-root-tab-band')));
+    expect(drawer.bottom, lessThanOrEqualTo(band.top));
+  });
+
+  testWidgets('分隔線在玻璃上看得見：至少 1pt 寬、前景色 30% 以上', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final divider = find.byKey(const ValueKey('poi-divider-12'));
+    expect(tester.getSize(divider).width, greaterThanOrEqualTo(1));
+    final fill = tester.widget<ColoredBox>(
+      find.descendant(of: divider, matching: find.byType(ColoredBox)),
+    );
+    expect(fill.color.a, greaterThanOrEqualTo(0.3));
+  });
+
+  testWidgets('淺色模式下卡片文字也用媒體上的白色前景（與深色對齊）', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne], theme: AppTheme.light()));
+    await tester.pumpAndSettle();
+
+    final title = tester.widget<Text>(
+      find.byKey(const ValueKey('entry-card-title-11')),
+    );
+    expect(title.style!.color, Colors.white);
+    final meta = tester.widget<Text>(
+      find.byKey(const ValueKey('entry-card-meta-11')),
+    );
+    expect(meta.style!.color!.a, greaterThanOrEqualTo(0.6));
+    expect(meta.style!.color!.r, 1);
+  });
+
   testWidgets('卡片之間有分隔線，第一張卡前面沒有', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne]));
     await tester.pumpAndSettle();
@@ -1911,7 +1951,9 @@ void main() {
     expect(
       mapConfig!.initialPadding.bottom,
       greaterThanOrEqualTo(
-        TpBottomAccessory.compactHeight + expectedRootClearance + TpSpacing.s1,
+        TpBottomAccessory.compactHeight +
+            expectedRootClearance +
+            TpRootTabGeometry.bandExtraHeight,
       ),
     );
     final drawerRect = tester.getRect(
@@ -1920,11 +1962,11 @@ void main() {
     expect(
       tester.view.physicalSize.height / tester.view.devicePixelRatio -
           drawerRect.bottom,
-      expectedRootClearance + TpSpacing.s1,
+      expectedRootClearance + TpRootTabGeometry.bandExtraHeight,
     );
   });
 
-  testWidgets('真實浮動 root tab 下 POI accessory 保留 4pt 間距', (tester) async {
+  testWidgets('真實浮動 root tab 下 POI accessory 避開帶狀遮蔽（16pt 間距）', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -1947,7 +1989,10 @@ void main() {
     );
     final accessoryContext = tester.element(find.byType(TpBottomAccessory));
     expect(MediaQuery.paddingOf(accessoryContext).bottom, rootTab.height);
-    expect(poi.bottom, lessThanOrEqualTo(rootTab.top - TpSpacing.s1));
+    expect(
+      poi.bottom,
+      lessThanOrEqualTo(rootTab.top - TpRootTabGeometry.bandExtraHeight),
+    );
   });
 
   testWidgets('定位鈕是圓形玻璃按鈕且點擊範圍不小於 44pt', (tester) async {

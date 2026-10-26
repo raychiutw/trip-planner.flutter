@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:tripline/theme/tokens.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -181,17 +182,13 @@ void main() {
   });
   for (final brightness in Brightness.values) {
     testWidgets('$brightness 媒體亮暗背景的日期與帳號均可讀且保留 tint 選取', (tester) async {
-      final theme = brightness == Brightness.dark
-          ? AppTheme.dark()
-          : AppTheme.light();
       for (final background in [Colors.white, Colors.black]) {
         final scene = await _pumpControls(
           tester,
           brightness: brightness,
           background: background,
-          referenceColor: theme.colorScheme.surfaceContainerLow.withValues(
-            alpha: .7,
-          ),
+          // 媒體上一律用深色系統色（淺色模式也是）。
+          referenceColor: TpSystemColorsDark.secondary.withValues(alpha: .7),
         );
         final raster = await _capture(
           tester,
@@ -201,7 +198,6 @@ void main() {
         expect(raster.contrast(scene.date), greaterThanOrEqualTo(4.5));
         expect(raster.contrast(scene.account), greaterThanOrEqualTo(3));
         final selectedRect = tester.getRect(find.text('Day 1'));
-        final scheme = Theme.of(tester.element(find.text('Day 1'))).colorScheme;
         // 與同一 raster 的 70% 色票比較，避免浮點公式和預乘像素的量化差異。
         final expectedBacking = raster.pixel(24, 24);
         final actualBacking = raster.backing(scene.date);
@@ -214,9 +210,9 @@ void main() {
         }
         expect(
           tester.widget<Text>(find.text('Day 1')).style!.color,
-          scheme.primary,
+          TpSystemColorsDark.tint,
         );
-        expect(raster.backing(selectedRect), scheme.surfaceContainerHigh);
+        expect(raster.backing(selectedRect), TpSystemColorsDark.tertiary);
       }
     });
     for (final reduceTransparency in [false, true]) {
