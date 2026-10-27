@@ -58,6 +58,9 @@ class TpRootScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onMedia = TpMediaBackdropScope.of(context);
+    // 鍵盤開啟時 root tab 會隱藏（見 AppShell），遮蔽帶跟著收掉；否則 Scaffold
+    // 把 body 縮到鍵盤上緣，帶會貼在鍵盤上方，把輸入列糊成一團。
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       extendBody: true,
       body: Stack(
@@ -82,23 +85,24 @@ class TpRootScaffold extends StatelessWidget {
           // 而且 shader 的模糊在模擬器上不渲染 —— 內容照樣清晰地穿過 tab bar
           // 與「行程」「地圖」的文字疊在一起（#167 之後的真機與模擬器皆可見）。
           // 帶狀遮蔽是內容側的處理，與 tab bar 自己的材質不互相取代。
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height:
-                TpRootTabGeometry.clearance(context) +
-                TpRootTabGeometry.bandExtraHeight,
-            child: _TpRootBand(
-              key: const ValueKey('tp-root-tab-band'),
-              edge: _TpBandEdge.bottom,
-              onMedia: onMedia,
-              solidExtent:
+          if (!keyboardOpen)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height:
                   TpRootTabGeometry.clearance(context) +
                   TpRootTabGeometry.bandExtraHeight,
-              featherExtent: 0,
+              child: _TpRootBand(
+                key: const ValueKey('tp-root-tab-band'),
+                edge: _TpBandEdge.bottom,
+                onMedia: onMedia,
+                solidExtent:
+                    TpRootTabGeometry.clearance(context) +
+                    TpRootTabGeometry.bandExtraHeight,
+                featherExtent: 0,
+              ),
             ),
-          ),
           Positioned(
             top: TpRootGeometry.headerTop(context),
             left: TpRootGeometry.horizontalInset,
