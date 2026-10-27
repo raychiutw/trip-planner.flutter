@@ -60,7 +60,8 @@ class TpRootScaffold extends StatelessWidget {
     final onMedia = TpMediaBackdropScope.of(context);
     // 鍵盤開啟時 root tab 會隱藏（見 AppShell），遮蔽帶跟著收掉；否則 Scaffold
     // 把 body 縮到鍵盤上緣，帶會貼在鍵盤上方，把輸入列糊成一團。
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    // 外層 AppShell 的 Scaffold 已吃掉 MediaQuery 的 viewInsets，這裡要讀 View。
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
     return Scaffold(
       extendBody: true,
       body: Stack(
