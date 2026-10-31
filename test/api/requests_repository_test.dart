@@ -4,7 +4,6 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/requests_repository.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/models/trip_request.dart';
 
 void main() {
@@ -15,9 +14,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    repo = RequestsRepository(
-      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
-    );
+    repo = RequestsRepository(client: ApiClient(dio: dio));
   });
 
   test(

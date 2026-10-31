@@ -13,7 +13,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'api/cache/cache_migration.dart';
 import 'api/cache/drift_cache_store.dart';
-import 'api/credential_store.dart';
+import 'api/oauth/oauth_providers.dart';
+import 'api/oauth/oauth_token_store.dart';
 import 'api/providers.dart';
 import 'app/accessibility_scope.dart';
 import 'app/app_lock.dart';
@@ -99,7 +100,7 @@ Future<void> main() async {
           retry: appProviderRetry,
           overrides: [
             settingsStoreProvider.overrideWithValue(settingsStore),
-            credentialStoreProvider.overrideWithValue(SecureCredentialStore()),
+            oauthTokenStoreProvider.overrideWithValue(SecureOAuthTokenStore()),
             themeModeProvider.overrideWith(
               () => ThemeModeController(initialMode: initialThemeMode),
             ),

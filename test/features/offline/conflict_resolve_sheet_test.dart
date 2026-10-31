@@ -6,7 +6,6 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/conflict_resolve_sheet.dart';
 import 'package:tripline/theme/app_theme.dart';
 
@@ -34,9 +33,7 @@ void main() {
       ProviderScope(
         overrides: [
           cacheStoreProvider.overrideWithValue(cache),
-          apiClientProvider.overrideWithValue(
-            ApiClient(sessionStore: InMemorySessionStore(), cacheStore: cache),
-          ),
+          apiClientProvider.overrideWithValue(ApiClient(cacheStore: cache)),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),

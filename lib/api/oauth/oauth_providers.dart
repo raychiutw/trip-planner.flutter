@@ -1,5 +1,5 @@
-/// OAuth 層 providers。bearerTokenSourceProvider 餵給 apiClientProvider(僅在
-/// OAuthConfig.isConfigured 時啟用 → 否則 app 維持 cookie 登入,零破壞)。
+/// OAuth 層 providers。bearerTokenSourceProvider 餵給 apiClientProvider;
+/// 認證只走 PKCE 與 Bearer(ADR-0014)。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,11 +10,9 @@ import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 import 'stored_bearer_token_source.dart';
 
-/// OAuth 登入是否啟用(預設依 dart-define 的 client_id;測試可 override)。
-final oauthEnabledProvider = Provider<bool>((ref) => OAuthConfig.isConfigured);
-
+/// 預設記憶體版；App 於 main() override 成 [SecureOAuthTokenStore]。
 final oauthTokenStoreProvider = Provider<OAuthTokenStore>(
-  (ref) => SecureOAuthTokenStore(),
+  (ref) => InMemoryOAuthTokenStore(),
 );
 
 final oauthRepositoryProvider = Provider<OAuthRepository>(

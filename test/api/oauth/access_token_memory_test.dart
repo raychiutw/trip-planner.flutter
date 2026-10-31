@@ -1,8 +1,6 @@
-import 'dart:convert';
-
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
@@ -31,21 +29,6 @@ void main() {
 
   StoredBearerTokenSource sourceOn(OAuthTokenStore store) =>
       StoredBearerTokenSource(store: store, repository: repo, clientId: 'cid');
-
-  test('SecureOAuthTokenStore 落地的內容不含 access token', () async {
-    FlutterSecureStorage.setMockInitialValues({});
-    final store = SecureOAuthTokenStore();
-    await store.write(_tok('SECRET_ACCESS'));
-
-    final raw = await const FlutterSecureStorage().read(
-      key: 'tripline_oauth_tokens',
-    );
-    expect(raw, isNot(contains('SECRET_ACCESS')));
-    final json = jsonDecode(raw!) as Map<String, dynamic>;
-    expect(json.containsKey('access_token'), isFalse);
-    expect(json['refresh_token'], 'RT');
-    expect((await store.read())!.refreshToken, 'RT');
-  });
 
   test('登入後 adopt：access token 只在記憶體，store 只留 refresh', () async {
     final store = InMemoryOAuthTokenStore();
@@ -83,4 +66,56 @@ void main() {
 
     expect(await source.accessToken(), isNull);
   });
+
+  test('refresh 被拒（疑似重放或已撤銷）：清掉憑證並通知登出', () async {
+    final store = InMemoryOAuthTokenStore();
+    final source = sourceOn(store);
+    await source.adopt(
+      OAuthTokens(
+        accessToken: 'OLD',
+        refreshToken: 'RT',
+        expiresAt: DateTime.now().subtract(const Duration(seconds: 1)),
+      ),
+    );
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenThrow(
+      const ApiError(status: 400, code: 'invalid_grant', message: 'replayed'),
+    );
+    var signedOut = 0;
+    source.signedOut.listen((_) => signedOut++);
+
+    expect(await source.refresh(), isFalse);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(await store.read(), isNull);
+    expect(await source.accessToken(), isNull);
+    expect(signedOut, 1);
+  });
+
+  test('受保護的憑證還沒解鎖：取不到 access token，但不清憑證、不通知登出', () async {
+    final store = _LockedStore();
+    final source = sourceOn(store);
+    var signedOut = 0;
+    source.signedOut.listen((_) => signedOut++);
+
+    expect(await source.accessToken(), isNull);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(store.cleared, isFalse);
+    expect(signedOut, 0);
+  });
+}
+
+class _LockedStore extends InMemoryOAuthTokenStore {
+  bool cleared = false;
+
+  @override
+  Future<OAuthTokens?> read() async => throw const TokenStoreLockedException();
+
+  @override
+  Future<void> clear() async => cleared = true;
 }

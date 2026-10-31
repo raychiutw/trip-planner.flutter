@@ -5,6 +5,8 @@
 /// single-flight,避免同一輪過期觸發多次 refresh 把 rotating token 燒掉。
 library;
 
+import 'dart:async';
+
 import '../../models/oauth_tokens.dart';
 import '../api_client.dart' show BearerTokenSource;
 import '../api_error.dart';
@@ -29,6 +31,12 @@ class StoredBearerTokenSource implements BearerTokenSource {
   /// access token 只活在記憶體;store 只留 refresh token(ADR-0014)。
   OAuthTokens? _memory;
 
+  final _signedOut = StreamController<void>.broadcast();
+
+  /// refresh token 被後端拒絕(撤銷、過期、重放)而清掉憑證時通知,
+  /// 認證狀態據此回到未登入。
+  Stream<void> get signedOut => _signedOut.stream;
+
   /// 登入完成後交給來源:access token 進記憶體,其餘落地。
   Future<void> adopt(OAuthTokens tokens) async {
     _memory = tokens;
@@ -37,7 +45,13 @@ class StoredBearerTokenSource implements BearerTokenSource {
 
   @override
   Future<String?> accessToken() async {
-    final stored = await _store.read();
+    final OAuthTokens? stored;
+    try {
+      stored = await _store.read();
+    } on TokenStoreLockedException {
+      // 受保護的憑證還沒解鎖:這時沒有可用的登入憑證,但憑證本身還在。
+      return null;
+    }
     if (stored == null) {
       // 已登出(store 被清掉):記憶體裡的 access token 也不能再用。
       _memory = null;
@@ -56,7 +70,12 @@ class StoredBearerTokenSource implements BearerTokenSource {
       _inFlight ??= _doRefresh().whenComplete(() => _inFlight = null);
 
   Future<OAuthTokens?> _doRefresh() async {
-    final old = await _store.read();
+    final OAuthTokens? old;
+    try {
+      old = await _store.read();
+    } on TokenStoreLockedException {
+      return null;
+    }
     final rt = old?.refreshToken;
     if (rt == null || rt.isEmpty) return null;
 
@@ -65,7 +84,11 @@ class StoredBearerTokenSource implements BearerTokenSource {
       fresh = await _repo.refresh(refreshToken: rt, clientId: _clientId);
     } on ApiError catch (e) {
       // 400/401 = refresh token 真的失效(撤銷/過期)→ 視為登出。
-      if (e.status == 400 || e.status == 401) await _store.clear();
+      if (e.status == 400 || e.status == 401) {
+        await _store.clear();
+        _memory = null;
+        _signedOut.add(null);
+      }
       return null;
     } on Exception {
       // 網路等暫時性錯誤 → 保留 token,稍後再試(不清空)。

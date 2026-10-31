@@ -5,7 +5,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/map_repository.dart';
-import 'package:tripline/api/session_store.dart';
 
 void main() {
   late Dio dio;
@@ -17,9 +16,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    mapRepository = MapRepository(
-      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
-    );
+    mapRepository = MapRepository(client: ApiClient(dio: dio));
   });
 
   test('fetchRoute：用 lng,lat query 呼叫 /route 並解析結果', () async {

@@ -3,27 +3,24 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/oauth_tokens.dart';
 import '../models/user.dart';
 import 'account_repository.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
 import 'collab_repository.dart';
-import 'credential_store.dart';
 import 'map_repository.dart';
 import 'oauth/id_token.dart';
 import 'oauth/oauth_config.dart';
+import 'oauth/oauth_login_service.dart';
+import 'oauth/oauth_token_store.dart';
 import 'oauth/oauth_providers.dart';
 import 'requests_repository.dart';
 import 'reports_repository.dart';
-import 'session_store.dart';
 import 'settings_store.dart';
 import 'share_repository.dart';
 import 'trip_repository.dart';
-
-final sessionStoreProvider = Provider<SessionStore>(
-  (ref) => SecureSessionStore(),
-);
 
 final settingsStoreProvider = Provider<SettingsStore>(
   (ref) => InMemorySettingsStore(),
@@ -34,21 +31,13 @@ final cacheStoreProvider = Provider<CacheStore>((ref) => InMemoryCacheStore());
 
 final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(
-    sessionStore: ref.watch(sessionStoreProvider),
     cacheStore: ref.watch(cacheStoreProvider),
-    // 有設定 OAuth client 才走 Bearer(無 token 時 source 回 null → 仍 cookie);
-    // 未設定則完全不接 → 維持 cookie 登入,零破壞。
-    bearerSource: OAuthConfig.isConfigured
-        ? ref.watch(bearerTokenSourceProvider)
-        : null,
+    bearerSource: ref.watch(bearerTokenSourceProvider),
   ),
 );
 
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(
-    client: ref.watch(apiClientProvider),
-    sessionStore: ref.watch(sessionStoreProvider),
-  ),
+  (ref) => AuthRepository(client: ref.watch(apiClientProvider)),
 );
 
 final accountRepositoryProvider = Provider<AccountRepository>(
@@ -79,6 +68,19 @@ final shareRepositoryProvider = Provider<ShareRepository>(
   (ref) => ShareRepository(client: ref.watch(apiClientProvider)),
 );
 
+/// 受保護的登入憑證還沒解鎖(使用者取消或沒通過生物辨識)。
+/// 登入畫面據此多提供「解鎖」入口。
+final authLockedProvider = NotifierProvider<AuthLockedNotifier, bool>(
+  AuthLockedNotifier.new,
+);
+
+class AuthLockedNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool locked) => state = locked;
+}
+
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
   // 上次快取擁有者標記(存 cacheStore;隨 clear 一起清、登入後重建)。
@@ -86,32 +88,46 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   @override
   Future<UserInfo?> build() async {
+    // refresh 被後端拒絕、憑證已清掉 → 回到未登入(離線快取保留,同一帳號重新登入還用得到)。
+    final sub = ref.watch(bearerTokenSourceProvider).signedOut.listen((_) {
+      if (ref.mounted) state = const AsyncData(null);
+    });
+    ref.onDispose(sub.cancel);
+
     final user = await _resolveUser();
     await _enforceCacheOwner(user);
     return user;
   }
 
   Future<UserInfo?> _resolveUser() async {
-    // OAuth 模式:有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。
-    // 驗證未過必須落回 currentUser() —— id_token 是這條路徑唯一的身分來源,
-    // 不驗就等於「secure storage 裡有什麼就信什麼」。
-    if (OAuthConfig.isConfigured) {
-      final idToken =
-          (await ref.watch(oauthTokenStoreProvider).read())?.idToken;
-      if (idToken != null) {
-        final claims = verifiedIdTokenClaims(
-          idToken,
-          clientId: OAuthConfig.clientId,
+    final OAuthTokens? tokens;
+    try {
+      tokens = await ref.read(oauthTokenStoreProvider).read();
+    } on TokenStoreLockedException {
+      // 憑證在、但要通過生物辨識才讀得到:停在登入畫面等使用者解鎖。
+      ref.read(authLockedProvider.notifier).set(true);
+      return null;
+    }
+    ref.read(authLockedProvider.notifier).set(false);
+    if (tokens == null) return null;
+
+    // 有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。驗證未過必須落回
+    // currentUser() —— id_token 是這條路徑唯一的身分來源,不驗就等於
+    // 「secure storage 裡有什麼就信什麼」。
+    final idToken = tokens.idToken;
+    if (idToken != null) {
+      final claims = verifiedIdTokenClaims(
+        idToken,
+        clientId: OAuthConfig.clientId,
+      );
+      final email = claims?['email'] as String?;
+      if (claims != null && email != null) {
+        return UserInfo(
+          id: claims['sub'] as String? ?? '',
+          email: email,
+          emailVerified: claims['email_verified'] == true,
+          displayName: claims['name'] as String?,
         );
-        final email = claims?['email'] as String?;
-        if (claims != null && email != null) {
-          return UserInfo(
-            id: claims['sub'] as String? ?? '',
-            email: email,
-            emailVerified: claims['email_verified'] == true,
-            displayName: claims['name'] as String?,
-          );
-        }
       }
     }
     return ref.watch(authRepositoryProvider).currentUser();
@@ -130,12 +146,28 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     await cache.writeResponse(_cacheOwnerKey, ownerId);
   }
 
-  Future<void> login(String email, String password) async {
+  /// 用系統瀏覽器登入(PKCE)。使用者取消不算錯誤,維持未登入。
+  Future<void> signInWithBrowser() async {
+    state = const AsyncLoading();
+    try {
+      await ref.read(oauthLoginServiceProvider).login();
+    } on OAuthLoginException catch (e, stack) {
+      state = e.cancelled ? const AsyncData(null) : AsyncError(e, stack);
+      return;
+    }
+    ref.read(authLockedProvider.notifier).set(false);
+    state = await AsyncValue.guard(() async {
+      final user = await _resolveUser();
+      await _enforceCacheOwner(user);
+      return user;
+    });
+  }
+
+  /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)。
+  Future<void> unlock() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final user = await ref
-          .read(authRepositoryProvider)
-          .login(email: email, password: password);
+      final user = await _resolveUser();
       await _enforceCacheOwner(user);
       return user;
     });
@@ -150,26 +182,31 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return user;
   }
 
+  /// 登出:盡力撤銷 refresh token,再清本機憑證與離線資料。
   Future<void> logout() async {
-    await ref.read(authRepositoryProvider).logout();
-    await _clearLocalAuth();
-  }
-
-  /// 帳號已由後端刪除，只清本機認證與離線資料，不再呼叫 logout API。
-  Future<void> accountDeleted() async {
-    // 帳號已不存在，存下的生物辨識登入帳密也要一併清掉。
+    final store = ref.read(oauthTokenStoreProvider);
     try {
-      await ref.read(credentialStoreProvider).clear();
+      final refresh = (await store.read())?.refreshToken;
+      if (refresh != null) {
+        await ref
+            .read(oauthRepositoryProvider)
+            .revokeToken(
+              token: refresh,
+              clientId: OAuthConfig.clientId,
+              tokenTypeHint: 'refresh_token',
+            );
+      }
     } catch (_) {
-      // Keychain 清不掉也不能擋住本機登入狀態的清除。
+      // 撤銷失敗不能擋住本機登出。
     }
     await _clearLocalAuth();
   }
+
+  /// 帳號已由後端刪除，只清本機認證與離線資料，不再呼叫撤銷 API。
+  Future<void> accountDeleted() => _clearLocalAuth();
 
   Future<void> _clearLocalAuth() async {
-    if (OAuthConfig.isConfigured) {
-      await ref.read(oauthTokenStoreProvider).clear();
-    }
+    await ref.read(oauthTokenStoreProvider).clear();
     // 清離線快取,避免帳號間資料外洩。
     await ref.read(cacheStoreProvider).clear();
     state = const AsyncData(null);

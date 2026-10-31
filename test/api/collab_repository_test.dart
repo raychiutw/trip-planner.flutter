@@ -5,7 +5,6 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/collab_repository.dart';
-import 'package:tripline/api/session_store.dart';
 
 void main() {
   late Dio dio;
@@ -15,9 +14,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    repo = CollabRepository(
-      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
-    );
+    repo = CollabRepository(client: ApiClient(dio: dio));
   });
 
   test('fetchMembers：GET /permissions 裸陣列 → TripMember', () async {
@@ -92,11 +89,7 @@ void main() {
   test('fetchInvitation：不快取含 token 的公開預覽回應', () async {
     final cache = InMemoryCacheStore();
     repo = CollabRepository(
-      client: ApiClient(
-        sessionStore: InMemorySessionStore(),
-        dio: dio,
-        cacheStore: cache,
-      ),
+      client: ApiClient(dio: dio, cacheStore: cache),
     );
     dioAdapter.onGet(
       '/invitations',

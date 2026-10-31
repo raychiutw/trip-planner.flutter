@@ -7,7 +7,6 @@ import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/reports_repository.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 
 void main() {

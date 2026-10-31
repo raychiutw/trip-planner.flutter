@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/share_repository.dart';
 
 void main() {
@@ -13,9 +12,7 @@ void main() {
   setUp(() {
     dio = Dio();
     adapter = DioAdapter(dio: dio);
-    repo = ShareRepository(
-      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
-    );
+    repo = ShareRepository(client: ApiClient(dio: dio));
   });
 
   test('fetchShares：GET /trips/:id/shares → {shares}', () async {

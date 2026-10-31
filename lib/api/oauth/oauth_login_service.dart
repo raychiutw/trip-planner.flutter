@@ -1,131 +1,132 @@
-/// OAuth PKCE 登入編排(RFC 8252 loopback):起本地 server → 開系統瀏覽器授權 →
-/// 收 redirect 的 code → 換 token → 存。**device 相依、未單測**;核心(pkce/exchange)
-/// 已於各自單元測試覆蓋。production public client 已 provision。
+/// OAuth PKCE 登入編排:開系統瀏覽器授權 → 以 https callback(Universal Link／
+/// App Link)回到 App → 換 token → 交給憑證來源。
+/// 瀏覽器那一段由 [AuthorizationLauncher] 負責(device 相依、測試以假的替換)。
 library;
 
-import 'dart:async';
-import 'dart:io';
-
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 
 import '../../models/oauth_tokens.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
-import 'stored_bearer_token_source.dart';
 import 'pkce.dart';
+import 'stored_bearer_token_source.dart';
 
 class OAuthLoginException implements Exception {
-  OAuthLoginException(this.message, {String? userMessage})
-    : userMessage = userMessage ?? 'Tripline 登入失敗，請稍後再試';
+  OAuthLoginException(
+    this.message, {
+    String? userMessage,
+    this.cancelled = false,
+  }) : userMessage = userMessage ?? 'Tripline 登入失敗，請稍後再試';
 
-  /// 除錯用原文，可能含 client_id、埠號；**不可直接顯示給使用者**。
+  /// 除錯用原文，可能含 client_id；**不可直接顯示給使用者**。
   final String message;
 
   /// 給使用者看的繁中訊息。
   final String userMessage;
+
+  /// 使用者自己在瀏覽器關掉或取消，不算錯誤。
+  final bool cancelled;
   @override
   String toString() => 'OAuthLoginException: $message';
+}
+
+/// 把授權網址交給系統瀏覽器，等 https callback 帶著結果回到 App。
+abstract interface class AuthorizationLauncher {
+  Future<Uri> authorize(
+    Uri authorizeUrl, {
+    required String callbackHost,
+    required String callbackPath,
+  });
+}
+
+/// 正式實作:iOS ASWebAuthenticationSession、Android Auth Tab。
+class WebAuthLauncher implements AuthorizationLauncher {
+  const WebAuthLauncher();
+
+  @override
+  Future<Uri> authorize(
+    Uri authorizeUrl, {
+    required String callbackHost,
+    required String callbackPath,
+  }) async {
+    final result = await FlutterWebAuth2.authenticate(
+      url: authorizeUrl.toString(),
+      callbackUrlScheme: 'https',
+      options: FlutterWebAuth2Options(
+        httpsHost: callbackHost,
+        httpsPath: callbackPath,
+      ),
+    );
+    return Uri.parse(result);
+  }
 }
 
 class OAuthLoginService {
   OAuthLoginService({
     required OAuthRepository repository,
     required StoredBearerTokenSource source,
+    AuthorizationLauncher launcher = const WebAuthLauncher(),
     String clientId = OAuthConfig.clientId,
-    Duration timeout = const Duration(minutes: 5),
   }) : _repo = repository,
        _source = source,
-       _clientId = clientId,
-       _timeout = timeout;
+       _launcher = launcher,
+       _clientId = clientId;
 
   final OAuthRepository _repo;
   final StoredBearerTokenSource _source;
+  final AuthorizationLauncher _launcher;
   final String _clientId;
-  final Duration _timeout;
 
   Future<OAuthTokens> login() async {
-    if (_clientId.isEmpty) {
-      throw OAuthLoginException('未設定 OAuth client_id(--dart-define)');
-    }
     final verifier = generateCodeVerifier();
     final challenge = codeChallengeS256(verifier);
     final state = generateState();
 
-    final HttpServer server;
+    final authUrl = _repo.buildAuthorizeUrl(
+      clientId: _clientId,
+      redirectUri: OAuthConfig.redirectUri,
+      codeChallenge: challenge,
+      state: state,
+    );
+
+    final Uri callback;
     try {
-      server = await HttpServer.bind(
-        InternetAddress.loopbackIPv4,
-        OAuthConfig.redirectPort,
+      callback = await _launcher.authorize(
+        authUrl,
+        callbackHost: OAuthConfig.callbackHost,
+        callbackPath: OAuthConfig.callbackPath,
       );
-    } on Object catch (e) {
-      throw OAuthLoginException(
-        '無法在 127.0.0.1:${OAuthConfig.redirectPort} 啟動本地接收器(埠可能被占用):$e',
-      );
-    }
-    try {
-      final authUrl = _repo.buildAuthorizeUrl(
-        clientId: _clientId,
-        redirectUri: OAuthConfig.redirectUri,
-        codeChallenge: challenge,
-        state: state,
-      );
-      if (!await launchUrl(authUrl, mode: LaunchMode.externalApplication)) {
-        throw OAuthLoginException('無法開啟瀏覽器', userMessage: '無法開啟瀏覽器');
-      }
-
-      // 只認 state 相符的 callback;忽略 favicon/prefetch/外來雜訊(防 first-request 搶占)。
-      final params = await _awaitCallback(server, state).timeout(
-        _timeout,
-        onTimeout: () {
-          unawaited(server.close(force: true));
-          throw OAuthLoginException('登入逾時', userMessage: '登入逾時，請再試一次');
-        },
-      );
-
-      final error = params['error'];
-      if (error != null) throw OAuthLoginException('授權失敗:$error');
-      final code = params['code'];
-      if (code == null || code.isEmpty) {
-        throw OAuthLoginException('未取得授權碼');
-      }
-
-      final tokens = await _repo.exchangeCode(
-        code: code,
-        codeVerifier: verifier,
-        clientId: _clientId,
-        redirectUri: OAuthConfig.redirectUri,
-      );
-      await _source.adopt(tokens);
-      return tokens;
-    } finally {
-      await server.close(force: true);
-    }
-  }
-
-  /// 等到 state 相符的 callback(含 error redirect,後端 error 也會帶 state);
-  /// 其他請求回 404 並忽略,避免第一個雜訊請求被當成 callback。
-  Future<Map<String, String>> _awaitCallback(
-    HttpServer server,
-    String state,
-  ) async {
-    await for (final request in server) {
-      final params = request.uri.queryParameters;
-      if (params['state'] != state) {
-        request.response
-          ..statusCode = 404
-          ..close();
-        continue;
-      }
-      request.response
-        ..statusCode = 200
-        ..headers.contentType = ContentType.html
-        ..write(
-          '<html><body style="font-family:sans-serif;text-align:center;'
-          'padding-top:3rem">登入完成,可關閉此頁回到 App。</body></html>',
+    } on PlatformException catch (e) {
+      if (e.code == 'CANCELED') {
+        throw OAuthLoginException(
+          '使用者取消登入',
+          userMessage: '已取消登入',
+          cancelled: true,
         );
-      await request.response.close();
-      return params;
+      }
+      throw OAuthLoginException('無法開啟瀏覽器登入:${e.code}');
     }
-    throw OAuthLoginException('接收器已關閉');
+
+    final params = callback.queryParameters;
+    // 只認 state 相符的 callback,防止別的網頁偽造回跳(CSRF)。
+    if (params['state'] != state) {
+      throw OAuthLoginException('callback 的 state 不符');
+    }
+    final error = params['error'];
+    if (error != null) throw OAuthLoginException('授權失敗:$error');
+    final code = params['code'];
+    if (code == null || code.isEmpty) {
+      throw OAuthLoginException('未取得授權碼');
+    }
+
+    final tokens = await _repo.exchangeCode(
+      code: code,
+      codeVerifier: verifier,
+      clientId: _clientId,
+      redirectUri: OAuthConfig.redirectUri,
+    );
+    await _source.adopt(tokens);
+    return tokens;
   }
 }

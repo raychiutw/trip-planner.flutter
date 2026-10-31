@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
-import 'package:tripline/api/session_store.dart';
 
 class _FakeSource implements BearerTokenSource {
   _FakeSource(this._token, {this.refreshResult = false});
@@ -38,11 +37,7 @@ void main() {
         },
       ),
     );
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: _FakeSource('tok'),
-    );
+    final client = ApiClient(dio: dio, bearerSource: _FakeSource('tok'));
 
     await client.post('/x', body: const {});
     expect(captured['Authorization'], 'Bearer tok');
@@ -72,11 +67,7 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: true);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     final r = await client.get('/x');
     expect(source.refreshCalls, 1);
@@ -104,11 +95,7 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: false);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     await expectLater(
       client.get('/x'),
@@ -140,11 +127,7 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: true);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     expect(await client.post('/x', body: const {}), {'ok': true});
     expect(source.refreshCalls, 1);
@@ -171,11 +154,7 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: true);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     await expectLater(
       client.postForResponse('/oauth/login', body: const {}),

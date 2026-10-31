@@ -8,7 +8,6 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_status_banner.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -52,11 +51,7 @@ void main() {
       overrides: [
         cacheStoreProvider.overrideWithValue(cache),
         apiClientProvider.overrideWithValue(
-          ApiClient(
-            sessionStore: InMemorySessionStore(),
-            dio: dio,
-            cacheStore: cache,
-          ),
+          ApiClient(dio: dio, cacheStore: cache),
         ),
       ],
     );

@@ -8,7 +8,6 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache/cache_store.dart';
-import 'package:tripline/api/session_store.dart';
 
 /// 依序回放腳本 response 的假 adapter（http_mock_adapter 無法對同一
 /// request 簽章先回 429 再回 200，retry 測試需要序列回應）。
