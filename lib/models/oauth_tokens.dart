@@ -24,9 +24,9 @@ class OAuthTokens {
   bool isExpired({Duration skew = const Duration(seconds: 60)}) =>
       DateTime.now().isAfter(expiresAt.subtract(skew));
 
-  OAuthTokens copyWith({String? idToken}) => OAuthTokens(
+  OAuthTokens copyWith({String? idToken, String? refreshToken}) => OAuthTokens(
     accessToken: accessToken,
-    refreshToken: refreshToken,
+    refreshToken: refreshToken ?? this.refreshToken,
     idToken: idToken ?? this.idToken,
     tokenType: tokenType,
     scope: scope,

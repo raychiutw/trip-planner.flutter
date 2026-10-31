@@ -27,8 +27,14 @@ final bearerTokenSourceProvider = Provider<StoredBearerTokenSource>(
   ),
 );
 
+/// 預設是不可用的啟動器；App 於 main() override 成 `WebAuthLauncher`。
+final authorizationLauncherProvider = Provider<AuthorizationLauncher>(
+  (ref) => const UnavailableAuthorizationLauncher(),
+);
+
 final oauthLoginServiceProvider = Provider<OAuthLoginService>(
   (ref) => OAuthLoginService(
+    launcher: ref.watch(authorizationLauncherProvider),
     repository: ref.watch(oauthRepositoryProvider),
     source: ref.watch(bearerTokenSourceProvider),
   ),

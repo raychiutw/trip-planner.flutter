@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/oauth/oauth_config.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
@@ -41,6 +42,11 @@ OAuthTokens _tokens({String? idToken, String refresh = 'RT'}) => OAuthTokens(
   idToken: idToken,
   expiresAt: DateTime.now().add(const Duration(minutes: 15)),
 );
+
+class _ThrowingClearCache extends InMemoryCacheStore {
+  @override
+  Future<void> clear() async => throw StateError('disk');
+}
 
 class _LockedStore extends InMemoryOAuthTokenStore {
   bool locked = true;
@@ -248,6 +254,27 @@ void main() {
 
       expect(container.read(authStateProvider).value, isNull);
       expect(await store.read(), isNull);
+    });
+
+    test('登出時清快取失敗也要回到未登入，不能卡在已登入畫面', () async {
+      await store.write(_tokens(idToken: _idToken()));
+      final c = ProviderContainer(
+        overrides: [
+          oauthTokenStoreProvider.overrideWithValue(store),
+          oauthRepositoryProvider.overrideWithValue(oauthRepo),
+          apiClientProvider.overrideWithValue(ApiClient(dio: dio)),
+          cacheStoreProvider.overrideWithValue(_ThrowingClearCache()),
+        ],
+      );
+      addTearDown(c.dispose);
+      expect(await c.read(authStateProvider.future), isNotNull);
+
+      await expectLater(
+        c.read(authStateProvider.notifier).logout(),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(c.read(authStateProvider).value, isNull);
     });
 
     test('帳號刪除後清除離線快取與憑證，state 設為未登入', () async {

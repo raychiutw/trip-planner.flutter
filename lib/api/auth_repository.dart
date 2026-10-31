@@ -165,7 +165,7 @@ class AuthRepository {
   /// GET /oauth/userinfo；401（未登入/過期）回 null，不 throw。
   ///
   /// 離線快取(刻意行為):userinfo 走 ApiClient 透明快取,離線開機時 GET 連線失敗
-  /// 會回退最後一次成功的身分,讓 cookie 模式使用者離線仍保持登入、能讀已快取行程。
+  /// 會回退最後一次成功的身分,讓使用者離線仍保持登入、能讀已快取行程。
   /// 登出會清快取(避免跨帳號外洩);無快取時離線仍 throw(等同本快取功能前的行為)。
   Future<UserInfo?> currentUser() async {
     try {

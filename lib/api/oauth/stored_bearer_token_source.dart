@@ -95,10 +95,19 @@ class StoredBearerTokenSource implements BearerTokenSource {
       return null;
     }
 
-    // refresh 回應常不含新 id_token → 沿用舊的,身分不丟。
-    final merged = fresh.idToken == null
-        ? fresh.copyWith(idToken: old?.idToken)
-        : fresh;
+    // 登出（憑證已被清掉）發生在 refresh 進行中：不能把憑證寫回去讓它復活。
+    try {
+      if (await _store.read() == null) return null;
+    } on TokenStoreLockedException {
+      return null;
+    }
+
+    // refresh 回應常不含新 id_token → 沿用舊的,身分不丟；
+    // 沒有輪替（回應不含新 refresh token）時沿用舊的，否則下次就沒得換了。
+    final merged = fresh.copyWith(
+      idToken: fresh.idToken ?? old?.idToken,
+      refreshToken: fresh.refreshToken ?? rt,
+    );
     _memory = merged;
     try {
       await _store.write(merged);

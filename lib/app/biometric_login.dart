@@ -84,11 +84,11 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
           .read(biometricAuthenticatorProvider)
           .authenticate(reason: '開啟生物辨識登入');
       if (outcome != BiometricOutcome.success) return false;
-      await ref
+      final stored = await ref
           .read(oauthTokenStoreProvider)
           .setProtection(TokenProtection.biometric);
-      if (ref.mounted) state = state.copyWith(enabled: true);
-      return true;
+      if (ref.mounted) state = state.copyWith(enabled: stored);
+      return stored;
     } finally {
       _inFlight = false;
     }

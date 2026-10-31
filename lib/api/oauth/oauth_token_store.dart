@@ -10,7 +10,6 @@ library;
 
 import 'dart:convert';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../models/oauth_tokens.dart';
@@ -34,7 +33,8 @@ abstract class OAuthTokenStore {
   Future<void> write(OAuthTokens tokens);
 
   /// 改變 refresh token 的保護等級並以新等級重存。
-  Future<void> setProtection(TokenProtection protection);
+  /// 回 false 代表新等級存不進去（例如裝置沒設密碼），保護等級維持原樣。
+  Future<bool> setProtection(TokenProtection protection);
   Future<void> clear();
 }
 
@@ -122,10 +122,17 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   @override
   TokenProtection get protection => _protection;
 
+  Future<OAuthTokens?>? _reading;
+
+  /// 同時多處讀取共用一次 Keychain 存取，免得冷啟動連跳多次生物辨識。
   @override
-  Future<OAuthTokens?> read() async {
+  Future<OAuthTokens?> read() {
     final cached = _cache;
-    if (cached != null) return cached;
+    if (cached != null) return Future.value(cached);
+    return _reading ??= _readFromVault().whenComplete(() => _reading = null);
+  }
+
+  Future<OAuthTokens?> _readFromVault() async {
     final rawMeta = await _vault.read(
       _metaKey,
       protection: TokenProtection.passcode,
@@ -144,7 +151,7 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     final String? refresh;
     try {
       refresh = await _vault.read(_refreshKey, protection: _protection);
-    } on PlatformException catch (e) {
+    } on Exception catch (e) {
       if (_isInvalidated(e)) {
         // 生物特徵變動或項目失效:當作已登出,要求重新登入。
         await clear();
@@ -158,8 +165,12 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<void> write(OAuthTokens tokens) async {
-    final persisted = tokens.withoutAccessToken();
-    _cache = persisted;
+    _cache = tokens.withoutAccessToken();
+    await _persist(_cache!);
+  }
+
+  /// 落地；存不進去回 false（記憶體仍留著，下次開 app 重新登入）。
+  Future<bool> _persist(OAuthTokens persisted) async {
     final meta = {...persisted.toJson()}..remove('refresh_token');
     meta['protection'] = _protection.name;
     try {
@@ -172,18 +183,28 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
       if (refresh != null && refresh.isNotEmpty) {
         await _vault.write(_refreshKey, refresh, protection: _protection);
       }
-    } on PlatformException {
+      return true;
+    } on Exception {
       // 裝置沒設密碼等,存不進去:只留記憶體,下次開 app 重新登入。
       await _vault.delete(_metaKey);
       await _vault.delete(_refreshKey);
+      return false;
     }
   }
 
   @override
-  Future<void> setProtection(TokenProtection protection) async {
+  Future<bool> setProtection(TokenProtection protection) async {
     final current = await read();
+    if (current == null || protection == _protection) return true;
+    final previous = _protection;
+    // 不同 access control 的同名項目不能原地改，先刪再寫。
+    await _vault.delete(_refreshKey);
     _protection = protection;
-    if (current != null) await write(current);
+    if (await _persist(current)) return true;
+    // 新等級存不進去：退回原等級並盡力把憑證存回去，UI 不會顯示成已開啟。
+    _protection = previous;
+    await _persist(current);
+    return false;
   }
 
   @override
@@ -195,8 +216,8 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   }
 
   /// iOS errSecItemNotFound／Android KeyPermanentlyInvalidated 這類「項目已不可用」。
-  static bool _isInvalidated(PlatformException e) {
-    final text = '${e.code} ${e.message}'.toLowerCase();
+  static bool _isInvalidated(Object e) {
+    final text = e.toString().toLowerCase();
     return text.contains('invalidated') ||
         text.contains('-25300') ||
         text.contains('itemnotfound');
@@ -219,8 +240,10 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
       _tokens = tokens.withoutAccessToken();
 
   @override
-  Future<void> setProtection(TokenProtection protection) async =>
-      _protection = protection;
+  Future<bool> setProtection(TokenProtection protection) async {
+    _protection = protection;
+    return true;
+  }
 
   @override
   Future<void> clear() async {

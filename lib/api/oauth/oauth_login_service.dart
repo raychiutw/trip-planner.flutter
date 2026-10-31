@@ -3,9 +3,6 @@
 /// 瀏覽器那一段由 [AuthorizationLauncher] 負責(device 相依、測試以假的替換)。
 library;
 
-import 'package:flutter/services.dart';
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
-
 import '../../models/oauth_tokens.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
@@ -40,33 +37,24 @@ abstract interface class AuthorizationLauncher {
   });
 }
 
-/// 正式實作:iOS ASWebAuthenticationSession、Android Auth Tab。
-class WebAuthLauncher implements AuthorizationLauncher {
-  const WebAuthLauncher();
+/// 尚未組裝平台實作時的預設(測試或忘了 override):直接失敗。
+/// App 於 main() override 成 `WebAuthLauncher`(lib/app/web_auth_launcher.dart)。
+class UnavailableAuthorizationLauncher implements AuthorizationLauncher {
+  const UnavailableAuthorizationLauncher();
 
   @override
   Future<Uri> authorize(
     Uri authorizeUrl, {
     required String callbackHost,
     required String callbackPath,
-  }) async {
-    final result = await FlutterWebAuth2.authenticate(
-      url: authorizeUrl.toString(),
-      callbackUrlScheme: 'https',
-      options: FlutterWebAuth2Options(
-        httpsHost: callbackHost,
-        httpsPath: callbackPath,
-      ),
-    );
-    return Uri.parse(result);
-  }
+  }) async => throw OAuthLoginException('尚未設定授權啟動器');
 }
 
 class OAuthLoginService {
   OAuthLoginService({
     required OAuthRepository repository,
     required StoredBearerTokenSource source,
-    AuthorizationLauncher launcher = const WebAuthLauncher(),
+    required AuthorizationLauncher launcher,
     String clientId = OAuthConfig.clientId,
   }) : _repo = repository,
        _source = source,
@@ -90,23 +78,11 @@ class OAuthLoginService {
       state: state,
     );
 
-    final Uri callback;
-    try {
-      callback = await _launcher.authorize(
-        authUrl,
-        callbackHost: OAuthConfig.callbackHost,
-        callbackPath: OAuthConfig.callbackPath,
-      );
-    } on PlatformException catch (e) {
-      if (e.code == 'CANCELED') {
-        throw OAuthLoginException(
-          '使用者取消登入',
-          userMessage: '已取消登入',
-          cancelled: true,
-        );
-      }
-      throw OAuthLoginException('無法開啟瀏覽器登入:${e.code}');
-    }
+    final callback = await _launcher.authorize(
+      authUrl,
+      callbackHost: OAuthConfig.callbackHost,
+      callbackPath: OAuthConfig.callbackPath,
+    );
 
     final params = callback.queryParameters;
     // 只認 state 相符的 callback,防止別的網頁偽造回跳(CSRF)。

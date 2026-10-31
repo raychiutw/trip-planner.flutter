@@ -12,6 +12,8 @@ class _FakeVault implements SecretVault {
 
   /// 模擬：裝置沒設密碼、或生物辨識被取消／特徵變動。
   bool failWrites = false;
+  bool failBiometricWrites = false;
+  Duration readDelay = Duration.zero;
   PlatformException? readError;
 
   @override
@@ -20,6 +22,7 @@ class _FakeVault implements SecretVault {
     required TokenProtection protection,
   }) async {
     reads.add((key, protection));
+    if (readDelay > Duration.zero) await Future<void>.delayed(readDelay);
     final error = readError;
     if (error != null && protection == TokenProtection.biometric) throw error;
     return data[key];
@@ -32,7 +35,10 @@ class _FakeVault implements SecretVault {
     required TokenProtection protection,
   }) async {
     writes.add((key, protection));
-    if (failWrites) throw PlatformException(code: 'no-passcode');
+    if (failWrites ||
+        (failBiometricWrites && protection == TokenProtection.biometric)) {
+      throw PlatformException(code: 'no-passcode');
+    }
     data[key] = value;
   }
 
@@ -147,5 +153,48 @@ void main() {
     expect(vault.data, isEmpty);
     expect(store.protection, TokenProtection.passcode);
     expect(await store.read(), isNull);
+  });
+
+  test('改成生物辨識失敗（例如沒登記生物辨識）：保護等級維持原樣、憑證還在', () async {
+    await store.write(_tok());
+    vault.failBiometricWrites = true;
+
+    final ok = await store.setProtection(TokenProtection.biometric);
+
+    expect(ok, isFalse);
+    expect(store.protection, TokenProtection.passcode);
+    // 已退回原等級重存，重開 app 仍是登入狀態。
+    final restarted = SecureOAuthTokenStore(vault: vault);
+    expect((await restarted.read())!.refreshToken, 'RT');
+    expect(restarted.protection, TokenProtection.passcode);
+  });
+
+  test('改保護等級前先刪掉舊項目（不同 access control 不能原地覆寫）', () async {
+    await store.write(_tok());
+    vault.data.remove('sentinel');
+    final before = vault.data['tripline_oauth_refresh'];
+    expect(before, 'RT');
+
+    await store.setProtection(TokenProtection.biometric);
+
+    expect(vault.writes.last, (
+      'tripline_oauth_refresh',
+      TokenProtection.biometric,
+    ));
+  });
+
+  test('同時多處讀取只碰一次 Keychain（冷啟動不連跳多次生物辨識）', () async {
+    await store.write(_tok());
+    await store.setProtection(TokenProtection.biometric);
+    final restarted = SecureOAuthTokenStore(vault: vault);
+    vault.reads.clear();
+    vault.readDelay = const Duration(milliseconds: 5);
+
+    await Future.wait([restarted.read(), restarted.read(), restarted.read()]);
+
+    expect(
+      vault.reads.where((r) => r.$1 == 'tripline_oauth_refresh'),
+      hasLength(1),
+    );
   });
 }

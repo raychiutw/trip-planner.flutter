@@ -16,6 +16,7 @@ import 'api/cache/drift_cache_store.dart';
 import 'api/oauth/oauth_providers.dart';
 import 'api/oauth/oauth_token_store.dart';
 import 'api/providers.dart';
+import 'app/web_auth_launcher.dart';
 import 'app/accessibility_scope.dart';
 import 'app/app_lock.dart';
 import 'app/app_lock_host.dart';
@@ -101,6 +102,9 @@ Future<void> main() async {
           overrides: [
             settingsStoreProvider.overrideWithValue(settingsStore),
             oauthTokenStoreProvider.overrideWithValue(SecureOAuthTokenStore()),
+            authorizationLauncherProvider.overrideWithValue(
+              const WebAuthLauncher(),
+            ),
             themeModeProvider.overrideWith(
               () => ThemeModeController(initialMode: initialThemeMode),
             ),

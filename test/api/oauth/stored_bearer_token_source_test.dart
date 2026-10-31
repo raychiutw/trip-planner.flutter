@@ -16,7 +16,7 @@ class _WriteFailStore implements OAuthTokenStore {
   @override
   TokenProtection get protection => TokenProtection.passcode;
   @override
-  Future<void> setProtection(TokenProtection protection) async {}
+  Future<bool> setProtection(TokenProtection protection) async => true;
   @override
   Future<OAuthTokens?> read() async => _tokens;
   @override

@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/oauth/oauth_config.dart';
@@ -122,8 +121,12 @@ void main() {
     await expectLater(service.login(), throwsA(isA<OAuthLoginException>()));
   });
 
-  test('使用者在瀏覽器取消 → 丟出標記為取消的例外，訊息為繁中', () async {
-    launcher.error = PlatformException(code: 'CANCELED');
+  test('使用者在瀏覽器取消 → 取消例外原樣往上丟（不吞掉、不換 token）', () async {
+    launcher.error = OAuthLoginException(
+      '取消',
+      userMessage: '已取消登入',
+      cancelled: true,
+    );
 
     final error = await service.login().then<Object?>(
       (_) => null,

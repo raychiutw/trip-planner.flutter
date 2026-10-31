@@ -206,10 +206,14 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> accountDeleted() => _clearLocalAuth();
 
   Future<void> _clearLocalAuth() async {
-    await ref.read(oauthTokenStoreProvider).clear();
-    // 清離線快取,避免帳號間資料外洩。
-    await ref.read(cacheStoreProvider).clear();
-    state = const AsyncData(null);
+    try {
+      await ref.read(oauthTokenStoreProvider).clear();
+      // 清離線快取,避免帳號間資料外洩。
+      await ref.read(cacheStoreProvider).clear();
+    } finally {
+      // 清除過程出錯也要回到未登入，不能讓使用者卡在已登入畫面。
+      state = const AsyncData(null);
+    }
   }
 }
 
