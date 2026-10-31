@@ -1,5 +1,5 @@
 /// OAuth 2.1 PKCE 流程的 HTTP:authorize URL 組裝 + /oauth/token 交換/刷新。
-/// 自帶 Dio(不經 ApiClient 的 cookie/Origin;/oauth/* 後端本就不需認證)。
+/// 自帶 Dio(不經 ApiClient 的 Bearer 與 refresh 重送;/oauth/* 本就不需認證)。
 library;
 
 import 'package:dio/dio.dart';

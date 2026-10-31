@@ -37,41 +37,24 @@ flutter run                                           # 連 prod API — 一律�
 
 ### Provider 鏈(riverpod 3.x)
 
-`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 使用 `StreamProvider.family<_, String>`（`lib/features/trip_detail/trip_providers.dart:16,32,49`）；segments 同型，entry 使用 `(tripId, entryId)` 作為 key。timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch（對應 web 版 TripLayout），SWR 先 emit 本機快取再 emit 網路。
+`bearerTokenSourceProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 使用 `StreamProvider.family<_, String>`（`lib/features/trip_detail/trip_providers.dart:16,32,49`）；segments 同型，entry 使用 `(tripId, entryId)` 作為 key。timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch（對應 web 版 TripLayout），SWR 先 emit 本機快取再 emit 網路。
 
 注意:flutter_riverpod 3.x 未匯出 `Override` 型別,測試的 overrides 直接以 list literal 傳入 `ProviderScope`。
 
 ### 認證(關鍵且非顯而易見)
 
-後端是瀏覽器導向的 session cookie + CSRF Origin allowlist,app 扮演瀏覽器:
+認證只走 OAuth PKCE 與 Bearer(ADR-0014,取代 ADR-0005 的 cookie 路線):
 
-- 登入走 `postForResponse` 讀 `set-cookie`,解析 `tripline_session` 後存進 flutter_secure_storage
-- Cookie 模式由 `ApiClient` 統一帶 `Cookie:`;**mutating request 必帶 `Origin: kTriplineOrigin`**(缺少 → 403)。origin 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', ...)`(`lib/api/api_client.dart:21-24`),不得寫死字面值,本機後端靠 `--dart-define` 覆寫
-- Bearer 模式(`BearerTokenSource` 有 token)與 cookie 模式互斥:只帶 `Authorization: Bearer <token>`,**不送 Cookie/Origin**(`_authHeadersFor`,`lib/api/api_client.dart:508-529`)。兩種 header 都由 `ApiClient` 統一處理,不要繞過它用 raw dio 打 API
-- `currentUser()` 401 回 null 不 throw;登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
-
-### ApiClient 行為規則(每條有對應測試,改動需同步測試)
-
-1. 非 2xx → throw `ApiError`(三層 fallback 解析,見 `api_error.dart`)
-2. 一般請求與 SSE 共用 `retry_policy.dart` 的「同參數重送一次」純決策（`isRetryAttempt` 限一次）：429 僅 GET/HEAD（讀 `Retry-After`，cap 30s）、edge block page（2xx 但 `text/html`）同條件、Bearer 401 且 `refresh()` 成功則重送**不分 method**。登入／註冊的 `postForResponse` 帳密 POST 不自動重送，但統一轉換 429 與攔截頁錯誤。「mutation 絕不 retry」是錯的說法
-3. 204/空 body → `null`
-4. 路徑參數 `Uri.encodeComponent`
-
-### Model 解析規則(所有 fromJson 一致)
-
-wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.toDouble()`(server 可能回 int 或 double);bool flag 是 0/1:`json['x'] == 1 || json['x'] == true`;日期時間存字串不轉 DateTime;list 缺漏 → `[]`;`sortOrder`/`version` 缺漏 → `0`。完整規則與行號見 `CODING_STANDARDS.md`「Model 與 fromJson 解析規則」;無法從程式碼反推的後端行為(兩套 OCC、筆記段名三套字、停留點時間必填、`trips` 表無 `version`)見同檔「API 層規範／後端契約細節」。
-
-### Theme 取色守則
-
-Widget 取色一律走 `Theme.of(context).colorScheme`；柔褐 tint 是唯一品牌強調色，內容 surface 跟隨 iOS 系統語意層級。`TpSystemColorsLight/Dark` 只供 `AppTheme` 工廠建立 Light／Dark／High Contrast 主題，feature 不得直接引用；地圖逐日 pin／route palette 是唯一 rainbow 色例外。設計禁忌：無 gradient 裝飾、無 emoji icon。
-
-### OCC
-
-帶 `version` 的 model:後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用,離線佇列走三方 rebase(`OfflineSyncEngine._tryRebase`,`lib/api/cache/offline_sync_engine.dart`;決策見 ADR-0007)。行程本身無 `version`,更新走 `PUT /trips/:id` 且不送 `expectedVersion`。
+- 登入是系統瀏覽器授權(`OAuthLoginService`),以 https callback(Universal Link／App Link)回到 app;**App 內沒有密碼表單,也不保管密碼**。callback 網域、client id、API origin 都是 `--dart-define`／gradle 設定值,不得寫死
+- access token 只放記憶體(15 分鐘);refresh token 每次使用即輪替,落地在 Keychain／Keystore(`SecureOAuthTokenStore`),保護等級 `passcode`(預設)或 `biometric`(設定頁開啟)。裝置沒設密碼時不落地
+- `ApiClient` 統一帶 `Authorization: Bearer`;**不送 Cookie／Origin**。不要繞過它用 raw dio 打 API
+- refresh 被後端拒絕(400／401)會清憑證並由 `bearerTokenSource.signedOut` 通知 `authStateProvider` 回到未登入
+- `authStateProvider` 的身分優先取 id_token claims(驗過 `exp`／`aud`),否則落回 `currentUser()`(401 回 null 不 throw);登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
+- **master 在新 api 切換前不可發版**:新認證連不上舊入口(見 ADR-0014)
 
 ## 測試慣例
 
-三層鏡像 `lib/`:models(純 fromJson + edge case)、api(`http_mock_adapter` + `InMemorySessionStore`,不碰 `SecureSessionStore`)、screens(widget test + `ProviderScope` override,mocktail mock repository,假 GoRouter 當導航探針)。具體手法、provider override 與假綠燈防呆見 `CODING_STANDARDS.md`「測試規範」「測試不可假綠」。
+三層鏡像 `lib/`:models(純 fromJson + edge case)、api(`http_mock_adapter` + `InMemoryOAuthTokenStore`,不碰 `SecureOAuthTokenStore` 的真平台通道)、screens(widget test + `ProviderScope` override,mocktail mock repository,假 GoRouter 當導航探針)。具體手法、provider override 與假綠燈防呆見 `CODING_STANDARDS.md`「測試規範」「測試不可假綠」。
 
 ## Agent skills
 

@@ -14,6 +14,10 @@ class _WriteFailStore implements OAuthTokenStore {
   OAuthTokens? _tokens;
   bool cleared = false;
   @override
+  TokenProtection get protection => TokenProtection.passcode;
+  @override
+  Future<bool> setProtection(TokenProtection protection) async => true;
+  @override
   Future<OAuthTokens?> read() async => _tokens;
   @override
   Future<void> write(OAuthTokens tokens) async => throw Exception('disk full');
@@ -50,7 +54,7 @@ void main() {
   });
 
   test('未過期 → 直接回 access(不 refresh)', () async {
-    await store.write(_tok(ttl: const Duration(hours: 1)));
+    await source.adopt(_tok(ttl: const Duration(hours: 1)));
     expect(await source.accessToken(), 'AT');
     verifyNever(
       () => repo.refresh(
@@ -72,7 +76,8 @@ void main() {
           _tok(access: 'NEW', refresh: 'RT2', ttl: const Duration(hours: 1)),
     );
     expect(await source.accessToken(), 'NEW');
-    expect((await store.read())!.accessToken, 'NEW');
+    // 輪替後的 refresh token 已落地;access token 只在記憶體。
+    expect((await store.read())!.refreshToken, 'RT2');
   });
 
   test('refresh 回應無 id_token → 沿用舊 idToken(身分不丟)', () async {

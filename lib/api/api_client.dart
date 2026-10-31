@@ -1,4 +1,4 @@
-/// dio 封裝：cookie 認證、CSRF Origin、錯誤轉換、暫時性失敗 retry、204 處理。
+/// dio 封裝：Bearer 認證、錯誤轉換、暫時性失敗 retry、204 處理。
 library;
 
 import 'dart:convert';
@@ -12,13 +12,11 @@ import 'cache/cache_store.dart';
 import 'cache/offline_op.dart';
 import 'cache/offline_sync_engine.dart';
 import 'retry_policy.dart' as retry;
-import 'session_store.dart';
 
 export 'cache/offline_sync_engine.dart' show FlushResult;
 
 /// 本 build 連線的 origin。預設正式站，可用 --dart-define=TRIPLINE_API_ORIGIN
-/// 覆寫（本機開發指向本機後端）。一個 origin 同時決定 base URL（`origin/api`）
-/// 與 mutating request 的 CSRF Origin header。
+/// 覆寫（本機開發指向本機後端、切換到新 api）。決定 base URL（`origin/api`）。
 const String kTriplineOrigin = String.fromEnvironment(
   'TRIPLINE_API_ORIGIN',
   defaultValue: 'https://trip-planner-dby.pages.dev',
@@ -49,8 +47,8 @@ bool isOfflineError(DioException e) {
   }
 }
 
-/// 提供 Bearer access token 與 refresh 能力(OAuth 模式)。
-/// 注入 ApiClient 後,有 token 即走 Bearer(不送 Cookie/Origin);null/無 token → cookie 模式。
+/// 提供 Bearer access token 與 refresh 能力。
+/// 注入 ApiClient 後,有 token 就帶 `Authorization: Bearer`;null/無 token → 不帶認證。
 abstract class BearerTokenSource {
   Future<String?> accessToken();
 
@@ -61,15 +59,12 @@ abstract class BearerTokenSource {
 /// Tripline API client，base = `<origin>/api`。
 class ApiClient {
   ApiClient({
-    required SessionStore sessionStore,
     Dio? dio,
     String origin = kTriplineOrigin,
     BearerTokenSource? bearerSource,
     CacheStore? cacheStore,
     Map<String, int> cacheCapacityByPathPrefix = kCacheCapacityByPathPrefix,
-  }) : _sessionStore = sessionStore,
-       _origin = origin,
-       _bearerSource = bearerSource,
+  }) : _bearerSource = bearerSource,
        _cacheStore = cacheStore,
        _cacheCapacityByPathPrefix = cacheCapacityByPathPrefix,
        _dio = dio ?? Dio() {
@@ -78,8 +73,6 @@ class ApiClient {
     _dio.options.validateStatus = (_) => true;
   }
 
-  final SessionStore _sessionStore;
-  final String _origin;
   final BearerTokenSource? _bearerSource;
   final CacheStore? _cacheStore;
   final Map<String, int> _cacheCapacityByPathPrefix;
@@ -147,27 +140,6 @@ class ApiClient {
 
   Future<void> resolveConflictKeepTheirs(ConflictRecord c) =>
       _offline!.resolveConflictKeepTheirs(c);
-
-  /// POST 並保留完整 response（例如 AuthRepository 需要讀 set-cookie）。
-  ///
-  /// 仍統一套用 Cookie／Bearer／Origin，避免需要 response headers 的流程繞過
-  /// [ApiClient] 的認證與 CSRF 規則。
-  Future<Response<dynamic>> postForResponse(
-    String path, {
-    Object? body,
-    Map<String, dynamic>? query,
-  }) async {
-    final auth = await _authHeadersFor('POST');
-    final response = await _dio.request<dynamic>(
-      path,
-      queryParameters: query,
-      data: body,
-      options: Options(method: 'POST', headers: auth.headers),
-    );
-    // 帳密 POST 不做自動重送，避免重放憑證；仍統一轉換狀態與 CDN 攔截頁。
-    _throwIfFailed(response, preserveRetryAfter: true);
-    return response;
-  }
 
   Future<dynamic> get(
     String path, {
@@ -392,7 +364,8 @@ class ApiClient {
         evictMutationCache: evictMutationCache,
       );
     }
-    _throwIfFailed(response);
+    // 不會再重送的失敗保留 Retry-After（註冊等 429 要告訴使用者等多久）。
+    _throwIfFailed(response, preserveRetryAfter: true);
     final statusCode = response.statusCode ?? 0;
     if (statusCode == 204) {
       if (evictMutationCache) {
@@ -505,27 +478,15 @@ class ApiClient {
     return null;
   }
 
+  /// 只有 Bearer:有 access token 就帶 `Authorization`,沒有就不帶任何認證
+  /// (ADR-0014 取代 cookie 與 `Origin`)。
   Future<({Map<String, dynamic> headers, bool useBearer})> _authHeadersFor(
     String method,
   ) async {
     final requestHeaders = <String, dynamic>{};
     final bearer = await _bearerSource?.accessToken();
     final useBearer = bearer != null && bearer.isNotEmpty;
-    if (useBearer) {
-      // Bearer 模式:帶 token,不送 Cookie/Origin
-      //（後端對「有 Bearer 且無 Origin」的 request 跳過 CSRF 檢查）。
-      requestHeaders['Authorization'] = 'Bearer $bearer';
-    } else {
-      final sessionToken = await _sessionStore.read();
-      if (sessionToken != null && sessionToken.isNotEmpty) {
-        requestHeaders['Cookie'] = 'tripline_session=$sessionToken';
-      }
-      final isMutation = method != 'GET' && method != 'HEAD';
-      if (isMutation) {
-        // cookie 認證的 mutating request 必帶 Origin（後端 CSRF 檢查）
-        requestHeaders['Origin'] = _origin;
-      }
-    }
+    if (useBearer) requestHeaders['Authorization'] = 'Bearer $bearer';
     return (headers: requestHeaders, useBearer: useBearer);
   }
 

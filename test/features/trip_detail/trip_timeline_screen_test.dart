@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/cache_read_policy.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/selected_day_provider.dart';
@@ -21,6 +22,7 @@ import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/segment.dart';
+import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
@@ -28,6 +30,7 @@ import 'package:tripline/ui/swipe_to_delete.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
 import '../../helpers/branch_keepalive.dart';
+import '../../helpers/fake_oauth.dart';
 
 const _tripId = 'okinawa-2026';
 
@@ -204,6 +207,22 @@ const _computableTravelGapDays = [
 
 /// 以 create callback 注入假資料（flutter_riverpod 3.x 未匯出 Override 型別，
 /// 故在此 helper 內 inline 組 overrides，型別交由推斷）。
+/// 列印、筆記這類 sheet 會直接讀 repository；開它們的測試要自己 stub。
+_MockTripRepository _sheetRepo() {
+  registerFallbackValue(CacheReadPolicy.cached);
+  final repo = _MockTripRepository();
+  when(() => repo.fetchTrip(any())).thenAnswer((_) async => _fakeTrip);
+  when(() => repo.fetchDays(any())).thenAnswer((_) async => _fakeDays);
+  when(
+    () => repo.fetchDaySummaries(any(), policy: any(named: 'policy')),
+  ).thenAnswer((_) async => _fakeDays);
+  when(() => repo.fetchNotes(any())).thenAnswer((_) async => const TripNotes());
+  when(
+    () => repo.fetchNotesAiState(any()),
+  ).thenAnswer((_) async => const TripNoteAiState());
+  return repo;
+}
+
 Future<void> _pumpTimeline(
   WidgetTester tester, {
   FutureOr<Trip> Function()? fetchTrip,
@@ -295,6 +314,7 @@ Future<void> _pumpTimeline(
       // 關閉 riverpod 3 預設自動 retry：error 測試需要 provider 停在 AsyncError
       retry: (retryCount, error) => null,
       overrides: [
+        unstubbedApiClientOverride,
         // StreamProvider override 需回 Stream；以 Stream.fromFuture(Future.sync(...))
         // 包裝 helper 的 FutureOr callback，同時保留同步 throw / 永不完成的語意。
         tripDetailProvider(tripId).overrideWith(
@@ -844,7 +864,7 @@ void main() {
   });
 
   testWidgets('更多選單的列印由下往上開啟共用可關閉 sheet', (tester) async {
-    await _pumpTimeline(tester);
+    await _pumpTimeline(tester, repo: _sheetRepo());
     await _expectTripActionOpensClosableSheet(
       tester,
       const ValueKey('trip-action-print'),
@@ -860,7 +880,7 @@ void main() {
   });
 
   testWidgets('更多選單的筆記用內容 sheet，行程資料用表單 sheet', (tester) async {
-    await _pumpTimeline(tester);
+    await _pumpTimeline(tester, repo: _sheetRepo());
     await _expectTripActionOpensClosableSheet(
       tester,
       const ValueKey('trip-action-notes'),

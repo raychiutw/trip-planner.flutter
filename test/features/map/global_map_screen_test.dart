@@ -18,6 +18,7 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 import '../../helpers/fake_trip_map.dart';
+import '../../helpers/fake_oauth.dart';
 
 class _FakeLocationService implements TripMapLocationService {
   int calls = 0;
@@ -82,6 +83,7 @@ void main() {
   }) {
     return ProviderScope(
       overrides: [
+        unstubbedApiClientOverride,
         cacheStoreProvider.overrideWithValue(
           cacheStore ?? InMemoryCacheStore(),
         ),
@@ -284,7 +286,10 @@ void main() {
     addTearDown(tripsStream.close);
     tripsStream.add(_trips);
     final container = ProviderContainer(
+      // 沒 stub 的呼叫會失敗；關掉 riverpod 的自動 retry，免得留下 timer。
+      retry: (retryCount, error) => null,
       overrides: [
+        unstubbedApiClientOverride,
         cacheStoreProvider.overrideWithValue(store),
         myTripsProvider.overrideWith((ref) => tripsStream.stream),
         tripDaysProvider.overrideWith((ref, tripId) => Stream.value([_day])),

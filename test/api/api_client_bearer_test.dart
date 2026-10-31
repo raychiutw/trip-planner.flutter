@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
-import 'package:tripline/api/session_store.dart';
 
 class _FakeSource implements BearerTokenSource {
   _FakeSource(this._token, {this.refreshResult = false});
@@ -38,11 +37,7 @@ void main() {
         },
       ),
     );
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: _FakeSource('tok'),
-    );
+    final client = ApiClient(dio: dio, bearerSource: _FakeSource('tok'));
 
     await client.post('/x', body: const {});
     expect(captured['Authorization'], 'Bearer tok');
@@ -72,11 +67,7 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: true);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     final r = await client.get('/x');
     expect(source.refreshCalls, 1);
@@ -104,11 +95,7 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: false);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     await expectLater(
       client.get('/x'),
@@ -140,74 +127,32 @@ void main() {
       ),
     );
     final source = _FakeSource('old', refreshResult: true);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio, bearerSource: source);
 
     expect(await client.post('/x', body: const {}), {'ok': true});
     expect(source.refreshCalls, 1);
     expect(sentTokens, ['Bearer old', 'Bearer new']);
   });
 
-  test('登入 raw POST 的 401 不刷新 Bearer，也不重放憑證', () async {
+  test('沒有 bearerSource → 不帶任何認證（沒有 Cookie、Origin、Authorization）', () async {
     final dio = Dio();
-    var calls = 0;
+    late Map<String, dynamic> captured;
     dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
-          calls++;
-          handler.resolve(
-            Response(
-              requestOptions: options,
-              statusCode: 401,
-              data: {
-                'error': {'code': 'LOGIN_INVALID', 'message': 'x'},
-              },
-            ),
+        onRequest: (o, h) {
+          captured = o.headers;
+          h.resolve(
+            Response(requestOptions: o, statusCode: 200, data: {'ok': true}),
           );
         },
       ),
     );
-    final source = _FakeSource('old', refreshResult: true);
-    final client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      bearerSource: source,
-    );
+    final client = ApiClient(dio: dio);
 
-    await expectLater(
-      client.postForResponse('/oauth/login', body: const {}),
-      throwsA(isA<ApiError>().having((e) => e.status, 'status', 401)),
-    );
-    expect(calls, 1);
-    expect(source.refreshCalls, 0);
+    await client.post('/x', body: const {});
+
+    expect(captured.containsKey('Cookie'), isFalse);
+    expect(captured.containsKey('Origin'), isFalse);
+    expect(captured.containsKey('Authorization'), isFalse);
   });
-
-  test(
-    '無 bearerSource → cookie 模式（mutation 帶 Origin,不帶 Authorization）',
-    () async {
-      final dio = Dio();
-      late Map<String, dynamic> captured;
-      dio.interceptors.add(
-        InterceptorsWrapper(
-          onRequest: (o, h) {
-            captured = o.headers;
-            h.resolve(
-              Response(requestOptions: o, statusCode: 200, data: {'ok': true}),
-            );
-          },
-        ),
-      );
-      final store = InMemorySessionStore();
-      await store.write('sess');
-      final client = ApiClient(sessionStore: store, dio: dio);
-
-      await client.post('/x', body: const {});
-      expect(captured['Cookie'], 'tripline_session=sess');
-      expect(captured['Origin'], isNotNull);
-      expect(captured.containsKey('Authorization'), isFalse);
-    },
-  );
 }

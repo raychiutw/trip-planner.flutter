@@ -9,7 +9,6 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache_read_policy.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
-import 'package:tripline/api/session_store.dart';
 
 /// 依序回放腳本 response 的假 adapter（retry 測試需要序列回應）。
 class SequencedResponseAdapter implements HttpClientAdapter {
@@ -61,11 +60,7 @@ void main() {
     dio = Dio(BaseOptions())..options.validateStatus = (_) => true;
     adapter = DioAdapter(dio: dio);
     cache = InMemoryCacheStore();
-    client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      cacheStore: cache,
-    );
+    client = ApiClient(dio: dio, cacheStore: cache);
   });
 
   test('GET 成功 → write-through 寫入快取', () async {
@@ -216,11 +211,7 @@ void main() {
       ]),
     ]);
     final seqDio = Dio()..httpClientAdapter = seq;
-    final c = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: seqDio,
-      cacheStore: cache,
-    );
+    final c = ApiClient(dio: seqDio, cacheStore: cache);
     await c.get('/my-trips');
     expect(seq.recordedRequests, hasLength(2));
     expect((await cache.readResponse(cacheKeyFor('GET', '/my-trips')))!.data, [
@@ -467,7 +458,6 @@ void main() {
 
     test('超過上限時丟掉最舊的,總數不超過上限', () async {
       final capped = ApiClient(
-        sessionStore: InMemorySessionStore(),
         cacheStore: cache,
         dio: dio,
         cacheCapacityByPathPrefix: const {'/poi-search': 2},
@@ -500,7 +490,6 @@ void main() {
 
     test('上限只約束該前綴,不波及一般快取', () async {
       final capped = ApiClient(
-        sessionStore: InMemorySessionStore(),
         cacheStore: cache,
         dio: dio,
         cacheCapacityByPathPrefix: const {'/poi-search': 1},
@@ -524,7 +513,7 @@ void main() {
   });
 
   test('cacheStore=null → 行為不變(GET 成功不報錯)', () async {
-    final plain = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    final plain = ApiClient(dio: dio);
     adapter.onGet('/trips', (s) => s.reply(200, []));
     expect(await plain.get('/trips'), []);
   });

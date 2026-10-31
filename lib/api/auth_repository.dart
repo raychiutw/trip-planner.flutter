@@ -1,14 +1,12 @@
-/// 認證 repository：密碼登入拿 session cookie、登出、查目前使用者。
+/// 認證 repository：註冊、密碼重設、驗證信、帳號刪除與查目前使用者。
+/// 登入與登出走 OAuth（PKCE），不在這裡。
 library;
-
-import 'package:dio/dio.dart';
 
 import '../models/user.dart';
 import '../models/public_config.dart';
 import 'api_client.dart';
 import 'api_error.dart';
 import 'cache_read_policy.dart';
-import 'session_store.dart';
 
 class SignupJoinedTrip {
   const SignupJoinedTrip({required this.id, required this.title});
@@ -73,18 +71,9 @@ class AccountDeletionPreview {
 
 /// 對應 `/api/oauth/*` 認證 endpoints。
 class AuthRepository {
-  AuthRepository({
-    required ApiClient client,
-    required SessionStore sessionStore,
-  }) : _client = client,
-       _sessionStore = sessionStore;
+  AuthRepository({required ApiClient client}) : _client = client;
 
   final ApiClient _client;
-  final SessionStore _sessionStore;
-
-  static final _sessionCookiePattern = RegExp(
-    r'(?:^|;\s*)tripline_session=([^;]+)',
-  );
 
   /// GET /public-config → login/signup feature flags available pre-auth.
   Future<PublicConfig> fetchPublicConfig() async {
@@ -92,33 +81,7 @@ class AuthRepository {
     return PublicConfig.fromJson(body as Map<String, dynamic>);
   }
 
-  /// POST /oauth/login → 解析 set-cookie 的 tripline_session 寫入 store →
-  /// GET /oauth/userinfo 回 UserInfo。
-  Future<UserInfo> login({
-    required String email,
-    required String password,
-  }) async {
-    final loginResponse = await _client.postForResponse(
-      '/oauth/login',
-      body: {'email': email, 'password': password},
-    );
-
-    final statusCode = loginResponse.statusCode ?? 0;
-    final sessionToken = _sessionTokenFrom(loginResponse.headers);
-    if (sessionToken == null || sessionToken.isEmpty) {
-      throw ApiError(
-        status: statusCode,
-        code: 'AUTH_NO_SESSION_COOKIE',
-        message: '登入回應缺少 tripline_session cookie',
-      );
-    }
-    await _sessionStore.write(sessionToken);
-
-    final userInfoJson = await _client.get('/oauth/userinfo');
-    return UserInfo.fromJson(userInfoJson as Map<String, dynamic>);
-  }
-
-  /// POST /oauth/signup → 解析 set-cookie 的 tripline_session 寫入 store。
+  /// POST /oauth/signup。註冊後不會自動登入，使用者要再用瀏覽器登入。
   Future<SignupResult> signup({
     required String email,
     required String password,
@@ -126,7 +89,7 @@ class AuthRepository {
     String? displayName,
     String? invitationToken,
   }) async {
-    final signupResponse = await _client.postForResponse(
+    final body = await _client.post(
       '/oauth/signup',
       body: {
         'email': email.trim(),
@@ -138,19 +101,7 @@ class AuthRepository {
           'invitationToken': invitationToken.trim(),
       },
     );
-
-    final statusCode = signupResponse.statusCode ?? 0;
-    final sessionToken = _sessionTokenFrom(signupResponse.headers);
-    if (sessionToken == null || sessionToken.isEmpty) {
-      throw ApiError(
-        status: statusCode,
-        code: 'AUTH_NO_SESSION_COOKIE',
-        message: '註冊回應缺少 tripline_session cookie',
-      );
-    }
-    await _sessionStore.write(sessionToken);
-
-    return SignupResult.fromJson(signupResponse.data as Map<String, dynamic>);
+    return SignupResult.fromJson(body as Map<String, dynamic>);
   }
 
   /// GET /account：刪除前顯示會受影響的行程與共編者。
@@ -170,7 +121,6 @@ class AuthRepository {
           ? {'password': confirmation}
           : {'confirm': confirmation},
     );
-    await _sessionStore.clear();
   }
 
   /// POST /oauth/forgot-password；後端固定 generic response，避免帳號列舉。
@@ -212,21 +162,10 @@ class AuthRepository {
     return _messageFrom(body);
   }
 
-  /// POST /oauth/logout（忽略失敗）+ 清空本機 session。
-  Future<void> logout() async {
-    try {
-      await _client.post('/oauth/logout');
-    } catch (_) {
-      // server 端登出失敗不影響本機清除
-    } finally {
-      await _sessionStore.clear();
-    }
-  }
-
   /// GET /oauth/userinfo；401（未登入/過期）回 null，不 throw。
   ///
   /// 離線快取(刻意行為):userinfo 走 ApiClient 透明快取,離線開機時 GET 連線失敗
-  /// 會回退最後一次成功的身分,讓 cookie 模式使用者離線仍保持登入、能讀已快取行程。
+  /// 會回退最後一次成功的身分,讓使用者離線仍保持登入、能讀已快取行程。
   /// 登出會清快取(避免跨帳號外洩);無快取時離線仍 throw(等同本快取功能前的行為)。
   Future<UserInfo?> currentUser() async {
     try {
@@ -251,17 +190,6 @@ class AuthRepository {
   Future<bool> authorizeAi() async {
     final body = await _client.post('/account/ai-authorization');
     return body is Map && body['authorized'] == true;
-  }
-
-  String? _sessionTokenFrom(Headers headers) {
-    final setCookieHeaders = headers['set-cookie'] ?? const <String>[];
-    for (final cookieHeader in setCookieHeaders) {
-      final sessionCookieMatch = _sessionCookiePattern.firstMatch(cookieHeader);
-      if (sessionCookieMatch != null) {
-        return sessionCookieMatch.group(1);
-      }
-    }
-    return null;
   }
 
   String? _messageFrom(Object? body) {

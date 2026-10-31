@@ -4,7 +4,6 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
-import 'package:tripline/api/session_store.dart';
 
 DioException _offline(String path) => DioException(
   requestOptions: RequestOptions(path: path),
@@ -21,11 +20,7 @@ void main() {
     dio = Dio(BaseOptions())..options.validateStatus = (_) => true;
     adapter = DioAdapter(dio: dio);
     cache = InMemoryCacheStore();
-    client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      cacheStore: cache,
-    );
+    client = ApiClient(dio: dio, cacheStore: cache);
   });
 
   test('無快取線上 → 只 emit fresh', () async {

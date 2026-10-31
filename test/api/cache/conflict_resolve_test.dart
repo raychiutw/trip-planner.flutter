@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
-import 'package:tripline/api/session_store.dart';
 
 /// 同 flush_rebase_test.dart 的 RoutingSequencedAdapter(複用型別太瑣碎,直接內嵌)。
 class RoutingSequencedAdapter implements HttpClientAdapter {
@@ -80,11 +79,7 @@ void main() {
     adapter = RoutingSequencedAdapter();
     dio.httpClientAdapter = adapter;
     cache = InMemoryCacheStore();
-    client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      cacheStore: cache,
-    );
+    client = ApiClient(dio: dio, cacheStore: cache);
   });
 
   final daysKey = cacheKeyFor('GET', '/trips/t/days', {'all': '1'});

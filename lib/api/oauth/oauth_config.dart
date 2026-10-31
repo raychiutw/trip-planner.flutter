@@ -1,19 +1,30 @@
-/// OAuth client 設定(由 --dart-define 注入;production client: tripline-mobile)。
-/// 例:--dart-define=TRIPLINE_OAUTH_CLIENT_ID=tripline-mobile
-///     --dart-define=TRIPLINE_OAUTH_REDIRECT_PORT=8765
+/// OAuth client 設定(建置時以 --dart-define 注入;預設值是 production 的 public client)。
+///
+/// 切換到新 api 時只改這幾個值,不改程式:
+///   --dart-define=TRIPLINE_API_ORIGIN=...
+///   --dart-define=TRIPLINE_OAUTH_CLIENT_ID=tripline-mobile
+///   --dart-define=TRIPLINE_OAUTH_CALLBACK_HOST=...
+///   --dart-define=TRIPLINE_OAUTH_CALLBACK_PATH=/oauth/callback
 library;
 
 abstract final class OAuthConfig {
-  static const clientId = String.fromEnvironment('TRIPLINE_OAUTH_CLIENT_ID');
-
-  /// loopback 固定埠(RFC 8252);須與註冊的 redirect_uri 完全一致。
-  static const redirectPort = int.fromEnvironment(
-    'TRIPLINE_OAUTH_REDIRECT_PORT',
-    defaultValue: 8765,
+  /// public client 的 id(不是機密)。
+  static const clientId = String.fromEnvironment(
+    'TRIPLINE_OAUTH_CLIENT_ID',
+    defaultValue: 'tripline-mobile',
   );
 
-  static String get redirectUri => 'http://127.0.0.1:$redirectPort';
+  /// 授權回跳(Universal Link／App Link)的網域；須與後端登記的 redirect URI 一致，
+  /// 且該網域要承載 apple-app-site-association 與 assetlinks.json。
+  static const callbackHost = String.fromEnvironment(
+    'TRIPLINE_OAUTH_CALLBACK_HOST',
+    defaultValue: 'mobile-callback.trip-planner-dby.pages.dev',
+  );
 
-  /// 有設定 client_id 才啟用 OAuth 登入(否則 app 維持 cookie 登入)。
-  static bool get isConfigured => clientId.isNotEmpty;
+  static const callbackPath = String.fromEnvironment(
+    'TRIPLINE_OAUTH_CALLBACK_PATH',
+    defaultValue: '/oauth/callback',
+  );
+
+  static String get redirectUri => 'https://$callbackHost$callbackPath';
 }

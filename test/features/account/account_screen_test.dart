@@ -7,6 +7,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
+import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -15,6 +16,8 @@ import 'package:tripline/features/account/account_sheet.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+
+import '../../helpers/fake_oauth.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 
@@ -25,6 +28,8 @@ class MockTripRepository extends Mock implements TripRepository {}
 void main() {
   late MockAuthRepository mockAuthRepository;
   late MockTripRepository mockTripRepository;
+  late InMemoryOAuthTokenStore tokenStore;
+  late RecordingOAuthRepository oauthRepo;
 
   const verifiedUser = UserInfo(
     id: 'user-1',
@@ -36,7 +41,8 @@ void main() {
   setUp(() {
     mockAuthRepository = MockAuthRepository();
     mockTripRepository = MockTripRepository();
-    when(() => mockAuthRepository.logout()).thenAnswer((_) async {});
+    tokenStore = signedInTokenStore();
+    oauthRepo = RecordingOAuthRepository();
   });
 
   /// 注入登入中的假 user 後渲染 Account sheet root。
@@ -55,6 +61,7 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
+          ...signedInOverrides(store: tokenStore, repo: oauthRepo),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           appVersionProvider.overrideWith((ref) => Future.value(version)),
@@ -102,6 +109,7 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
+          ...signedInOverrides(store: tokenStore, repo: oauthRepo),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           appVersionProvider.overrideWith(
@@ -656,7 +664,8 @@ void main() {
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
     await tester.pumpAndSettle();
 
-    verify(() => mockAuthRepository.logout()).called(1);
+    expect(oauthRepo.revoked, ['RT']);
+    expect(await tokenStore.read(), isNull);
     expect(find.byType(CupertinoAlertDialog), findsNothing);
   });
 
@@ -668,7 +677,8 @@ void main() {
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 
-    verifyNever(() => mockAuthRepository.logout());
+    expect(oauthRepo.revoked, isEmpty);
+    expect(await tokenStore.read(), isNotNull);
     expect(find.byType(CupertinoAlertDialog), findsNothing);
     // 取消後仍停留在帳號頁。
     expect(find.text('Ray'), findsOneWidget);

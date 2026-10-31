@@ -9,11 +9,10 @@ import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/cache/offline_op.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
 
 class _ControlledApiClient extends ApiClient {
-  _ControlledApiClient() : super(sessionStore: InMemorySessionStore());
+  _ControlledApiClient() : super();
 
   final responses = <Completer<FlushResult>>[];
   var flushCalls = 0;
@@ -51,11 +50,7 @@ void main() {
       overrides: [
         cacheStoreProvider.overrideWithValue(cache),
         apiClientProvider.overrideWithValue(
-          ApiClient(
-            sessionStore: InMemorySessionStore(),
-            dio: dio,
-            cacheStore: cache,
-          ),
+          ApiClient(dio: dio, cacheStore: cache),
         ),
       ],
     );

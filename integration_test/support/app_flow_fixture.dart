@@ -14,6 +14,11 @@ import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/map_repository.dart';
+import 'package:tripline/api/oauth/oauth_login_service.dart';
+import 'package:tripline/api/oauth/oauth_providers.dart';
+import 'package:tripline/api/oauth/oauth_repository.dart';
+import 'package:tripline/api/oauth/oauth_token_store.dart';
+import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/settings_store.dart';
@@ -35,6 +40,7 @@ import 'package:tripline/main.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/notes.dart';
+import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip.dart';
@@ -183,8 +189,55 @@ const releaseSmokeFixtureAppVersion = AppVersion(
   buildNumber: '12',
 );
 
+/// 假的登入狀態：瀏覽器登入不真的開瀏覽器，只翻轉 [signedIn]（身分由被 mock 的
+/// `currentUser()` 讀這個旗標）。
+class FixtureSession {
+  bool signedIn = false;
+  Object? loginError;
+  int loginCalls = 0;
+}
+
+OAuthTokens _fixtureTokens() => OAuthTokens(
+  accessToken: 'AT',
+  refreshToken: 'RT',
+  expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+);
+
+class _FixtureLoginService implements OAuthLoginService {
+  _FixtureLoginService(this._source, this._session);
+
+  final StoredBearerTokenSource _source;
+  final FixtureSession _session;
+
+  @override
+  Future<OAuthTokens> login() async {
+    _session.loginCalls++;
+    final error = _session.loginError;
+    if (error != null) throw error;
+    _session.signedIn = true;
+    final tokens = _fixtureTokens();
+    await _source.adopt(tokens);
+    return tokens;
+  }
+}
+
+/// 不連網：登出時的撤銷直接成功。
+class _FixtureOAuthRepository implements OAuthRepository {
+  @override
+  Future<void> revokeToken({
+    required String token,
+    required String clientId,
+    String? tokenTypeHint,
+    String? clientSecret,
+  }) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class AppFlowFixture {
   AppFlowFixture._({
+    required this.session,
     required this.auth,
     required this.trips,
     required this.collab,
@@ -216,24 +269,21 @@ class AppFlowFixture {
     final map = MockMapRepository();
     final apiClient = MockApiClient();
     final speech = MockSpeechService();
+    final session = FixtureSession();
     final favoritesStream = StreamController<List<PoiFavorite>>.broadcast();
     final pendingCountStream = StreamController<int>.broadcast();
 
     when(
       () => apiClient.queueFlushRequests,
     ).thenAnswer((_) => const Stream<void>.empty());
-    when(auth.currentUser).thenAnswer((_) async => null);
-    when(
-      () => auth.login(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer(
-      (_) async => const UserInfo(
-        id: 'u-1',
-        email: 'ray@example.com',
-        displayName: 'Ray',
-      ),
+    when(auth.currentUser).thenAnswer(
+      (_) async => session.signedIn
+          ? const UserInfo(
+              id: 'u-1',
+              email: 'ray@example.com',
+              displayName: 'Ray',
+            )
+          : null,
     );
     when(auth.fetchAiAuthorization).thenAnswer((_) async => true);
     when(auth.authorizeAi).thenAnswer((_) async => true);
@@ -333,6 +383,7 @@ class AppFlowFixture {
     ).thenAnswer((_) => Stream.value(releaseSmokeFavorites));
 
     return AppFlowFixture._(
+      session: session,
       auth: auth,
       trips: trips,
       collab: collab,
@@ -349,6 +400,7 @@ class AppFlowFixture {
     );
   }
 
+  final FixtureSession session;
   final MockAuthRepository auth;
   final MockTripRepository trips;
   final MockCollabRepository collab;
@@ -368,11 +420,26 @@ class AppFlowFixture {
     await pendingCountStream.close();
   }
 
+  /// 認證相關 overrides：瀏覽器登入換成假的，憑證只活在記憶體。
+  List<dynamic> get authOverrides {
+    final store = InMemoryOAuthTokenStore();
+    if (session.signedIn) store.write(_fixtureTokens());
+    return [
+      oauthTokenStoreProvider.overrideWithValue(store),
+      oauthRepositoryProvider.overrideWithValue(_FixtureOAuthRepository()),
+      oauthLoginServiceProvider.overrideWith(
+        (ref) =>
+            _FixtureLoginService(ref.watch(bearerTokenSourceProvider), session),
+      ),
+    ];
+  }
+
   Widget get app {
     final appVersion = fixedAppVersion;
     final themeMode = initialThemeMode;
     return ProviderScope(
       overrides: [
+        ...authOverrides,
         apiClientProvider.overrideWithValue(apiClient),
         authRepositoryProvider.overrideWithValue(auth),
         tripRepositoryProvider.overrideWithValue(trips),
@@ -474,12 +541,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpWidget(appWrapper?.call(app) ?? app);
   await tester.pumpAndSettle();
 
-  await _signInFromWelcome(
-    tester,
-    fixture,
-    typeText: typeText,
-    captureState: captureState,
-  );
+  await _signInFromWelcome(tester, fixture, captureState: captureState);
   await captureState('trips');
 
   await tester.drag(
@@ -857,7 +919,6 @@ Future<void> runAppOwnedReleaseFlow(
 Future<void> _signInFromWelcome(
   WidgetTester tester,
   AppFlowFixture fixture, {
-  required AppFlowEnterText typeText,
   required Future<void> Function(String name) captureState,
 }) async {
   expect(find.byType(WelcomeScreen), findsOneWidget);
@@ -868,12 +929,7 @@ Future<void> _signInFromWelcome(
   await tester.pumpAndSettle();
   expect(find.byType(LoginScreen), findsOneWidget);
   await captureState('login');
-  await typeText(
-    find.byKey(const ValueKey('login-email-field')),
-    'ray@example.com',
-  );
-  await typeText(find.byKey(const ValueKey('login-password-field')), 'secret');
-  await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+  await tester.tap(find.byKey(const ValueKey('login-browser-button')));
   await tester.pumpAndSettle();
 
   final visibleText = tester
@@ -881,13 +937,7 @@ Future<void> _signInFromWelcome(
       .map((widget) => widget.data)
       .whereType<String>()
       .join(' | ');
-  expect(
-    () => verify(
-      () => fixture.auth.login(email: 'ray@example.com', password: 'secret'),
-    ).called(1),
-    returnsNormally,
-    reason: visibleText,
-  );
+  expect(fixture.session.loginCalls, 1, reason: visibleText);
   expect(find.byType(TripsListScreen), findsOneWidget, reason: visibleText);
 }
 
@@ -1084,12 +1134,7 @@ Future<void> runAppOwnedVisualEvidenceFlow(
   await tester.pumpWidget(appWrapper?.call(app) ?? app);
   await tester.pumpAndSettle();
 
-  await _signInFromWelcome(
-    tester,
-    fixture,
-    typeText: enterText,
-    captureState: (_) async {},
-  );
+  await _signInFromWelcome(tester, fixture, captureState: (_) async {});
   await scene('light/trips-list');
 
   // 行程卡「⋯」與長按開同一份錨定玻璃選單；選「共編」只推一個 route（一次 callback）。

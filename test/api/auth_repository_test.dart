@@ -4,12 +4,10 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
-import 'package:tripline/api/session_store.dart';
 
 void main() {
   late Dio dio;
   late DioAdapter dioAdapter;
-  late InMemorySessionStore sessionStore;
   late AuthRepository authRepository;
   late List<RequestOptions> recordedRequests;
 
@@ -34,12 +32,7 @@ void main() {
         },
       ),
     );
-    sessionStore = InMemorySessionStore();
-    final apiClient = ApiClient(sessionStore: sessionStore, dio: dio);
-    authRepository = AuthRepository(
-      client: apiClient,
-      sessionStore: sessionStore,
-    );
+    authRepository = AuthRepository(client: ApiClient(dio: dio));
   });
 
   group('public config', () {
@@ -63,137 +56,8 @@ void main() {
     );
   });
 
-  group('login', () {
-    test('429 保留 Retry-After，且登入憑證不重送', () async {
-      dioAdapter.onPost(
-        '/oauth/login',
-        (server) => server.reply(
-          429,
-          {
-            'error': {'code': 'LOGIN_RATE_LIMITED', 'message': '請稍後再試'},
-          },
-          headers: {
-            Headers.contentTypeHeader: [Headers.jsonContentType],
-            'retry-after': ['7'],
-          },
-        ),
-        data: {'email': 'ray@example.com', 'password': 'secret'},
-      );
-
-      await expectLater(
-        authRepository.login(email: 'ray@example.com', password: 'secret'),
-        throwsA(
-          isA<ApiError>()
-              .having((error) => error.status, 'status', 429)
-              .having((error) => error.retryAfterSeconds, 'Retry-After', 7),
-        ),
-      );
-      expect(recordedRequests, hasLength(1));
-      expect(await sessionStore.read(), isNull);
-    });
-
-    test('edge block 回應顯示上游暫不可用，且不寫入 session', () async {
-      dioAdapter.onPost(
-        '/oauth/login',
-        (server) => server.reply(
-          200,
-          '<html>blocked</html>',
-          headers: {
-            Headers.contentTypeHeader: ['text/html; charset=utf-8'],
-          },
-        ),
-        data: {'email': 'ray@example.com', 'password': 'secret'},
-      );
-
-      await expectLater(
-        authRepository.login(email: 'ray@example.com', password: 'secret'),
-        throwsA(
-          isA<ApiError>().having(
-            (error) => error.code,
-            'code',
-            'SYS_UPSTREAM_UNAVAILABLE',
-          ),
-        ),
-      );
-      expect(await sessionStore.read(), isNull);
-      expect(recordedRequests, hasLength(1));
-    });
-
-    test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo', () async {
-      dioAdapter.onPost(
-        '/oauth/login',
-        (server) => server.reply(
-          200,
-          {'ok': true, 'userId': 'u1hex', 'email': 'ray@example.com'},
-          headers: {
-            Headers.contentTypeHeader: [Headers.jsonContentType],
-            'set-cookie': [
-              'other_cookie=zzz; Path=/',
-              'tripline_session=abc.def; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000',
-            ],
-          },
-        ),
-        data: {'email': 'ray@example.com', 'password': 'secret'},
-      );
-      dioAdapter.onGet(
-        '/oauth/userinfo',
-        (server) => server.reply(200, userInfoJson),
-      );
-
-      final loggedInUser = await authRepository.login(
-        email: 'ray@example.com',
-        password: 'secret',
-      );
-
-      expect(await sessionStore.read(), 'abc.def');
-      expect(loggedInUser.id, 'u1hex');
-      expect(loggedInUser.email, 'ray@example.com');
-      expect(loggedInUser.emailVerified, isTrue);
-      expect(loggedInUser.displayName, 'Ray');
-      expect(recordedRequests.first.headers['Origin'], kTriplineOrigin);
-    });
-
-    test('401 LOGIN_INVALID → 丟 ApiError、store 不寫入', () async {
-      dioAdapter.onPost(
-        '/oauth/login',
-        (server) => server.reply(401, {
-          'error': {'code': 'LOGIN_INVALID', 'message': '帳號或密碼錯誤'},
-        }),
-        data: {'email': 'ray@example.com', 'password': 'wrong'},
-      );
-
-      await expectLater(
-        authRepository.login(email: 'ray@example.com', password: 'wrong'),
-        throwsA(
-          isA<ApiError>()
-              .having((error) => error.status, 'status', 401)
-              .having((error) => error.code, 'code', 'LOGIN_INVALID'),
-        ),
-      );
-      expect(await sessionStore.read(), isNull);
-    });
-
-    test('200 但無 tripline_session cookie → 丟 ApiError', () async {
-      dioAdapter.onPost(
-        '/oauth/login',
-        (server) => server.reply(200, {
-          'ok': true,
-          'userId': 'u1hex',
-          'email': 'ray@example.com',
-        }),
-        data: {'email': 'ray@example.com', 'password': 'secret'},
-      );
-
-      await expectLater(
-        authRepository.login(email: 'ray@example.com', password: 'secret'),
-        throwsA(isA<ApiError>()),
-      );
-      expect(await sessionStore.read(), isNull);
-    });
-  });
-
   group('signup', () {
-    test('201 解析 set-cookie 寫入 store 並回 signup 結果', () async {
+    test('201 回 signup 結果（不再有 session cookie，需另外用瀏覽器登入）', () async {
       dioAdapter.onPost(
         '/oauth/signup',
         (server) => server.reply(
@@ -208,9 +72,6 @@ void main() {
           },
           headers: {
             Headers.contentTypeHeader: [Headers.jsonContentType],
-            'set-cookie': [
-              'tripline_session=signup.session; Path=/; HttpOnly; Secure',
-            ],
           },
         ),
         data: {
@@ -230,17 +91,16 @@ void main() {
         invitationToken: ' invite-token ',
       );
 
-      expect(await sessionStore.read(), 'signup.session');
       expect(result.userId, 'u2hex');
       expect(result.email, 'traveler@example.com');
       expect(result.requiresVerification, isTrue);
       expect(result.joinedTrip?.id, 'trip-1');
       expect(result.joinedTrip?.title, '沖繩家庭旅行');
       expect(result.invitationError, isNull);
-      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
+      expect(recordedRequests.single.headers.containsKey('Origin'), isFalse);
     });
 
-    test('SIGNUP_EMAIL_TAKEN → 丟 ApiError、store 不寫入', () async {
+    test('SIGNUP_EMAIL_TAKEN → 丟 ApiError', () async {
       dioAdapter.onPost(
         '/oauth/signup',
         (server) => server.reply(409, {
@@ -267,7 +127,6 @@ void main() {
           ),
         ),
       );
-      expect(await sessionStore.read(), isNull);
     });
 
     test('privacyConsent 會以實際 boolean false 傳給後端', () async {
@@ -342,33 +201,6 @@ void main() {
         ),
       );
     });
-
-    test('201 但無 tripline_session cookie → 丟 ApiError', () async {
-      dioAdapter.onPost(
-        '/oauth/signup',
-        (server) => server.reply(201, {
-          'ok': true,
-          'userId': 'u2hex',
-          'email': 'ray@example.com',
-          'requiresVerification': true,
-        }),
-        data: {
-          'email': 'ray@example.com',
-          'password': 'secret123',
-          'privacyConsent': true,
-        },
-      );
-
-      await expectLater(
-        authRepository.signup(
-          email: 'ray@example.com',
-          password: 'secret123',
-          privacyConsent: true,
-        ),
-        throwsA(isA<ApiError>()),
-      );
-      expect(await sessionStore.read(), isNull);
-    });
   });
 
   group('account deletion', () {
@@ -401,8 +233,7 @@ void main() {
       );
     });
 
-    test('密碼帳號 DELETE /account 送 password 並清除 session', () async {
-      await sessionStore.write('session-token');
+    test('密碼帳號 DELETE /account 送 password', () async {
       dioAdapter.onDelete(
         '/account',
         (server) => server.reply(200, {'ok': true, 'tripsDeleted': 2}),
@@ -413,12 +244,9 @@ void main() {
         hasPassword: true,
         confirmation: 'secret123',
       );
-
-      expect(await sessionStore.read(), isNull);
     });
 
-    test('DELETE /account 失敗時保留 session，讓使用者可重新驗證再試', () async {
-      await sessionStore.write('session-token');
+    test('DELETE /account 失敗時丟 ApiError，讓使用者可重新驗證再試', () async {
       dioAdapter.onDelete(
         '/account',
         (server) => server.reply(401, {
@@ -435,8 +263,6 @@ void main() {
         ),
         throwsA(isA<ApiError>()),
       );
-
-      expect(await sessionStore.read(), 'session-token');
     });
 
     test('純 OAuth 帳號 DELETE /account 送 confirm DELETE', () async {
@@ -568,34 +394,6 @@ void main() {
 
       expect(await authRepository.fetchAiAuthorization(), isFalse);
       expect(await authRepository.authorizeAi(), isTrue);
-    });
-  });
-
-  group('logout', () {
-    test('成功時清空 store', () async {
-      await sessionStore.write('abc.def');
-      dioAdapter.onPost(
-        '/oauth/logout',
-        (server) => server.reply(200, {'ok': true}),
-      );
-
-      await authRepository.logout();
-
-      expect(await sessionStore.read(), isNull);
-    });
-
-    test('logout API 失敗仍清空 store 且不 throw', () async {
-      await sessionStore.write('abc.def');
-      dioAdapter.onPost(
-        '/oauth/logout',
-        (server) => server.reply(500, {
-          'error': {'code': 'SYS_INTERNAL', 'message': '系統錯誤'},
-        }),
-      );
-
-      await authRepository.logout();
-
-      expect(await sessionStore.read(), isNull);
     });
   });
 }

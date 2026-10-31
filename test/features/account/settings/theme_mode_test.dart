@@ -10,6 +10,8 @@ import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/models/user.dart';
 
+import '../../../helpers/fake_oauth.dart';
+
 Future<void> _flushAsyncLoad() async {
   for (var i = 0; i < 4; i++) {
     await Future<void>.delayed(Duration.zero);
@@ -207,11 +209,11 @@ void main() {
         emailVerified: true,
       ),
     );
-    when(authRepository.logout).thenAnswer((_) async {});
     final container = ProviderContainer(
       overrides: [
         settingsStoreProvider.overrideWithValue(store),
         authRepositoryProvider.overrideWithValue(authRepository),
+        ...signedInOverrides(),
       ],
     );
     container.listen(themeModeProvider, (_, _) {});

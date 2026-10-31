@@ -216,7 +216,7 @@ class _EnablePrompt extends ConsumerWidget {
   }
 }
 
-/// 密碼登入成功後詢問是否開啟生物辨識登入（排在 App 鎖的詢問之後）。
+/// 登入成功後詢問是否開啟生物辨識登入（排在 App 鎖的詢問之後）。
 class _BiometricLoginPrompt extends ConsumerWidget {
   const _BiometricLoginPrompt();
 
@@ -227,8 +227,7 @@ class _BiometricLoginPrompt extends ConsumerWidget {
     return _HostDialog(
       dialogKey: const ValueKey('bio-login-prompt'),
       title: '要用 $label 登入 Tripline 嗎？',
-      message:
-          '開啟後，登出再回來可以直接用 $label 登入，不必輸入密碼。帳號與密碼只存在這支手機的鑰匙圈。之後可以在「帳號 → 安全性」關閉。',
+      message: '開啟後，登入憑證只能用 $label 解鎖，密碼不會存在這支手機。之後可以在「帳號 → 安全性」關閉。',
       cancelLabel: '稍後再說',
       confirmLabel: '開啟',
       onCancel: () => unawaited(controller.answerPrompt(enable: false)),

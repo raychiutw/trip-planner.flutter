@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/user.dart';
@@ -15,7 +14,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    final apiClient = ApiClient(dio: dio);
     accountRepository = AccountRepository(client: apiClient);
   });
 

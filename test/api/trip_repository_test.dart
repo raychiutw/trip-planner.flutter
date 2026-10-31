@@ -9,7 +9,6 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache_read_policy.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
-import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/note_section.dart';
@@ -41,7 +40,7 @@ void main() {
         },
       ),
     );
-    final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    final apiClient = ApiClient(dio: dio);
     tripRepository = TripRepository(client: apiClient);
   });
 
@@ -1774,11 +1773,7 @@ void main() {
       final swrDio = Dio();
       final swrAdapter = DioAdapter(dio: swrDio);
       final swrRepo = TripRepository(
-        client: ApiClient(
-          sessionStore: InMemorySessionStore(),
-          dio: swrDio,
-          cacheStore: cache,
-        ),
+        client: ApiClient(dio: swrDio, cacheStore: cache),
       );
       await cache.writeResponse(
         cacheKeyFor('GET', '/trips/okinawa/days', {'all': '1'}),
@@ -1807,11 +1802,7 @@ void main() {
     setUp(() {
       cache = InMemoryCacheStore();
       repo = TripRepository(
-        client: ApiClient(
-          sessionStore: InMemorySessionStore(),
-          dio: dio,
-          cacheStore: cache,
-        ),
+        client: ApiClient(dio: dio, cacheStore: cache),
       );
     });
     final daysKey = cacheKeyFor('GET', '/trips/okinawa/days', {'all': '1'});
@@ -1933,11 +1924,7 @@ void main() {
     setUp(() {
       cache = InMemoryCacheStore();
       repo = TripRepository(
-        client: ApiClient(
-          sessionStore: InMemorySessionStore(),
-          dio: dio,
-          cacheStore: cache,
-        ),
+        client: ApiClient(dio: dio, cacheStore: cache),
       );
     });
 

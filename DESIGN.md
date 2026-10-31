@@ -136,12 +136,11 @@ iPhone 固定四個 root tabs：
 
 ### 5.2 生物辨識登入
 
-- **Tripline 決策**：密碼登入成功後（每台裝置問一次，在 App 鎖的詢問之後）詢問是否開啟「Face ID／Touch ID 登入」。同意就把 email 與密碼存進這台裝置的 Keychain（`unlocked_this_device`：僅限本機、不進備份、不遷移、裝置鎖定時讀不到。沒有綁生物辨識的 Keychain access control，生物辨識是 App 層在讀出前的關卡；若要改成系統層強制，需改用 access control flags 並真機驗證），之後在登入頁按「使用 … 登入」，通過驗證才讀出並走一般密碼登入。純 client，不改後端。
-- **Tripline 決策**：登出保留存下的帳密（這是功能的目的）；刪除帳號時清除。與 App 鎖互相獨立：登出會關掉 App 鎖，不影響這裡。
-- **Tripline 決策**：只適用 email＋密碼；Google／OAuth 登入沒有密碼可存，不適用。
-- **Tripline 決策**：存下的密碼被後端拒絕（`LOGIN_INVALID`，例如在別處改過密碼）時清掉帳密，回到手動輸入；網路等一般失敗保留。已開啟時用同一個 email 的新密碼手動登入成功，靜默更新存下的密碼；換成別的 email 手動登入，則清掉前一位的帳密並對新帳號重新詢問（不靜默覆蓋）。登出時待答的詢問與待存帳密一律作廢。
-- **Tripline 決策**：開啟有三個入口，都要有密碼才存得進去：① 密碼登入成功後的詢問；② 登入頁的「使用 … 登入」在尚未綁定時仍顯示，點了要求先填 Email 與密碼，登入成功就直接綁定（不再詢問），按鈕下方註明第一次需輸入帳密；③ 設定列「安全性」在裝置支援時一律出現，開啟要重新輸入密碼，通過後端驗證才綁定（只接受目前登入的 email，避免驗證換發 session 把使用者登出）。關閉要先通過一次生物辨識驗證並清掉帳密。
-- **Tripline 決策**：登入頁的生物辨識按鈕以裝置實際方式命名（「Face ID」「Touch ID」「生物辨識」），不使用籠統字眼；取消或失敗只留在登入頁，不阻擋手動輸入。
+- **Tripline 決策**：登入只走系統瀏覽器（OAuth PKCE），App 內沒有密碼表單，也不保管密碼（ADR-0014）。登入頁只有「使用瀏覽器登入」與建立帳號連結。
+- **Tripline 決策**：生物辨識登入＝refresh token 改存成「讀取時要通過目前登記的生物辨識」的 Keychain／Keystore 項目；冷啟動讀取時由系統跳出 Face ID／Touch ID，之後的 refresh 在記憶體內完成，不會再次跳出。預設（未開啟）用裝置密碼等級保護；裝置沒設密碼時不落地，每次開 App 重新登入。
+- **Tripline 決策**：開啟有兩個入口：① 登入成功後詢問一次（每台裝置一次，在 App 鎖的詢問之後；只有裝置密碼、沒有生物辨識的裝置不問）；② 設定列「安全性」在裝置有生物辨識時出現，開啟前先通過一次驗證。關閉要先確認並通過驗證，會清掉 refresh token 並登出。與 App 鎖互相獨立。
+- **Tripline 決策**：受保護的憑證沒通過驗證時，登入頁停在「使用 Face ID 解鎖」＋「改用瀏覽器登入」，不當成已登出；生物特徵變動使項目失效時清掉憑證並回到未登入，要求重新登入。
+- **Tripline 決策**：按鈕以裝置實際方式命名（「Face ID」「Touch ID」「生物辨識」），不使用籠統字眼。真機行為（Keychain access control、Android Keystore）須實機驗收（#490）。
 
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。
 

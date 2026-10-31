@@ -4,7 +4,6 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/favorites_repository.dart';
-import 'package:tripline/api/session_store.dart';
 
 void main() {
   late Dio dio;
@@ -14,7 +13,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    final apiClient = ApiClient(dio: dio);
     favoritesRepository = FavoritesRepository(client: apiClient);
   });
 

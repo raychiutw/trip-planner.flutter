@@ -1,25 +1,20 @@
-/// 登入畫面：email + 密碼 → authStateProvider.login。
+/// 登入畫面：用系統瀏覽器登入（OAuth PKCE），不在 App 內輸入密碼（ADR-0014）。
 /// 登入成功後的跳轉由 router redirect 處理，不在此畫面導航。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart'
     show CupertinoActivityIndicator, CupertinoIcons;
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_error.dart';
 import '../../api/oauth/oauth_login_service.dart';
-import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_lock.dart';
-import '../../app/biometric_login.dart';
-import '../../app/error_message.dart';
 import '../../theme/tokens.dart';
 
-/// 密碼登入畫面（/login，shell 外）。
+/// 登入畫面（/login，shell 外）。
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -28,95 +23,24 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _loginAttempted = false;
-  bool _oauthLoading = false;
-  String? _oauthError;
+  bool _attempted = false;
 
-  /// 已知錯誤碼的繁中人話 fallback（server message 非繁中時使用）。
-  static const _fallbackMessageByCode = <String, String>{
-    'LOGIN_RATE_LIMITED': '登入嘗試次數過多，請稍後再試',
-    'LOGIN_INVALID': 'Email 或密碼錯誤',
-    'AUTH_NO_SESSION_COOKIE': '登入回應異常，請稍後再試',
-  };
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  Future<void> _browserLogin() async {
+    if (ref.read(authStateProvider).isLoading) return;
+    setState(() => _attempted = true);
+    // 失敗訊息由 authStateProvider 的 AsyncError 呈現；使用者取消則維持未登入。
+    await ref.read(authStateProvider.notifier).signInWithBrowser();
   }
 
-  Future<void> _submit({bool bind = false}) async {
-    if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
-    final formState = _formKey.currentState;
-    if (formState == null || !formState.validate()) return;
-    setState(() => _loginAttempted = true);
-    ref
-        .read(biometricLoginProvider.notifier)
-        .rememberAttempt(
-          _emailController.text.trim(),
-          _passwordController.text,
-          bind: bind,
-        );
-    // 失敗訊息由 authStateProvider 的 AsyncError 呈現，不在此 throw
-    await ref
-        .read(authStateProvider.notifier)
-        .login(_emailController.text.trim(), _passwordController.text);
-    if (!mounted) return;
-    // 登入成功(無 error)→ 結束 autofill 情境,iOS 才會跳出「儲存密碼到 Keychain」提示。
-    if (!ref.read(authStateProvider).hasError) {
-      TextInput.finishAutofillContext();
-    }
+  /// 受保護的登入憑證解鎖（跳出 Face ID／Touch ID）。
+  Future<void> _unlock() async {
+    if (ref.read(authStateProvider).isLoading) return;
+    setState(() => _attempted = true);
+    await ref.read(authStateProvider.notifier).unlock();
   }
 
-  /// 生物辨識登入：驗證通過後由 controller 用存下的帳密走一般登入。
-  /// 取消或失敗只留在登入頁，使用者仍可手動輸入。
-  Future<void> _biometricLogin() async {
-    if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
-    final controller = ref.read(biometricLoginProvider.notifier);
-    if (!ref.read(biometricLoginProvider).hasSaved) {
-      // 第一次：先用帳密驗證，成功後直接綁定。
-      await _submit(bind: true);
-      return;
-    }
-    setState(() => _loginAttempted = true);
-    await controller.loginWithBiometric();
-  }
-
-  /// OAuth PKCE 登入(系統瀏覽器 + loopback);成功後 invalidate authState → router 跳轉。
-  Future<void> _oauthLogin() async {
-    if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
-    setState(() {
-      _oauthLoading = true;
-      _oauthError = null;
-    });
-    try {
-      await ref.read(oauthLoginServiceProvider).login();
-      if (mounted) ref.invalidate(authStateProvider);
-    } on OAuthLoginException catch (e) {
-      if (mounted) setState(() => _oauthError = e.userMessage);
-    } on Exception {
-      if (mounted) setState(() => _oauthError = 'Tripline 登入失敗，請稍後再試');
-    } finally {
-      if (mounted) setState(() => _oauthLoading = false);
-    }
-  }
-
-  /// 錯誤訊息：server 回繁中直接用；否則查 code 對照表；再不然通用訊息。
-  String _loginErrorMessage(Object error) {
-    if (error is ApiError) {
-      if (hasCjk(error.message)) return error.message;
-      return _fallbackMessageByCode[error.code] ?? '登入失敗，請稍後再試';
-    }
-    return '登入失敗，請檢查網路後再試';
-  }
-
-  void _togglePasswordVisibility() =>
-      setState(() => _obscurePassword = !_obscurePassword);
+  String _errorMessage(Object error) =>
+      error is OAuthLoginException ? error.userMessage : 'Tripline 登入失敗，請稍後再試';
 
   @override
   Widget build(BuildContext context) => _buildContent(context);
@@ -129,11 +53,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ? TpSystemColorsDark.success
         : TpSystemColorsLight.success;
     final authState = ref.watch(authStateProvider);
-    final isSubmitting = authState.isLoading;
-    final isBusy = isSubmitting || _oauthLoading;
+    final isBusy = authState.isLoading;
+    final locked = ref.watch(authLockedProvider);
     final biometricKind = ref.watch(appLockKindProvider).value;
-    final biometricBound = ref.watch(biometricLoginProvider).hasSaved;
-    final showBiometric = biometricKind != null;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
@@ -151,211 +73,117 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               constraints: const BoxConstraints(
                 maxWidth: AppContentWidth.authCard,
               ),
-              child: AutofillGroup(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Semantics(
-                        header: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      'Tripline',
+                      textAlign: TextAlign.center,
+                      style: textTheme.displaySmall?.copyWith(
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: TpSpacing.s2),
+                  Text(
+                    '把每段旅程，安排得剛剛好',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: TpSpacing.s8),
+                  if (emailVerified) ...[
+                    Semantics(
+                      key: const ValueKey('login-verified-banner'),
+                      container: true,
+                      liveRegion: true,
+                      label: '成功：信箱已驗證，請登入繼續。',
+                      excludeSemantics: true,
+                      child: Container(
+                        key: const ValueKey('login-verified-surface'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TpSpacing.s4,
+                          vertical: TpSpacing.s3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: successColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(TpRadius.md),
+                          border: highContrast
+                              ? Border.all(color: colorScheme.onSurface)
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.check_mark_circled_solid,
+                              color: successColor,
+                            ),
+                            const SizedBox(width: TpSpacing.s2),
+                            Expanded(
+                              child: Text(
+                                '信箱已驗證，請登入繼續。',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: TpSpacing.s4),
+                  ],
+                  if (_attempted && authState.hasError) ...[
+                    Semantics(
+                      key: const ValueKey('login-error-banner'),
+                      container: true,
+                      liveRegion: true,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TpSpacing.s4,
+                          vertical: TpSpacing.s3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(TpRadius.md),
+                        ),
                         child: Text(
-                          'Tripline',
-                          textAlign: TextAlign.center,
-                          style: textTheme.displaySmall?.copyWith(
+                          _errorMessage(authState.error!),
+                          style: textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurface,
                           ),
                         ),
                       ),
-                      const SizedBox(height: TpSpacing.s2),
-                      Text(
-                        '把每段旅程，安排得剛剛好',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                    ),
+                    const SizedBox(height: TpSpacing.s4),
+                  ],
+                  if (locked) ...[
+                    FilledButton.icon(
+                      key: const ValueKey('login-unlock-button'),
+                      onPressed: isBusy ? null : _unlock,
+                      icon: Icon(
+                        biometricKind == BiometricKind.faceId
+                            ? CupertinoIcons.person_crop_square
+                            : CupertinoIcons.lock_shield,
                       ),
-                      const SizedBox(height: TpSpacing.s8),
-                      if (emailVerified) ...[
-                        Semantics(
-                          key: const ValueKey('login-verified-banner'),
-                          container: true,
-                          liveRegion: true,
-                          label: '成功：信箱已驗證，請登入繼續。',
-                          excludeSemantics: true,
-                          child: Container(
-                            key: const ValueKey('login-verified-surface'),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: TpSpacing.s4,
-                              vertical: TpSpacing.s3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: successColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(TpRadius.md),
-                              border: highContrast
-                                  ? Border.all(color: colorScheme.onSurface)
-                                  : null,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  CupertinoIcons.check_mark_circled_solid,
-                                  color: successColor,
-                                ),
-                                const SizedBox(width: TpSpacing.s2),
-                                Expanded(
-                                  child: Text(
-                                    '信箱已驗證，請登入繼續。',
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: TpSpacing.s4),
-                      ],
-                      if (_loginAttempted && authState.hasError) ...[
-                        Semantics(
-                          key: const ValueKey('login-error-banner'),
-                          container: true,
-                          liveRegion: true,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: TpSpacing.s4,
-                              vertical: TpSpacing.s3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.errorContainer,
-                              borderRadius: BorderRadius.circular(TpRadius.md),
-                            ),
-                            child: Text(
-                              _loginErrorMessage(authState.error!),
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: TpSpacing.s4),
-                      ],
-                      TextFormField(
-                        key: const ValueKey('login-email-field'),
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        autofillHints: const [
-                          AutofillHints.username,
-                          AutofillHints.email,
-                        ],
-                        textInputAction: TextInputAction.next,
-                        readOnly: isBusy,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        validator: (value) =>
-                            (value == null || value.trim().isEmpty)
-                            ? '請輸入 Email'
-                            : null,
-                      ),
-                      const SizedBox(height: TpSpacing.s4),
-                      TextFormField(
-                        key: const ValueKey('login-password-field'),
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        autofillHints: const [AutofillHints.password],
-                        textInputAction: TextInputAction.done,
-                        readOnly: isBusy,
-                        onFieldSubmitted: (_) => _submit(),
-                        decoration: InputDecoration(
-                          labelText: '密碼',
-                          suffixIcon: Semantics(
-                            key: const ValueKey(
-                              'login-password-visibility-toggle',
-                            ),
-                            button: true,
-                            label: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                            onTap: _togglePasswordVisibility,
-                            child: Tooltip(
-                              message: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                              excludeFromSemantics: true,
-                              child: IconButton(
-                                onPressed: _togglePasswordVisibility,
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? CupertinoIcons.eye
-                                      : CupertinoIcons.eye_slash,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        validator: (value) =>
-                            (value == null || value.isEmpty) ? '請輸入密碼' : null,
-                      ),
-                      const SizedBox(height: TpSpacing.s6),
-                      FilledButton(
-                        key: const ValueKey('login-submit-button'),
-                        onPressed: isBusy ? null : _submit,
-                        child: isSubmitting
-                            ? const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox.square(
-                                    dimension: 18,
-                                    child: CupertinoActivityIndicator(),
-                                  ),
-                                  SizedBox(width: TpSpacing.s2),
-                                  Text('登入中'),
-                                ],
-                              )
-                            : const Text('登入'),
-                      ),
-                      if (showBiometric) ...[
-                        const SizedBox(height: TpSpacing.s4),
-                        OutlinedButton.icon(
-                          key: const ValueKey('login-biometric-button'),
-                          onPressed: isBusy ? null : _biometricLogin,
-                          icon: Icon(
-                            biometricKind == BiometricKind.faceId
-                                ? CupertinoIcons.person_crop_square
-                                : CupertinoIcons.lock_shield,
-                          ),
-                          label: Text('使用 ${biometricKind.lockLabel} 登入'),
-                        ),
-                        if (!biometricBound)
-                          Padding(
-                            padding: const EdgeInsets.only(top: TpSpacing.s1),
-                            child: Text(
-                              '第一次請先輸入 Email 與密碼，驗證後綁定 ${biometricKind.lockLabel}',
-                              textAlign: TextAlign.center,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                      ],
-                      if (ref.watch(oauthEnabledProvider)) ...[
-                        const SizedBox(height: TpSpacing.s4),
-                        if (_oauthError != null) ...[
-                          Semantics(
-                            container: true,
-                            liveRegion: true,
-                            child: Text(
-                              _oauthError!,
-                              textAlign: TextAlign.center,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: TpSpacing.s2),
-                        ],
-                        OutlinedButton(
-                          key: const ValueKey('login-oauth-button'),
-                          onPressed: isBusy ? null : _oauthLogin,
-                          child: _oauthLoading
+                      label: Text('使用 ${biometricKind.lockLabel} 解鎖'),
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                  ],
+                  (locked
+                      ? OutlinedButton(
+                          key: const ValueKey('login-browser-button'),
+                          onPressed: isBusy ? null : _browserLogin,
+                          child: const Text('改用瀏覽器登入'),
+                        )
+                      : FilledButton(
+                          key: const ValueKey('login-browser-button'),
+                          onPressed: isBusy ? null : _browserLogin,
+                          child: isBusy
                               ? const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -364,28 +192,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       child: CupertinoActivityIndicator(),
                                     ),
                                     SizedBox(width: TpSpacing.s2),
-                                    Text('Tripline 登入中'),
+                                    Text('登入中'),
                                   ],
                                 )
-                              : const Text('使用 Tripline 帳號登入'),
-                        ),
-                      ],
-                      const SizedBox(height: TpSpacing.s3),
-                      TextButton(
-                        key: const ValueKey('login-forgot-password-link'),
-                        onPressed: isBusy
-                            ? null
-                            : () => context.go('/login/forgot'),
-                        child: const Text('忘記密碼？'),
-                      ),
-                      TextButton(
-                        key: const ValueKey('login-signup-link'),
-                        onPressed: isBusy ? null : () => context.go('/signup'),
-                        child: const Text('沒有帳號，建立帳號'),
-                      ),
-                    ],
+                              : const Text('使用瀏覽器登入'),
+                        )),
+                  const SizedBox(height: TpSpacing.s3),
+                  TextButton(
+                    key: const ValueKey('login-signup-link'),
+                    onPressed: isBusy ? null : () => context.go('/signup'),
+                    child: const Text('沒有帳號，建立帳號'),
                   ),
-                ),
+                ],
               ),
             ),
           ),

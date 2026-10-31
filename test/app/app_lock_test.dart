@@ -39,7 +39,9 @@ class _Rig {
     InMemorySettingsStore? store,
     this.textScale = 1,
   }) : bio = FakeBiometricAuthenticator(kind: kind, outcomes: outcomes),
-       store = store ?? InMemorySettingsStore(),
+       store = (store ?? InMemorySettingsStore())
+         // 生物辨識登入的詢問（登入後只問一次）不是這裡要測的，先標成已問過。
+         ..write('bio_login_prompted', '1'),
        auth = _FakeAuth(user),
        enabledAtStart = enabled;
 

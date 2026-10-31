@@ -9,7 +9,6 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/cache/offline_op.dart';
-import 'package:tripline/api/session_store.dart';
 
 DioException _offline(String path) => DioException(
   requestOptions: RequestOptions(path: path),
@@ -135,11 +134,7 @@ void main() {
     dio = Dio(BaseOptions())..options.validateStatus = (_) => true;
     adapter = DioAdapter(dio: dio);
     cache = InMemoryCacheStore();
-    client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      cacheStore: cache,
-    );
+    client = ApiClient(dio: dio, cacheStore: cache);
   });
 
   final daysKey = cacheKeyFor('GET', '/trips/t/days', {'all': '1'});
@@ -496,11 +491,7 @@ void main() {
     final blockingDio = Dio(BaseOptions());
     blockingDio.options.validateStatus = (_) => true;
     blockingDio.httpClientAdapter = blockingAdapter;
-    final blockingClient = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: blockingDio,
-      cacheStore: cache,
-    );
+    final blockingClient = ApiClient(dio: blockingDio, cacheStore: cache);
     final flushSubscription = blockingClient.queueFlushRequests.listen(
       (_) => unawaited(blockingClient.flushQueue()),
     );
@@ -563,11 +554,7 @@ void main() {
     final blockingDio = Dio(BaseOptions());
     blockingDio.options.validateStatus = (_) => true;
     blockingDio.httpClientAdapter = blockingAdapter;
-    final blockingClient = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: blockingDio,
-      cacheStore: cache,
-    );
+    final blockingClient = ApiClient(dio: blockingDio, cacheStore: cache);
 
     final firstSave = blockingClient.sendMutation(
       'PATCH',
@@ -614,11 +601,7 @@ void main() {
     final transitionDio = Dio(BaseOptions());
     transitionDio.options.validateStatus = (_) => true;
     transitionDio.httpClientAdapter = transitionAdapter;
-    final transitionClient = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: transitionDio,
-      cacheStore: cache,
-    );
+    final transitionClient = ApiClient(dio: transitionDio, cacheStore: cache);
     await cache.writeResponse(daysKey, [
       {
         'dayNum': 1,
@@ -669,11 +652,7 @@ void main() {
     final blockingDio = Dio(BaseOptions());
     blockingDio.options.validateStatus = (_) => true;
     blockingDio.httpClientAdapter = blockingAdapter;
-    final blockingClient = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: blockingDio,
-      cacheStore: cache,
-    );
+    final blockingClient = ApiClient(dio: blockingDio, cacheStore: cache);
     await cache.writeResponse(daysKey, [
       {
         'dayNum': 1,
@@ -728,11 +707,7 @@ void main() {
     final blockingDio = Dio(BaseOptions());
     blockingDio.options.validateStatus = (_) => true;
     blockingDio.httpClientAdapter = blockingAdapter;
-    final blockingClient = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: blockingDio,
-      cacheStore: raceCache,
-    );
+    final blockingClient = ApiClient(dio: blockingDio, cacheStore: raceCache);
     await raceCache.writeResponse(daysKey, [
       {
         'dayNum': 1,
@@ -797,11 +772,7 @@ void main() {
       final raceDio = Dio(BaseOptions())..options.validateStatus = (_) => true;
       final raceAdapter = DioAdapter(dio: raceDio);
       raceDio.httpClientAdapter = raceAdapter;
-      final raceClient = ApiClient(
-        sessionStore: InMemorySessionStore(),
-        dio: raceDio,
-        cacheStore: raceCache,
-      );
+      final raceClient = ApiClient(dio: raceDio, cacheStore: raceCache);
       await raceCache.writeResponse(daysKey, [
         {
           'dayNum': 1,

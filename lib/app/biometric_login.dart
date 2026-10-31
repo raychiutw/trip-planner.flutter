@@ -1,8 +1,8 @@
-/// 生物辨識登入：登出後也能用 Face ID／Touch ID 取代手動輸入帳密。
+/// 生物辨識登入：用 Face ID／Touch ID 保護本機的登入憑證（ADR-0014）。
 ///
-/// 純 client、不改後端：密碼登入成功後詢問一次，同意就把 email 與密碼存進
-/// Keychain；之後在登入頁通過生物辨識才讀出並走一般的密碼登入。與 App 鎖
-/// （[appLockProvider]）互相獨立：登出會關掉 App 鎖，但保留這裡存的帳密。
+/// 開啟後 refresh token 改存成「讀取時要通過生物辨識」的 Keychain／Keystore 項目，
+/// 冷啟動讀取時由系統跳出驗證；App 不保管密碼。關閉會清掉 refresh token 並登出。
+/// 與 App 鎖（[appLockProvider]）互相獨立。
 library;
 
 import 'dart:async';
@@ -10,213 +10,104 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/api_error.dart';
-import '../api/credential_store.dart';
+import '../api/oauth/oauth_providers.dart';
+import '../api/oauth/oauth_token_store.dart';
 import '../api/providers.dart';
 import '../models/user.dart';
 import 'app_lock.dart';
 
 const _promptedKey = 'bio_login_prompted';
 
-enum BindOutcome { bound, wrongAccount }
-
 @immutable
 class BiometricLoginState {
-  const BiometricLoginState({
-    this.hasSaved = false,
-    this.promptPending = false,
-  });
+  const BiometricLoginState({this.enabled = false, this.promptPending = false});
 
-  /// Keychain 內有可用的帳密（決定登入頁是否出現生物辨識按鈕）。
-  final bool hasSaved;
+  /// refresh token 目前受生物辨識保護。
+  final bool enabled;
 
-  /// 密碼登入成功後，要詢問是否開啟。
+  /// 登入成功後，要詢問是否開啟。
   final bool promptPending;
 
-  BiometricLoginState copyWith({bool? hasSaved, bool? promptPending}) =>
+  BiometricLoginState copyWith({bool? enabled, bool? promptPending}) =>
       BiometricLoginState(
-        hasSaved: hasSaved ?? this.hasSaved,
+        enabled: enabled ?? this.enabled,
         promptPending: promptPending ?? this.promptPending,
       );
 }
 
 class BiometricLoginController extends Notifier<BiometricLoginState> {
-  SavedCredentials? _attempt;
-
-  /// 詢問框待答時暫存的帳密，答「開啟」才寫進 Keychain。
-  SavedCredentials? _pendingSave;
-  bool _attemptFromSaved = false;
-
-  /// 登入頁尚未綁定時點「使用 Face ID 登入」：密碼登入成功就直接綁定。
-  bool _attemptBinds = false;
   bool _inFlight = false;
 
   @override
   BiometricLoginState build() {
     ref.listen(authStateProvider, (_, next) => _onAuth(next));
-    unawaited(_loadSaved());
-    return const BiometricLoginState();
+    return BiometricLoginState(enabled: _storeEnabled);
   }
 
-  Future<void> _loadSaved() async {
-    try {
-      final saved = await ref.read(credentialStoreProvider).read();
-      if (ref.mounted) state = state.copyWith(hasSaved: saved != null);
-    } catch (_) {
-      // Keychain 讀不到就當作沒有，登入頁維持手動輸入。
-    }
-  }
-
-  /// 登入畫面送出密碼登入前呼叫，登入成功才會用到。
-  ///
-  /// [bind] 為 true 時，登入成功就直接綁定（不再詢問）。
-  void rememberAttempt(String email, String password, {bool bind = false}) {
-    _attempt = SavedCredentials(email: email, password: password);
-    _attemptFromSaved = false;
-    _attemptBinds = bind;
-  }
+  bool get _storeEnabled =>
+      ref.read(oauthTokenStoreProvider).protection == TokenProtection.biometric;
 
   void _onAuth(AsyncValue<UserInfo?> next) {
-    if (next is AsyncData<UserInfo?> && next.value == null) {
-      // 登出：待答的詢問與待存的帳密都作廢（不能存到下一位使用者名下），
-      // 並重新對帳 Keychain（帳號被刪除時帳密已被清掉）。
-      _pendingSave = null;
-      if (state.promptPending) state = state.copyWith(promptPending: false);
-      unawaited(_loadSaved());
-    }
-    final attempt = _attempt;
-    if (attempt == null) return;
-    if (next is AsyncData<UserInfo?> && next.value != null) {
-      _attempt = null;
-      if (_attemptBinds) {
-        _attemptBinds = false;
-        unawaited(_save(attempt));
-      } else if (!_attemptFromSaved) {
-        unawaited(_afterPasswordLogin(attempt));
-      }
-    } else if (next is AsyncError<UserInfo?>) {
-      _attempt = null;
-      _attemptBinds = false;
-      final error = next.error;
-      // 存下的密碼已失效（例如在別處改過密碼）：清掉，回到手動登入。
-      if (_attemptFromSaved &&
-          error is ApiError &&
-          error.code == 'LOGIN_INVALID') {
-        unawaited(_clear());
-      }
-    }
-  }
-
-  Future<void> _afterPasswordLogin(SavedCredentials attempt) async {
-    final store = ref.read(credentialStoreProvider);
-    var otherAccount = false;
-    if (state.hasSaved) {
-      try {
-        final saved = await store.read();
-        if (saved?.email == attempt.email) {
-          // 同一帳號：靜默跟上新密碼。
-          if (saved?.password != attempt.password) await store.write(attempt);
-          return;
-        }
-        // 換成別的帳號手動登入：前一位的帳密不留給這一位，重新詢問。
-        otherAccount = true;
-        await store.clear();
-        if (ref.mounted) state = state.copyWith(hasSaved: false);
-      } catch (_) {
-        return;
-      }
-    }
-    if (!otherAccount && await _read(_promptedKey) == '1') return;
-    // 裝置不可用時不問、也不記已問過，等之後可用再問一次。
-    if (await ref.read(biometricAuthenticatorProvider).availableKind() ==
-        null) {
+    if (next is! AsyncData<UserInfo?>) return;
+    if (next.value == null) {
+      // 登出：待答的詢問作廢，保護等級已隨憑證一起重置。
+      state = BiometricLoginState(enabled: _storeEnabled);
       return;
     }
-    _pendingSave = attempt;
+    state = state.copyWith(enabled: _storeEnabled);
+    unawaited(_maybePrompt());
+  }
+
+  /// 登入成功後只問一次；裝置沒有生物辨識或已經開啟就不問。
+  Future<void> _maybePrompt() async {
+    if (state.enabled) return;
+    if (await _read(_promptedKey) == '1') return;
+    final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
+    // 沒有生物辨識（只有裝置密碼）時不問：裝置密碼保護已是預設。
+    if (kind == null || kind == BiometricKind.passcode) return;
     if (ref.mounted) state = state.copyWith(promptPending: true);
   }
 
   /// 回答登入後的詢問；不論選哪個都記為已問過。
   Future<void> answerPrompt({required bool enable}) async {
     state = state.copyWith(promptPending: false);
-    final toSave = _pendingSave;
-    _pendingSave = null;
     await _write(_promptedKey, '1');
-    if (!enable || toSave == null) return;
-    await _save(toSave);
+    if (enable) await this.enable();
   }
 
-  Future<void> _save(SavedCredentials credentials) async {
-    try {
-      await ref.read(credentialStoreProvider).write(credentials);
-      await _write(_promptedKey, '1');
-      if (ref.mounted) state = state.copyWith(hasSaved: true);
-    } catch (_) {
-      // 存不進 Keychain：維持關閉，下次登入頁仍是手動輸入。
-    }
-  }
-
-  /// 設定頁開啟：重新輸入帳密，驗證通過才綁定。
-  ///
-  /// 只接受目前登入的帳號（驗證會換發 session，換成別人的帳號會把使用者登出）。
-  /// 密碼錯誤等 [ApiError] 直接往上丟給呼叫端顯示。
-  Future<BindOutcome> bind(String email, String password) async {
-    final current = ref.read(authStateProvider).value?.email;
-    if (current == null || current.toLowerCase() != email.toLowerCase()) {
-      return BindOutcome.wrongAccount;
-    }
-    await ref
-        .read(authRepositoryProvider)
-        .login(email: email, password: password);
-    await _save(SavedCredentials(email: email, password: password));
-    return BindOutcome.bound;
-  }
-
-  /// 登入頁的「使用 Face ID 登入」：驗證通過才讀出帳密並走一般密碼登入。
-  Future<BiometricOutcome> loginWithBiometric() async {
-    if (_inFlight) return BiometricOutcome.cancelled;
+  /// 開啟：先驗證身分，通過才把 refresh token 改存成受生物辨識保護。
+  Future<bool> enable() async {
+    if (_inFlight) return false;
     _inFlight = true;
     try {
       final outcome = await ref
           .read(biometricAuthenticatorProvider)
-          .authenticate(reason: '登入 Tripline');
-      if (outcome != BiometricOutcome.success) return outcome;
-      SavedCredentials? saved;
-      try {
-        saved = await ref.read(credentialStoreProvider).read();
-      } catch (_) {
-        return BiometricOutcome.failed;
-      }
-      if (saved == null) {
-        state = state.copyWith(hasSaved: false);
-        return BiometricOutcome.failed;
-      }
-      _attempt = saved;
-      _attemptFromSaved = true;
-      await ref
-          .read(authStateProvider.notifier)
-          .login(saved.email, saved.password);
-      return BiometricOutcome.success;
+          .authenticate(reason: '開啟生物辨識登入');
+      if (outcome != BiometricOutcome.success) return false;
+      final stored = await ref
+          .read(oauthTokenStoreProvider)
+          .setProtection(TokenProtection.biometric);
+      if (ref.mounted) state = state.copyWith(enabled: stored);
+      return stored;
     } finally {
       _inFlight = false;
     }
   }
 
-  /// 關閉：先驗證身分，通過才清除存下的帳密。
+  /// 關閉：先驗證身分，通過才清掉 refresh token 並登出。
   Future<bool> disable() async {
-    final outcome = await ref
-        .read(biometricAuthenticatorProvider)
-        .authenticate(reason: '驗證身分以關閉生物辨識登入');
-    if (outcome != BiometricOutcome.success) return false;
-    await _clear();
-    return true;
-  }
-
-  Future<void> _clear() async {
+    if (_inFlight) return false;
+    _inFlight = true;
     try {
-      await ref.read(credentialStoreProvider).clear();
-    } catch (_) {}
-    if (ref.mounted) state = state.copyWith(hasSaved: false);
+      final outcome = await ref
+          .read(biometricAuthenticatorProvider)
+          .authenticate(reason: '驗證身分以關閉生物辨識登入');
+      if (outcome != BiometricOutcome.success) return false;
+      await ref.read(authStateProvider.notifier).logout();
+      return true;
+    } finally {
+      _inFlight = false;
+    }
   }
 
   Future<String?> _read(String key) async {

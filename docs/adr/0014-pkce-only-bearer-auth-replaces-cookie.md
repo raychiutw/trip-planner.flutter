@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # 認證只走 PKCE 與 Bearer，取代 cookie 與原生密碼登入
@@ -13,6 +13,7 @@ status: proposed
 - **授權回跳**：改用 https callback（Universal Link／App Link），網域是可設定值，後端搬網域時只改設定。
 - **SSE**：繼續用 `Authorization: Bearer` 標頭，不換一次性 ticket。ticket 是為了瀏覽器 `EventSource` 不能帶標頭，Dio 沒有這個限制。前提是新 api 的 SSE 端點接受標頭認證，已請後端確認。
 - **落地方式**：直接合進 master，不另開長壽 branch，也不加開關，只是不 bump `VERSION`。切換前的 master 不可以發版。
+- **實作備註**：回跳用 `flutter_web_auth_2`（iOS ASWebAuthenticationSession https callback、Android Auth Tab）；受保護儲存用 `flutter_secure_storage` 的 `accessControlFlags: biometryCurrentSet`／`AndroidOptions.biometric`。iOS 需在 Apple Developer 為 App ID 開啟 Associated Domains，provisioning profile 才含該 entitlement，否則簽章失敗。
 
 ## Considered Options
 

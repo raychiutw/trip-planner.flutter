@@ -62,6 +62,15 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["googleMapsApiKey"] = googleMapsAndroidApiKey
+        // 授權回跳（App Link）的網域與路徑；要與 Dart 端 TRIPLINE_OAUTH_CALLBACK_HOST／
+        // TRIPLINE_OAUTH_CALLBACK_PATH 以及後端登記的 redirect URI 一致。
+        // 切換網域時：./gradlew ... -PoauthCallbackHost=<host> -PoauthCallbackPath=<path>
+        manifestPlaceholders["oauthCallbackHost"] =
+            (project.findProperty("oauthCallbackHost") as String?)
+                ?: "mobile-callback.trip-planner-dby.pages.dev"
+        manifestPlaceholders["oauthCallbackPath"] =
+            (project.findProperty("oauthCallbackPath") as String?)
+                ?: "/oauth/callback"
         testInstrumentationRunner =
             if (standardIntegrationTest) {
                 "androidx.test.runner.AndroidJUnitRunner"

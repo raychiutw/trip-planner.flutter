@@ -68,6 +68,7 @@ import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
 import '../helpers/fake_trip_map.dart';
+import '../helpers/fake_oauth.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
 class _FakeAuthNotifier extends AuthNotifier {
@@ -122,6 +123,7 @@ ProviderContainer _buildContainer({
   TripPrintActions? printActions,
   bool resolveAuthFromRepository = false,
   bool disableAutomaticRetry = false,
+  List<dynamic> extraOverrides = const [],
 }) {
   final mockTripRepository = _MockTripRepository();
   final mockAccountRepository = _MockAccountRepository();
@@ -196,6 +198,7 @@ ProviderContainer _buildContainer({
   final container = ProviderContainer(
     retry: disableAutomaticRetry ? (_, _) => null : null,
     overrides: [
+      ...extraOverrides,
       if (authRepository != null)
         authRepositoryProvider.overrideWithValue(authRepository),
       if (!resolveAuthFromRepository)
@@ -782,14 +785,15 @@ void main() {
   testWidgets('公開分享可列印，登入後返回同一連結並複製行程', (tester) async {
     final auth = _MockAuthRepository();
     final printActions = _RecordingPrintActions();
-    when(auth.currentUser).thenAnswer((_) async => null);
+    var signedIn = false;
     when(
-      () => auth.login(email: 'traveler@example.com', password: 'secret'),
-    ).thenAnswer((_) async => _loggedInUser);
+      auth.currentUser,
+    ).thenAnswer((_) async => signedIn ? _loggedInUser : null);
     final container = _buildContainer(
       currentUser: null,
       authRepository: auth,
       resolveAuthFromRepository: true,
+      extraOverrides: fakeBrowserLoginOverrides(onLogin: () => signedIn = true),
       printActions: printActions,
     );
     addTearDown(container.dispose);
@@ -823,15 +827,7 @@ void main() {
     );
     verifyNever(() => repository.clonePublicTripShare(any()));
 
-    await tester.enterText(
-      find.byKey(const ValueKey('login-email-field')),
-      'traveler@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('login-password-field')),
-      'secret',
-    );
-    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.tap(find.byKey(const ValueKey('login-browser-button')));
     await tester.pumpAndSettle();
     expect(router.state.uri.path, '/s/public-token');
     expect(find.byType(PublicShareScreen), findsOneWidget);
@@ -863,14 +859,15 @@ void main() {
 
   testWidgets('邀請登入後接受並從 Account 返回受邀行程', (tester) async {
     final auth = _MockAuthRepository();
-    when(auth.currentUser).thenAnswer((_) async => null);
+    var signedIn = false;
     when(
-      () => auth.login(email: 'traveler@example.com', password: 'secret'),
-    ).thenAnswer((_) async => _loggedInUser);
+      auth.currentUser,
+    ).thenAnswer((_) async => signedIn ? _loggedInUser : null);
     final container = _buildContainer(
       currentUser: null,
       authRepository: auth,
       resolveAuthFromRepository: true,
+      extraOverrides: fakeBrowserLoginOverrides(onLogin: () => signedIn = true),
     );
     addTearDown(container.dispose);
     final collab = container.read(collabRepositoryProvider);
@@ -901,15 +898,7 @@ void main() {
     );
     verifyNever(() => collab.acceptInvitation(any()));
 
-    await tester.enterText(
-      find.byKey(const ValueKey('login-email-field')),
-      'traveler@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('login-password-field')),
-      'secret',
-    );
-    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.tap(find.byKey(const ValueKey('login-browser-button')));
     await tester.pumpAndSettle();
     expect(router.state.uri.toString(), '/invite?token=raw-token');
     expect(find.byKey(const ValueKey('invite-accept')), findsOneWidget);
@@ -1395,6 +1384,7 @@ void main() {
       authRepository: auth,
       requestsRepository: requests,
       resolveAuthFromRepository: true,
+      extraOverrides: signedInOverrides(),
       // 此測試驗證最終 error 的導航與草稿；自動 retry 不屬於此 seam。
       disableAutomaticRetry: true,
     );

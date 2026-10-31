@@ -24,9 +24,9 @@ class OAuthTokens {
   bool isExpired({Duration skew = const Duration(seconds: 60)}) =>
       DateTime.now().isAfter(expiresAt.subtract(skew));
 
-  OAuthTokens copyWith({String? idToken}) => OAuthTokens(
+  OAuthTokens copyWith({String? idToken, String? refreshToken}) => OAuthTokens(
     accessToken: accessToken,
-    refreshToken: refreshToken,
+    refreshToken: refreshToken ?? this.refreshToken,
     idToken: idToken ?? this.idToken,
     tokenType: tokenType,
     scope: scope,
@@ -50,22 +50,32 @@ class OAuthTokens {
     );
   }
 
-  /// 持久化用(expiresAt 以 ISO8601 存)。
+  /// 落地用的版本:**不含 access token**(只放記憶體,見 ADR-0014)。
+  /// 讀回來的 access token 是空字串且視為已過期,第一次使用前會先 refresh。
+  OAuthTokens withoutAccessToken() => OAuthTokens(
+    accessToken: '',
+    refreshToken: refreshToken,
+    idToken: idToken,
+    tokenType: tokenType,
+    scope: scope,
+    expiresAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+  );
+
+  /// 持久化用:只存 refresh token 與身分資訊,絕不存 access token。
   Map<String, dynamic> toJson() => {
-    'access_token': accessToken,
     'refresh_token': ?refreshToken,
     'id_token': ?idToken,
     'token_type': tokenType,
     'scope': ?scope,
-    'expires_at': expiresAt.toIso8601String(),
   };
 
+  /// 讀回落地內容。舊版曾存過 access_token / expires_at,一律忽略。
   factory OAuthTokens.fromJson(Map<String, dynamic> json) => OAuthTokens(
-    accessToken: json['access_token'] as String,
+    accessToken: '',
     refreshToken: json['refresh_token'] as String?,
     idToken: json['id_token'] as String?,
     tokenType: json['token_type'] as String? ?? 'Bearer',
     scope: json['scope'] as String?,
-    expiresAt: DateTime.parse(json['expires_at'] as String),
+    expiresAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
   );
 }

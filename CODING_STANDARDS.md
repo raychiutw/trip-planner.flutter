@@ -44,7 +44,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### Provider 鏈
 
-`sessionStoreProvider`／`cacheStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`／其餘 repository；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`（經 `refreshListenable` 橋接 authState 變化）。
+`bearerTokenSourceProvider`／`cacheStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`／其餘 repository；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`（經 `refreshListenable` 橋接 authState 變化）。
 
 - 測試 override 鏈上任一節點即可替換全部下游。**優先 override 最靠近被測畫面的那一節**：測 screen override repository provider，不要 override `apiClientProvider` 再去 mock HTTP。
 - production code 不得為了「方便測試」新增 provider。既有節點已足夠當 seam。
@@ -68,27 +68,23 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **只驗證靜態 provider error 呈現時，關掉自動重試**：`ProviderScope(retry: (retryCount, error) => null, overrides: [...], child: ...)`。少了它，error 態會被自動重試蓋掉而 flake。驗證自動重試或手動／自動重試互動時，保留被測的 retry 政策，以可控制的來源事件及讀取次數驗證行為。
   範例：`test/features/trips/collab/collab_screen_test.dart:34`、`test/features/favorites/favorites_screen_test.dart:446`、`test/features/trip_detail/trip_timeline_screen_test.dart:294`。
 - **產品的自動重試政策是 `appProviderRetry`（`lib/app/provider_retry.dart`）**：最多重試兩次、約 2 秒內交給使用者原地重試，4xx 不重試；根 `ProviderScope` 必須帶它（`test/app/provider_retry_test.dart` 守門）。不要讓畫面在失敗後長時間停在載入中。
-- 只 override 到 repository 層，`api/` 測試用 `http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
+- 只 override 到 repository 層，`api/` 測試用 `http_mock_adapter` + `InMemoryOAuthTokenStore`，不碰 `SecureOAuthTokenStore` 的真平台通道。
 
 ## API 層規範
 
 ### ApiClient 是唯一出口
 
-- 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `postForResponse` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Cookie／Bearer／Origin、錯誤轉換、重試與快取。
-- 只有需要 Dio 原生 request options 的 OAuth PKCE 流程可取 `client.dio`；需要讀 response headers（例如登入解 `set-cookie`）用 `postForResponse`（`lib/api/api_client.dart:106`），不是 raw dio。
+- 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Bearer、錯誤轉換、重試與快取。
+- OAuth token 端點（`OAuthRepository`）自帶 Dio，不經 `ApiClient`；其餘 HTTP 一律走 `ApiClient`。
 
-### 認證 header：兩種模式互斥
+### 認證 header：只有 Bearer
 
-`_authHeadersFor()`（`lib/api/api_client.dart:508-529`）依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
-
-- **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。
-- **cookie 模式**（無 token）：`sessionStore` 有值才帶 `Cookie: tripline_session=<token>`；且方法非 `GET`／`HEAD` 時必帶 `Origin: <origin>` —— 缺這個 header 的 mutation 後端回 403。
-
+`_authHeadersFor()`（`lib/api/api_client.dart`）只做一件事：`BearerTokenSource` 回非空 token 就帶 `Authorization: Bearer <token>`，否則不帶任何認證。**不送 `Cookie`、不送 `Origin`**（ADR-0014）。repository 與畫面層都不得自己拼這些 header。
 
 ### origin 常數
 
 - `kTriplineOrigin` 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', defaultValue: 'https://trip-planner-dby.pages.dev')`（`lib/api/api_client.dart:21-24`）。不得改回字面常數，本機後端靠 `--dart-define` 覆寫。
-- 一個 origin 同時決定 base URL（`'$origin/api'`，`lib/api/api_client.dart:78`）與 CSRF `Origin` header，不可分別設定。
+- origin 決定 base URL（`'$origin/api'`）；切換到新 api 時只改這個設定值。
 - origin 必須是純 origin：不含 `/api` 路徑、無結尾斜線（有測試守：`test/api/api_client_test.dart:430`）。
 
 
@@ -101,7 +97,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：一般 `POST`／`PATCH`／`DELETE` 一樣會被重送一次。`refresh()` 回 false → 直接丟 `ApiError(401)`。
 
 - SSE 串流版 `_getTextStream()` 走同一份決策；遇 429／攔截頁要先釋放回應串流再等待。改決策時驗證一般請求與 SSE 兩個站點。
-- 登入／註冊的 `postForResponse` 是 raw 帳密 POST，不自動重送憑證；`ApiClient` 統一將 429 轉 `ApiError` 並保留 `Retry-After`，將攔截頁轉 `SYS_UPSTREAM_UNAVAILABLE`。
+- `ApiClient` 統一將 429 轉 `ApiError` 並保留 `Retry-After`（註冊等不重送的 429 要告訴使用者等多久），將攔截頁轉 `SYS_UPSTREAM_UNAVAILABLE`。
 - 429／edge block **不重送 mutation**（`test/api/api_client_test.dart:228`、`:358`）；Bearer 401 refresh 則會。「mutation 絕不 retry」是錯的說法，不要寫進註解或文件。
 - 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列，重連後由 `OfflineSyncEngine.flushQueue` 依序重送（`lib/api/cache/offline_sync_engine.dart`）。
 - `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/retry_policy.dart`）。
@@ -221,7 +217,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 掛正式路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下。**複數 `/trips/:tripId` 才是真正建畫面的路由**；單數 `/trip/:tripId` 是 web 時代留下的 alias，由 `lib/app/legacy_aliases.dart` 的資料表轉向複數版。地圖 alias 由 `rootMapAlias` 導到 root `/map`，保留 trip／day／entry，不建立行程地圖子頁。一般行程子頁一律加在複數路徑下；path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。新增 web alias 時更新資料表及其純函式測試。
 - shell 外的整頁（無 root tab bar）加在 `routes` 頂層、`StatefulShellRoute` 之外。
 - 未登入時 shell 內的頁由 `lib/app/auth_redirect_policy.dart` 的 `authRedirect` 導到 **`/welcome`**，不是 `/login`。原始請求路徑保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進同檔的 `publicShellOutsideRoutes`，否則同樣會導到 `/welcome`。
-- widget test 必須 override `authStateProvider`，否則啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗，畫面一進來就被視為未登入。
+- widget test 要不 override `authStateProvider`（用假的 `AuthNotifier`），要不就用 `test/helpers/fake_oauth.dart` 的 `signedInOverrides()`／`fakeBrowserLoginOverrides()` 提供登入憑證與假的瀏覽器登入。沒登入憑證時 `authStateProvider` 直接是未登入，不會去打 `currentUser()`。
 - 每個 screen 檔頭加 `///` library doc 說明畫面職責，格式照 `lib/app/router.dart:1-2`。
 
 ---
@@ -323,8 +319,8 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 測試替身
 
-- **測試中不得呼叫 `SecureSessionStore` 的任何方法**（走平台 channel，會丟 `MissingPluginException`）。一律用 `InMemorySessionStore`（`lib/api/session_store.dart:34`，正式碼提供的測試替身）。
-  - 唯一允許出現 `SecureSessionStore` 字樣的地方是型別斷言，例如 `test/api/providers_test.dart:50-58` 的 `expect(container.read(sessionStoreProvider), isA<SecureSessionStore>())` —— 只讀型別，不觸發 channel。
+- **測試中不得使用 `SecureOAuthTokenStore` 的預設 `FlutterSecureVault`**（走平台 channel，會丟 `MissingPluginException`）。一律用 `InMemoryOAuthTokenStore`（`lib/api/oauth/oauth_token_store.dart`，正式碼提供的測試替身，行為與正式版一致：不保留 access token）；要測 Keychain 行為時注入假的 `SecretVault`（見 `test/api/oauth/secure_token_store_test.dart`）。
+  - `oauthTokenStoreProvider` 預設就是記憶體版，App 於 `main()` override 成 `SecureOAuthTokenStore`。
 - api 層測試 mock **HTTP 層**，不 mock repository：`http_mock_adapter` 的 `DioAdapter`（`test/api/api_client_test.dart:73-74`）。
   - `DioAdapter` 無法對同一 request 簽章依序回不同 response（429 → 200 的 retry 測試）。需要序列回應時自寫 `HttpClientAdapter`，樣板見 `test/api/api_client_test.dart:15-39` 的 `SequencedResponseAdapter`。
 - **不要在 `Dio(BaseOptions(...))` 設 `baseUrl`。** `ApiClient` 建構子第 `lib/api/api_client.dart:78` 行無條件覆寫成 `'$origin/api'`，任何在 `BaseOptions` 設的 `baseUrl` 都會被丟掉。要改 base 一律走 `ApiClient(origin: ...)`。
@@ -372,7 +368,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### 新增程式碼的測試門檻
 
 - 新增 model → 至少一個 `fromJson` 測試，且必須含 wire 型別 edge case：nullable 欄位缺漏回 null（`test/models/entry_test.dart:24-32`）、`0`/`1` 轉 bool（`test/models/user_test.dart:24-37`、`test/models/notes_test.dart:138`、`test/models/trip_test.dart:112`）、後端回 int 或 double 都要收（`test/models/entry_test.dart:42-51` rating `4` → `4.0`；`test/models/trip_test.dart:46-54` `memberCount: 3.0` → `3`）。
-- 改 `ApiClient` 的四條行為規則（Cookie／Origin、429 retry、204 空 body、路徑編碼）→ 對應 group 的測試要同步改，不得只改實作。group 命名沿用「規則 N：<行為>」（`test/api/api_client_test.dart:88,113`）。
+- 改 `ApiClient` 的四條行為規則（Bearer header／不送 Origin、429 retry、204 空 body、路徑編碼）→ 對應 group 的測試要同步改，不得只改實作。group 命名沿用「規則 N：<行為>」（`test/api/api_client_test.dart:88,113`）。
 - 新增 screen → 至少一個 widget test。
 - 修 bug → 先寫一支重現該 bug 的失敗測試，再修。
 
@@ -390,7 +386,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 > **注意三則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
 > 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripDetailProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
-> 2. 「測試完全不碰 `SecureSessionStore`」—— 實際上 `test/api/providers_test.dart:50` 有一支型別斷言測試合法引用它，規則收斂為「不呼叫其方法」。
+> 2. 「測試完全不碰 `SecureSessionStore`」—— 該類別已隨 cookie 認證移除（ADR-0014）；現行規則見「測試替身」：不用 `SecureOAuthTokenStore` 的預設平台通道。
 > 3. 來源文件都寫「三層鏡像」。實際 `test/` 有 13 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
 
 ## 測試不可假綠
