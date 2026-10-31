@@ -14,9 +14,9 @@ void main() {
     );
     await store.write(t);
     final back = await store.read();
-    expect(back!.accessToken, 'AT');
+    // access token 不落地(ADR-0014):只剩 refresh token。
+    expect(back!.accessToken, isEmpty);
     expect(back.refreshToken, 'RT');
-    expect(back.expiresAt, t.expiresAt);
 
     await store.clear();
     expect(await store.read(), isNull);

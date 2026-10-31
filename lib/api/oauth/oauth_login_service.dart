@@ -11,7 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/oauth_tokens.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
-import 'oauth_token_store.dart';
+import 'stored_bearer_token_source.dart';
 import 'pkce.dart';
 
 class OAuthLoginException implements Exception {
@@ -30,16 +30,16 @@ class OAuthLoginException implements Exception {
 class OAuthLoginService {
   OAuthLoginService({
     required OAuthRepository repository,
-    required OAuthTokenStore store,
+    required StoredBearerTokenSource source,
     String clientId = OAuthConfig.clientId,
     Duration timeout = const Duration(minutes: 5),
   }) : _repo = repository,
-       _store = store,
+       _source = source,
        _clientId = clientId,
        _timeout = timeout;
 
   final OAuthRepository _repo;
-  final OAuthTokenStore _store;
+  final StoredBearerTokenSource _source;
   final String _clientId;
   final Duration _timeout;
 
@@ -95,7 +95,7 @@ class OAuthLoginService {
         clientId: _clientId,
         redirectUri: OAuthConfig.redirectUri,
       );
-      await _store.write(tokens);
+      await _source.adopt(tokens);
       return tokens;
     } finally {
       await server.close(force: true);

@@ -26,11 +26,25 @@ class StoredBearerTokenSource implements BearerTokenSource {
 
   Future<OAuthTokens?>? _inFlight;
 
+  /// access token 只活在記憶體;store 只留 refresh token(ADR-0014)。
+  OAuthTokens? _memory;
+
+  /// 登入完成後交給來源:access token 進記憶體,其餘落地。
+  Future<void> adopt(OAuthTokens tokens) async {
+    _memory = tokens;
+    await _store.write(tokens);
+  }
+
   @override
   Future<String?> accessToken() async {
-    final tokens = await _store.read();
-    if (tokens == null) return null;
-    if (!tokens.isExpired()) return tokens.accessToken;
+    final stored = await _store.read();
+    if (stored == null) {
+      // 已登出(store 被清掉):記憶體裡的 access token 也不能再用。
+      _memory = null;
+      return null;
+    }
+    final memory = _memory;
+    if (memory != null && !memory.isExpired()) return memory.accessToken;
     return (await _refreshShared())?.accessToken;
   }
 
@@ -62,6 +76,7 @@ class StoredBearerTokenSource implements BearerTokenSource {
     final merged = fresh.idToken == null
         ? fresh.copyWith(idToken: old?.idToken)
         : fresh;
+    _memory = merged;
     try {
       await _store.write(merged);
     } on Exception {

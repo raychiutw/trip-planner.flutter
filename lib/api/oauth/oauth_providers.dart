@@ -4,7 +4,6 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api_client.dart' show BearerTokenSource;
 import 'oauth_config.dart';
 import 'oauth_login_service.dart';
 import 'oauth_repository.dart';
@@ -22,7 +21,7 @@ final oauthRepositoryProvider = Provider<OAuthRepository>(
   (ref) => OAuthRepository(),
 );
 
-final bearerTokenSourceProvider = Provider<BearerTokenSource>(
+final bearerTokenSourceProvider = Provider<StoredBearerTokenSource>(
   (ref) => StoredBearerTokenSource(
     store: ref.watch(oauthTokenStoreProvider),
     repository: ref.watch(oauthRepositoryProvider),
@@ -33,6 +32,6 @@ final bearerTokenSourceProvider = Provider<BearerTokenSource>(
 final oauthLoginServiceProvider = Provider<OAuthLoginService>(
   (ref) => OAuthLoginService(
     repository: ref.watch(oauthRepositoryProvider),
-    store: ref.watch(oauthTokenStoreProvider),
+    source: ref.watch(bearerTokenSourceProvider),
   ),
 );

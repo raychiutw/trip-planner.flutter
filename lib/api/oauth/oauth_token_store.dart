@@ -35,13 +35,13 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<void> write(OAuthTokens tokens) =>
-      _storage.write(key: _key, value: jsonEncode(tokens.toJson()));
+      _storage.write(key: _key, value: jsonEncode(tokens.toJson())); // toJson 已不含 access token
 
   @override
   Future<void> clear() => _storage.delete(key: _key);
 }
 
-/// 測試用:純記憶體。
+/// 測試用:純記憶體。與正式版一樣不保留 access token。
 class InMemoryOAuthTokenStore implements OAuthTokenStore {
   OAuthTokens? _tokens;
 
@@ -49,7 +49,8 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   Future<OAuthTokens?> read() async => _tokens;
 
   @override
-  Future<void> write(OAuthTokens tokens) async => _tokens = tokens;
+  Future<void> write(OAuthTokens tokens) async =>
+      _tokens = tokens.withoutAccessToken();
 
   @override
   Future<void> clear() async => _tokens = null;
