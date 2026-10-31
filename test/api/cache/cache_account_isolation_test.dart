@@ -3,8 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/cache/cache_store.dart';
+import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/models/user.dart';
+
+import '../../helpers/fake_oauth.dart';
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
@@ -38,6 +41,7 @@ void main() {
       overrides: [
         cacheStoreProvider.overrideWithValue(cache),
         authRepositoryProvider.overrideWithValue(repo),
+        oauthTokenStoreProvider.overrideWithValue(signedInTokenStore()),
       ],
     );
     addTearDown(c.dispose);
@@ -66,6 +70,7 @@ void main() {
       overrides: [
         cacheStoreProvider.overrideWithValue(cache),
         authRepositoryProvider.overrideWithValue(repo),
+        oauthTokenStoreProvider.overrideWithValue(signedInTokenStore()),
       ],
     );
     addTearDown(c.dispose);
@@ -84,21 +89,22 @@ void main() {
     await cache.appendMutation(_mut('1'));
 
     final repo = _MockAuthRepo();
-    when(() => repo.currentUser()).thenAnswer((_) async => null);
+    // 先是登出狀態（沒有憑證），之後用瀏覽器登入成另一個帳號。
     when(
-      () => repo.login(email: 'b@x.com', password: 'secret'),
+      () => repo.currentUser(),
     ).thenAnswer((_) async => const UserInfo(id: 'B', email: 'b@x.com'));
 
     final c = ProviderContainer(
       overrides: [
         cacheStoreProvider.overrideWithValue(cache),
         authRepositoryProvider.overrideWithValue(repo),
+        ...fakeBrowserLoginOverrides(),
       ],
     );
     addTearDown(c.dispose);
 
     expect(await c.read(authStateProvider.future), isNull);
-    await c.read(authStateProvider.notifier).login('b@x.com', 'secret');
+    await c.read(authStateProvider.notifier).signInWithBrowser();
 
     expect(c.read(authStateProvider).value?.id, 'B');
     expect(await cache.readResponse('GET /my-trips'), isNull);
@@ -121,6 +127,7 @@ void main() {
       overrides: [
         cacheStoreProvider.overrideWithValue(cache),
         authRepositoryProvider.overrideWithValue(repo),
+        oauthTokenStoreProvider.overrideWithValue(signedInTokenStore()),
       ],
     );
     addTearDown(c.dispose);

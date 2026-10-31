@@ -61,6 +61,19 @@ ResponseBody htmlBlockResponseBody() => ResponseBody.fromString(
   },
 );
 
+/// 固定回傳 access token 的來源;[token] 為 null 代表沒有登入。
+class _FixedSource implements BearerTokenSource {
+  _FixedSource([this.token = 'token123']);
+
+  String? token;
+
+  @override
+  Future<String?> accessToken() async => token;
+
+  @override
+  Future<bool> refresh() async => false;
+}
+
 class _RefreshingSource implements BearerTokenSource {
   String _token = 'old';
   int refreshCalls = 0;
@@ -79,14 +92,12 @@ class _RefreshingSource implements BearerTokenSource {
 void main() {
   late Dio dio;
   late DioAdapter dioAdapter;
-  late InMemorySessionStore sessionStore;
   late List<RequestOptions> recordedRequests;
   late ApiClient apiClient;
 
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    sessionStore = InMemorySessionStore();
     recordedRequests = [];
     dio.interceptors.add(
       InterceptorsWrapper(
@@ -96,26 +107,34 @@ void main() {
         },
       ),
     );
-    apiClient = ApiClient(sessionStore: sessionStore, dio: dio);
+    apiClient = ApiClient(dio: dio, bearerSource: _FixedSource());
   });
 
-  group('規則 1：Cookie header', () {
-    test(
-      'store 有 token 時每個 request 帶 Cookie: tripline_session=<token>',
-      () async {
-        await sessionStore.write('token123');
-        dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
+  group('規則 1：Bearer header', () {
+    test('有 access token 時每個 request 帶 Authorization: Bearer', () async {
+      dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
 
-        await apiClient.get('/my-trips');
+      await apiClient.get('/my-trips');
 
-        expect(
-          recordedRequests.single.headers['Cookie'],
-          'tripline_session=token123',
-        );
-      },
-    );
+      expect(
+        recordedRequests.single.headers['Authorization'],
+        'Bearer token123',
+      );
+    });
 
-    test('store 無 token 時不帶 Cookie header', () async {
+    test('沒有 access token 時不帶 Authorization', () async {
+      final anonymous = ApiClient(dio: dio, bearerSource: _FixedSource(null));
+      dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
+
+      await anonymous.get('/my-trips');
+
+      expect(
+        recordedRequests.single.headers.containsKey('Authorization'),
+        isFalse,
+      );
+    });
+
+    test('完全不帶 Cookie（認證只走 Bearer）', () async {
       dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
 
       await apiClient.get('/my-trips');
@@ -124,19 +143,20 @@ void main() {
     });
   });
 
-  group('規則 2：Origin header', () {
-    test('mutating request（POST）帶 Origin', () async {
-      dioAdapter.onPost(
-        '/oauth/logout',
-        (server) => server.reply(200, {'ok': true}),
+  group('規則 2：不再送 Origin', () {
+    test('mutating request（POST）不帶 Origin', () async {
+      dioAdapter.onPost('/trips', (server) => server.reply(200, {'ok': true}));
+
+      await apiClient.post('/trips');
+
+      expect(recordedRequests.single.headers.containsKey('Origin'), isFalse);
+      expect(
+        recordedRequests.single.headers['Authorization'],
+        'Bearer token123',
       );
-
-      await apiClient.post('/oauth/logout');
-
-      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
     });
 
-    test('DELETE 可送 JSON body 並帶 Origin', () async {
+    test('DELETE 可送 JSON body', () async {
       dioAdapter.onDelete(
         '/account',
         (server) => server.reply(200, {'ok': true}),
@@ -146,7 +166,7 @@ void main() {
       await apiClient.delete('/account', body: {'confirm': 'DELETE'});
 
       expect(recordedRequests.single.data, {'confirm': 'DELETE'});
-      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
+      expect(recordedRequests.single.headers.containsKey('Origin'), isFalse);
     });
 
     test('GET 不帶 Origin', () async {
@@ -193,10 +213,7 @@ void main() {
         ]),
       ]);
       final sequencedDio = Dio()..httpClientAdapter = sequencedAdapter;
-      final retryingClient = ApiClient(
-        sessionStore: sessionStore,
-        dio: sequencedDio,
-      );
+      final retryingClient = ApiClient(dio: sequencedDio);
 
       final responseBody = await retryingClient.get('/my-trips');
 
@@ -227,10 +244,7 @@ void main() {
         ),
       ]);
       final sequencedDio = Dio()..httpClientAdapter = sequencedAdapter;
-      final retryingClient = ApiClient(
-        sessionStore: sessionStore,
-        dio: sequencedDio,
-      );
+      final retryingClient = ApiClient(dio: sequencedDio);
 
       await expectLater(
         retryingClient.get('/my-trips'),
@@ -253,10 +267,7 @@ void main() {
         jsonResponseBody(200, {'ok': true}),
       ]);
       final sequencedDio = Dio()..httpClientAdapter = sequencedAdapter;
-      final nonRetryingClient = ApiClient(
-        sessionStore: sessionStore,
-        dio: sequencedDio,
-      );
+      final nonRetryingClient = ApiClient(dio: sequencedDio);
 
       await expectLater(
         nonRetryingClient.post('/trips', body: {'id': 't1'}),
@@ -270,10 +281,7 @@ void main() {
         htmlBlockResponseBody(),
         jsonResponseBody(200, {'ok': true}),
       ]);
-      final client = ApiClient(
-        sessionStore: sessionStore,
-        dio: Dio()..httpClientAdapter = adapter,
-      );
+      final client = ApiClient(dio: Dio()..httpClientAdapter = adapter);
 
       expect(await client.get('/trips'), {'ok': true});
       expect(adapter.recordedRequests, hasLength(2));
@@ -286,7 +294,6 @@ void main() {
       ]);
       final cacheStore = InMemoryCacheStore();
       final client = ApiClient(
-        sessionStore: sessionStore,
         dio: Dio()..httpClientAdapter = adapter,
         cacheStore: cacheStore,
       );
@@ -316,10 +323,7 @@ void main() {
         ),
         jsonResponseBody(200, {'ok': true}),
       ]);
-      final client = ApiClient(
-        sessionStore: sessionStore,
-        dio: Dio()..httpClientAdapter = adapter,
-      );
+      final client = ApiClient(dio: Dio()..httpClientAdapter = adapter);
       final cancelToken = CancelToken();
       final request = client.get('/trips', cancelToken: cancelToken);
       await adapter.firstRequest.future;
@@ -350,10 +354,7 @@ void main() {
           },
         ),
       ]);
-      final client = ApiClient(
-        sessionStore: sessionStore,
-        dio: Dio()..httpClientAdapter = adapter,
-      );
+      final client = ApiClient(dio: Dio()..httpClientAdapter = adapter);
 
       expect(await client.head('/health'), isNull);
       expect(adapter.recordedRequests, hasLength(2));
@@ -374,10 +375,7 @@ void main() {
         htmlBlockResponseBody(),
         jsonResponseBody(200, {'ok': true}),
       ]);
-      final client = ApiClient(
-        sessionStore: sessionStore,
-        dio: Dio()..httpClientAdapter = adapter,
-      );
+      final client = ApiClient(dio: Dio()..httpClientAdapter = adapter);
 
       await expectLater(
         client.post('/trips', body: {'id': 't1'}),
@@ -491,7 +489,6 @@ void main() {
       ]);
       final source = _RefreshingSource();
       final client = ApiClient(
-        sessionStore: sessionStore,
         dio: Dio()..httpClientAdapter = adapter,
         bearerSource: source,
       );
@@ -507,8 +504,7 @@ void main() {
       );
     });
 
-    test('getTextStream 帶 Cookie/Accept，並解出文字 chunk', () async {
-      await sessionStore.write('token123');
+    test('getTextStream 帶 Bearer/Accept，並解出文字 chunk', () async {
       final adapter = SequencedResponseAdapter([
         ResponseBody.fromString(
           'data: {"status":"completed"}\n\n',
@@ -519,14 +515,15 @@ void main() {
         ),
       ]);
       final streamDio = Dio()..httpClientAdapter = adapter;
-      final client = ApiClient(sessionStore: sessionStore, dio: streamDio);
+      final client = ApiClient(dio: streamDio, bearerSource: _FixedSource());
 
       final text = await client.getTextStream('/requests/7/events').join();
 
       expect(text, 'data: {"status":"completed"}\n\n');
       final request = adapter.recordedRequests.single;
       expect(request.responseType, ResponseType.stream);
-      expect(request.headers['Cookie'], 'tripline_session=token123');
+      expect(request.headers['Authorization'], 'Bearer token123');
+      expect(request.headers.containsKey('Cookie'), isFalse);
       expect(request.headers[Headers.acceptHeader], 'text/event-stream');
     });
 
@@ -543,7 +540,7 @@ void main() {
         ),
       ]);
       final streamDio = Dio()..httpClientAdapter = adapter;
-      final client = ApiClient(sessionStore: sessionStore, dio: streamDio);
+      final client = ApiClient(dio: streamDio, bearerSource: _FixedSource());
 
       await expectLater(
         client.getTextStream('/requests/7/events').drain<void>(),
@@ -560,10 +557,7 @@ void main() {
         htmlBlockResponseBody(),
         htmlBlockResponseBody(),
       ]);
-      final client = ApiClient(
-        sessionStore: sessionStore,
-        dio: Dio()..httpClientAdapter = adapter,
-      );
+      final client = ApiClient(dio: Dio()..httpClientAdapter = adapter);
 
       await expectLater(
         client.getTextStream('/requests/7/events').drain<void>(),

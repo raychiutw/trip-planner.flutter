@@ -364,7 +364,8 @@ class ApiClient {
         evictMutationCache: evictMutationCache,
       );
     }
-    _throwIfFailed(response);
+    // 不會再重送的失敗保留 Retry-After（註冊等 429 要告訴使用者等多久）。
+    _throwIfFailed(response, preserveRetryAfter: true);
     final statusCode = response.statusCode ?? 0;
     if (statusCode == 204) {
       if (evictMutationCache) {
