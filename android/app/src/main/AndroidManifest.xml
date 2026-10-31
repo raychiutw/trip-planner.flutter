@@ -37,6 +37,23 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- OAuth 授權回跳：https App Link（flutter_web_auth_2 的 CallbackActivity）。
+             host／path 由 build.gradle.kts 的 manifestPlaceholders 注入，
+             後端要在該網域提供 /.well-known/assetlinks.json（含 App signing key 指紋）。 -->
+        <activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true"
+            android:taskAffinity="">
+            <intent-filter android:label="flutter_web_auth_2" android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="${oauthCallbackHost}"
+                    android:path="${oauthCallbackPath}" />
+            </intent-filter>
+        </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

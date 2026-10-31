@@ -227,8 +227,7 @@ class _BiometricLoginPrompt extends ConsumerWidget {
     return _HostDialog(
       dialogKey: const ValueKey('bio-login-prompt'),
       title: '要用 $label 登入 Tripline 嗎？',
-      message:
-          '開啟後，登入憑證只能用 $label 解鎖，密碼不會存在這支手機。之後可以在「帳號 → 安全性」關閉。',
+      message: '開啟後，登入憑證只能用 $label 解鎖，密碼不會存在這支手機。之後可以在「帳號 → 安全性」關閉。',
       cancelLabel: '稍後再說',
       confirmLabel: '開啟',
       onCancel: () => unawaited(controller.answerPrompt(enable: false)),

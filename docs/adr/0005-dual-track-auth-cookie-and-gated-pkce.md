@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0014
 ---
 
 # 認證雙軌：app 扮演瀏覽器走 cookie，OAuth PKCE 已就緒但以 dart-define 關閉

@@ -64,7 +64,7 @@ _避免_: bottom sheet、POI carousel、卡片抽屜
 
 **App 鎖**:
 本機生物辨識解鎖(Face ID / Touch ID,可退回裝置密碼)。純 client,不涉及後端或 session;鎖定時蓋住整個 App,驗證失敗只留在鎖定畫面,不登出。
-_避免_: 生物辨識登入、passkey(那是用生物辨識取代密碼,需要後端,本 App 不做)
+_避免_: passkey(那是用生物辨識取代密碼,需要後端,本 App 不做)
 
 **登入憑證**:
 App 持有的認證資料,分成只放記憶體、15 分鐘有效的 access token,與落地儲存、每次使用即輪替的 refresh token。App 不保管使用者密碼。
