@@ -264,9 +264,12 @@ Widget _buildScreen(
 }) {
   // ai-state 對絕大多數測試是背景雜訊:預設成功回空,只有專門測隔離的那條
   // 傳 `stubAiState: false` 自己 stub 成 throw。放這裡而不是每條測試各補一次。
-  if (repo != null && stubAiState) {
+  // 沒傳 repo 時也要換掉：預設的 ApiClient 會真的打網路（測試環境回 400），
+  // AI 狀態讀取失敗就會在頁面頂端冒出「AI 生成失敗」橫幅。
+  final effectiveRepo = repo ?? _MockTripRepository();
+  if (stubAiState) {
     when(
-      () => repo.fetchNotesAiState(any()),
+      () => effectiveRepo.fetchNotesAiState(any()),
     ).thenAnswer((_) async => const TripNoteAiState());
   }
   return ProviderScope(
@@ -279,7 +282,7 @@ Widget _buildScreen(
       tripNotesProvider.overrideWith(
         notesBuilder ?? (ref, tripId) => Stream.value(notes),
       ),
-      if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
+      tripRepositoryProvider.overrideWithValue(effectiveRepo),
       if (requestsRepo != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepo),
     ],

@@ -36,7 +36,7 @@ void main() {
     expect(soon.isExpired(skew: const Duration(seconds: 60)), isTrue);
   });
 
-  test('toJson/fromJson round-trip', () {
+  test('toJson/fromJson：落地內容只有 refresh token 與身分，絕不含 access token', () {
     final t = OAuthTokens(
       accessToken: 'at',
       refreshToken: 'rt',
@@ -44,12 +44,14 @@ void main() {
       scope: 'openid',
       expiresAt: DateTime.utc(2026, 6, 12, 10, 30),
     );
+    expect(t.toJson().containsKey('access_token'), isFalse);
+    expect(t.toJson().containsKey('expires_at'), isFalse);
     final back = OAuthTokens.fromJson(t.toJson());
-    expect(back.accessToken, 'at');
+    expect(back.accessToken, isEmpty);
+    expect(back.isExpired(), isTrue); // 讀回來一定要先 refresh 才有 access token
     expect(back.refreshToken, 'rt');
     expect(back.idToken, 'idt');
     expect(back.scope, 'openid');
-    expect(back.expiresAt, t.expiresAt);
   });
 
   test('copyWith(idToken) 保留其餘欄位', () {

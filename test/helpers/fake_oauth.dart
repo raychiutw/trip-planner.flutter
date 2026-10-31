@@ -1,5 +1,9 @@
+import 'package:flutter/services.dart' show MissingPluginException;
+import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
+import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/models/oauth_tokens.dart';
@@ -58,4 +62,45 @@ List<dynamic> fakeBrowserLoginOverrides({
     created?.call(service);
     return service;
   }),
+];
+
+/// 取憑證就丟例外的來源：讓「忘了 stub 的 API 呼叫」像沒有平台通道時一樣失敗，
+/// 而不是真的打網路（測試環境的 HttpClient 會回 400，變成頁面上的 ApiError）。
+class _ThrowingBearerSource implements BearerTokenSource {
+  @override
+  Future<String?> accessToken() async =>
+      throw MissingPluginException('測試環境沒有 stub 這個 API 呼叫');
+
+  @override
+  Future<bool> refresh() async => false;
+}
+
+/// 預設的 ApiClient 換成「任何請求都失敗」的版本，供沒 stub 網路的畫面測試使用。
+dynamic get unstubbedApiClientOverride => apiClientProvider.overrideWithValue(
+  ApiClient(bearerSource: _ThrowingBearerSource()),
+);
+
+/// 不連網的 OAuthRepository：只記錄被撤銷的 token。
+class RecordingOAuthRepository implements OAuthRepository {
+  final revoked = <String>[];
+
+  @override
+  Future<void> revokeToken({
+    required String token,
+    required String clientId,
+    String? tokenTypeHint,
+    String? clientSecret,
+  }) async => revoked.add(token);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// 已登入狀態：有憑證的 store，加上不連網的 OAuthRepository。
+List<dynamic> signedInOverrides({
+  InMemoryOAuthTokenStore? store,
+  RecordingOAuthRepository? repo,
+}) => [
+  oauthTokenStoreProvider.overrideWithValue(store ?? signedInTokenStore()),
+  oauthRepositoryProvider.overrideWithValue(repo ?? RecordingOAuthRepository()),
 ];

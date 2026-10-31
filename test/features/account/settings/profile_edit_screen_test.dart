@@ -13,6 +13,8 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
+import '../../../helpers/fake_oauth.dart';
+
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _MockAccountRepo extends Mock implements AccountRepository {}
@@ -64,6 +66,7 @@ void main() {
       retry: (_, _) => null,
       overrides: [
         authRepositoryProvider.overrideWithValue(authRepo),
+        ...signedInOverrides(),
         accountRepositoryProvider.overrideWithValue(accountRepo),
       ],
       child: MaterialApp.router(
