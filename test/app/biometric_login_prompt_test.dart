@@ -7,7 +7,6 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/app_lock_host.dart';
-import 'package:tripline/app/biometric_login.dart';
 import 'package:tripline/features/account/settings/biometric_login_row.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';

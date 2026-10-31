@@ -14,6 +14,7 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart' show AccountDeletionPreview;
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/cache/cache_store.dart' show QueuedMutation;
+import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/share_repository.dart';
@@ -85,7 +86,6 @@ class HigFakes {
     final account = MockAccountRepository();
     final share = MockShareRepository();
     final poi = MockPoiRepository();
-    when(fixture.auth.logout).thenAnswer((_) async {});
     when(fixture.auth.fetchAccountDeletionPreview).thenAnswer(
       (_) async => const AccountDeletionPreview(
         hasPassword: true,
@@ -94,6 +94,7 @@ class HigFakes {
       ),
     );
     if (loggedIn) {
+      fixture.session.signedIn = true;
       when(fixture.auth.currentUser).thenAnswer((_) async => higUser);
     }
     when(() => account.fetchAccountSessions()).thenAnswer(
@@ -246,6 +247,7 @@ class HigFakes {
       // (產品行為見 #471)。
       retry: (retryCount, error) => null,
       overrides: [
+        ...f.authOverrides,
         biometricAuthenticatorProvider.overrideWithValue(biometric),
         appLockProvider.overrideWith(
           () => AppLockController(initialEnabled: appLockEnabled ?? false),
@@ -485,23 +487,11 @@ List<HigScene> higScenes() => [
     '#420 #424',
     location: '/login',
     loggedIn: false,
-    stub: (f) => when(
-      () => f.auth.login(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer((_) async => throw _failure),
-    act: (tester, f) async {
-      await tester.enterText(
-        find.byKey(const ValueKey('login-email-field')),
-        'ray@example.com',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('login-password-field')),
-        'wrong-password',
-      );
-      await _tapKey(tester, 'login-submit-button');
-    },
+    stub: (f) => f.fixture.session.loginError = OAuthLoginException(
+      'boom',
+      userMessage: 'Tripline 登入失敗，請稍後再試',
+    ),
+    act: (tester, f) async => _tapKey(tester, 'login-browser-button'),
   ),
   const HigScene(
     'auth-signup',
@@ -925,33 +915,8 @@ List<HigScene> higScenes() => [
     '#462',
     loggedIn: false,
     location: '/login',
-    stub: (f) {
-      f.biometric = _OkBiometric();
-      var signedIn = false;
-      when(
-        () => f.auth.login(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-        ),
-      ).thenAnswer((_) async {
-        signedIn = true;
-        return higUser;
-      });
-      when(
-        f.auth.currentUser,
-      ).thenAnswer((_) async => signedIn ? higUser : null);
-    },
-    act: (tester, f) async {
-      await tester.enterText(
-        find.byKey(const ValueKey('login-email-field')),
-        'ray@example.com',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('login-password-field')),
-        'secret-password',
-      );
-      await _tapKey(tester, 'login-submit-button');
-    },
+    stub: (f) => f.biometric = _OkBiometric(),
+    act: (tester, f) async => _tapKey(tester, 'login-browser-button'),
   ),
   HigScene(
     'account-home-security',

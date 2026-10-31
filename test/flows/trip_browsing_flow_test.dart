@@ -18,6 +18,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
+import '../helpers/fake_oauth.dart';
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -50,17 +51,13 @@ const _days = [
 ];
 
 void main() {
-  testWidgets('A:未登入填表登入 → 進入行程清單', (tester) async {
+  testWidgets('A:未登入用瀏覽器登入 → 進入行程清單', (tester) async {
     final mockAuth = _MockAuthRepository();
     final mockTrips = _MockTripRepository();
-    when(() => mockAuth.currentUser()).thenAnswer((_) async => null);
-    when(
-      () => mockAuth.login(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer(
-      (_) async => const UserInfo(id: 'u1', email: 'ray@example.com'),
+    var signedIn = false;
+    when(() => mockAuth.currentUser()).thenAnswer(
+      (_) async =>
+          signedIn ? const UserInfo(id: 'u1', email: 'ray@example.com') : null,
     );
     when(
       mockTrips.watchMyTrips,
@@ -70,6 +67,7 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuth),
+          ...fakeBrowserLoginOverrides(onLogin: () => signedIn = true),
           tripRepositoryProvider.overrideWithValue(mockTrips),
           appNetworkAvailabilityProvider.overrideWithValue(
             const Stream.empty(),
@@ -84,21 +82,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('login-email-field')),
-      'ray@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('login-password-field')),
-      'secret',
-    );
-    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.tap(find.byKey(const ValueKey('login-browser-button')));
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
-    verify(
-      () => mockAuth.login(email: 'ray@example.com', password: 'secret'),
-    ).called(1);
   });
 
   testWidgets('B:已登入 清單→點卡片→時間軸→點筆記→筆記頁', (tester) async {

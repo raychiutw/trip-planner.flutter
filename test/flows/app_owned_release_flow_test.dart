@@ -47,8 +47,6 @@ void main() {
       },
     );
     expect(textEntries, [
-      (key: const ValueKey('login-email-field'), text: 'ray@example.com'),
-      (key: const ValueKey('login-password-field'), text: 'secret'),
       (key: const ValueKey('chat-input'), text: 'device smoke draft'),
       (key: const ValueKey('favorites-search-input'), text: '牧志'),
     ]);
