@@ -7,7 +7,7 @@
 ## 開工前檢查
 
 1. 先讀本檔，再讀任務明確點名或依工作流需要使用的每一份 `SKILL.md`；必要 skill 不可用時必須停下並回報，不得跳過，也不得以手動步驟冒充已執行 skill。
-2. 讀取 `CONTEXT.md` 與工作範圍相關的 `docs/adr/`，沿用既有領域詞彙與決策。
+2. 讀取 `GLOSSARY.md` 與工作範圍相關的 `docs/adr/`，沿用既有領域詞彙與決策。
 3. **要寫或改 `lib/` 的程式碼前，先讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 中與工作範圍相關的節**。那份是本 repo 編碼規範的唯一出處，也是 `code-review` Standards 軸的主要依據；本檔只留摘要，兩者衝突時以該份為準。UI／UX 另讀 `DESIGN.md`。
 4. 先確認目前 branch、worktree 與既有變更；不得覆蓋或順手提交不屬於本次任務的內容。
 5. 程式碼探索優先使用下列 Codebase Knowledge Graph；不足時才退回文字或檔案搜尋。
@@ -48,7 +48,7 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 
 本節即為使用者對這條 repo 工作流的預先指定；不必等使用者逐一重打 slash command，但每個 skill 規定的停點、確認與外部發布步驟仍必須照做。
 
-- `grill-with-docs`：在寫 code 前逐題收斂共同理解；一次只問一題。能由 repository 回答的事自行查證，不問使用者。即時維護 `CONTEXT.md` 詞彙；ADR 只在「難以逆轉、缺少脈絡會困惑、存在真實 trade-off」三者都成立時建立。
+- `grill-with-docs`：在寫 code 前逐題收斂共同理解；一次只問一題。能由 repository 回答的事自行查證，不問使用者。即時維護 `GLOSSARY.md` 詞彙；ADR 只在「難以逆轉、缺少脈絡會困惑、存在真實 trade-off」三者都成立時建立。
 - `to-spec`：預設不可省略。沿用已完成的討論，不重新訪談；探索現況、提出最少且最高層的既有測試 seam，取得使用者確認後，將 spec 發布到 GitHub Issues 並加上 `ready-for-agent`。**只有單一 fresh context 做得完、沒有 blocker、沒有需要另行發布的產品決策，且不具備有意義垂直切片的小功能，才可略過 `to-spec`**；略過時仍須先由 `grill-with-docs` 確認範圍與測試 seam，再直接進入 `implement`。
 - `to-tickets`：將工作拆成可獨立驗證、可在單一 fresh context 完成的 tracer-bullet 垂直切片，標示 blocking edges，取得使用者同意後發布。**只有整個變更確定可在單一 fresh context 完成、沒有 blocker，且無有意義的垂直切片可拆時才可省略**；省略後由已確認的 spec，或符合上一條例外的共同理解，直接進入 `implement`。
 - `implement`：**一律不可省略，也不得以直接手動編輯取代**。從已核准的 spec、tickets，或符合上述小功能例外的已確認範圍開始，每個 `implement` 使用 fresh context；在已確認的 seam 以 `tdd` 一次完成一個 red → green 垂直切片，定期跑單檔測試與 type check，結尾跑完整測試，再依 `code-review` 對 Standards／Spec 兩軸審查，最後才提交目前 feature branch。
@@ -144,7 +144,7 @@ Issues 與 PRD 使用 GitHub Issues（`raychiutw/trip-planner.flutter`），透�
 
 ### Domain docs
 
-採 single-context 架構。根目錄 `CONTEXT.md` 只作詞彙表，不放實作細節或 spec；由 `grill-with-docs` 驅動的 `domain-modeling` 隨討論即時更新。`docs/adr/` 只按上述三重門檻建立。詳見 `docs/agents/domain.md`。
+採 single-context 架構。根目錄 `GLOSSARY.md` 只作詞彙表，不放實作細節或 spec；由 `grill-with-docs` 驅動的 `domain-modeling` 隨討論即時更新。`docs/adr/` 只按上述三重門檻建立。詳見 `docs/agents/domain.md`。
 
 ## Matt Pocock 官方依據
 

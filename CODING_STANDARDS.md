@@ -5,7 +5,7 @@
 搭配讀:
 
 - UI／UX 變更另須一併讀 [`DESIGN.md`](DESIGN.md) —— 見〈UI 規範〉,那裡說明兩份文件的分工
-- 領域詞彙見 [`CONTEXT.md`](CONTEXT.md);同一個東西有多種叫法時以它為準
+- 領域詞彙見 [`GLOSSARY.md`](GLOSSARY.md);同一個東西有多種叫法時以它為準
 - 「為什麼是這樣」見 [`docs/adr/`](docs/adr) —— 本頁只寫規則,不寫決策脈絡
 - 貢獻流程、環境設定與 PR 規矩見 [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
@@ -275,7 +275,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 動作動詞的圖示與顏色
 
-`DESIGN.md` 只在 §4.1 泛稱「destructive action 使用 system destructive role」,沒寫圖示與顏色。以下由程式碼歸納。四個動詞的**語意定義在 [`CONTEXT.md`](CONTEXT.md#動作動詞)**(新增／加入／移除／刪除),本節只規範對應的圖示與顏色,兩者一起看才完整。
+`DESIGN.md` 只在 §4.1 泛稱「destructive action 使用 system destructive role」,沒寫圖示與顏色。以下由程式碼歸納。四個動詞的**語意定義在 [`GLOSSARY.md`](GLOSSARY.md#動作動詞)**(新增／加入／移除／刪除),本節只規範對應的圖示與顏色,兩者一起看才完整。
 
 | 動詞 | 圖示 | `TpActionItem.role` | 顏色 |
 |---|---|---|---|

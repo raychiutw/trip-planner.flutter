@@ -35,7 +35,7 @@ sufficient visual differentiation」。所以「中性」與「強調色」兩�
 
 ## Consequences
 
-- `CONTEXT.md` 的「品牌柔褐不鋪成底色」多了一條明文例外,只限 root tab 選取膠囊。
+- `GLOSSARY.md` 的「品牌柔褐不鋪成底色」多了一條明文例外,只限 root tab 選取膠囊。
 - **無障礙 fallback 不跟著改**:提高對比／降低透明度時仍收斂為中性不透明
   (`surfaceContainerHigh` α1),避免大面積品牌色在高對比下失控。
 - **形式仍是整格膠囊,不是 Apple 那種只包字符的圓。** `GlassTabBar` 的 indicator 幾何
