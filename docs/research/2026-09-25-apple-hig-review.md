@@ -6,7 +6,7 @@
 
 HIG 網頁正文由 JavaScript 載入，本次另讀取 Apple 官方 DocC JSON（例如 [Tab bars 原始文件](https://developer.apple.com/tutorials/data/design/human-interface-guidelines/tab-bars.json)），不以搜尋摘要代替全文。下列引用連到可閱讀的官方頁面。Layout 文件的更新紀錄包含 2026-09-09，Tab bars／Searching 包含 2026-06-08，因此不是只根據 2025 年 iOS 26 發布印象推論。來源：[Layout](https://developer.apple.com/design/human-interface-guidelines/layout)、[Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)、[Searching](https://developer.apple.com/design/human-interface-guidelines/searching)。
 
-本專案的 [DESIGN.md](../../DESIGN.md) 已區分「HIG 必須」是 Tripline 自訂 release gate，並不表示 Apple 原文每條都是 must；[CONTEXT.md](../../CONTEXT.md) 定義語彙。本研究沿用浮動 header、固定 bar、root tab bar、bottom accessory、停留點與行程 POI。架構與產品決策仍以既有 ADR 為準。
+本專案的 [DESIGN.md](../../DESIGN.md) 已區分「HIG 必須」是 Tripline 自訂 release gate，並不表示 Apple 原文每條都是 must；[GLOSSARY.md](../../GLOSSARY.md) 定義語彙。本研究沿用浮動 header、固定 bar、root tab bar、bottom accessory、停留點與行程 POI。架構與產品決策仍以既有 ADR 為準。
 
 - **Apple 設計指引**：HIG 建議、平台互動慣例與系統能力，不等於逐像素審核表。
 - **App Store 規定**：App Review Guidelines 有適用前提的發布要求，另列於下方。
@@ -27,7 +27,7 @@ HIG 網頁正文由 JavaScript 載入，本次另讀取 Apple 官方 DocC JSON�
 | 日期時間 | 系統 picker 支援不同樣式與日期／時間模式，值與排序依 locale；分鐘間隔可用 60 的因數。[Pickers](https://developer.apple.com/design/human-interface-guidelines/pickers) | 五分鐘間隔、確認後才寫回是 Tripline 決策，不是 Apple 強制。驗證 12／24 小時制、日期邊界與取消不改原值。 |
 | 地圖 | 保留熟悉 pan／zoom／rotate，標記選取清楚，密集點可群聚；控制項需與底圖有對比。[Maps](https://developer.apple.com/design/human-interface-guidelines/maps) | 驗證浮動 header／accessory 不攔截地圖空白區；POI 卡與 marker 選取同步，定位拒絕仍可瀏覽。Apple Maps 的 logo／legal 規則是特定圖資要求，不應直接當成 Google SDK 合約；沿用 [ADR-0011](../adr/0011-single-map-sdk-google-navigation-flutter.md)。 |
 | 字級與讀屏 | 可放大文字、合理對比、不單靠顏色、VoiceOver 與不同輸入方式可操作；以 Accessibility Inspector 稽核。[Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) | 至少驗證 2× 文字與完整系統大字級；所有圖示按鈕具名稱、selected／expanded 狀態可讀；日期、路線用編號／語意補色彩；拖曳排序提供按鈕或 accessibility action。44×44pt 是 Apple 現行表格的 default（minimum 另列 28×28pt）；全部控制至少 44pt 為本專案既有觸控 gate，未降低。 |
-| 載入與 AI 等待 | 不留空白阻止其他操作；時間已知用 determinate、未知用 indeterminate progress。[Loading](https://developer.apple.com/design/human-interface-guidelines/loading) | 保留 stale 內容背景更新。聊天工單可長時間等待，呈現持續狀態、可離開再回來，不用假百分比，不以短 timeout 假裝失敗。具體工單生命週期來自 CONTEXT.md。 |
+| 載入與 AI 等待 | 不留空白阻止其他操作；時間已知用 determinate、未知用 indeterminate progress。[Loading](https://developer.apple.com/design/human-interface-guidelines/loading) | 保留 stale 內容背景更新。聊天工單可長時間等待，呈現持續狀態、可離開再回來，不用假百分比，不以短 timeout 假裝失敗。具體工單生命週期來自 GLOSSARY.md。 |
 | 錯誤與刪除 | Alert 會中斷工作，只用於有用且必要的決定；不可復原且少見的破壞性操作要確認；錯誤寫明情境與可採行動。[Alerts](https://developer.apple.com/design/human-interface-guidelines/alerts) | 一般離線狀態用持續說明與重試；保留輸入。依 [ADR-0008](../adr/0008-deletion-is-irreversible.md) 的永久刪除政策，具名確認、說明連帶影響、伺服器成功才移除，不另建 Undo。 |
 | 權限 | 只索取功能需要的資料，最好使用功能時才詢問，purpose string 說明用途。[Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy) | 點定位／麥克風才請求；拒絕後保留無定位瀏覽／文字輸入；不把重複權限 prompt 當作錯誤回復。 |
 | 帳號 | 只有核心功能需要時才要求帳號；說明必要性，盡可能先讓人理解價值；提供刪除帳號。[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts) | Login 說明同步與共編價值，保留返回／重試與錯誤文案；公開分享的瀏覽權限依後端契約判定，不為通用 HIG 擅改認證模式。 |

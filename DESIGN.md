@@ -385,7 +385,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：Android 沿用既有 `mipmap-*/ic_launcher.png`，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
 - 所有 PNG 必須是正方形、正確像素尺寸且**不含 alpha**。
 
-木棕 `#A97A4A` 就是 CONTEXT.md 定義的 tint（品牌柔褐）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。
+木棕 `#A97A4A` 就是 GLOSSARY.md 定義的 tint（品牌柔褐）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。
 
 ## 17. Motion 與 haptics
 
@@ -442,7 +442,7 @@ UI 規範的來源階層，由高到低：
 
 1. [`docs/adr/`](docs/adr) —— ADR 記錄的是決策當下的取捨與被拒方案，且會標註更正史。與本文件衝突時**以 ADR 為準**（例：導覽 chrome 的膠囊分組見 [ADR-0004](docs/adr/0004-neutral-selection-surface-with-tinted-foreground.md)）。
 2. 本文件。
-3. [CONTEXT.md](CONTEXT.md) —— 只定義語彙，不定義規範；但本文件用到的名稱必須與它一致。
+3. [GLOSSARY.md](GLOSSARY.md) —— 只定義語彙，不定義規範；但本文件用到的名稱必須與它一致。
 
 `code-review` 的 Standards 軸同時讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 與本文件。**UI 條文不重複維護**：刪除動線（§12）、Accessibility release gate（§18）、驗收矩陣（§19）只寫在本文件；`CODING_STANDARDS.md` §UI 規範不複述，只補上本文件沒有的動作動詞圖示與顏色對照表。
 

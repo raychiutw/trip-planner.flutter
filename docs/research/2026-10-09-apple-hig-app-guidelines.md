@@ -309,7 +309,7 @@ iOS／iPadOS Dynamic Type 數值（pt，size／leading；來源同 Typography �
 - **Reduce Motion 與 blur**：HIG 明列「避免動畫進出 blur」；DESIGN.md §11、§17 的 Reduce Motion 清單未提 blur 轉場，可在驗收（§19.2 的 Reduce Motion 一項）加註檢查玻璃/blur 進出場。
 - **標示 DESIGN.md §4.1 第 75 行**：「`完成`、`取消`、`儲存`等動作用文字按鈕」標為 **HIG 必須**，與 §11 第 3 項不符；不改 code，只建議之後調整標記。
 - **Dark Mode 設定**：DESIGN.md §5 已標為 Tripline 決策，與 §11 第 1 項一致；先前文件第 52 行對「Android 跟隨 iOS」的處理也同樣獨立，未受影響。
-- **離線文案**：HIG 沒有 Offline 專頁，CONTEXT.md「線上限定」要求「離線時必須說明原因」與 Feedback 頁「Show people when a command can't be carried out and help them understand why」一致。
+- **離線文案**：HIG 沒有 Offline 專頁，GLOSSARY.md「線上限定」要求「離線時必須說明原因」與 Feedback 頁「Show people when a command can't be carried out and help them understand why」一致。
 - **啟動還原**：Launching 要求還原上次狀態；DESIGN.md §3.1 要求各 tab 保留 Navigation Stack、Day、篩選與捲動位置，**範圍限於 app 存活期間的 tab 切換**；本次未在 DESIGN.md 找到「程序被系統回收後冷啟動還原」的條文。這是否已實作需另查程式碼，本研究不下結論。
 
 ## 13. 未能確認／待查項
