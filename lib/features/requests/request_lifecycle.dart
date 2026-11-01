@@ -184,6 +184,14 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       state = RequestInFlight(request: row, status: row.status);
       return row;
     } on ApiError catch (error) {
+      // 403（失去該行程權限）與 404（工單已被後端清掉，例如筆記產生失敗）重試不會好，
+      // 繼續輪詢只是空轉：本機終結為 failed，讓畫面誠實提示（後端語意見 #297）。
+      if ((error.status == 403 || error.status == 404) &&
+          !_stale(run) &&
+          state is RequestInFlight) {
+        _terminate(RequestStatus.failed, null, serverConfirmed: false);
+        return null;
+      }
       if (error.status == 401 && !_stale(run)) {
         _events?.cancel();
         _events = null;
