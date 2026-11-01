@@ -15,6 +15,22 @@ void main() {
     repo = OAuthRepository(dio: dio, origin: 'https://x');
   });
 
+  test('buildAuthorizeUrl：授權頁用 authorizeOrigin，與換票的 API origin 分開', () {
+    final split = OAuthRepository(
+      dio: dio,
+      origin: 'https://api.example',
+      authorizeOrigin: 'https://web.example',
+    );
+    final u = split.buildAuthorizeUrl(
+      clientId: 'cid',
+      redirectUri: 'https://cb.example/oauth/callback',
+      codeChallenge: 'chal',
+      state: 'st',
+    );
+    expect(u.origin, 'https://web.example');
+    expect(u.path, '/api/oauth/authorize');
+  });
+
   test('buildAuthorizeUrl：帶齊 query + S256', () {
     final u = repo.buildAuthorizeUrl(
       clientId: 'cid',

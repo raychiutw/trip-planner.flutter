@@ -5,17 +5,22 @@ library;
 import 'package:dio/dio.dart';
 
 import '../../models/oauth_tokens.dart';
-import '../api_client.dart' show kTriplineOrigin;
+import '../api_client.dart' show kTriplineAuthorizeOrigin, kTriplineOrigin;
 import '../api_error.dart';
 import '../dpop/dpop_clock.dart';
 import '../dpop/dpop_proof.dart';
 import '../dpop/proof_key.dart';
 
 class OAuthRepository {
-  OAuthRepository({Dio? dio, String origin = kTriplineOrigin, DpopClock? clock})
-    : _origin = origin,
-      _clock = clock ?? DpopClock(),
-      _dio = dio ?? Dio() {
+  OAuthRepository({
+    Dio? dio,
+    String origin = kTriplineOrigin,
+    String authorizeOrigin = kTriplineAuthorizeOrigin,
+    DpopClock? clock,
+  }) : _origin = origin,
+       _authorizeOrigin = authorizeOrigin,
+       _clock = clock ?? DpopClock(),
+       _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     _dio.options.validateStatus = (_) => true;
     // 避免 token 交換/刷新無限期 hang(連帶卡住所有等 refresh 的 request)。
@@ -24,6 +29,7 @@ class OAuthRepository {
   }
 
   final String _origin;
+  final String _authorizeOrigin;
   final Dio _dio;
   final DpopClock _clock;
 
@@ -35,7 +41,7 @@ class OAuthRepository {
     required String state,
     String scope = 'openid profile email offline_access',
   }) {
-    return Uri.parse('$_origin/api/oauth/authorize').replace(
+    return Uri.parse('$_authorizeOrigin/api/oauth/authorize').replace(
       queryParameters: {
         'response_type': 'code',
         'client_id': clientId,
