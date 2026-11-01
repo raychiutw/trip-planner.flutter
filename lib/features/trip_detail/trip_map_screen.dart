@@ -1125,7 +1125,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                     child: Text(
                       '${index + 1}',
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: current ? Colors.white : stop.color,
+                        color: current ? onDayPinColor(stop.color) : stop.color,
                         fontWeight: FontWeight.w800,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),

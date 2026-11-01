@@ -35,6 +35,15 @@ Color dayPinColor(int dayNum) {
   return kDayPinPalette[(dayNum - 1) % kDayPinPalette.length];
 }
 
+/// 日別色當實心底時的數字色：白或黑，取對比較高的一個（#469）。
+///
+/// 白字對 Tailwind -500 色只有 2~4:1（lime 約 2:1），黑字全部 ≥ 4.9:1。
+Color onDayPinColor(Color fill) {
+  final l = fill.computeLuminance();
+  // 白字對比 1.05/(l+0.05)，黑字對比 (l+0.05)/0.05；兩者相等處約 l = 0.179。
+  return l > 0.179 ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
+}
+
 /// marker 的視覺契約（對齊 web `mapHelpers.markerStyle`）。
 @immutable
 class TripMapMarkerStyle {

@@ -33,6 +33,7 @@ import 'package:tripline/ui/tp_horizontal_selector.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 
 import '../../helpers/branch_keepalive.dart';
+import '../../helpers/contrast.dart';
 import '../../helpers/fake_trip_map.dart';
 
 ProviderContainer _containerOf(WidgetTester tester) =>
@@ -922,6 +923,22 @@ void main() {
     final inactive = badge(12);
     expect(inactive.color!.a, closeTo(0.16, 0.01));
     expect((inactive.border! as Border).top.width, 1.5);
+  });
+
+  testWidgets('目前卡的編號數字對實心徽章底色達 WCAG AA 4.5:1（#469）', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final badge = find.byKey(const ValueKey('poi-number-11'));
+    final fill =
+        (tester.widget<Container>(badge).decoration! as BoxDecoration).color!;
+    final digit = tester.widget<Text>(
+      find.descendant(of: badge, matching: find.byType(Text)),
+    );
+    expect(
+      wcagContrast(digit.style!.color!, const Color(0x00000000), under: fill),
+      greaterThanOrEqualTo(4.5),
+    );
   });
 
   testWidgets('POI accessory 不壓在 tab 帶狀遮蔽上（否則玻璃下緣出現黑帶）', (tester) async {

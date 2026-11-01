@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/map/map_style.dart';
 
+import '../../helpers/contrast.dart';
+
 void main() {
   group('dayPinColor', () {
     test('色盤順序與 web DAY_PALETTE 一致', () {
@@ -85,5 +87,15 @@ void main() {
       expect(style.strokeWidth, 6);
       expect(style.opacity, 0.85);
     });
+  });
+
+  test('onDayPinColor：十個日別色的實心底上數字都達 WCAG AA 4.5:1（#469）', () {
+    for (final fill in kDayPinPalette) {
+      expect(
+        wcagContrast(onDayPinColor(fill), const Color(0x00000000), under: fill),
+        greaterThanOrEqualTo(4.5),
+        reason: '$fill',
+      );
+    }
   });
 }

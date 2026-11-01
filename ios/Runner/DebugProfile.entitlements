@@ -5,6 +5,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:mobile-callback.trip-planner-dby.pages.dev</string>
+		<string>applinks:trip-planner-dby.pages.dev</string>
 	</array>
 	<key>keychain-access-groups</key>
 	<array>
