@@ -39,20 +39,6 @@ class InMemoryProofKeyStore implements ProofKeyStore {
   Future<void> delete() async => _key = null;
 }
 
-/// 原生硬體金鑰完成前的占位：一律不支援，讓 [FallbackProofKeyStore] 退軟體。
-class UnsupportedProofKeyStore implements ProofKeyStore {
-  const UnsupportedProofKeyStore();
-
-  @override
-  Future<ProofKey?> load() async => null;
-
-  @override
-  Future<ProofKey> create() async => throw const ProofKeyUnsupportedException();
-
-  @override
-  Future<void> delete() async {}
-}
-
 /// 軟體後備金鑰：私鑰 JWK 存 Keychain／Keystore（可匯出，ADR-0015）。
 /// 裝置沒設密碼存不進去時只留記憶體，與登入憑證一致（下次開 app 重新登入）。
 class SoftwareProofKeyStore implements ProofKeyStore {
