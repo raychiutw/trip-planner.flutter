@@ -104,6 +104,19 @@ void main() {
     await HardwareProofKeyStore().delete();
   });
 
+  test('sign 回來的簽章不是 64 bytes：視為失敗，不把壞簽章交給伺服器', () async {
+    handle((call) async {
+      if (call.method == 'create') return {'x': 'XX', 'y': 'YY'};
+      return Uint8List.fromList(List.filled(70, 1)); // 像是沒轉換的 DER
+    });
+    final key = await HardwareProofKeyStore().create();
+
+    await expectLater(
+      key.sign(Uint8List(1)),
+      throwsA(isA<PlatformException>()),
+    );
+  });
+
   test('sign 失敗時把錯誤往上丟（簽不出來不能假裝成功）', () async {
     handle((call) async {
       if (call.method == 'create') return {'x': 'XX', 'y': 'YY'};
