@@ -26,16 +26,6 @@ const String kTriplineOrigin = String.fromEnvironment(
   defaultValue: 'https://trip-planner-api-production.lean-lean.workers.dev',
 );
 
-/// 系統瀏覽器授權頁（`/api/oauth/authorize`）所在的 origin。換票、刷新仍走
-/// [kTriplineOrigin]。新 api 的 authorize 會導到 web 尚未提供的
-/// `/oauth/authorize` 頁（web 只有 `/oauth/consent`），所以先指向會導到網站登入頁的
-/// 舊入口；web 補上該頁後改回 [kTriplineOrigin]，再移除這個常數。授權碼存在
-/// 兩邊共用的 D1，新 api 的 token 端點可兌換。
-const String kTriplineAuthorizeOrigin = String.fromEnvironment(
-  'TRIPLINE_AUTHORIZE_ORIGIN',
-  defaultValue: 'https://trip-planner-dby.pages.dev',
-);
-
 /// 網頁版（分享頁、隱私頁）的 origin。與 API origin 分開：分享連結是給旅伴在
 /// 瀏覽器開的網頁網址，不能用 API 的網域組。要與 App Link／Universal Link
 /// 宣告的網域一致（見 `share_link_configuration_test`）。
