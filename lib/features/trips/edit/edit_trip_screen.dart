@@ -177,13 +177,15 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     onChanged: ctrl.setLang,
                   ),
                   const SizedBox(height: TpSpacing.s2),
-                  SwitchListTile.adaptive(
-                    key: const ValueKey('edit-published'),
-                    title: const Text('發布（公開上線）'),
-                    contentPadding: EdgeInsets.zero,
-                    value: state.published,
-                    onChanged: ctrl.setPublished,
-                  ),
+                  if (state.canTogglePublished)
+                    SwitchListTile.adaptive(
+                      key: const ValueKey('edit-published'),
+                      title: const Text('發布（公開上線）'),
+                      subtitle: const Text('開啟時，任何知道網址的人都能看到完整行程，包含訂房與緊急聯絡人。'),
+                      contentPadding: EdgeInsets.zero,
+                      value: state.published,
+                      onChanged: ctrl.setPublished,
+                    ),
                   for (final error in [
                     ctrl.saveError,
                     state.error,

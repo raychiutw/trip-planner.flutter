@@ -24,6 +24,7 @@ class EditTripState {
     this.description = '',
     this.lang = 'zh-TW',
     this.published = false,
+    this.canTogglePublished = false,
     this.startDate,
     this.endDate,
     this.days = const [],
@@ -43,6 +44,10 @@ class EditTripState {
   final String description;
   final String lang;
   final bool published;
+
+  /// 載入時行程已發布才可操作開關：app 不提供公開上線（ADR 外的產品決策，#430），
+  /// 只讓既有的發布能被關掉。
+  final bool canTogglePublished;
   final String? startDate;
   final String? endDate;
   final List<TripDay> days;
@@ -72,6 +77,7 @@ class EditTripState {
       description: description,
       lang: lang,
       published: published,
+      canTogglePublished: canTogglePublished,
       startDate: startDate == _sentinel ? this.startDate : startDate as String?,
       endDate: endDate == _sentinel ? this.endDate : endDate as String?,
       days: days ?? this.days,
@@ -94,6 +100,7 @@ class EditTripState {
       description: draft.description,
       lang: draft.lang,
       published: draft.published,
+      canTogglePublished: canTogglePublished,
       destinations: draft.destinations,
       saving: session.submitting,
       saved: !session.dirty && !session.submitting,
@@ -231,6 +238,7 @@ class EditTripController extends Notifier<EditTripState> {
       session.addListener(() => state = state._withSession(session));
       state = EditTripState(
         loading: false,
+        canTogglePublished: trip.published,
         startDate: trip.startDate ?? _firstDate(days),
         endDate: trip.endDate ?? _lastDate(days),
         days: days,

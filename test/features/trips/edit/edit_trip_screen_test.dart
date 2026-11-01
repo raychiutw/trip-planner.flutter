@@ -148,6 +148,44 @@ void main() {
     );
   });
 
+  testWidgets('未發布的行程沒有發布開關（app 不提供公開上線，分享走分享連結）', (tester) async {
+    when(() => tripRepo.fetchTrip(any())).thenAnswer(
+      (_) async => const Trip(
+        id: 'okinawa',
+        name: 'Okinawa',
+        title: '原標題',
+        description: '原描述',
+        lang: 'zh-TW',
+        dayCount: 5,
+        startDate: '2026-04-23',
+        endDate: '2026-04-27',
+        destinations: [TripDestination(name: '那霸', lat: 26.2, lng: 127.6)],
+      ),
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    // 先捲到底，避免開關在畫面外沒被建出來而假綠。
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('edit-lang')), findsOneWidget);
+    expect(find.byKey(const ValueKey('edit-published')), findsNothing);
+    expect(find.textContaining('知道網址'), findsNothing);
+  });
+
+  testWidgets('已發布的行程保留開關以便關閉，並說明任何知道網址的人都看得到', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-published')),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.byKey(const ValueKey('edit-published')), findsOneWidget);
+    expect(find.textContaining('知道網址'), findsOneWidget);
+  });
+
   testWidgets('載入失敗顯示可重試錯誤頁，不渲染表單與儲存鈕，重試成功後出現表單', (tester) async {
     var calls = 0;
     when(() => tripRepo.fetchTrip(any())).thenAnswer((_) async {
