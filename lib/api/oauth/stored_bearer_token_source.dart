@@ -8,13 +8,14 @@ library;
 import 'dart:async';
 
 import '../../models/oauth_tokens.dart';
-import '../api_client.dart' show BearerTokenSource;
+import '../api_client.dart' show BearerTokenSource, DpopKeyProvider;
 import '../api_error.dart';
+import '../dpop/proof_key.dart';
 import '../dpop/proof_key_store.dart';
 import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 
-class StoredBearerTokenSource implements BearerTokenSource {
+class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   StoredBearerTokenSource({
     required OAuthTokenStore store,
     required OAuthRepository repository,
@@ -46,6 +47,11 @@ class StoredBearerTokenSource implements BearerTokenSource {
     _memory = tokens;
     await _store.write(tokens);
   }
+
+  /// 目前的 access token 是綁定金鑰的才回金鑰，ApiClient 據此用 DPoP scheme。
+  @override
+  Future<ProofKey?> proofKey() async =>
+      (_memory?.isDpop ?? false) ? await _proofKeys?.load() : null;
 
   /// 清掉本機登入憑證、記憶體中的 access token 與 DPoP 金鑰（登出、帳號刪除）。
   Future<void> clear() async {

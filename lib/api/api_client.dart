@@ -2,6 +2,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show HttpDate;
 
 import 'package:dio/dio.dart';
 
@@ -11,6 +12,8 @@ import 'cache/cache_keys.dart';
 import 'cache/cache_store.dart';
 import 'cache/offline_op.dart';
 import 'cache/offline_sync_engine.dart';
+import 'dpop/dpop_proof.dart';
+import 'dpop/proof_key.dart';
 import 'retry_policy.dart' as retry;
 
 export 'cache/offline_sync_engine.dart' show FlushResult;
@@ -56,6 +59,12 @@ abstract class BearerTokenSource {
   Future<bool> refresh();
 }
 
+/// token 被綁定到金鑰（DPoP，ADR-0015）時，提供簽 proof 的金鑰；沒綁定回 null，
+/// [ApiClient] 就維持 Bearer。與 [BearerTokenSource] 分開，沒有金鑰概念的來源不必實作。
+abstract interface class DpopKeyProvider {
+  Future<ProofKey?> proofKey();
+}
+
 /// Tripline API client，base = `<origin>/api`。
 class ApiClient {
   ApiClient({
@@ -77,6 +86,10 @@ class ApiClient {
   final CacheStore? _cacheStore;
   final Map<String, int> _cacheCapacityByPathPrefix;
   final Dio _dio;
+
+  /// 伺服器時間減手機時間（由 400 `invalid_dpop_proof` 的 `Date` 標頭校正，
+  /// 只放記憶體）。DPoP proof 的 `iat` 只容許 ±60 秒。
+  Duration _clockOffset = Duration.zero;
 
   late final OfflineSyncEngine? _offline = _cacheStore == null
       ? null
@@ -319,7 +332,7 @@ class ApiClient {
     CacheReadPolicy policy = CacheReadPolicy.cached,
     bool evictMutationCache = true,
   }) async {
-    final auth = await _authHeadersFor(method);
+    final auth = await _authHeadersFor(method, path);
 
     final Response<dynamic> response;
     try {
@@ -345,6 +358,18 @@ class ApiClient {
       rethrow;
     }
 
+    if (!isRetryAttempt && auth.useDpop && _adoptServerClock(response)) {
+      return _send(
+        method,
+        path,
+        query: query,
+        body: body,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+        policy: policy,
+        evictMutationCache: evictMutationCache,
+      );
+    }
     final decision = await _retryDecision(
       response,
       useBearer: auth.useBearer,
@@ -407,7 +432,7 @@ class ApiClient {
     CancelToken? cancelToken,
     bool isRetryAttempt = false,
   }) async* {
-    final auth = await _authHeadersFor('GET');
+    final auth = await _authHeadersFor('GET', path);
     final response = await _dio.request<ResponseBody>(
       path,
       queryParameters: query,
@@ -478,16 +503,50 @@ class ApiClient {
     return null;
   }
 
-  /// 只有 Bearer:有 access token 就帶 `Authorization`,沒有就不帶任何認證
-  /// (ADR-0014 取代 cookie 與 `Origin`)。
-  Future<({Map<String, dynamic> headers, bool useBearer})> _authHeadersFor(
-    String method,
-  ) async {
+  /// 有 access token 就帶 `Authorization`,沒有就不帶任何認證(ADR-0014 取代
+  /// cookie 與 `Origin`)。token 綁定金鑰時用 `DPoP` scheme 並**每個請求重新簽**
+  /// proof（ADR-0015）；`useBearer` 在兩種 scheme 下都表示「有帶 token」。
+  Future<({Map<String, dynamic> headers, bool useBearer, bool useDpop})>
+  _authHeadersFor(String method, String path) async {
     final requestHeaders = <String, dynamic>{};
-    final bearer = await _bearerSource?.accessToken();
-    final useBearer = bearer != null && bearer.isNotEmpty;
-    if (useBearer) requestHeaders['Authorization'] = 'Bearer $bearer';
-    return (headers: requestHeaders, useBearer: useBearer);
+    final token = await _bearerSource?.accessToken();
+    final hasToken = token != null && token.isNotEmpty;
+    if (!hasToken) {
+      return (headers: requestHeaders, useBearer: false, useDpop: false);
+    }
+    final Object? source = _bearerSource;
+    final key = source is DpopKeyProvider ? await source.proofKey() : null;
+    if (key == null) {
+      requestHeaders['Authorization'] = 'Bearer $token';
+      return (headers: requestHeaders, useBearer: true, useDpop: false);
+    }
+    requestHeaders['Authorization'] = 'DPoP $token';
+    requestHeaders['DPoP'] = await buildDpopProof(
+      key: key,
+      method: method,
+      url: Uri.parse('${_dio.options.baseUrl}$path'),
+      accessToken: token,
+      now: DateTime.now().add(_clockOffset),
+    );
+    return (headers: requestHeaders, useBearer: true, useDpop: true);
+  }
+
+  /// 400 `invalid_dpop_proof` 且回應有可解析的 `Date`：記下伺服器與手機的時差，
+  /// 回 true 表示可以用校正後的時間重簽重送。沒有 `Date` 就無從校正，回 false。
+  bool _adoptServerClock(Response<dynamic> response) {
+    if (response.statusCode != 400) return false;
+    if (ApiError.fromResponse(400, response.data).code !=
+        'invalid_dpop_proof') {
+      return false;
+    }
+    final date = response.headers.value('date');
+    if (date == null) return false;
+    try {
+      _clockOffset = HttpDate.parse(date).difference(DateTime.now());
+      return true;
+    } on Exception {
+      return false;
+    }
   }
 
   /// mutation 成功後,依失效表移除受影響的 GET 快取(body 供 add-to-trip 取 tripId)。

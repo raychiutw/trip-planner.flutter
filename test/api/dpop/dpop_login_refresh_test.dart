@@ -165,6 +165,31 @@ void main() {
     });
   });
 
+  group('proofKey()（給 ApiClient 決定 scheme）', () {
+    test('DPoP 登入後回登入時的金鑰', () async {
+      await loginService(keys).login();
+
+      expect(
+        (await source.proofKey())!.publicJwk,
+        (await keys.load())!.publicJwk,
+      );
+    });
+
+    test('Bearer 登入後回 null', () async {
+      reply = (_) => tokenBody('Bearer');
+      await loginService(keys).login();
+
+      expect(await source.proofKey(), isNull);
+    });
+
+    test('登出後回 null', () async {
+      await loginService(keys).login();
+      await source.clear();
+
+      expect(await source.proofKey(), isNull);
+    });
+  });
+
   group('refresh', () {
     test('DPoP 憑證 refresh：用登入時同一把金鑰簽 proof', () async {
       await loginService(keys).login();
