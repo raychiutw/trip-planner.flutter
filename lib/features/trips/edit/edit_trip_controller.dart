@@ -45,7 +45,7 @@ class EditTripState {
   final String lang;
   final bool published;
 
-  /// 載入時行程已發布才可操作開關：app 不提供公開上線（ADR 外的產品決策，#430），
+  /// 載入時行程已發布才顯示開關：app 不提供公開上線（產品決策，#430），
   /// 只讓既有的發布能被關掉。
   final bool canTogglePublished;
   final String? startDate;
