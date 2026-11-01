@@ -362,7 +362,14 @@ Future<T?> showAppActionSheet<T>(
                     const Icon(CupertinoIcons.check_mark, size: 18),
                     const SizedBox(width: 8),
                   ],
-                  Text(action.label),
+                  Text(
+                    action.label,
+                    // Cupertino 預設畫 systemRed（淺色對白底 3.55:1），
+                    // 改用 Tripline 的高對比 error 色（#469）。
+                    style: action.role == TpActionRole.destructive
+                        ? TextStyle(color: Theme.of(context).colorScheme.error)
+                        : null,
+                  ),
                 ],
               ),
             )
