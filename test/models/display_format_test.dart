@@ -51,4 +51,38 @@ void main() {
       expect(formatEntryTime(null, null, null), '');
     });
   });
+
+  group('formatUtcTimestamp（後端 datetime(\'now\') 是 UTC，沒有時區標記）', () {
+    const taipei = Duration(hours: 8);
+
+    test('沒有時區的字串視為 UTC，換成本地時間（+8）', () {
+      expect(
+        formatUtcTimestamp('2026-07-09 01:00:00', localOffset: taipei),
+        '2026-07-09 09:00',
+      );
+    });
+
+    test('跨日要進位', () {
+      expect(
+        formatUtcTimestamp('2026-07-09 20:30:00', localOffset: taipei),
+        '2026-07-10 04:30',
+      );
+    });
+
+    test('ISO 帶 Z 或帶時區偏移都照該時區換算', () {
+      expect(
+        formatUtcTimestamp('2026-07-09T01:00:00Z', localOffset: taipei),
+        '2026-07-09 09:00',
+      );
+      expect(
+        formatUtcTimestamp('2026-07-09T09:00:00+08:00', localOffset: taipei),
+        '2026-07-09 09:00',
+      );
+    });
+
+    test('解析不了就原樣回傳，不吞掉資料', () {
+      expect(formatUtcTimestamp('昨天', localOffset: taipei), '昨天');
+      expect(formatUtcTimestamp('', localOffset: taipei), '');
+    });
+  });
 }

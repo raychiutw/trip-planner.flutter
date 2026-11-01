@@ -10,6 +10,7 @@ import '../../../api/providers.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../app/error_message.dart';
+import '../../../models/display_format.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
@@ -222,7 +223,7 @@ class _AuditCard extends StatelessWidget {
             ),
             const SizedBox(height: TpSpacing.s2),
             Text(
-              _formatTimestamp(row.createdAt),
+              formatUtcTimestamp(row.createdAt),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: TpSpacing.s1),
@@ -410,11 +411,6 @@ String _diffValue(Object? value) {
 String _compactValue(Object? value) {
   final text = value?.toString() ?? 'null';
   return text.length > 48 ? '${text.substring(0, 48)}…' : text;
-}
-
-String _formatTimestamp(String value) {
-  if (value.length >= 16) return value.replaceFirst('T', ' ').substring(0, 16);
-  return value;
 }
 
 String _auditErrorMessage(Object error) {

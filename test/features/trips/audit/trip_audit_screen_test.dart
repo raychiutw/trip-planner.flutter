@@ -81,6 +81,38 @@ void main() {
     verify(() => repository.fetchAuditLog('trip-1', limit: 50)).called(1);
   });
 
+  testWidgets('異動時間是 UTC：以裝置時區顯示，不直接截字串', (tester) async {
+    when(
+      () => repository.fetchAuditLog(
+        'trip-1',
+        limit: any(named: 'limit'),
+        requestId: any(named: 'requestId'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        TripAuditRow(
+          id: 9,
+          tripId: 'trip-1',
+          tableName: 'trip_entries',
+          recordId: 101,
+          action: TripAuditAction.update,
+          changedBy: 'ray@example.com',
+          requestId: 44,
+          diffJson: '{"title":{"old":"a","new":"b"}}',
+          createdAt: '2026-07-09 20:30:00', // 後端 datetime('now')，UTC
+        ),
+      ],
+    );
+    await pumpScreen(tester);
+
+    final local = DateTime.utc(2026, 7, 9, 20, 30).toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final expected =
+        '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
+    expect(find.textContaining(expected), findsOneWidget);
+  });
+
   testWidgets('顯示 audit log 摘要與 diff 欄位', (tester) async {
     await pumpScreen(tester);
 

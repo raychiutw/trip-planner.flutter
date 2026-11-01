@@ -38,3 +38,20 @@ String dayLabel(int dayNum, {String? title}) {
   if (text == null || text.isEmpty || text == base) return base;
   return '$base · $text';
 }
+
+/// 後端 `datetime('now')` 寫的 `YYYY-MM-DD HH:MM:SS` 是 UTC 但沒有時區標記，
+/// 直接截字串顯示會差一個時區。這裡視為 UTC 換成本地時間，輸出 `YYYY-MM-DD HH:MM`。
+///
+/// 已帶 `Z` 或 `±hh:mm` 的 ISO 字串照該時區換算；解析不了就原樣回傳。
+/// [localOffset] 供測試固定時區，正式使用留空走裝置時區。
+String formatUtcTimestamp(String value, {Duration? localOffset}) {
+  final iso = value.trim().replaceFirst(' ', 'T');
+  final hasZone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(iso);
+  final parsed = DateTime.tryParse(hasZone ? iso : '${iso}Z');
+  if (parsed == null) return value;
+  final utc = parsed.toUtc();
+  final local = localOffset == null ? utc.toLocal() : utc.add(localOffset);
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${local.year.toString().padLeft(4, '0')}-${two(local.month)}-${two(local.day)} '
+      '${two(local.hour)}:${two(local.minute)}';
+}
