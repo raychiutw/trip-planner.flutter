@@ -530,8 +530,8 @@ class _StalledReport extends StatelessWidget {
     return const _StatePanel(
       key: ValueKey('trip-health-stalled'),
       icon: CupertinoIcons.hourglass,
-      title: '這次健檢已經停止',
-      message: '報告不會再更新了。可以重新健檢一次。',
+      title: '報告暫時沒有更新',
+      message: '這次健檢已經結束，但報告還沒讀到。可以稍後再開一次，或重新健檢。',
       liveRegion: true,
     );
   }

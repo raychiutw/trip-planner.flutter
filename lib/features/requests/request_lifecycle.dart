@@ -63,14 +63,21 @@ final class RequestTerminal extends RequestLifecycleState {
 const kRequestPollInterval = Duration(seconds: 4);
 const kRequestPollCeiling = Duration(seconds: 30);
 
+/// SSE 連線開著卻這麼久沒任何訊息，就當作半開並退回輪詢（#297 C）。
+/// ponytail: 後端心跳間隔沒有證據，先取保守值；退回輪詢只是多讀幾次，不會誤判終結。
+const kRequestSseIdle = Duration(seconds: 90);
+
 class RequestLifecycle extends Notifier<RequestLifecycleState> {
   RequestLifecycle(
     this.requestId, {
     Future<void> Function(Duration) wait = Future<void>.delayed,
-  }) : _wait = wait;
+    Duration sseIdle = kRequestSseIdle,
+  }) : _wait = wait,
+       _sseIdle = sseIdle;
 
   final int requestId;
   final Future<void> Function(Duration) _wait;
+  final Duration _sseIdle;
 
   StreamSubscription<TripRequestEvent>? _events;
   AppLifecycleListener? _lifecycle;
@@ -234,28 +241,33 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       unawaited(_fallbackToPolling(run));
       return;
     }
-    _events = stream.listen(
-      (event) {
-        if (_stale(run) || state is RequestTerminal) return;
-        if (!event.isTerminal) {
-          if (event.status case final status?) {
-            state = RequestInFlight(request: state.request, status: status);
-          }
-          return;
-        }
-        _terminate(
-          event.status ?? RequestStatus.failed,
-          event.error != null ? TerminalReason.error : null,
-          errorMessage: event.error,
+    _events = stream
+        .timeout(
+          _sseIdle,
+          onTimeout: (sink) => sink.addError(TimeoutException('SSE idle')),
+        )
+        .listen(
+          (event) {
+            if (_stale(run) || state is RequestTerminal) return;
+            if (!event.isTerminal) {
+              if (event.status case final status?) {
+                state = RequestInFlight(request: state.request, status: status);
+              }
+              return;
+            }
+            _terminate(
+              event.status ?? RequestStatus.failed,
+              event.error != null ? TerminalReason.error : null,
+              errorMessage: event.error,
+            );
+            if (event.status == RequestStatus.failed && event.error == null) {
+              unawaited(_completeTerminalReason(run));
+            }
+          },
+          onError: (Object _) => _fallbackToPolling(run),
+          onDone: () => _fallbackToPolling(run),
+          cancelOnError: true,
         );
-        if (event.status == RequestStatus.failed && event.error == null) {
-          unawaited(_completeTerminalReason(run));
-        }
-      },
-      onError: (Object _) => _fallbackToPolling(run),
-      onDone: () => _fallbackToPolling(run),
-      cancelOnError: true,
-    );
   }
 
   /// SSE 不帶原因。先共用既有讀取；若它回了終態前的舊進行中資料，
