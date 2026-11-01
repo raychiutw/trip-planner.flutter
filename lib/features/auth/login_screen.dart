@@ -137,7 +137,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: TpSpacing.s4),
                   ],
-                  if (_attempted && authState.hasError) ...[
+                  // 從首頁直接登入失敗時沒有按過本頁的按鈕，登入失敗的錯誤仍要顯示。
+                  if (authState.hasError &&
+                      (_attempted ||
+                          authState.error is OAuthLoginException)) ...[
                     Semantics(
                       key: const ValueKey('login-error-banner'),
                       container: true,
