@@ -42,13 +42,14 @@ void main() {
     when(() => repo.watchRequestEvents(7)).thenAnswer((_) => events.stream);
   });
 
-  ProviderContainer makeContainer() {
+  ProviderContainer makeContainer({Duration? sseIdle}) {
     final c = ProviderContainer(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(repo),
         requestLifecycleProvider(7).overrideWith(
           () => RequestLifecycle(
             7,
+            sseIdle: sseIdle ?? kRequestSseIdle,
             wait: (delay) {
               final w = Completer<void>();
               waits.add(w);
@@ -85,6 +86,43 @@ void main() {
       (sub.read() as RequestTerminal).errorMessage,
       'NOTES_AI_NO_VALID_ITEMS',
     );
+  });
+
+  test('SSE 連線開著但久無訊息 → 退回輪詢（#297 C）', () async {
+    var reads = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      reads++;
+      return _req(
+        reads < 3 ? RequestStatus.processing : RequestStatus.completed,
+      );
+    });
+    final c = makeContainer(sseIdle: const Duration(milliseconds: 30));
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    expect(waits, isEmpty);
+
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await _flush();
+    expect(waits, isNotEmpty, reason: 'idle 逾時後應開始輪詢等待');
+    waits.first.complete();
+    await _flush();
+    waits[1].complete();
+    await _flush();
+    expect(sub.read(), isA<RequestTerminal>());
+  });
+
+  test('有訊息就重置 idle 計時，不誤退回輪詢', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = makeContainer(sseIdle: const Duration(milliseconds: 60));
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    for (var i = 0; i < 4; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      events.add(const TripRequestEvent(status: RequestStatus.processing));
+    }
+    expect(waits, isEmpty);
   });
 
   test('種子讀取已終結 → 直接 terminal,不開 SSE', () async {

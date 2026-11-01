@@ -25,6 +25,30 @@ void main() {
     }
   });
 
+  test('淺色破壞性紅字在白底與紅色淡底上都達 WCAG AA 4.5:1（#469）', () {
+    final scheme = AppTheme.light().colorScheme;
+    expect(
+      wcagContrast(
+        scheme.error,
+        const Color(0x00000000),
+        under: TpSystemColorsLight.background,
+      ),
+      greaterThanOrEqualTo(4.5),
+    );
+    final tinted = Color.alphaBlend(
+      scheme.errorContainer,
+      TpSystemColorsLight.background,
+    );
+    expect(
+      wcagContrast(
+        scheme.onErrorContainer,
+        const Color(0x00000000),
+        under: tinted,
+      ),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
   group('HIG 系統主題', () {
     test('淺色使用 system surfaces、labels 與單一 tint', () {
       final theme = AppTheme.light();

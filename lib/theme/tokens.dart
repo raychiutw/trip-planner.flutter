@@ -26,7 +26,9 @@ abstract final class TpSystemColorsLight {
   static const separator = Color(0x493C3C43);
   static const opaqueSeparator = Color(0x5C3C3C43);
 
-  static const destructive = Color(0xFFFF3B30);
+  /// iOS 系統紅（#FF3B30）當文字對白底只有 3.55:1；Tripline 改用 Apple 的
+  /// 高對比紅 #D70015 以達 WCAG AA 4.5:1（#469）。
+  static const destructive = Color(0xFFD70015);
   static const destructiveBackground = Color(0x1AFF3B30);
   static const success = Color(0xFF34C759);
   static const warning = Color(0xFFFF9500);
