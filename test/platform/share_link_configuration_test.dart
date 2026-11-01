@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// 旅伴收到的分享連結是 `https://<主站>/s/<token>`；要讓已安裝 App 的人直接
 /// 在 App 內開（#454），iOS 與 Android 都要宣告主站網域的 /s/ 路徑。
-/// 主站網域要與 `ApiClient` 的 origin 預設值一致。
+/// 主站網域要與 `kTriplineWebOrigin` 的預設值一致（API origin 已與網頁分開）。
 void main() {
   const host = 'trip-planner-dby.pages.dev';
 
@@ -41,10 +41,10 @@ void main() {
     expect(gradle, contains('?: "$host"'));
   });
 
-  test('Dart 端 API origin 預設與分享連結網域一致', () {
+  test('Dart 端網頁 origin 預設與分享連結網域一致', () {
     expect(
       File('lib/api/api_client.dart').readAsStringSync(),
-      contains("defaultValue: 'https://$host'"),
+      contains("'TRIPLINE_WEB_ORIGIN',\n  defaultValue: 'https://$host'"),
     );
   });
 }

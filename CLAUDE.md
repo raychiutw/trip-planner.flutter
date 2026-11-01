@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 專案性質
 
-[trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的 iOS/Android 移植版(Flutter)。**後端不動**:共用同一套 Cloudflare Pages Functions API(`https://trip-planner-dby.pages.dev/api`),本 repo 只是另一個 client — 多數設計決策由此約束推導。P0~P2 移植範圍(唯讀畫面 → CRUD → 離線/AI)皆已完成,後續待辦一律在 GitHub Issues。
+[trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的 iOS/Android 移植版(Flutter)。**後端不動**:共用同一套 Cloudflare Pages Functions API(舊入口 `https://trip-planner-dby.pages.dev/api`;現行預設是新 api `https://trip-planner-api-production.lean-lean.workers.dev`),本 repo 只是另一個 client — 多數設計決策由此約束推導。P0~P2 移植範圍(唯讀畫面 → CRUD → 離線/AI)皆已完成,後續待辦一律在 GitHub Issues。
 
 ## 常用指令
 
@@ -51,7 +51,7 @@ flutter run                                           # 連 prod API — 一律�
 - DPoP 金鑰每次登入產生一把(硬體優先:iOS Secure Enclave／Android Keystore,沒有才退軟體金鑰),隨登入憑證一起刪除;介面是 `ProofKey`(`lib/api/dpop/`)。SSE 帶同樣的標頭並處理 `event: reconnect`
 - refresh 被後端拒絕(400／401)會清憑證並由 `bearerTokenSource.signedOut` 通知 `authStateProvider` 回到未登入
 - `authStateProvider` 的身分優先取 id_token claims(驗過 `exp`／`aud`),否則落回 `currentUser()`(401 回 null 不 throw);登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
-- **master 在新 api 切換前不可發版**:新認證連不上舊入口(見 ADR-0014)
+- **API origin 預設是新 api**(`kTriplineOrigin`;網頁版網域 `kTriplineWebOrigin` 另外,分享連結、隱私頁用它)。新認證連不上舊入口(見 ADR-0014),回切舊入口要同時換掉認證,不是只改 `TRIPLINE_API_ORIGIN`
 
 ## 測試慣例
 

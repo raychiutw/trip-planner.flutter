@@ -13,7 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr/qr.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../api/api_client.dart' show kTriplineOrigin;
+import '../../../api/api_client.dart' show kTriplineWebOrigin;
 import '../../../app/adaptive.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_feedback.dart';
@@ -310,7 +310,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 children: [
                   if (state.lastCreated != null)
                     _CreatedCard(
-                      url: state.lastCreated!.fullUrl(kTriplineOrigin),
+                      url: state.lastCreated!.fullUrl(kTriplineWebOrigin),
                       onCopy: _copy,
                       onShare: _share,
                     ),
