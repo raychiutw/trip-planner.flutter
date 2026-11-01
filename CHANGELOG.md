@@ -4,9 +4,11 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-01
+
 ### 變更
 
-- 認證改為只走系統瀏覽器登入（OAuth PKCE）與 Bearer，取代 cookie 與 App 內密碼表單；access token 只放記憶體，refresh token 落地於 Keychain／Keystore。生物辨識登入改成解鎖本機登入憑證，不再保存密碼。**在新 api 切換前不可發版。**
+- 認證改為只走系統瀏覽器登入（OAuth PKCE）與 Bearer，取代 cookie 與 App 內密碼表單；access token 只放記憶體，refresh token 落地於 Keychain／Keystore。生物辨識登入改成解鎖本機登入憑證，不再保存密碼。
 
 ## [0.36.4] - 2026-10-28
 
