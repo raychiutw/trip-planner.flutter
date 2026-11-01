@@ -145,7 +145,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **直接讀 camelCase key**（server `deepCamel()` 已轉），不做 snake_case 轉換。既有例外只有兩處：`lib/models/entry.dart:31`（`distanceM ?? distance_m`）、`lib/models/day.dart:89`、`:91`（`dayNum`／`day_num`、`dayOfWeek`／`day_of_week`）。新欄位不得再加 fallback；要加就要在 PR 說明後端為何沒轉。
 - **數字一律經 `num`**：`(json['x'] as num?)?.toInt()` / `?.toDouble()`（`lib/models/entry.dart:30`、`:78-79`、`:89`）；必填數字用 `(json['id'] as num).toInt()`（`lib/models/entry.dart:141`）。出現 `as int` / `as double` 直接視為違反 —— server 同一欄位可能回 int 也可能回 double。
 - **bool flag 接受 0/1 或 bool**：`json['x'] == 1 || json['x'] == true`（`lib/models/entry.dart:33`）。寫成 `json['x'] as bool?` 會永遠 false。
-- **日期時間一律存字串，不轉 `DateTime`**，顯示層要用再 parse。實際格式：停留點 `startTime`／`endTime` 是 `"HH:MM"`（`lib/models/entry.dart:118-120`）、day `date` 是 `"YYYY-MM-DD"`（`lib/models/day.dart:69-70`）、航班 `departAt`／`arriveAt` 是 ISO8601 local datetime 字串、`createdAt`／`updatedAt` 是 `"YYYY-MM-DD HH:MM:SS"`（UTC）。唯一 epoch 例外是移動段的 `computedAt`／`updatedAt`（int）。
+- **日期時間一律存字串，不轉 `DateTime`**，顯示層要用再 parse。實際格式：停留點 `startTime`／`endTime` 是 `"HH:MM"`（`lib/models/entry.dart:118-120`）、day `date` 是 `"YYYY-MM-DD"`（`lib/models/day.dart:69-70`）、航班 `departAt`／`arriveAt` 是 ISO8601 local datetime 字串、`createdAt`／`updatedAt` 是 `"YYYY-MM-DD HH:MM:SS"`（UTC，沒有時區標記；顯示一律用 `formatUtcTimestamp` 換成本地時間，不得截字串）。唯一 epoch 例外是移動段的 `computedAt`／`updatedAt`（int）。
 - **list 欄位缺漏 → `[]`**：`(json['xs'] as List<dynamic>? ?? []).map(...).toList()`（`lib/models/entry.dart:156`、`lib/models/day.dart:98`）。
 - **`sortOrder`／`version` 缺漏 → `0`**：`(json['sortOrder'] as num?)?.toInt() ?? 0`（`lib/models/entry.dart:143`、`:150`、`lib/models/day.dart:94`）。
 - **enum 用 top-level `parseX(String?)` 解析，未知字串走安全預設，絕不 throw**。安全 = 偏向「還沒結束、繼續觀察」：
@@ -290,7 +290,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 內容卡與內容列上的「⋯」用 `TpMoreMenuButton(plain: true)`(`lib/ui/tp_more_menu.dart`),長按同一張卡以 `TpMoreMenuController.open` 開同一份選單;適用行程卡、收藏卡、停留點卡、共編成員列、分享連結列與筆記列。feature 不得自組 `IconButton` 開 `showAppActionSheet` 當卡片選單;也不得為了有東西可錨定而放看不見但可聚焦的空按鈕 —— 沒有動作的對象就不放入口。
 - 自訂觸發器(`triggerBuilder`)可以是 chip 等需要 `Material` 的元件;overlay 內的複本由 `TpMoreMenuButton` 固定成頁面觸發器的尺寸並提供透明 `Material`,feature 不必自己包。
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:666`、`lib/features/trips/collab/collab_screen.dart:230`、`lib/features/favorites/favorites_screen.dart:469`)。
-- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存例外:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off;`travel_pill.dart` 的交通工具圖示〔步行、開車、計程車、公車、火車、電車、飛機、船、單車、路線〕,Cupertino 沒有成套對應,整組維持 Material 以免同一排風格混用)。`test/ui/material_residue_guard_test.dart` 守住已收斂的檔案與例外清單。進度指示器一律 `CircularProgressIndicator.adaptive()`。
+- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存例外:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off;`travel_pill.dart` 的交通工具圖示〔步行、開車、計程車、公車、火車、電車、飛機、船、單車、路線〕,Cupertino 沒有成套對應,整組維持 Material 以免同一排風格混用)。`test/ui/material_residue_guard_test.dart` 守住已收斂的檔案與例外清單。進度指示器一律 `CircularProgressIndicator.adaptive()`。**`CheckboxListTile` 登記為例外**（匿名分享建立與編輯、註冊隱私同意、開發者應用 scopes 共 4 處）：iOS 對應的 Switch 是即時生效的開／關，會把「我同意」或「勾選項目」變成設定開關，語意不同，故維持核取方塊；其餘多選列表改走圓形選取。
 - **Material 控制項改走 Tp 元件**(`lib/ui/`;`test/ui/material_residue_guard_test.dart` 守住全 `lib/` 不得再出現原生版本):
 
   | 不得使用 | 改用 | 備註 |

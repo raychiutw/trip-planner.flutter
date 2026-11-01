@@ -22,6 +22,10 @@ void main() {
     'lib/features/trips/health/trip_health_screen.dart',
     'lib/features/share/public_share_screen.dart',
     'lib/features/account/account_sessions_screen.dart',
+    'lib/features/account/developer_apps_screen.dart',
+    'lib/features/map/map_canvas_web.dart',
+    'lib/features/trip_detail/entry_action_route_screen.dart',
+    'lib/features/trip_detail/widgets/entry_edit_sheet.dart',
   ];
 
   // 登記於 CODING_STANDARDS 的例外:Cupertino 沒有對應符號。

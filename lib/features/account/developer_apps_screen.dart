@@ -763,7 +763,7 @@ class _SecretValueRow extends StatelessWidget {
               key: copyKey,
               tooltip: '複製 $copyLabel',
               onPressed: onCopy,
-              icon: const Icon(Icons.copy_outlined),
+              icon: const Icon(CupertinoIcons.doc_on_doc),
             ),
           ],
         ),

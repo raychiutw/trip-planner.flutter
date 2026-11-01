@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -189,9 +190,7 @@ class _EntryActionRouteScreenState
       enabled: !_submitting,
       selected: selected,
       leading: Icon(
-        selected
-            ? Icons.radio_button_checked_outlined
-            : Icons.radio_button_unchecked_outlined,
+        selected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
       ),
       title: Text(title),
       onTap: _submitting
