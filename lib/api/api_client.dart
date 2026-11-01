@@ -18,10 +18,19 @@ import 'retry_policy.dart' as retry;
 
 export 'cache/offline_sync_engine.dart' show FlushResult;
 
-/// 本 build 連線的 origin。預設正式站，可用 --dart-define=TRIPLINE_API_ORIGIN
-/// 覆寫（本機開發指向本機後端、切換到新 api）。決定 base URL（`origin/api`）。
+/// 本 build 連線的 API origin。預設新 api 的正式站，可用
+/// --dart-define=TRIPLINE_API_ORIGIN 覆寫（本機開發指向本機後端、回切舊入口）。
+/// 決定 base URL（`origin/api`）。
 const String kTriplineOrigin = String.fromEnvironment(
   'TRIPLINE_API_ORIGIN',
+  defaultValue: 'https://trip-planner-api-production.lean-lean.workers.dev',
+);
+
+/// 網頁版（分享頁、隱私頁）的 origin。與 API origin 分開：分享連結是給旅伴在
+/// 瀏覽器開的網頁網址，不能用 API 的網域組。要與 App Link／Universal Link
+/// 宣告的網域一致（見 `share_link_configuration_test`）。
+const String kTriplineWebOrigin = String.fromEnvironment(
+  'TRIPLINE_WEB_ORIGIN',
   defaultValue: 'https://trip-planner-dby.pages.dev',
 );
 

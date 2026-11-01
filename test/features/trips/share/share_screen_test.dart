@@ -11,6 +11,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/ui/tp_chip.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/api_client.dart'
+    show kTriplineOrigin, kTriplineWebOrigin;
 import 'package:tripline/api/share_repository.dart';
 import 'package:tripline/features/trips/share/share_screen.dart';
 import 'package:tripline/models/trip_share.dart';
@@ -322,6 +324,33 @@ void main() {
     expect(rect.top, greaterThanOrEqualTo(0));
     expect(rect.bottom, lessThanOrEqualTo(600));
     expect(tester.widget<Semantics>(card).properties.liveRegion, isTrue);
+  });
+
+  testWidgets('建立後顯示的分享網址用網頁 origin，不是 API origin', (tester) async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(id: 99, token: 'tk', url: '/s/tk'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final create = find.byKey(const ValueKey('share-create'));
+    await tester.scrollUntilVisible(
+      create,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(create);
+    await tester.pumpAndSettle();
+
+    expect(find.text('$kTriplineWebOrigin/s/tk'), findsOneWidget);
+    expect(find.textContaining(kTriplineOrigin), findsNothing);
   });
 
   testWidgets('重新產生失敗：錯誤就地顯示於該列，重試重做重新產生', (tester) async {
