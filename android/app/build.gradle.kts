@@ -134,4 +134,6 @@ dependencies {
     // App 鎖(local_auth)的 BiometricPrompt 需要 AppCompat 主題資源。
     implementation("androidx.appcompat:appcompat:1.7.0")
     androidTestUtil("androidx.test:orchestrator:1.5.1")
+    // 純轉換（DPoP 金鑰的 DER／座標）的 JVM 單元測試。
+    testImplementation("junit:junit:4.13.2")
 }

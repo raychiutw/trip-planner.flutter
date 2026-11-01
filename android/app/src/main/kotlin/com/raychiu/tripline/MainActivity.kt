@@ -15,9 +15,17 @@ class MainActivity : FlutterFragmentActivity() {
     private val requestCode = 7301
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var permissionChannel: MethodChannel? = null
+    private var proofKeyChannel: MethodChannel? = null
+    private var proofKeyHandler: ProofKeyChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        proofKeyHandler = ProofKeyChannel().also { handler ->
+            proofKeyChannel = MethodChannel(
+                flutterEngine.dartExecutor.binaryMessenger,
+                "tripline/proof-key",
+            ).also { it.setMethodCallHandler(handler) }
+        }
         permissionChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             channelName,
@@ -93,6 +101,10 @@ class MainActivity : FlutterFragmentActivity() {
         pendingPermissionResult = null
         permissionChannel?.setMethodCallHandler(null)
         permissionChannel = null
+        proofKeyChannel?.setMethodCallHandler(null)
+        proofKeyChannel = null
+        proofKeyHandler?.dispose()
+        proofKeyHandler = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
