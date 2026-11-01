@@ -77,9 +77,11 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Bearer、錯誤轉換、重試與快取。
 - OAuth token 端點（`OAuthRepository`）自帶 Dio，不經 `ApiClient`；其餘 HTTP 一律走 `ApiClient`。
 
-### 認證 header：只有 Bearer
+### 認證 header：Bearer 或 DPoP
 
-`_authHeadersFor()`（`lib/api/api_client.dart`）只做一件事：`BearerTokenSource` 回非空 token 就帶 `Authorization: Bearer <token>`，否則不帶任何認證。**不送 `Cookie`、不送 `Origin`**（ADR-0014）。repository 與畫面層都不得自己拼這些 header。
+`_authHeadersFor()`（`lib/api/api_client.dart`）只做一件事：`BearerTokenSource` 回非空 token 就帶 `Authorization`，否則不帶任何認證。來源同時是 `DpopKeyProvider` 且回得出金鑰（token 綁定金鑰）時用 `DPoP <token>` 並**每個請求重新簽** proof（`DPoP` header，含 `htm`／`htu`／`ath`、唯一 `jti`，ADR-0015），否則用 `Bearer <token>`。**不送 `Cookie`、不送 `Origin`**（ADR-0014）。repository 與畫面層都不得自己拼這些 header。
+
+收到 400 `invalid_dpop_proof` 且回應有 `Date` 標頭時，`ApiClient` 會記下時差並用校正後的時間重簽、只重試一次。
 
 ### origin 常數
 

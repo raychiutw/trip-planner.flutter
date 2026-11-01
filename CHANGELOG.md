@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 登入憑證綁定到這支手機持有的金鑰（DPoP）：金鑰優先放在 iOS Secure Enclave／Android Keystore（私鑰取不出來），沒有硬體時退回軟體金鑰；token 外洩後別人無法直接使用。每次登入換新金鑰，登出時一併刪除。AI 對話的即時串流在憑證到期或達上限後會自動重連並接續。
+
 ### 變更
 
 - 認證改為只走系統瀏覽器登入（OAuth PKCE）與 Bearer，取代 cookie 與 App 內密碼表單；access token 只放記憶體，refresh token 落地於 Keychain／Keystore。生物辨識登入改成解鎖本機登入憑證，不再保存密碼。**在新 api 切換前不可發版。**
