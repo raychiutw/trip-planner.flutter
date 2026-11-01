@@ -26,7 +26,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 新增 import 前先確認方向。下層檔案出現指向上層目錄的 `import '../<上層>/...'` 一律退回。
 - `models/` 是純 Dart：`lib/models/` 內**不得出現任何 `package:flutter` import**（含 `flutter_riverpod`、`flutter_secure_storage`）。目前實測零命中，這條是硬邊界。
 - `theme/` 不依賴專案內任何其他層。只允許 `package:flutter/material.dart` 與 theme 內部互引（`lib/theme/app_theme.dart:1,3`、`lib/theme/tokens.dart:1`）。
-- `api/` 不得 import `package:flutter/*`（無 widget、無 `BuildContext`）。允許的 Flutter 生態套件僅限 `flutter_riverpod`（`lib/api/providers.dart:4`）與 `flutter_secure_storage`（`lib/api/session_store.dart:4`、`lib/api/oauth/oauth_token_store.dart:6`）。非機敏 App 偏好的抽象介面留在 `lib/api/settings_store.dart`，平台 `shared_preferences` 實作放在 `lib/app/shared_preferences_settings_store.dart`，由 `lib/main.dart` 組裝。PR 若在 `api/` 引入 `material.dart` 即違反。
+- `api/` 不得 import `package:flutter/*`（無 widget、無 `BuildContext`）。允許的 Flutter 生態套件僅限 `flutter_riverpod`（`lib/api/providers.dart:4`）與 `flutter_secure_storage`（`lib/api/session_store.dart:4`、`lib/api/oauth/oauth_token_store.dart:6`）。純 Dart 的密碼學套件 `pointycastle`（DPoP 軟體金鑰，`lib/api/dpop/`，ADR-0015）不屬 Flutter 生態套件，可在 `api/` 使用。非機敏 App 偏好的抽象介面留在 `lib/api/settings_store.dart`，平台 `shared_preferences` 實作放在 `lib/app/shared_preferences_settings_store.dart`，由 `lib/main.dart` 組裝。PR 若在 `api/` 引入 `material.dart` 即違反。
 - `ui/` 的 widget 不得 import `features/`。共用 widget 需要資料時由呼叫端以參數傳入，不自行 watch feature provider。
 
 ### `lib/api/cache/` 的位置

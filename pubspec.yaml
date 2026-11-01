@@ -64,6 +64,7 @@ dependencies:
   liquid_glass_widgets: 1.4.1
   local_auth: ^3.0.2
   flutter_web_auth_2: ^5.1.0
+  pointycastle: ^4.0.0
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,29 @@
+{
+ "note": "測試用拋棄式金鑰；iat 固定所以伺服器會因過期拒絕，僅供簽章與欄位格式比對",
+ "private_jwk": {
+  "kty": "EC",
+  "x": "XitYJF4-AdQE9O0AQ0VeCy1Snc9jHXM32u_VbA1i_0s",
+  "y": "7qGgws_nd9FDFkSuL5Clloc_lcR-d1faNY3hql7BhWo",
+  "crv": "P-256",
+  "d": "oGrSwbEbVvG-kHWp2TgOBsl-JXKzgUjeFFbKJ49bz9U"
+ },
+ "public_jwk": {
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "XitYJF4-AdQE9O0AQ0VeCy1Snc9jHXM32u_VbA1i_0s",
+  "y": "7qGgws_nd9FDFkSuL5Clloc_lcR-d1faNY3hql7BhWo"
+ },
+ "jkt_rfc7638": "MMkgHqm1Zkzit706WudZVKol8ncAvau0_R-b_IvtouA",
+ "token_request": {
+  "htm": "POST",
+  "htu": "https://trip-planner-api.lean-lean.workers.dev/api/oauth/token",
+  "proof": "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiWGl0WUpGNC1BZFFFOU8wQVEwVmVDeTFTbmM5akhYTTMydV9WYkExaV8wcyIsInkiOiI3cUdnd3NfbmQ5RkRGa1N1TDVDbGxvY19sY1ItZDFmYU5ZM2hxbDdCaFdvIn19.eyJqdGkiOiJ2ZWMtdG9rZW4tMSIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3RyaXAtcGxhbm5lci1hcGkubGVhbi1sZWFuLndvcmtlcnMuZGV2L2FwaS9vYXV0aC90b2tlbiIsImlhdCI6MTcwMDAwMDAwMH0.DUuXXGX9Kv0Zochoxk1gP3r4nWRA0kZmZtLPd_O6-j6I1ZUN9ToOeL5pwBH4JnbiI4xSYQMVdsgId4nNUuuvSA"
+ },
+ "resource_request": {
+  "access_token": "example-access-token-0123456789",
+  "ath": "__l8RMPyt-va5w7PYZGzLYGRYWNFzURP7_dFkfvd-Zc",
+  "htm": "GET",
+  "htu": "https://trip-planner-api.lean-lean.workers.dev/api/requests/1/events",
+  "proof": "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiWGl0WUpGNC1BZFFFOU8wQVEwVmVDeTFTbmM5akhYTTMydV9WYkExaV8wcyIsInkiOiI3cUdnd3NfbmQ5RkRGa1N1TDVDbGxvY19sY1ItZDFmYU5ZM2hxbDdCaFdvIn19.eyJqdGkiOiJ2ZWMtcmVzLTEiLCJodG0iOiJHRVQiLCJodHUiOiJodHRwczovL3RyaXAtcGxhbm5lci1hcGkubGVhbi1sZWFuLndvcmtlcnMuZGV2L2FwaS9yZXF1ZXN0cy8xL2V2ZW50cyIsImlhdCI6MTcwMDAwMDAwMCwiYXRoIjoiX19sOFJNUHl0LXZhNXc3UFlaR3pMWUdSWVdORnpVUlA3X2RGa2Z2ZC1aYyJ9.MqFvI2bW7RGBReFC8XvEnC50p0XVxyvRAc-qWfmXngY_IOa1fn-R31GOLnlM2XTJlqSaT_Wi0AXqMhhB_aB9Nw"
+ }
+}
