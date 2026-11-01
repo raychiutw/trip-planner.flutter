@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'google_maps_external_launcher.dart';
@@ -65,7 +66,7 @@ class _TripMapWebFallbackState extends State<TripMapWebFallback> {
           TextButton.icon(
             style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
             onPressed: _opening ? null : _open,
-            icon: const Icon(Icons.open_in_new_rounded),
+            icon: const Icon(CupertinoIcons.arrow_up_right_square),
             label: const Text('在 Google 地圖開啟'),
           ),
           if (_failed)

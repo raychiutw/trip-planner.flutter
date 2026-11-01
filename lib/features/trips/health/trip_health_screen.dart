@@ -14,6 +14,7 @@ import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../app/error_message.dart';
 import '../../../app/app_feedback.dart';
+import '../../../models/display_format.dart';
 import '../../../models/day.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
@@ -320,7 +321,7 @@ class _Header extends StatelessWidget {
             TpTag(label: _statusLabel(report?.status)),
             TpTag(label: '$entryCount 個停留點'),
             if (completedAt != null)
-              TpTag(label: _formatTimestamp(completedAt)),
+              TpTag(label: formatUtcTimestamp(completedAt)),
           ],
         ),
       ],
@@ -852,13 +853,6 @@ String _dimensionLabel(TripHealthDimension dimension) => switch (dimension) {
 
 String _entryTargetLabel(TripHealthActionTarget? target) =>
     target?.entryId != null ? '前往停留點' : '前往第 ${target?.day ?? ''} 天';
-
-String _formatTimestamp(String value) {
-  if (value.length >= 16) {
-    return value.replaceFirst('T', ' ').substring(0, 16);
-  }
-  return value;
-}
 
 String _healthErrorMessage(Object error, String fallback) {
   if (error is ApiError) {

@@ -650,7 +650,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                         child: TextButton.icon(
                           key: const ValueKey('entry-edit-stale-retry'),
                           onPressed: _retryAfterStale,
-                          icon: const Icon(Icons.refresh),
+                          icon: const Icon(CupertinoIcons.refresh),
                           label: const Text('重試載入'),
                         ),
                       ),
@@ -663,7 +663,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               OutlinedButton.icon(
                 key: const ValueKey('entry-edit-stale-retry'),
                 onPressed: _retryAfterStale,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(CupertinoIcons.refresh),
                 label: const Text('重新載入新版'),
               ),
               const SizedBox(height: TpSpacing.s3),
