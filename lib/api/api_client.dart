@@ -237,8 +237,14 @@ class ApiClient {
   Stream<String> getTextStream(
     String path, {
     Map<String, dynamic>? query,
+    Map<String, String>? headers,
     CancelToken? cancelToken,
-  }) => _getTextStream(path, query: query, cancelToken: cancelToken);
+  }) => _getTextStream(
+    path,
+    query: query,
+    extraHeaders: headers,
+    cancelToken: cancelToken,
+  );
 
   /// 解析 Retry-After；保留既有呼叫入口。
   static int parseRetryAfterSeconds(String? headerValue) =>
@@ -429,6 +435,7 @@ class ApiClient {
   Stream<String> _getTextStream(
     String path, {
     Map<String, dynamic>? query,
+    Map<String, String>? extraHeaders,
     CancelToken? cancelToken,
     bool isRetryAttempt = false,
   }) async* {
@@ -439,7 +446,11 @@ class ApiClient {
       options: Options(
         method: 'GET',
         responseType: ResponseType.stream,
-        headers: {...auth.headers, Headers.acceptHeader: 'text/event-stream'},
+        headers: {
+          ...?extraHeaders,
+          ...auth.headers,
+          Headers.acceptHeader: 'text/event-stream',
+        },
       ),
       cancelToken: cancelToken,
     );
@@ -463,6 +474,7 @@ class ApiClient {
       yield* _getTextStream(
         path,
         query: query,
+        extraHeaders: extraHeaders,
         cancelToken: cancelToken,
         isRetryAttempt: true,
       );

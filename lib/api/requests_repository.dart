@@ -68,15 +68,64 @@ class RequestsRepository {
   }
 
   /// GET /requests/:id/events（SSE）→ status/progress events.
-  Stream<TripRequestEvent> watchRequestEvents(int id) =>
-      parseTripRequestEventStream(
-        _client.getTextStream('/requests/$id/events'),
+  ///
+  /// 串流中途憑證到期、被撤銷或達 30 分鐘上限時，伺服器送 `event: reconnect`
+  /// 後關閉；這裡帶 `Last-Event-ID` 與重簽的 proof 自動重連並接續，呼叫端看到的
+  /// 仍是同一條連續的事件流。原生 EventSource 自動重連會重送舊的 proof，不可依賴。
+  /// 連續 [_maxIdleReconnects] 次重連都沒有新事件就丟 [StateError]，不無限重連。
+  Stream<TripRequestEvent> watchRequestEvents(int id) async* {
+    String? lastEventId;
+    var idleReconnects = 0;
+    while (true) {
+      var reconnect = false;
+      var progressed = false;
+      final frames = _parseSseFrames(
+        _client.getTextStream(
+          '/requests/$id/events',
+          headers: {'Last-Event-ID': ?lastEventId},
+        ),
       );
+      await for (final frame in frames) {
+        if (frame.id != null) lastEventId = frame.id;
+        if (frame.event == _reconnectEvent) {
+          reconnect = true;
+          break;
+        }
+        final event = _tripRequestEventOf(frame);
+        if (event == null) continue;
+        progressed = true;
+        yield event;
+      }
+      if (!reconnect) return;
+      idleReconnects = progressed ? 0 : idleReconnects + 1;
+      if (idleReconnects > _maxIdleReconnects) {
+        throw StateError('SSE 重連後仍沒有新事件');
+      }
+    }
+  }
+}
+
+const _reconnectEvent = 'reconnect';
+const _maxIdleReconnects = 3;
+
+class _SseFrame {
+  const _SseFrame({this.id, this.event, required this.data});
+  final String? id;
+  final String? event;
+  final String data;
 }
 
 Stream<TripRequestEvent> parseTripRequestEventStream(
   Stream<String> chunks,
 ) async* {
+  await for (final frame in _parseSseFrames(chunks)) {
+    if (frame.event == _reconnectEvent) continue;
+    final event = _tripRequestEventOf(frame);
+    if (event != null) yield event;
+  }
+}
+
+Stream<_SseFrame> _parseSseFrames(Stream<String> chunks) async* {
   var buffer = '';
   await for (final chunk in chunks) {
     buffer = (buffer + chunk).replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -85,32 +134,44 @@ Stream<TripRequestEvent> parseTripRequestEventStream(
       if (boundary == -1) break;
       final frame = buffer.substring(0, boundary);
       buffer = buffer.substring(boundary + 2);
-      final event = _parseTripRequestEventFrame(frame);
-      if (event != null) yield event;
+      final parsed = _parseSseFrame(frame);
+      if (parsed != null) yield parsed;
     }
   }
 
   final trailing = buffer.trim();
   if (trailing.isNotEmpty) {
-    final event = _parseTripRequestEventFrame(trailing);
-    if (event != null) yield event;
+    final parsed = _parseSseFrame(trailing);
+    if (parsed != null) yield parsed;
   }
 }
 
-TripRequestEvent? _parseTripRequestEventFrame(String frame) {
+_SseFrame? _parseSseFrame(String frame) {
+  String? id;
+  String? event;
   final dataLines = <String>[];
   for (final rawLine in frame.split('\n')) {
     final line = rawLine.trimRight();
     if (line.isEmpty || line.startsWith(':')) continue;
-    if (!line.startsWith('data:')) continue;
-    var data = line.substring(5);
-    if (data.startsWith(' ')) data = data.substring(1);
-    dataLines.add(data);
+    final colon = line.indexOf(':');
+    final field = colon == -1 ? line : line.substring(0, colon);
+    var value = colon == -1 ? '' : line.substring(colon + 1);
+    if (value.startsWith(' ')) value = value.substring(1);
+    switch (field) {
+      case 'id':
+        id = value;
+      case 'event':
+        event = value;
+      case 'data':
+        dataLines.add(value);
+    }
   }
+  if (dataLines.isEmpty && event == null) return null;
+  return _SseFrame(id: id, event: event, data: dataLines.join('\n').trim());
+}
 
-  if (dataLines.isEmpty) return null;
-  final payload = dataLines.join('\n').trim();
-  if (payload.isEmpty) return null;
-  final decoded = jsonDecode(payload);
+TripRequestEvent? _tripRequestEventOf(_SseFrame frame) {
+  if (frame.data.isEmpty) return null;
+  final decoded = jsonDecode(frame.data);
   return TripRequestEvent.fromJson((decoded as Map).cast<String, dynamic>());
 }
