@@ -94,10 +94,13 @@ void main() {
     });
   });
 
-  test('load 遇到原生錯誤（金鑰失效等）回 null，不丟例外', () async {
-    handle((_) async => throw PlatformException(code: 'key_invalidated'));
+  test('load 遇到原生錯誤（例如鎖屏讀不到）：丟 ProofKeyLockedException，不能當成金鑰遺失', () async {
+    handle((_) async => throw PlatformException(code: 'key_unavailable'));
 
-    expect(await HardwareProofKeyStore().load(), isNull);
+    await expectLater(
+      HardwareProofKeyStore().load(),
+      throwsA(isA<ProofKeyLockedException>()),
+    );
   });
 
   test('delete 遇到沒有原生 channel 時不丟例外', () async {

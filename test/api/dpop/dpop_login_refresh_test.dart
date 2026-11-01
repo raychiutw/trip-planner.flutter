@@ -46,6 +46,16 @@ class _Hardware implements ProofKeyStore {
   }
 }
 
+/// load 暫時讀不到（裝置鎖定等），不代表金鑰不存在。
+class _LockedKeys implements ProofKeyStore {
+  @override
+  Future<ProofKey?> load() async => throw const ProofKeyLockedException();
+  @override
+  Future<ProofKey> create() async => throw const ProofKeyLockedException();
+  @override
+  Future<void> delete() async {}
+}
+
 class _FakeHardwareKey implements ProofKey {
   final _inner = SoftwareProofKey.generate();
   @override
@@ -261,6 +271,87 @@ void main() {
 
       expect(await store.read(), isNull);
       expect(await keys.load(), isNull);
+    });
+
+    test('金鑰暫時讀不到（鎖屏）：不登出、不清憑證，之後再試', () async {
+      await store.write(
+        OAuthTokens(
+          accessToken: '',
+          refreshToken: 'RT',
+          tokenType: 'DPoP',
+          expiresAt: DateTime.fromMillisecondsSinceEpoch(0),
+        ),
+      );
+      final locked = StoredBearerTokenSource(
+        store: store,
+        repository: repo,
+        clientId: 'cid',
+        proofKeys: _LockedKeys(),
+      );
+      var signedOut = 0;
+      locked.signedOut.listen((_) => signedOut++);
+
+      expect(await locked.accessToken(), isNull);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sent, isEmpty);
+      expect((await store.read())!.refreshToken, 'RT');
+      expect(signedOut, 0);
+    });
+
+    test('proofKey()：金鑰暫時讀不到回 null，不丟例外', () async {
+      final locked = StoredBearerTokenSource(
+        store: store,
+        repository: repo,
+        clientId: 'cid',
+        proofKeys: _LockedKeys(),
+      );
+      await locked.adopt(
+        OAuthTokens(
+          accessToken: 'AT',
+          refreshToken: 'RT',
+          tokenType: 'DPoP',
+          expiresAt: DateTime.now().add(const Duration(minutes: 5)),
+        ),
+      );
+
+      expect(await locked.proofKey(), isNull);
+    });
+
+    test('舊的 refresh 被拒時，若期間已用新帳號重新登入：不清掉新的憑證與金鑰', () async {
+      await loginService(keys).login();
+      await store.write(
+        OAuthTokens(
+          accessToken: '',
+          refreshToken: 'RT',
+          tokenType: 'DPoP',
+          expiresAt: DateTime.fromMillisecondsSinceEpoch(0),
+        ),
+      );
+      final fresh = StoredBearerTokenSource(
+        store: store,
+        repository: repo,
+        clientId: 'cid',
+        proofKeys: keys,
+      );
+      statusCode = 400;
+      reply = (_) {
+        // 回應之前，使用者已登出並重新登入（換了 refresh token）。
+        store.write(
+          OAuthTokens(
+            accessToken: '',
+            refreshToken: 'RT-NEW',
+            tokenType: 'DPoP',
+            expiresAt: DateTime.fromMillisecondsSinceEpoch(0),
+          ),
+        );
+        return {'error': 'invalid_grant'};
+      };
+
+      await fresh.accessToken();
+
+      expect((await store.read())!.refreshToken, 'RT-NEW');
+      expect(await keys.load(), isNotNull);
     });
 
     test('clear()：清憑證、記憶體與金鑰', () async {

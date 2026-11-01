@@ -48,10 +48,27 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
     await _store.write(tokens);
   }
 
+  Future<bool> _stillHolds(String refreshToken) async {
+    try {
+      return (await _store.read())?.refreshToken == refreshToken;
+    } on TokenStoreLockedException {
+      return false;
+    }
+  }
+
+  /// 憑證已不在（例如生物辨識失效時由儲存層自行清掉）卻可能還留著金鑰：刪掉。
+  Future<void> discardProofKey() async => _proofKeys?.delete();
+
   /// 目前的 access token 是綁定金鑰的才回金鑰，ApiClient 據此用 DPoP scheme。
   @override
-  Future<ProofKey?> proofKey() async =>
-      (_memory?.isDpop ?? false) ? await _proofKeys?.load() : null;
+  Future<ProofKey?> proofKey() async {
+    if (!(_memory?.isDpop ?? false)) return null;
+    try {
+      return await _proofKeys?.load();
+    } on ProofKeyLockedException {
+      return null; // 這個請求會因此以 Bearer 送出而被拒，不影響憑證
+    }
+  }
 
   /// 清掉本機登入憑證、記憶體中的 access token 與 DPoP 金鑰（登出、帳號刪除）。
   Future<void> clear() async {
@@ -107,10 +124,17 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
 
     // 綁定的 refresh token 必須用原本那把金鑰簽；金鑰沒了就不可能換成功，
     // 不必打網路，直接回登入頁（ADR-0015）。
-    final key = old!.isDpop ? await _proofKeys?.load() : null;
-    if (old.isDpop && key == null) {
-      await _invalidate();
-      return null;
+    ProofKey? key;
+    if (old!.isDpop) {
+      try {
+        key = await _proofKeys?.load();
+      } on ProofKeyLockedException {
+        return null; // 鎖屏等暫時讀不到：保留憑證，稍後再試，不能當成金鑰遺失
+      }
+      if (key == null) {
+        await _invalidate();
+        return null;
+      }
     }
 
     final OAuthTokens fresh;
@@ -122,7 +146,10 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       );
     } on ApiError catch (e) {
       // 400/401 = refresh token 真的失效(撤銷/過期)→ 視為登出。
-      if (e.status == 400 || e.status == 401) await _invalidate();
+      // 回應回來前使用者可能已登出又重新登入：憑證已換人就別清掉新的。
+      if ((e.status == 400 || e.status == 401) && await _stillHolds(rt)) {
+        await _invalidate();
+      }
       return null;
     } on Exception {
       // 網路等暫時性錯誤 → 保留 token,稍後再試(不清空)。

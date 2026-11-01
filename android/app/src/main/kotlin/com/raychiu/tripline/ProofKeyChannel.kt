@@ -77,12 +77,19 @@ class ProofKeyChannel : MethodChannel.MethodCallHandler {
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "create" -> create(result)
-            "load" -> load(result)
-            "sign" -> sign(call, result)
-            "delete" -> {
+            "create" -> runAsync(result, "unsupported") { create() }
+            "load" -> runAsync(result, "key_unavailable") { load() }
+            "sign" -> {
+                val data = call.argument<ByteArray>("data")
+                if (data == null) {
+                    result.error("no_key", "missing data", null)
+                } else {
+                    runAsync(result, "sign_failed") { sign(data) }
+                }
+            }
+            "delete" -> runAsync(result, "delete_failed") {
                 deleteKey()
-                result.success(null)
+                null
             }
             else -> result.notImplemented()
         }
@@ -90,6 +97,22 @@ class ProofKeyChannel : MethodChannel.MethodCallHandler {
 
     fun dispose() {
         executor.shutdown()
+    }
+
+    /**
+     * 所有操作都在同一條背景執行緒依序執行：StrongBox 產生金鑰可能數秒，不佔主執行緒；
+     * 也避免 delete 與進行中的 sign／create 互踩。
+     */
+    private fun runAsync(result: MethodChannel.Result, errorCode: String, block: () -> Any?) {
+        executor.execute {
+            val outcome = runCatching(block)
+            mainHandler.post {
+                outcome.fold(
+                    onSuccess = { result.success(it) },
+                    onFailure = { result.error(errorCode, it.message, null) },
+                )
+            }
+        }
     }
 
     private fun keyStore(): KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
@@ -133,7 +156,8 @@ class ProofKeyChannel : MethodChannel.MethodCallHandler {
     private fun base64Url(bytes: ByteArray): String =
         Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
-    private fun create(result: MethodChannel.Result) {
+    /** 建立失敗或只落在軟體 Keystore 都丟例外（Dart 端據此退回軟體金鑰）。 */
+    private fun create(): Map<String, String> {
         try {
             deleteKey()
             // 先試 StrongBox；沒有或失敗就用一般（TEE）Keystore。
@@ -143,57 +167,31 @@ class ProofKeyChannel : MethodChannel.MethodCallHandler {
                 deleteKey()
                 generate(strongBox = false)
             }
-            if (!isHardwareBacked(pair.private)) {
-                deleteKey()
-                result.error("unsupported", "software keystore", null)
-                return
-            }
-            result.success(point(pair.public as ECPublicKey))
+            check(isHardwareBacked(pair.private)) { "software keystore" }
+            return point(pair.public as ECPublicKey)
         } catch (e: Exception) {
             deleteKey()
-            result.error("unsupported", e.message, null)
+            throw e
         }
     }
 
-    private fun load(result: MethodChannel.Result) {
-        try {
-            val store = keyStore()
-            val publicKey = store.getCertificate(ALIAS)?.publicKey as? ECPublicKey
-            if (publicKey == null || store.getKey(ALIAS, null) == null) {
-                result.success(null)
-            } else {
-                result.success(point(publicKey))
-            }
-        } catch (e: Exception) {
-            result.success(null)
-        }
+    /** 確定沒有金鑰才回 null；Keystore 讀取失敗丟例外（Dart 端視為「暫時讀不到」）。 */
+    private fun load(): Map<String, String>? {
+        val store = keyStore()
+        if (!store.containsAlias(ALIAS)) return null
+        val publicKey = store.getCertificate(ALIAS).publicKey as ECPublicKey
+        checkNotNull(store.getKey(ALIAS, null)) { "key missing" }
+        return point(publicKey)
     }
 
-    private fun sign(call: MethodCall, result: MethodChannel.Result) {
-        val data = call.argument<ByteArray>("data")
-        if (data == null) {
-            result.error("no_key", "missing data", null)
-            return
+    private fun sign(data: ByteArray): ByteArray {
+        val key = keyStore().getKey(ALIAS, null) as? PrivateKey ?: error("no key")
+        val der = Signature.getInstance("SHA256withECDSA").run {
+            initSign(key)
+            update(data)
+            sign()
         }
-        // StrongBox 簽章可能數百毫秒，不佔主執行緒。
-        executor.execute {
-            val outcome = runCatching {
-                val key = keyStore().getKey(ALIAS, null) as? PrivateKey
-                    ?: error("no key")
-                val der = Signature.getInstance("SHA256withECDSA").run {
-                    initSign(key)
-                    update(data)
-                    sign()
-                }
-                ProofKeyCodec.rawSignature(der) ?: error("bad signature")
-            }
-            mainHandler.post {
-                outcome.fold(
-                    onSuccess = { result.success(it) },
-                    onFailure = { result.error("sign_failed", it.message, null) },
-                )
-            }
-        }
+        return ProofKeyCodec.rawSignature(der) ?: error("bad signature")
     }
 
     private companion object {

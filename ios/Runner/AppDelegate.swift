@@ -141,14 +141,15 @@ private final class ProofKeyPlugin: NSObject, FlutterPlugin {
     SecItemDelete(keyQuery as CFDictionary)
   }
 
-  private static func loadKey() -> SecKey? {
+  /// 找不到回 `(nil, errSecItemNotFound)`；其他狀態（例如裝置鎖定的
+  /// `errSecInteractionNotAllowed`）要讓呼叫端知道「暫時讀不到」，不能當成沒有金鑰。
+  private static func loadKey() -> (key: SecKey?, status: OSStatus) {
     var query = keyQuery
     query[kSecReturnRef as String] = true
     var item: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-      let item
-    else { return nil }
-    return (item as! SecKey)
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    guard status == errSecSuccess, let item else { return (nil, status) }
+    return (item as! SecKey, status)
   }
 
   private static func point(of privateKey: SecKey) -> [String: String]? {
@@ -192,8 +193,17 @@ private final class ProofKeyPlugin: NSObject, FlutterPlugin {
   }
 
   private func load(_ result: @escaping FlutterResult) {
-    guard let key = Self.loadKey(), let point = Self.point(of: key) else {
-      result(nil)
+    let loaded = Self.loadKey()
+    guard let key = loaded.key else {
+      if loaded.status == errSecItemNotFound {
+        result(nil)
+      } else {
+        result(FlutterError(code: "key_unavailable", message: "status \(loaded.status)", details: nil))
+      }
+      return
+    }
+    guard let point = Self.point(of: key) else {
+      result(FlutterError(code: "key_unavailable", message: "public key", details: nil))
       return
     }
     result(point)
@@ -202,7 +212,7 @@ private final class ProofKeyPlugin: NSObject, FlutterPlugin {
   private func sign(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
     guard let arguments = call.arguments as? [String: Any],
       let data = (arguments["data"] as? FlutterStandardTypedData)?.data,
-      let key = Self.loadKey()
+      let key = Self.loadKey().key
     else {
       result(FlutterError(code: "no_key", message: "missing key or data", details: nil))
       return

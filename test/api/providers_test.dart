@@ -220,6 +220,24 @@ void main() {
       expect(await store.read(), isNull);
     });
 
+    test('冷啟動讀不到憑證（例如生物辨識失效已被清掉）：殘留的 DPoP 金鑰一併刪除', () async {
+      final keys = InMemoryProofKeyStore();
+      await keys.create();
+      final c = ProviderContainer(
+        overrides: [
+          oauthTokenStoreProvider.overrideWithValue(store),
+          proofKeyStoreProvider.overrideWithValue(keys),
+          oauthRepositoryProvider.overrideWithValue(oauthRepo),
+          apiClientProvider.overrideWithValue(ApiClient(dio: dio)),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      expect(await c.read(authStateProvider.future), isNull);
+
+      expect(await keys.load(), isNull);
+    });
+
     test('logout：DPoP 金鑰一併刪除', () async {
       final keys = InMemoryProofKeyStore();
       await keys.create();

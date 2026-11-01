@@ -14,8 +14,15 @@ class ProofKeyUnsupportedException implements Exception {
   String toString() => 'ProofKeyUnsupportedException';
 }
 
+/// 金鑰暫時讀不到（例如裝置鎖定）。不等於金鑰不存在：不能因此清憑證或登出。
+class ProofKeyLockedException implements Exception {
+  const ProofKeyLockedException();
+  @override
+  String toString() => 'ProofKeyLockedException';
+}
+
 abstract interface class ProofKeyStore {
-  /// 這次登入使用的金鑰；沒有回 null。
+  /// 這次登入使用的金鑰；確定沒有才回 null，暫時讀不到丟 [ProofKeyLockedException]。
   Future<ProofKey?> load();
 
   /// 產生新金鑰（先清掉舊的）。硬體實作在不支援的環境丟

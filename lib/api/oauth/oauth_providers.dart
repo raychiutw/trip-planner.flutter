@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../dpop/dpop_clock.dart';
 import '../dpop/proof_key_store.dart';
 import 'oauth_config.dart';
 import 'oauth_login_service.dart';
@@ -22,8 +23,11 @@ final proofKeyStoreProvider = Provider<ProofKeyStore>(
   (ref) => InMemoryProofKeyStore(),
 );
 
+/// 手機與伺服器的時差，token 端點與 API 請求共用（DPoP proof 的 `iat`）。
+final dpopClockProvider = Provider<DpopClock>((ref) => DpopClock());
+
 final oauthRepositoryProvider = Provider<OAuthRepository>(
-  (ref) => OAuthRepository(),
+  (ref) => OAuthRepository(clock: ref.watch(dpopClockProvider)),
 );
 
 final bearerTokenSourceProvider = Provider<StoredBearerTokenSource>(

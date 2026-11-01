@@ -25,7 +25,8 @@ class HardwareProofKeyStore implements ProofKeyStore {
     } on MissingPluginException {
       return null;
     } on PlatformException {
-      return null; // 金鑰失效等：當作沒有金鑰
+      // 原生只在「確定沒有」時回 null；其他錯誤（鎖屏讀不到等）不能當成金鑰遺失。
+      throw const ProofKeyLockedException();
     }
   }
 

@@ -2,7 +2,6 @@
 library;
 
 import 'dart:convert';
-import 'dart:io' show HttpDate;
 
 import 'package:dio/dio.dart';
 
@@ -12,6 +11,7 @@ import 'cache/cache_keys.dart';
 import 'cache/cache_store.dart';
 import 'cache/offline_op.dart';
 import 'cache/offline_sync_engine.dart';
+import 'dpop/dpop_clock.dart';
 import 'dpop/dpop_proof.dart';
 import 'dpop/proof_key.dart';
 import 'retry_policy.dart' as retry;
@@ -73,7 +73,9 @@ class ApiClient {
     BearerTokenSource? bearerSource,
     CacheStore? cacheStore,
     Map<String, int> cacheCapacityByPathPrefix = kCacheCapacityByPathPrefix,
+    DpopClock? clock,
   }) : _bearerSource = bearerSource,
+       _clock = clock ?? DpopClock(),
        _cacheStore = cacheStore,
        _cacheCapacityByPathPrefix = cacheCapacityByPathPrefix,
        _dio = dio ?? Dio() {
@@ -87,9 +89,8 @@ class ApiClient {
   final Map<String, int> _cacheCapacityByPathPrefix;
   final Dio _dio;
 
-  /// 伺服器時間減手機時間（由 400 `invalid_dpop_proof` 的 `Date` 標頭校正，
-  /// 只放記憶體）。DPoP proof 的 `iat` 只容許 ±60 秒。
-  Duration _clockOffset = Duration.zero;
+  /// 由 400 `invalid_dpop_proof` 的 `Date` 標頭校正，與 token 端點共用。
+  final DpopClock _clock;
 
   late final OfflineSyncEngine? _offline = _cacheStore == null
       ? null
@@ -538,7 +539,7 @@ class ApiClient {
       method: method,
       url: Uri.parse('${_dio.options.baseUrl}$path'),
       accessToken: token,
-      now: DateTime.now().add(_clockOffset),
+      now: _clock.now(),
     );
     return (headers: requestHeaders, useBearer: true, useDpop: true);
   }
@@ -551,14 +552,7 @@ class ApiClient {
         'invalid_dpop_proof') {
       return false;
     }
-    final date = response.headers.value('date');
-    if (date == null) return false;
-    try {
-      _clockOffset = HttpDate.parse(date).difference(DateTime.now());
-      return true;
-    } on Exception {
-      return false;
-    }
+    return _clock.adoptServerDate(response.headers.value('date'));
   }
 
   /// mutation 成功後,依失效表移除受影響的 GET 快取(body 供 add-to-trip 取 tripId)。

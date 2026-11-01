@@ -7,12 +7,14 @@ import 'package:dio/dio.dart';
 import '../../models/oauth_tokens.dart';
 import '../api_client.dart' show kTriplineOrigin;
 import '../api_error.dart';
+import '../dpop/dpop_clock.dart';
 import '../dpop/dpop_proof.dart';
 import '../dpop/proof_key.dart';
 
 class OAuthRepository {
-  OAuthRepository({Dio? dio, String origin = kTriplineOrigin})
+  OAuthRepository({Dio? dio, String origin = kTriplineOrigin, DpopClock? clock})
     : _origin = origin,
+      _clock = clock ?? DpopClock(),
       _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     _dio.options.validateStatus = (_) => true;
@@ -23,6 +25,7 @@ class OAuthRepository {
 
   final String _origin;
   final Dio _dio;
+  final DpopClock _clock;
 
   /// 在系統瀏覽器開啟的授權 URL(absolute)。
   Uri buildAuthorizeUrl({
@@ -95,29 +98,41 @@ class OAuthRepository {
   }
 
   /// 有 [proofKey] 就附 DPoP proof（ADR-0015）；伺服器依此決定 token 是否綁定金鑰。
+  /// 回 400 `invalid_dpop_proof` 且有 `Date` 標頭時，校正時差後重簽重送一次。
   Future<OAuthTokens> _token(
     Map<String, dynamic> form,
     ProofKey? proofKey,
   ) async {
-    final proof = proofKey == null
-        ? null
-        : await buildDpopProof(
-            key: proofKey,
-            method: 'POST',
-            url: Uri.parse('$_origin/api/oauth/token'),
-          );
-    final res = await _dio.post<dynamic>(
-      '/oauth/token',
-      data: form,
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-        headers: {'DPoP': ?proof},
-      ),
-    );
-    final status = res.statusCode ?? 0;
-    if (status < 200 || status >= 300) {
-      throw ApiError.fromResponse(status, res.data);
+    for (var attempt = 0; ; attempt++) {
+      final proof = proofKey == null
+          ? null
+          : await buildDpopProof(
+              key: proofKey,
+              method: 'POST',
+              url: Uri.parse('$_origin/api/oauth/token'),
+              now: _clock.now(),
+            );
+      final res = await _dio.post<dynamic>(
+        '/oauth/token',
+        data: form,
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {'DPoP': ?proof},
+        ),
+      );
+      final status = res.statusCode ?? 0;
+      if (status >= 200 && status < 300) {
+        return OAuthTokens.fromTokenResponse(res.data as Map<String, dynamic>);
+      }
+      final error = ApiError.fromResponse(status, res.data);
+      if (attempt == 0 &&
+          proofKey != null &&
+          status == 400 &&
+          error.code == 'invalid_dpop_proof' &&
+          _clock.adoptServerDate(res.headers.value('date'))) {
+        continue;
+      }
+      throw error;
     }
-    return OAuthTokens.fromTokenResponse(res.data as Map<String, dynamic>);
   }
 }
