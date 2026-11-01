@@ -75,6 +75,7 @@ void main() {
         codeVerifier: any(named: 'codeVerifier'),
         clientId: any(named: 'clientId'),
         redirectUri: any(named: 'redirectUri'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer(
       (_) async => OAuthTokens(
@@ -109,6 +110,7 @@ void main() {
         codeVerifier: any(named: 'codeVerifier'),
         clientId: any(named: 'clientId'),
         redirectUri: any(named: 'redirectUri'),
+        proofKey: any(named: 'proofKey'),
       ),
     );
   });

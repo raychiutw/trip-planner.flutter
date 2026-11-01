@@ -33,6 +33,7 @@ final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(
     cacheStore: ref.watch(cacheStoreProvider),
     bearerSource: ref.watch(bearerTokenSourceProvider),
+    clock: ref.watch(dpopClockProvider),
   ),
 );
 
@@ -109,7 +110,10 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       return null;
     }
     ref.read(authLockedProvider.notifier).set(false);
-    if (tokens == null) return null;
+    if (tokens == null) {
+      await ref.read(bearerTokenSourceProvider).discardProofKey();
+      return null;
+    }
 
     // 有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。驗證未過必須落回
     // currentUser() —— id_token 是這條路徑唯一的身分來源,不驗就等於
@@ -207,7 +211,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<void> _clearLocalAuth() async {
     try {
-      await ref.read(oauthTokenStoreProvider).clear();
+      await ref.read(bearerTokenSourceProvider).clear();
       // 清離線快取,避免帳號間資料外洩。
       await ref.read(cacheStoreProvider).clear();
     } finally {

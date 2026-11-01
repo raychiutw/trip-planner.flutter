@@ -25,6 +25,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer((_) async => _tok('FRESH', refresh: 'RT2'));
   });
@@ -43,6 +44,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     );
     final persisted = (await store.read())!;
@@ -56,7 +58,13 @@ void main() {
 
     final restarted = sourceOn(store);
     expect(await restarted.accessToken(), 'FRESH');
-    verify(() => repo.refresh(refreshToken: 'RT', clientId: 'cid')).called(1);
+    verify(
+      () => repo.refresh(
+        refreshToken: 'RT',
+        clientId: 'cid',
+        proofKey: any(named: 'proofKey'),
+      ),
+    ).called(1);
   });
 
   test('登出清掉 store 後，記憶體裡的 access token 不能繼續用', () async {
@@ -83,6 +91,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenThrow(
       const ApiError(status: 400, code: 'invalid_grant', message: 'replayed'),
@@ -112,6 +121,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer(
       (_) async => OAuthTokens(
@@ -139,6 +149,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer((_) => gate.future);
 

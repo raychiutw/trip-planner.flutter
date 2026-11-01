@@ -9,6 +9,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache/cache_store.dart';
+import 'package:tripline/api/dpop/proof_key_store.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/oauth/oauth_config.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
@@ -219,6 +220,44 @@ void main() {
       expect(await store.read(), isNull);
     });
 
+    test('冷啟動讀不到憑證（例如生物辨識失效已被清掉）：殘留的 DPoP 金鑰一併刪除', () async {
+      final keys = InMemoryProofKeyStore();
+      await keys.create();
+      final c = ProviderContainer(
+        overrides: [
+          oauthTokenStoreProvider.overrideWithValue(store),
+          proofKeyStoreProvider.overrideWithValue(keys),
+          oauthRepositoryProvider.overrideWithValue(oauthRepo),
+          apiClientProvider.overrideWithValue(ApiClient(dio: dio)),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      expect(await c.read(authStateProvider.future), isNull);
+
+      expect(await keys.load(), isNull);
+    });
+
+    test('logout：DPoP 金鑰一併刪除', () async {
+      final keys = InMemoryProofKeyStore();
+      await keys.create();
+      final c = ProviderContainer(
+        overrides: [
+          oauthTokenStoreProvider.overrideWithValue(store),
+          proofKeyStoreProvider.overrideWithValue(keys),
+          oauthRepositoryProvider.overrideWithValue(oauthRepo),
+          apiClientProvider.overrideWithValue(ApiClient(dio: dio)),
+        ],
+      );
+      addTearDown(c.dispose);
+      await store.write(_tokens(idToken: _idToken()));
+      expect(await c.read(authStateProvider.future), isNotNull);
+
+      await c.read(authStateProvider.notifier).logout();
+
+      expect(await keys.load(), isNull);
+    });
+
     test('logout：撤銷失敗仍清空本機憑證', () async {
       when(
         () => oauthRepo.revokeToken(
@@ -243,6 +282,7 @@ void main() {
         () => oauthRepo.refresh(
           refreshToken: any(named: 'refreshToken'),
           clientId: any(named: 'clientId'),
+          proofKey: any(named: 'proofKey'),
         ),
       ).thenThrow(
         const ApiError(status: 400, code: 'invalid_grant', message: 'x'),

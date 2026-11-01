@@ -8,23 +8,28 @@ library;
 import 'dart:async';
 
 import '../../models/oauth_tokens.dart';
-import '../api_client.dart' show BearerTokenSource;
+import '../api_client.dart' show BearerTokenSource, DpopKeyProvider;
 import '../api_error.dart';
+import '../dpop/proof_key.dart';
+import '../dpop/proof_key_store.dart';
 import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 
-class StoredBearerTokenSource implements BearerTokenSource {
+class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   StoredBearerTokenSource({
     required OAuthTokenStore store,
     required OAuthRepository repository,
     required String clientId,
+    ProofKeyStore? proofKeys,
   }) : _store = store,
        _repo = repository,
-       _clientId = clientId;
+       _clientId = clientId,
+       _proofKeys = proofKeys;
 
   final OAuthTokenStore _store;
   final OAuthRepository _repo;
   final String _clientId;
+  final ProofKeyStore? _proofKeys;
 
   Future<OAuthTokens?>? _inFlight;
 
@@ -41,6 +46,44 @@ class StoredBearerTokenSource implements BearerTokenSource {
   Future<void> adopt(OAuthTokens tokens) async {
     _memory = tokens;
     await _store.write(tokens);
+  }
+
+  Future<bool> _stillHolds(String refreshToken) async {
+    try {
+      return (await _store.read())?.refreshToken == refreshToken;
+    } on TokenStoreLockedException {
+      return false;
+    }
+  }
+
+  /// 憑證已不在（例如生物辨識失效時由儲存層自行清掉）卻可能還留著金鑰：刪掉。
+  Future<void> discardProofKey() async => _proofKeys?.delete();
+
+  /// 目前的 access token 是綁定金鑰的才回金鑰，ApiClient 據此用 DPoP scheme。
+  @override
+  Future<ProofKey?> proofKey() async {
+    if (!(_memory?.isDpop ?? false)) return null;
+    try {
+      return await _proofKeys?.load();
+    } on ProofKeyLockedException {
+      return null; // 這個請求會因此以 Bearer 送出而被拒，不影響憑證
+    }
+  }
+
+  /// 清掉本機登入憑證、記憶體中的 access token 與 DPoP 金鑰（登出、帳號刪除）。
+  Future<void> clear() async {
+    _memory = null;
+    try {
+      await _store.clear();
+    } finally {
+      await _proofKeys?.delete();
+    }
+  }
+
+  /// refresh 被拒或金鑰遺失：憑證與金鑰一併清掉，並通知回到未登入。
+  Future<void> _invalidate() async {
+    await clear();
+    _signedOut.add(null);
   }
 
   @override
@@ -79,15 +122,33 @@ class StoredBearerTokenSource implements BearerTokenSource {
     final rt = old?.refreshToken;
     if (rt == null || rt.isEmpty) return null;
 
+    // 綁定的 refresh token 必須用原本那把金鑰簽；金鑰沒了就不可能換成功，
+    // 不必打網路，直接回登入頁（ADR-0015）。
+    ProofKey? key;
+    if (old!.isDpop) {
+      try {
+        key = await _proofKeys?.load();
+      } on ProofKeyLockedException {
+        return null; // 鎖屏等暫時讀不到：保留憑證，稍後再試，不能當成金鑰遺失
+      }
+      if (key == null) {
+        await _invalidate();
+        return null;
+      }
+    }
+
     final OAuthTokens fresh;
     try {
-      fresh = await _repo.refresh(refreshToken: rt, clientId: _clientId);
+      fresh = await _repo.refresh(
+        refreshToken: rt,
+        clientId: _clientId,
+        proofKey: key,
+      );
     } on ApiError catch (e) {
       // 400/401 = refresh token 真的失效(撤銷/過期)→ 視為登出。
-      if (e.status == 400 || e.status == 401) {
-        await _store.clear();
-        _memory = null;
-        _signedOut.add(null);
+      // 回應回來前使用者可能已登出又重新登入：憑證已換人就別清掉新的。
+      if ((e.status == 400 || e.status == 401) && await _stillHolds(rt)) {
+        await _invalidate();
       }
       return null;
     } on Exception {
@@ -105,7 +166,7 @@ class StoredBearerTokenSource implements BearerTokenSource {
     // refresh 回應常不含新 id_token → 沿用舊的,身分不丟；
     // 沒有輪替（回應不含新 refresh token）時沿用舊的，否則下次就沒得換了。
     final merged = fresh.copyWith(
-      idToken: fresh.idToken ?? old?.idToken,
+      idToken: fresh.idToken ?? old.idToken,
       refreshToken: fresh.refreshToken ?? rt,
     );
     _memory = merged;

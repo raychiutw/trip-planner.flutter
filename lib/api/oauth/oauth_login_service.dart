@@ -4,6 +4,7 @@
 library;
 
 import '../../models/oauth_tokens.dart';
+import '../dpop/proof_key_store.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
 import 'pkce.dart';
@@ -56,7 +57,9 @@ class OAuthLoginService {
     required StoredBearerTokenSource source,
     required AuthorizationLauncher launcher,
     String clientId = OAuthConfig.clientId,
+    ProofKeyStore? proofKeys,
   }) : _repo = repository,
+       _proofKeys = proofKeys,
        _source = source,
        _launcher = launcher,
        _clientId = clientId;
@@ -65,6 +68,7 @@ class OAuthLoginService {
   final StoredBearerTokenSource _source;
   final AuthorizationLauncher _launcher;
   final String _clientId;
+  final ProofKeyStore? _proofKeys;
 
   Future<OAuthTokens> login() async {
     final verifier = generateCodeVerifier();
@@ -96,12 +100,23 @@ class OAuthLoginService {
       throw OAuthLoginException('未取得授權碼');
     }
 
-    final tokens = await _repo.exchangeCode(
-      code: code,
-      codeVerifier: verifier,
-      clientId: _clientId,
-      redirectUri: OAuthConfig.redirectUri,
-    );
+    // 每次登入一把新金鑰（ADR-0015）；伺服器沒綁定就用不到，立刻刪掉。
+    final keys = _proofKeys;
+    final key = await keys?.create();
+    final OAuthTokens tokens;
+    try {
+      tokens = await _repo.exchangeCode(
+        code: code,
+        codeVerifier: verifier,
+        clientId: _clientId,
+        redirectUri: OAuthConfig.redirectUri,
+        proofKey: key,
+      );
+    } on Object {
+      await keys?.delete();
+      rethrow;
+    }
+    if (!tokens.isDpop) await keys?.delete();
     await _source.adopt(tokens);
     return tokens;
   }

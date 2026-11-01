@@ -20,6 +20,9 @@ class OAuthTokens {
   final String? scope;
   final DateTime expiresAt;
 
+  /// 伺服器把 token 綁在 client 金鑰上（DPoP）：之後要用 `Authorization: DPoP` 加 proof。
+  bool get isDpop => tokenType.toLowerCase() == 'dpop';
+
   /// 含 skew(預設 60s)提前視為過期,避免邊界用到剛好失效的 token。
   bool isExpired({Duration skew = const Duration(seconds: 60)}) =>
       DateTime.now().isAfter(expiresAt.subtract(skew));

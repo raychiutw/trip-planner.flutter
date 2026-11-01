@@ -13,9 +13,11 @@ import 'package:path_provider/path_provider.dart';
 
 import 'api/cache/cache_migration.dart';
 import 'api/cache/drift_cache_store.dart';
+import 'api/dpop/proof_key_store.dart';
 import 'api/oauth/oauth_providers.dart';
 import 'api/oauth/oauth_token_store.dart';
 import 'api/providers.dart';
+import 'app/hardware_proof_key_store.dart';
 import 'app/web_auth_launcher.dart';
 import 'app/accessibility_scope.dart';
 import 'app/app_lock.dart';
@@ -102,6 +104,12 @@ Future<void> main() async {
           overrides: [
             settingsStoreProvider.overrideWithValue(settingsStore),
             oauthTokenStoreProvider.overrideWithValue(SecureOAuthTokenStore()),
+            proofKeyStoreProvider.overrideWithValue(
+              FallbackProofKeyStore(
+                hardware: HardwareProofKeyStore(),
+                software: SoftwareProofKeyStore(vault: FlutterSecureVault()),
+              ),
+            ),
             authorizationLauncherProvider.overrideWithValue(
               const WebAuthLauncher(),
             ),
