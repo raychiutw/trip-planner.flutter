@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../dpop/proof_key_store.dart';
 import 'oauth_config.dart';
 import 'oauth_login_service.dart';
 import 'oauth_repository.dart';
@@ -15,6 +16,12 @@ final oauthTokenStoreProvider = Provider<OAuthTokenStore>(
   (ref) => InMemoryOAuthTokenStore(),
 );
 
+/// DPoP 金鑰的保存。預設記憶體版；App 於 main() override 成
+/// [FallbackProofKeyStore]（硬體優先，退軟體，ADR-0015）。
+final proofKeyStoreProvider = Provider<ProofKeyStore>(
+  (ref) => InMemoryProofKeyStore(),
+);
+
 final oauthRepositoryProvider = Provider<OAuthRepository>(
   (ref) => OAuthRepository(),
 );
@@ -24,6 +31,7 @@ final bearerTokenSourceProvider = Provider<StoredBearerTokenSource>(
     store: ref.watch(oauthTokenStoreProvider),
     repository: ref.watch(oauthRepositoryProvider),
     clientId: OAuthConfig.clientId,
+    proofKeys: ref.watch(proofKeyStoreProvider),
   ),
 );
 
@@ -37,5 +45,6 @@ final oauthLoginServiceProvider = Provider<OAuthLoginService>(
     launcher: ref.watch(authorizationLauncherProvider),
     repository: ref.watch(oauthRepositoryProvider),
     source: ref.watch(bearerTokenSourceProvider),
+    proofKeys: ref.watch(proofKeyStoreProvider),
   ),
 );

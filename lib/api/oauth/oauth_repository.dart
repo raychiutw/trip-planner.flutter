@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import '../../models/oauth_tokens.dart';
 import '../api_client.dart' show kTriplineOrigin;
 import '../api_error.dart';
+import '../dpop/dpop_proof.dart';
+import '../dpop/proof_key.dart';
 
 class OAuthRepository {
   OAuthRepository({Dio? dio, String origin = kTriplineOrigin})
@@ -49,23 +51,25 @@ class OAuthRepository {
     required String codeVerifier,
     required String clientId,
     required String redirectUri,
+    ProofKey? proofKey,
   }) => _token({
     'grant_type': 'authorization_code',
     'code': code,
     'redirect_uri': redirectUri,
     'client_id': clientId,
     'code_verifier': codeVerifier,
-  });
+  }, proofKey);
 
   /// refresh_token 換新 token pair(public client 不帶 secret)。
   Future<OAuthTokens> refresh({
     required String refreshToken,
     required String clientId,
+    ProofKey? proofKey,
   }) => _token({
     'grant_type': 'refresh_token',
     'refresh_token': refreshToken,
     'client_id': clientId,
-  });
+  }, proofKey);
 
   /// RFC 7009 token revocation. Unknown/already revoked tokens still return 200.
   Future<void> revokeToken({
@@ -90,11 +94,25 @@ class OAuthRepository {
     }
   }
 
-  Future<OAuthTokens> _token(Map<String, dynamic> form) async {
+  /// 有 [proofKey] 就附 DPoP proof（ADR-0015）；伺服器依此決定 token 是否綁定金鑰。
+  Future<OAuthTokens> _token(
+    Map<String, dynamic> form,
+    ProofKey? proofKey,
+  ) async {
+    final proof = proofKey == null
+        ? null
+        : await buildDpopProof(
+            key: proofKey,
+            method: 'POST',
+            url: Uri.parse('$_origin/api/oauth/token'),
+          );
     final res = await _dio.post<dynamic>(
       '/oauth/token',
       data: form,
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: Options(
+        contentType: Headers.formUrlEncodedContentType,
+        headers: {'DPoP': ?proof},
+      ),
     );
     final status = res.statusCode ?? 0;
     if (status < 200 || status >= 300) {

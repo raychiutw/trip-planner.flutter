@@ -207,7 +207,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<void> _clearLocalAuth() async {
     try {
-      await ref.read(oauthTokenStoreProvider).clear();
+      await ref.read(bearerTokenSourceProvider).clear();
       // 清離線快取,避免帳號間資料外洩。
       await ref.read(cacheStoreProvider).clear();
     } finally {

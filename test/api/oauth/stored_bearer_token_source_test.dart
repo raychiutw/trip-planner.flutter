@@ -60,6 +60,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     );
   });
@@ -70,6 +71,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer(
       (_) async =>
@@ -93,6 +95,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer(
       (_) async => OAuthTokens(
@@ -116,6 +119,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenThrow(
       const ApiError(status: 401, code: 'invalid_grant', message: 'x'),
@@ -130,6 +134,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenThrow(Exception('network'));
     expect(await source.refresh(), isFalse);
@@ -149,6 +154,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer(
       (_) async => _tok(access: 'NEW', ttl: const Duration(hours: 1)),
@@ -164,6 +170,7 @@ void main() {
       () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
         clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
       ),
     ).thenAnswer((_) async {
       calls++;
