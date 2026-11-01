@@ -894,7 +894,14 @@ class _ComposerState extends ConsumerState<_Composer> {
   /// lazy init:第一次成功後快取結果，後續沿用不再請求權限。
   Future<bool> _ensureInit() async {
     if (widget.speechAvailable == true) return true;
-    final ok = await ref.read(speechServiceProvider).init();
+    // plugin 在辨識服務不可用時會丟例外（如 recognizerNotAvailable），一律當成不可用。
+    final bool ok;
+    try {
+      ok = await ref.read(speechServiceProvider).init();
+    } on Exception {
+      if (mounted) widget.onSpeechAvailableChanged(false);
+      return false;
+    }
     if (mounted) widget.onSpeechAvailableChanged(ok);
     return ok;
   }

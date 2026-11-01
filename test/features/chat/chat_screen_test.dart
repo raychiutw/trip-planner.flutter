@@ -2144,6 +2144,28 @@ void main() {
       expect(field.controller!.text, '幫我規劃晚餐');
     });
 
+    testWidgets('init() 丟例外（如 Android 11+ recognizerNotAvailable）視為不可用並提示', (
+      tester,
+    ) async {
+      final speech = _MockSpeechService();
+      when(() => speech.isAvailable).thenReturn(false);
+      when(speech.init).thenThrow(Exception('recognizerNotAvailable'));
+      when(() => speech.listen(any())).thenAnswer((_) async {});
+      when(speech.openSettings).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(buildApp(speech: speech));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('繼續'));
+      await tester.pumpAndSettle();
+
+      verify(speech.init).called(1);
+      verifyNever(() => speech.listen(any()));
+      expect(find.text('無法使用語音輸入'), findsOneWidget);
+    });
+
     testWidgets('init() 回 false 後不重複請求，並提供系統設定恢復動線', (tester) async {
       final speech = _MockSpeechService();
       when(tripRepo.watchMyTrips).thenAnswer(

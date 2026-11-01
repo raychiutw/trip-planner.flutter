@@ -12,6 +12,7 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_state_view.dart';
+import '../trip_detail/selected_day_provider.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trips_list_screen.dart';
@@ -40,6 +41,9 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   int? _activeDayNum;
+
+  /// [_activeDayNum] 是哪個行程選的；換到別的行程時不能把它當成新行程的天數（#298）。
+  String? _activeDayTripId;
   String? _pendingRouteTripId;
   String? _renderedTripId;
 
@@ -47,6 +51,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   void initState() {
     super.initState();
     _activeDayNum = widget.initialDayNum;
+    _activeDayTripId = widget.initialTripId;
     final tripId = widget.initialTripId;
     _pendingRouteTripId = tripId;
     if (tripId != null) _selectRouteTripAfterBuild(tripId);
@@ -64,7 +69,15 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     }
     if (widget.initialDayNum != oldWidget.initialDayNum) {
       _activeDayNum = widget.initialDayNum;
+      _activeDayTripId = widget.initialTripId;
     }
+  }
+
+  /// 新行程已有共用的選取日（時間軸選的）就用它；沒有才沿用上一個行程的天數。
+  int? _dayFor(String tripId) {
+    final from = _activeDayTripId;
+    if (from == null || from == tripId) return _activeDayNum;
+    return ref.read(selectedDayProvider).dayNumFor(tripId) ?? _activeDayNum;
   }
 
   void _selectRouteTripAfterBuild(String tripId) {
@@ -147,13 +160,16 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
           initialEntryId: selected.tripId == widget.initialTripId
               ? widget.initialEntryId
               : null,
-          initialDayNum: _activeDayNum,
+          initialDayNum: _dayFor(selected.tripId),
           mapBuilder: widget.mapBuilder,
           locationService: widget.locationService,
           onTripSelected: (tripId) => unawaited(
             ref.read(currentTripIdProvider.notifier).select(tripId),
           ),
-          onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
+          onActiveDayChanged: (dayNum) {
+            _activeDayNum = dayNum;
+            _activeDayTripId = selected.tripId;
+          },
         );
       },
     );

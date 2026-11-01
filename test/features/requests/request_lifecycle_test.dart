@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
@@ -426,6 +427,43 @@ void main() {
     await _flush();
     expect(sub.read(), isA<RequestTerminal>());
   });
+
+  for (final status in [403, 404]) {
+    test('讀取遇 $status（沒權限／工單不存在）→ 終結為 failed、未經伺服器確認，不再輪詢', () async {
+      when(
+        () => repo.fetchRequest(7),
+      ).thenThrow(ApiError(status: status, code: 'X', message: 'x'));
+      final c = makeContainer();
+      final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+      await _flush();
+
+      final state = sub.read();
+      expect(state, isA<RequestTerminal>());
+      expect((state as RequestTerminal).status, RequestStatus.failed);
+      expect(state.serverConfirmed, isFalse);
+      expect(waits, isEmpty, reason: '終結後不排輪詢');
+    });
+
+    test('輪詢途中讀取遇 $status → 終結，不再排下一輪', () async {
+      var calls = 0;
+      when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+        calls++;
+        if (calls >= 2) throw ApiError(status: status, code: 'X', message: 'x');
+        return _req(RequestStatus.processing);
+      });
+      final c = makeContainer();
+      final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+      await _flush();
+      events.addError(Exception('sse'));
+      await _flush();
+      expect(waits, hasLength(1));
+      waits[0].complete();
+      await _flush();
+
+      expect(sub.read(), isA<RequestTerminal>());
+      expect(waits, hasLength(1), reason: '不再排下一輪');
+    });
+  }
 
   test('SSE 事件對應:只帶 error → failed / error;processing 事件不終結', () async {
     when(
