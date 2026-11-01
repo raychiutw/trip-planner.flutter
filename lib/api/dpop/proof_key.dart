@@ -31,8 +31,8 @@ class SoftwareProofKey implements ProofKey {
         ParametersWithRandom(ECKeyGeneratorParameters(_curve), _secureRandom()),
       );
     final pair = generator.generateKeyPair();
-    final priv = pair.privateKey as ECPrivateKey;
-    final pub = pair.publicKey as ECPublicKey;
+    final priv = pair.privateKey;
+    final pub = pair.publicKey;
     return SoftwareProofKey._(
       priv.d!,
       pub.Q!.x!.toBigInteger()!,
