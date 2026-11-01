@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.37.2] - 2026-11-01
+
 ### 變更
 
 - 登入授權頁改回新 api（網站已補上 `/oauth/authorize` 頁），移除 0.37.1 暫用的 `TRIPLINE_AUTHORIZE_ORIGIN`；授權、換票與 API 都用同一個 origin。
