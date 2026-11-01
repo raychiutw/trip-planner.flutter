@@ -68,6 +68,10 @@ android {
         manifestPlaceholders["oauthCallbackHost"] =
             (project.findProperty("oauthCallbackHost") as String?)
                 ?: "mobile-callback.trip-planner-dby.pages.dev"
+        // 分享連結（/s/<token>）的 App Link 網域，要與 TRIPLINE_API_ORIGIN 的主站一致。
+        manifestPlaceholders["shareLinkHost"] =
+            (project.findProperty("shareLinkHost") as String?)
+                ?: "trip-planner-dby.pages.dev"
         manifestPlaceholders["oauthCallbackPath"] =
             (project.findProperty("oauthCallbackPath") as String?)
                 ?: "/oauth/callback"

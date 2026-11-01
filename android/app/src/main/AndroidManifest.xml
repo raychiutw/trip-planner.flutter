@@ -36,6 +36,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 旅伴的分享連結 https://<主站>/s/<token>：已安裝 App 就在 App 內開（#454）。
+                 host 由 build.gradle.kts 的 shareLinkHost 注入；主站要提供 assetlinks.json。 -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="${shareLinkHost}"
+                    android:pathPrefix="/s/" />
+            </intent-filter>
         </activity>
         <!-- OAuth 授權回跳：https App Link（flutter_web_auth_2 的 CallbackActivity）。
              host／path 由 build.gradle.kts 的 manifestPlaceholders 注入，
