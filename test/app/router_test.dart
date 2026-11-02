@@ -15,6 +15,7 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -80,6 +81,24 @@ class _FakeAuthNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => _fixedUser;
 }
 
+/// 記錄有沒有被要求走瀏覽器登入（不開真的瀏覽器）。
+class _BrowserLoginSpyNotifier extends AuthNotifier {
+  _BrowserLoginSpyNotifier({this.failWith});
+
+  final OAuthLoginException? failWith;
+  int signInCount = 0;
+
+  @override
+  Future<UserInfo?> build() async => null;
+
+  @override
+  Future<void> signInWithBrowser() async {
+    signInCount++;
+    final error = failWith;
+    if (error != null) state = AsyncError(error, StackTrace.empty);
+  }
+}
+
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 class _MockTripRepository extends Mock implements TripRepository {}
@@ -124,6 +143,7 @@ ProviderContainer _buildContainer({
   bool resolveAuthFromRepository = false,
   bool disableAutomaticRetry = false,
   List<dynamic> extraOverrides = const [],
+  AuthNotifier Function()? authNotifier,
 }) {
   final mockTripRepository = _MockTripRepository();
   final mockAccountRepository = _MockAccountRepository();
@@ -202,7 +222,9 @@ ProviderContainer _buildContainer({
       if (authRepository != null)
         authRepositoryProvider.overrideWithValue(authRepository),
       if (!resolveAuthFromRepository)
-        authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
+        authStateProvider.overrideWith(
+          authNotifier ?? () => _FakeAuthNotifier(currentUser),
+        ),
       if (requestsRepository != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepository),
       if (printActions != null)
@@ -617,8 +639,12 @@ void main() {
     expect(find.byType(TripsListScreen), findsNothing);
   });
 
-  testWidgets('Welcome CTA 前往登入', (tester) async {
-    final container = _buildContainer(currentUser: null);
+  testWidgets('Welcome 登入鈕直接開瀏覽器登入，不再多繞一頁登入畫面', (tester) async {
+    final spy = _BrowserLoginSpyNotifier();
+    final container = _buildContainer(
+      currentUser: null,
+      authNotifier: () => spy,
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -629,15 +655,26 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+    await tester.tap(find.byKey(const ValueKey('welcome-login-top')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(spy.signInCount, 1);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
   });
 
-  testWidgets('未登入 deep link 經 Welcome 保留安全站內目的地', (tester) async {
-    final container = _buildContainer(currentUser: null);
+  testWidgets('未登入 deep link 經 Welcome 直接登入後回到原目的地', (tester) async {
+    final auth = _MockAuthRepository();
+    var signedIn = false;
+    when(
+      auth.currentUser,
+    ).thenAnswer((_) async => signedIn ? _loggedInUser : null);
+    final container = _buildContainer(
+      currentUser: null,
+      authRepository: auth,
+      resolveAuthFromRepository: true,
+      extraOverrides: fakeBrowserLoginOverrides(onLogin: () => signedIn = true),
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -647,7 +684,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-
     final router = container.read(appRouterProvider);
     router.go('/chat?tripId=trip-1');
     await tester.pumpAndSettle();
@@ -656,15 +692,34 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
     expect(
-      router
-          .routerDelegate
-          .currentConfiguration
-          .uri
-          .queryParameters['redirect_after'],
+      router.routerDelegate.currentConfiguration.uri.toString(),
       '/chat?tripId=trip-1',
     );
+  });
+
+  testWidgets('Welcome 直接登入失敗：轉到登入畫面顯示錯誤，可重試', (tester) async {
+    final container = _buildContainer(
+      currentUser: null,
+      authNotifier: () =>
+          _BrowserLoginSpyNotifier(failWith: OAuthLoginException('boom')),
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('welcome-login-top')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-error-banner')), findsOneWidget);
   });
 
   testWidgets('已登入導向 /welcome 會回 /trips', (tester) async {

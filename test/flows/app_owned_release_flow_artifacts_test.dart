@@ -112,7 +112,6 @@ void main() {
     'account',
     'form',
     'destructive-confirm',
-    'login',
     'trips',
     'offline',
     'error',
@@ -141,7 +140,7 @@ void main() {
         ),
         isEmpty,
       );
-      expect(expected.length * _artifactStates.length, 140);
+      expect(expected.length * _artifactStates.length, 130);
     },
   );
 

@@ -54,7 +54,6 @@ void main() {
       captures,
       containsAllInOrder([
         'welcome',
-        'login',
         'trips',
         'destructive-confirm',
         'itinerary',

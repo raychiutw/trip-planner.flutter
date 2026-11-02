@@ -28,7 +28,6 @@ import 'package:tripline/app/router.dart';
 import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
-import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
@@ -915,7 +914,7 @@ Future<void> runAppOwnedReleaseFlow(
   expect(tester.takeException(), isNull);
 }
 
-/// 兩條流程共用的登入段：從 welcome 進 login、送出、確認進到行程列表。
+/// 兩條流程共用的登入段：welcome 的登入鈕直接開授權視窗，確認進到行程列表。
 Future<void> _signInFromWelcome(
   WidgetTester tester,
   AppFlowFixture fixture, {
@@ -926,10 +925,6 @@ Future<void> _signInFromWelcome(
   await tester.ensureVisible(find.byKey(const ValueKey('welcome-login-hero')));
   await tester.pump();
   await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
-  await tester.pumpAndSettle();
-  expect(find.byType(LoginScreen), findsOneWidget);
-  await captureState('login');
-  await tester.tap(find.byKey(const ValueKey('login-browser-button')));
   await tester.pumpAndSettle();
 
   final visibleText = tester

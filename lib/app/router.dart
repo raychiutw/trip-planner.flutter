@@ -69,7 +69,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/welcome',
         builder: (context, state) => WelcomeScreen(
-          onLogin: () => context.go(loginLocationFromWelcome(state.uri)),
+          // 直接開系統瀏覽器登入，不多繞一頁登入畫面；失敗才轉到登入畫面
+          // 顯示錯誤並讓使用者重試。成功後由 redirect 帶回 redirect_after。
+          onLogin: () async {
+            final signIn = ref
+                .read(authStateProvider.notifier)
+                .signInWithBrowser();
+            await signIn;
+            if (!context.mounted) return;
+            if (ref.read(authStateProvider).hasError) {
+              context.go(loginLocationFromWelcome(state.uri));
+            }
+          },
         ),
       ),
       GoRoute(

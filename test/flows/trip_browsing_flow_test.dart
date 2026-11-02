@@ -8,7 +8,6 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
-import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -79,10 +78,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
-    await tester.pumpAndSettle();
-    expect(find.byType(LoginScreen), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('login-browser-button')));
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
