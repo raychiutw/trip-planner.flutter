@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.37.4] - 2026-11-02
+
+### 修正
+
+- iOS 登入授權視窗一開就被系統取消（真機按登入沒反應）：callback 網域補上 `webcredentials` 關聯（iOS 17.4 起 https callback 需要）。網站端 AASA 需同步加上 webcredentials。
+
 ### 變更
 
 - 停用 Firebase Test Lab 的實機 E2E workflow，並刪除對應的 repository variables 與 `mobile-e2e` environment；原值與重新啟用步驟記在 `docs/mobile-e2e.md`。
