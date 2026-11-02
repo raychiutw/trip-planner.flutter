@@ -32,6 +32,27 @@ void main() {
     expect(u.queryParameters['state'], 'st');
   });
 
+  test('buildAuthorizeUrl：預設 scope 含行程讀寫（資源伺服器靠 token scope 授權）', () {
+    final u = repo.buildAuthorizeUrl(
+      clientId: 'cid',
+      redirectUri: 'http://127.0.0.1:8765',
+      codeChallenge: 'chal',
+      state: 'st',
+    );
+
+    expect(
+      u.queryParameters['scope']!.split(' '),
+      containsAll([
+        'openid',
+        'profile',
+        'email',
+        'offline_access',
+        'trips:read',
+        'trips:write',
+      ]),
+    );
+  });
+
   test('exchangeCode：POST /oauth/token form → token', () async {
     adapter.onPost(
       '/oauth/token',

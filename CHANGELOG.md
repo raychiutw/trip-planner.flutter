@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 修正
+
+- 登入成功後讀取行程全部 403：授權請求預設 scope 補上 `trips:read trips:write`（資源伺服器依 token scope 授權）。需後端先把這兩個 scope 登記進 mobile client 的 `allowed_scopes`（#519）才能發版；已登入的舊 token 需重新登入。（#517、#520）
+
 ## [0.37.4] - 2026-11-02
 
 ### 修正
