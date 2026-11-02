@@ -1,5 +1,20 @@
 # Mobile E2E automation
 
+> **2026-11-02 起 Firebase Test Lab 已停用。** workflow「Mobile E2E / Firebase Test Lab」在 GitHub 端設為停用（`gh workflow enable 315836126` 可重新啟用），repository variables 與 `mobile-e2e` environment 已刪除。要重新啟用，先把下列 repository variables 設回去，再重建 `mobile-e2e` environment（只允許 `master` 部署），並確認 GCP 端的 Workload Identity 與服務帳號仍有效：
+>
+> | 變數 | 原值 |
+> |---|---|
+> | `FIREBASE_ANDROID_MODEL` | `MediumPhone.arm` |
+> | `FIREBASE_ANDROID_VERSION` | `34` |
+> | `FIREBASE_IOS_MODEL` | `iphone14pro` |
+> | `FIREBASE_IOS_VERSION` | `16.6` |
+> | `FIREBASE_TEST_LAB_PROJECT_ID` | `trip-planner-490413` |
+> | `FIREBASE_TEST_RESULTS_BUCKET` | `trip-planner-490413-test-lab-results` |
+> | `GCP_TEST_LAB_SERVICE_ACCOUNT` | `tripline-test-lab-ci@trip-planner-490413.iam.gserviceaccount.com` |
+> | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/618723152809/locations/global/workloadIdentityPools/github-actions/providers/tripline-github` |
+>
+> 以下內容描述停用前的設計，保留作為重新啟用時的參考。
+
 Tripline uses two complementary test layers:
 
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;

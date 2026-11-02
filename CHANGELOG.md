@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 變更
+
+- 停用 Firebase Test Lab 的實機 E2E workflow，並刪除對應的 repository variables 與 `mobile-e2e` environment；原值與重新啟用步驟記在 `docs/mobile-e2e.md`。
+
 ## [0.37.3] - 2026-11-02
 
 ### 變更
