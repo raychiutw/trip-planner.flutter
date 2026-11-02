@@ -40,17 +40,14 @@ void main() {
       state: 'st',
     );
 
-    expect(
-      u.queryParameters['scope']!.split(' '),
-      containsAll([
-        'openid',
-        'profile',
-        'email',
-        'offline_access',
-        'trips:read',
-        'trips:write',
-      ]),
-    );
+    expect(u.queryParameters['scope']!.split(' '), [
+      'openid',
+      'profile',
+      'email',
+      'offline_access',
+      'trips:read',
+      'trips:write',
+    ]);
   });
 
   test('exchangeCode：POST /oauth/token form → token', () async {
