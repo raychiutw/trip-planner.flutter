@@ -8,6 +8,10 @@
 
 - 登入成功後讀取行程全部 403：授權請求預設 scope 補上 `trips:read trips:write`（資源伺服器依 token scope 授權）。需後端先把這兩個 scope 登記進 mobile client 的 `allowed_scopes`（#519）才能發版；已登入的舊 token 需重新登入。（#517、#520）
 
+### 變更
+
+- iOS 按「登入」後直接開啟授權視窗，不再先跳系統的「想要使用…登入」提示：授權 session 改為 ephemeral（不沿用 Safari 的登入狀態，每次登入需重新輸入）。Android 行為不變。（#518）
+
 ## [0.37.4] - 2026-11-02
 
 ### 修正
