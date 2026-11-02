@@ -145,74 +145,77 @@ void main() {
   );
 
   for (final state in _artifactStates) {
-    testWidgets('${state.suffix} writes the complete release evidence set', (
-      tester,
-    ) async {
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.platformDispatcher.clearAllTestValues);
+    testWidgets(
+      '${state.suffix} writes the complete release evidence set',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearAllTestValues);
 
-      final boundaryKey = GlobalKey();
-      tester.view.physicalSize = state.size;
-      tester.platformDispatcher.platformBrightnessTestValue = state.brightness;
-      tester.platformDispatcher.textScaleFactorTestValue = state.textScale;
-      tester.platformDispatcher.accessibilityFeaturesTestValue =
-          FakeAccessibilityFeatures(
-            disableAnimations: state.reduceMotion,
-            reduceMotion: state.reduceMotion,
-            highContrast: state.increasedContrast,
-          );
+        final boundaryKey = GlobalKey();
+        tester.view.physicalSize = state.size;
+        tester.platformDispatcher.platformBrightnessTestValue =
+            state.brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = state.textScale;
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(
+              disableAnimations: state.reduceMotion,
+              reduceMotion: state.reduceMotion,
+              highContrast: state.increasedContrast,
+            );
 
-      await runAppOwnedReleaseFlow(
-        tester,
-        appWrapper: (child) => AppAccessibilityScope(
-          reduceTransparency: state.reduceTransparency,
-          child: RepaintBoundary(key: boundaryKey, child: child),
-        ),
-        capture: (name) async {
-          await tester.pump();
-          final boundary =
-              boundaryKey.currentContext!.findRenderObject()!
-                  as RenderRepaintBoundary;
-          await tester.runAsync(() async {
-            final layer = boundary.debugLayer! as OffsetLayer;
-            final image = await layer.toImage(boundary.paintBounds);
-            try {
-              final data = await image.toByteData(
-                format: ui.ImageByteFormat.png,
-              );
-              await File(
-                '${output.path}/$name-${state.suffix}.png',
-              ).writeAsBytes(data!.buffer.asUint8List(), flush: true);
-            } finally {
-              image.dispose();
-            }
-          });
-        },
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-
-      final files = output
-          .listSync()
-          .whereType<File>()
-          .where(
-            (file) =>
-                file.uri.pathSegments.last.endsWith('-${state.suffix}.png'),
-          )
-          .toList();
-      for (final name in expected) {
-        expect(
-          files.map((file) => file.uri.pathSegments.last),
-          contains('$name-${state.suffix}.png'),
+        await runAppOwnedReleaseFlow(
+          tester,
+          appWrapper: (child) => AppAccessibilityScope(
+            reduceTransparency: state.reduceTransparency,
+            child: RepaintBoundary(key: boundaryKey, child: child),
+          ),
+          capture: (name) async {
+            await tester.pump();
+            final boundary =
+                boundaryKey.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary;
+            await tester.runAsync(() async {
+              final layer = boundary.debugLayer! as OffsetLayer;
+              final image = await layer.toImage(boundary.paintBounds);
+              try {
+                final data = await image.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                await File(
+                  '${output.path}/$name-${state.suffix}.png',
+                ).writeAsBytes(data!.buffer.asUint8List(), flush: true);
+              } finally {
+                image.dispose();
+              }
+            });
+          },
         );
-      }
-      expect(files, hasLength(expected.length));
-      expect(
-        files,
-        everyElement(predicate<File>((file) => file.lengthSync() > 1000)),
-      );
-    }, timeout: const Timeout(Duration(seconds: 45)));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+
+        final files = output
+            .listSync()
+            .whereType<File>()
+            .where(
+              (file) =>
+                  file.uri.pathSegments.last.endsWith('-${state.suffix}.png'),
+            )
+            .toList();
+        for (final name in expected) {
+          expect(
+            files.map((file) => file.uri.pathSegments.last),
+            contains('$name-${state.suffix}.png'),
+          );
+        }
+        expect(files, hasLength(expected.length));
+        expect(
+          files,
+          everyElement(predicate<File>((file) => file.lengthSync() > 1000)),
+        );
+      },
+      timeout: const Timeout(Duration(seconds: 45)),
+    );
   }
 }
