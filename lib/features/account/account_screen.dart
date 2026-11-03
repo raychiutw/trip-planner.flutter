@@ -230,7 +230,9 @@ class _SettingsGroup extends ConsumerWidget {
           children: [
             const AppLockRow(),
             const BiometricLoginRow(),
-            if (ref.watch(accountHasPasswordProvider).value ?? false)
+            if (ref.watch(accountHasPasswordProvider) case AsyncData(
+              value: true,
+            ))
               TpSettingsRow(
                 key: const ValueKey('settings-change-password'),
                 leading: const Icon(CupertinoIcons.lock),

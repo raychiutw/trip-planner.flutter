@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../app/error_message.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -23,7 +24,8 @@ const _minPasswordLength = 8;
 /// 這個帳號有沒有 local 密碼(GET /account 的 `hasPassword`)。
 ///
 /// 只用 Google 登入的帳號沒有密碼可改,設定頁據此決定要不要顯示「變更密碼」。
-/// 取不到就當作沒有(不顯示入口,不影響其他設定)。
+/// 取不到就當作沒有(不顯示入口,不影響其他設定):入口列的 loading／error 刻意不畫任何東西,
+/// 所以呼叫端只比對 `AsyncData(value: true)`,不走 `.when` 三態。
 final accountHasPasswordProvider = FutureProvider<bool>((ref) async {
   final preview = await ref
       .watch(authRepositoryProvider)
@@ -127,77 +129,85 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         primaryActionEnabled: _canSubmit,
         onPrimaryAction: _submit,
       ),
-      body: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        children: [
-          TpSettingsGroup(
-            title: '密碼',
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TpSpacing.s4,
-                  vertical: TpSpacing.s2,
-                ),
-                child: TextField(
-                  key: const ValueKey('change-password-current'),
-                  controller: _current,
-                  obscureText: true,
-                  enabled: !_submitting,
-                  autofocus: true,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: const InputDecoration(
-                    labelText: '目前密碼',
-                    border: InputBorder.none,
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.form,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          children: [
+            TpSettingsGroup(
+              title: '密碼',
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TpSpacing.s4,
+                    vertical: TpSpacing.s2,
+                  ),
+                  child: TextField(
+                    key: const ValueKey('change-password-current'),
+                    controller: _current,
+                    obscureText: true,
+                    enabled: !_submitting,
+                    autofocus: true,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: const InputDecoration(
+                      labelText: '目前密碼',
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TpSpacing.s4,
-                  vertical: TpSpacing.s2,
-                ),
-                child: TextField(
-                  key: const ValueKey('change-password-new'),
-                  controller: _next,
-                  obscureText: _obscureNext,
-                  enabled: !_submitting,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: const [AutofillHints.newPassword],
-                  onSubmitted: (_) => _submit(),
-                  decoration: InputDecoration(
-                    labelText: '新密碼',
-                    helperText: '至少 $_minPasswordLength 字元。變更後其他裝置會登出,這台維持登入。',
-                    border: InputBorder.none,
-                    errorText: _nextError,
-                    suffixIcon: IconButton(
-                      key: const ValueKey('change-password-visibility-toggle'),
-                      tooltip: _obscureNext ? '顯示密碼' : '隱藏密碼',
-                      icon: Icon(
-                        _obscureNext
-                            ? CupertinoIcons.eye
-                            : CupertinoIcons.eye_slash,
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TpSpacing.s4,
+                    vertical: TpSpacing.s2,
+                  ),
+                  child: TextField(
+                    key: const ValueKey('change-password-new'),
+                    controller: _next,
+                    obscureText: _obscureNext,
+                    enabled: !_submitting,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.newPassword],
+                    onSubmitted: (_) => _submit(),
+                    decoration: InputDecoration(
+                      labelText: '新密碼',
+                      helperText:
+                          '至少 $_minPasswordLength 字元。變更後其他裝置會登出,這台維持登入。',
+                      border: InputBorder.none,
+                      errorText: _nextError,
+                      suffixIcon: IconButton(
+                        key: const ValueKey(
+                          'change-password-visibility-toggle',
+                        ),
+                        tooltip: _obscureNext ? '顯示密碼' : '隱藏密碼',
+                        icon: Icon(
+                          _obscureNext
+                              ? CupertinoIcons.eye
+                              : CupertinoIcons.eye_slash,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureNext = !_obscureNext),
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureNext = !_obscureNext),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
