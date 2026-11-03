@@ -60,7 +60,9 @@ class ChangePasswordScreen extends ConsumerStatefulWidget {
 class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   final _current = TextEditingController();
   final _next = TextEditingController();
+  final _nextFocus = FocusNode();
   bool _obscureNext = true;
+  bool _showLocalError = false;
   bool _submitting = false;
   String? _error;
 
@@ -69,19 +71,29 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     super.initState();
     _current.addListener(_rebuild);
     _next.addListener(_rebuild);
+    _nextFocus.addListener(() {
+      if (!_nextFocus.hasFocus && _next.text.isNotEmpty) {
+        setState(() => _showLocalError = true);
+      }
+    });
   }
 
   @override
   void dispose() {
     _current.dispose();
     _next.dispose();
+    _nextFocus.dispose();
     super.dispose();
   }
 
   void _rebuild() => setState(() => _error = null);
 
-  /// 新密碼欄位的就地提示;空白時不提示(還沒開始填)。
-  String? get _nextError {
+  /// 本地規則(過短、與目前相同)的提示:離開新密碼欄位後、或按主要動作後才顯示,打字中不跳錯。
+  /// 之後(已顯示過)隨輸入即時更新,改對就消失。與 web 版同一套時機(HIG:輸入完成前不打斷)。
+  String? get _nextError => _showLocalError ? _localError : null;
+
+  /// 新密碼欄位的規則檢查;空白時不提示(還沒開始填)。
+  String? get _localError {
     final value = _next.text;
     if (value.isEmpty) return null;
     if (value.length < _minPasswordLength) {
@@ -91,14 +103,16 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     return null;
   }
 
+  /// 主要動作只在「任一欄空白或送出中」停用;內容不合法時仍可按,按了才看到原因。
   bool get _canSubmit =>
-      !_submitting &&
-      _current.text.isNotEmpty &&
-      _next.text.isNotEmpty &&
-      _nextError == null;
+      !_submitting && _current.text.isNotEmpty && _next.text.isNotEmpty;
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
+    if (_localError != null) {
+      setState(() => _showLocalError = true);
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -183,6 +197,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     child: TextField(
                       key: const ValueKey('change-password-new'),
                       controller: _next,
+                      focusNode: _nextFocus,
                       obscureText: _obscureNext,
                       enabled: !_submitting,
                       textInputAction: TextInputAction.done,

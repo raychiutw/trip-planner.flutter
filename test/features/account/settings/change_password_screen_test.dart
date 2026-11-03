@@ -113,7 +113,7 @@ void main() {
     expect(inner(tester, next).obscureText, isTrue);
   });
 
-  testWidgets('兩欄都有填且合法才能送出', (tester) async {
+  testWidgets('主要動作：任一欄空白時停用；兩欄都有填就啟用，即使內容不合法（按了看原因）', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(submitEnabled(tester), isFalse);
@@ -122,28 +122,63 @@ void main() {
     expect(submitEnabled(tester), isFalse);
     await fill(tester, '', newPassword);
     expect(submitEnabled(tester), isFalse);
-    await fill(tester, oldPassword, newPassword);
+    await fill(tester, oldPassword, 'short');
     expect(submitEnabled(tester), isTrue);
   });
 
-  testWidgets('新密碼少於 8 字元：就地提示且不能送出', (tester) async {
+  testWidgets('新密碼少於 8 字元：打字中不跳錯，離開欄位後才提示；按主要動作也提示且不送出', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
     await fill(tester, oldPassword, 'short');
+    expect(find.text('新密碼至少 8 字元'), findsNothing);
 
+    await tester.tap(current); // 離開新密碼欄位
+    await tester.pump();
     expect(find.text('新密碼至少 8 字元'), findsOneWidget);
-    expect(submitEnabled(tester), isFalse);
+    expect(submitEnabled(tester), isTrue);
+    verifyNever(
+      () => accountRepo.changePassword(
+        currentPassword: any(named: 'currentPassword'),
+        newPassword: any(named: 'newPassword'),
+      ),
+    );
   });
 
-  testWidgets('新密碼與目前密碼相同：就地提示且不能送出', (tester) async {
+  testWidgets('不離開欄位直接按主要動作：本地規則不過就提示、不送出', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await fill(tester, oldPassword, 'short');
+    await tester.tap(submit);
+    await tester.pump();
+
+    expect(find.text('新密碼至少 8 字元'), findsOneWidget);
+    verifyNever(
+      () => accountRepo.changePassword(
+        currentPassword: any(named: 'currentPassword'),
+        newPassword: any(named: 'newPassword'),
+      ),
+    );
+  });
+
+  testWidgets('新密碼與目前密碼相同：按主要動作提示且不送出；改對後提示消失', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
     await fill(tester, oldPassword, oldPassword);
-
+    await tester.tap(submit);
+    await tester.pump();
     expect(find.text('新密碼不能和目前密碼相同'), findsOneWidget);
-    expect(submitEnabled(tester), isFalse);
+    verifyNever(
+      () => accountRepo.changePassword(
+        currentPassword: any(named: 'currentPassword'),
+        newPassword: any(named: 'newPassword'),
+      ),
+    );
+
+    await fill(tester, oldPassword, newPassword);
+    expect(find.text('新密碼不能和目前密碼相同'), findsNothing);
   });
 
   testWidgets('成功：帶兩個密碼呼叫 changePassword，提示成功並回上一頁', (tester) async {
