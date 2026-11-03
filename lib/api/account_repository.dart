@@ -20,6 +20,21 @@ class AccountRepository {
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
   }
 
+  /// POST /account/password，已登入的變更密碼（要帶目前密碼）。
+  ///
+  /// 成功後後端會登出其他裝置、保留目前這台。目前密碼錯回 403
+  /// `CHANGE_PASSWORD_CURRENT_INVALID`（刻意不是 401，所以不會被當成登入過期）；
+  /// 其餘錯誤碼見 trip-planner-api 的 `CHANGE_PASSWORD_*`。錯誤一律丟 [ApiError]，由畫面依 code 分支。
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _client.post(
+      '/account/password',
+      body: {'current_password': currentPassword, 'new_password': newPassword},
+    );
+  }
+
   /// GET /account/notifications，讀取通知偏好。
   Future<AccountNotificationPreferences>
   fetchAccountNotificationPreferences() async {

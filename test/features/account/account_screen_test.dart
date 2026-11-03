@@ -683,4 +683,45 @@ void main() {
     // 取消後仍停留在帳號頁。
     expect(find.text('Ray'), findsOneWidget);
   });
+  group('變更密碼入口：只有有 local 密碼的帳號才顯示', () {
+    const rowKey = ValueKey('settings-change-password');
+
+    testWidgets('有密碼：顯示並可點擊', (tester) async {
+      when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
+        (_) async => const AccountDeletionPreview(
+          hasPassword: true,
+          tripsOwned: 0,
+          collaboratorsAffected: 0,
+        ),
+      );
+      await pumpAccountScreen(tester);
+
+      expect(find.byKey(rowKey), findsOneWidget);
+      expect(tester.widget<TpSettingsRow>(find.byKey(rowKey)).onTap, isNotNull);
+    });
+
+    testWidgets('只用 Google 登入、沒有密碼：不顯示', (tester) async {
+      when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
+        (_) async => const AccountDeletionPreview(
+          hasPassword: false,
+          tripsOwned: 0,
+          collaboratorsAffected: 0,
+        ),
+      );
+      await pumpAccountScreen(tester);
+
+      expect(find.byKey(rowKey), findsNothing);
+      expect(find.byKey(const ValueKey('settings-sessions')), findsOneWidget);
+    });
+
+    testWidgets('取不到預覽：不顯示，其餘設定列不受影響', (tester) async {
+      when(
+        () => mockAuthRepository.fetchAccountDeletionPreview(),
+      ).thenThrow(const ApiError(status: 500, code: 'X', message: 'x'));
+      await pumpAccountScreen(tester);
+
+      expect(find.byKey(rowKey), findsNothing);
+      expect(find.byKey(const ValueKey('settings-sessions')), findsOneWidget);
+    });
+  });
 }

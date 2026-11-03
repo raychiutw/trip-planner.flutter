@@ -25,6 +25,7 @@ import 'developer_apps_screen.dart';
 import 'settings/app_lock_row.dart';
 import 'settings/biometric_login_row.dart';
 import 'settings/appearance_screen.dart';
+import 'settings/change_password_screen.dart';
 import 'settings/notifications_screen.dart';
 import 'settings/profile_edit_screen.dart';
 import 'settings/theme_mode_controller.dart';
@@ -229,6 +230,13 @@ class _SettingsGroup extends ConsumerWidget {
           children: [
             const AppLockRow(),
             const BiometricLoginRow(),
+            if (ref.watch(accountHasPasswordProvider).value ?? false)
+              TpSettingsRow(
+                key: const ValueKey('settings-change-password'),
+                leading: const Icon(CupertinoIcons.lock),
+                title: '變更密碼',
+                onTap: () => open(const ChangePasswordScreen()),
+              ),
             TpSettingsRow(
               key: const ValueKey('settings-sessions'),
               leading: const Icon(CupertinoIcons.device_phone_portrait),
