@@ -2,6 +2,7 @@
 /// device 相依，不做單元測試（轉換邏輯很薄，真機驗證見 #490）。
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 
@@ -21,10 +22,7 @@ class WebAuthLauncher implements AuthorizationLauncher {
       final result = await FlutterWebAuth2.authenticate(
         url: authorizeUrl.toString(),
         callbackUrlScheme: 'https',
-        options: FlutterWebAuth2Options(
-          httpsHost: callbackHost,
-          httpsPath: callbackPath,
-        ),
+        options: webAuthOptions(host: callbackHost, path: callbackPath),
       );
       return Uri.parse(result);
     } on PlatformException catch (e) {
@@ -32,6 +30,20 @@ class WebAuthLauncher implements AuthorizationLauncher {
     }
   }
 }
+
+/// 授權視窗選項。iOS 用 ephemeral session：非 ephemeral 的 session 與 Safari 共用網站資料，
+/// 系統會先跳「想要使用…登入」讓使用者再按一次；代價是不沿用 Safari 的登入狀態。
+/// Android 維持原行為（外掛在 Android 也吃這個選項，所以要明確限定平台）。
+@visibleForTesting
+FlutterWebAuth2Options webAuthOptions({
+  required String host,
+  required String path,
+  TargetPlatform? platform,
+}) => FlutterWebAuth2Options(
+  httpsHost: host,
+  httpsPath: path,
+  preferEphemeral: (platform ?? defaultTargetPlatform) == TargetPlatform.iOS,
+);
 
 /// 視窗開啟後這麼快就被「取消」，不可能是人按的，而是系統根本沒把視窗顯示出來。
 const _instantCancel = Duration(seconds: 1);

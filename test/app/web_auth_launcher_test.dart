@@ -3,6 +3,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/web_auth_launcher.dart';
 
 void main() {
+  group('授權視窗選項', () {
+    test('iOS：用 ephemeral session（系統不再先跳「想要使用…登入」提示）', () {
+      final o = webAuthOptions(
+        host: 'h.example',
+        path: '/cb',
+        platform: TargetPlatform.iOS,
+      );
+
+      expect(o.preferEphemeral, isTrue);
+      expect(o.httpsHost, 'h.example');
+      expect(o.httpsPath, '/cb');
+    });
+
+    test('Android：不開 ephemeral（行為維持原樣）', () {
+      final o = webAuthOptions(
+        host: 'h.example',
+        path: '/cb',
+        platform: TargetPlatform.android,
+      );
+
+      expect(o.preferEphemeral, isFalse);
+    });
+  });
+
   PlatformException canceled([Object? details]) => PlatformException(
     code: 'CANCELED',
     message: 'User canceled login',
