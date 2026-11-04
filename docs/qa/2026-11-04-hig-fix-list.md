@@ -45,6 +45,11 @@
 | W3 | `trip-detail`（手機） | 版面 | 移動方式膠囊超出右緣被截斷 | 允許換行或改成可橫向捲動並露出邊緣提示 | 看圖 |
 | W4 | `explore`（手機） | — | 篩選膠囊「Sight 1」與卡片類別「SIGHT」是未在地化的英文原值 | 類別 key 對照到中文標籤 | 看圖 |
 | W5 | `trips-new`（手機） | B | 日期欄位「選擇日期」字級明顯大於同頁其他 placeholder | 與其他欄位的 placeholder 字級對齊 | 看圖 |
+| W6 | `trip-detail` | WCAG 2.5.3 | 起訖時間 chip 的 `aria-label="編輯起訖時間"` 蓋掉可見時間文字（`EntryTimeChip.tsx:140`，9 個節點） | 讓 accessible name 以可見文字開頭，如「09:00–12:00，編輯起訖時間」 | axe 加程式碼 |
+| W7 | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
+| W8 | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
+
+web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告「補掃」一節：重排與放大沒有橫向捲動；`explore` 搜尋欄的焦點樣式待目視確認；`landing` 的 200% 文字檢查沒有生效。
 
 需要設計確認、不一定要改：`trip-print` 淺深兩色相同（列印預覽固定淺色）；`login`、`signup`、`forgot-password` 的桌機右側宣傳面板與外觀反相；`login` 手機寬卡片內外各有一個 Tripline 標誌。
 
@@ -88,7 +93,7 @@
 | A9 | `ax-public-share-2x` | B2：HIG/accessibility |
 | A10 | 36 個有分頁列的淺色場景（例：`trips-list`、`chat`） | C1：HIG/accessibility |
 | A11 | `trip-timeline`、`favorites`、`explore` | 無一手來源條目（檢查表沒有 VoiceOver 標籤專條；以 Flutter 的 `labeledTapTargetGuideline` 為依據） |
-| W1～W5 | web 報告各場景 | web 條目依 WCAG 2.2／APG，HIG 數值套到 web 是專案自訂標準；見 web 報告 |
+| W1～W8 | web 報告各場景 | web 條目依 WCAG 2.2／APG，HIG 數值套到 web 是專案自訂標準；見 web 報告 |
 
 ## 清單覆蓋率
 
@@ -104,7 +109,7 @@ App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-scr
 
 - 沒量字級（B1）。對比：App 已用內建工具掃過（見三之三），web 沒有量。
 - VoiceOver 只做了「可點擊元素有沒有標籤」的靜態檢查，沒有真的用 VoiceOver 走過；Increase Contrast、Reduce Motion 沒檢查。
-- web 沒做鍵盤、焦點、dialog 與 200% 重排；web 只跑了 chromium。
+- web：axe、320px 重排、200% 文字、鍵盤焦點已用工具掃過（有限制，見 web 報告），沒有 dialog 行為檢查；只跑 chromium，webkit 瀏覽器未安裝所以沒跑。
 - 彈出層（sheet、dialog、picker）大多沒有場景，見 `docs/research/2026-11-04-hig-app-screen-inventory.md` 的缺口摘要。
 - 「符合」與「未見明顯問題」是我目視的結論，沒有第二人複核。
 
