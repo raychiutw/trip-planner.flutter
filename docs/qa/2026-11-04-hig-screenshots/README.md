@@ -23,7 +23,7 @@ flutter test integration_test/hig_screenshots_test.dart -d <UDID> \
 | `account-logout-confirm` | 標準 alert：標題、一行說明、左「取消」右紅色「登出」。符合預期。 | 破壞性確認 |
 | `collab` | 角色選擇 chip「共編成員／檢視成員」畫面上高約 35pt，低於 44pt；但觸控量測回報 0 違規，因為量的是語意節點範圍，可能比畫出來的大。**畫面尺寸與量測結果不一致，需人確認實際可點區域。** | A1 |
 | `trip-health-findings` | 第二張建議卡（低風險）寬度只有第一張的約一半，兩張卡寬不一致，疑似版面缺陷。 | 版面一致性 |
-| `entry-edit` | 帶「取消／儲存」的 modal 表單底下仍顯示底部分頁列。 | modal 與 tab bar |
+| `entry-edit` | （已於 #547 改為整頁 modal，重拍後沒有分頁列；原觀察：帶「取消／儲存」的 modal 表單底下仍顯示底部分頁列。） | modal 與 tab bar |
 | `global-map` | 地圖區域是測試用的「Google Map fixture」文字，不是真地圖，只能看疊在地圖上的控制項與底部卡片。 | — |
 | `auth-reset-password-success` | 成功頁頂端仍有返回鈕，頁面大片留白，主按鈕「前往登入」。 | — |
 

@@ -35,10 +35,10 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `print` | TripPrintScreen | 已有場景 | `trip-print` `ax-trip-print-2x` |
 | `health` | TripHealthScreen | 已有場景 | `trip-health-not-run` `trip-health-findings` `trip-health-load-failed` |
 | `audit` | TripAuditScreen | 已有場景 | `trip-audit` `trip-audit-empty` `trip-audit-load-failed` |
-| `entries/new` | EntryAddRouteScreen | 已有場景 | `entry-add` |
-| `entries/:eid/edit` | EntryEditRouteScreen | 已有場景 | `entry-edit` |
-| `entries/:eid/copy` | EntryActionRouteScreen | 已有場景 | `entry-copy` |
-| `entries/:eid/move` | EntryActionRouteScreen | 已有場景 | `entry-move` |
+| `/trips/:tripId/entries/new`（shell 外整頁 modal） | EntryAddRouteScreen | 已有場景 | `entry-add` |
+| `/trips/:tripId/entries/:eid/edit`（shell 外整頁 modal） | EntryEditRouteScreen | 已有場景 | `entry-edit` |
+| `/trips/:tripId/entries/:eid/copy`（shell 外整頁 modal） | EntryActionRouteScreen | 已有場景 | `entry-copy` |
+| `/trips/:tripId/entries/:eid/move`（shell 外整頁 modal） | EntryActionRouteScreen | 已有場景 | `entry-move` |
 | `entries/:eid/pois` | EntryPoiScreen | 已有場景 | `entry-pois` |
 | `/map` | GlobalMapScreen | 已有場景 | `global-map` `global-map-empty` `global-map-load-failed` |
 | `/favorites` | FavoritesScreen | 已有場景 | `favorites` `favorites-load-failed` `ax-favorites-2x` |

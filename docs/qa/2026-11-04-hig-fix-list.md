@@ -31,9 +31,10 @@
 
 ## 二、App 要改的
 
-**#544 處理結果**（分支 `fix/hig-app-544`，每項先紅燈再實作；✅＝已修，⚪＝查過不改，A3／A4 要先決定；**A3 已於 #546／#549 完成**，A4 未動）：
+**#544 處理結果**（分支 `fix/hig-app-544`，每項先紅燈再實作；✅＝已修，⚪＝查過不改，A3／A4 要先決定；**A3 已於 #546／#549 完成，A4 已於 #547 完成**）：
 
-- ✅ **A3 行程編輯改即時儲存（#546、#549）**：採「拿掉取消、改即時儲存」。標題列只剩「完成」；標題與描述失焦或按「完成」才送出、打字中不送；目的地、語言、發布狀態改了立即送；日期平移與天數新增、刪除維持立即生效，刪除仍先確認且不可復原（ADR-0008）；移除「捨棄未儲存的變更」確認。失敗時保留輸入並在欄位下方就地顯示錯誤與「重試」；「完成」遇到未送出成功的變更會攔截（說出欄位，選「重試」或「放棄變更」）；標題清空不送出、就地提示「標題不能是空白」，按「完成」時還原成上次成功的值。離線時 `PUT /trips/:id` 本來就不進離線佇列，送出會失敗，與改版前相同，只是現在失敗就地可見並可重試。重拍 `trip-edit`、`trip-edit-load-failed`，新增 `trip-edit-save-failed`（淺深各看過）。A4（停留點表單的分頁列）與本項無關，未動。
+- ✅ **A3 行程編輯改即時儲存（#546、#549）**：採「拿掉取消、改即時儲存」。標題列只剩「完成」；標題與描述失焦或按「完成」才送出、打字中不送；目的地、語言、發布狀態改了立即送；日期平移與天數新增、刪除維持立即生效，刪除仍先確認且不可復原（ADR-0008）；移除「捨棄未儲存的變更」確認。失敗時保留輸入並在欄位下方就地顯示錯誤與「重試」；「完成」遇到未送出成功的變更會攔截（說出欄位，選「重試」或「放棄變更」）；標題清空不送出、就地提示「標題不能是空白」，按「完成」時還原成上次成功的值。離線時 `PUT /trips/:id` 本來就不進離線佇列，送出會失敗，與改版前相同，只是現在失敗就地可見並可重試。重拍 `trip-edit`、`trip-edit-load-failed`，新增 `trip-edit-save-failed`（淺深各看過）。A4（停留點表單的分頁列）與本項無關，見下一項。
+- ✅ **A4 停留點新增／編輯／複製／移動改為整頁 modal（#547）**：四條路由移到 shell 外（`fullscreenDialog`，與新增行程、編輯行程一致），網址不變、舊 web 連結別名照常；畫面沒有底部分頁列（路由測試以 `AppleRootTabBar` 不存在為守門，mutation 把路由搬回 shell 內會轉紅）。新增與複製／移動存檔後優先 pop 回進入前的畫面，健檢頁的編輯入口由 `go` 改 `push` 才能返回。複製與移動在 App 內沒有入口，只搬位置未刪除。重拍 `entry-add`、`entry-edit`、`entry-copy`、`entry-move`（淺深逐張看過，皆無分頁列）。
 - ✅ A1 註冊鈕：未勾同意停用並顯示說明。✅ A2 加入行程錯誤態：圖示加「返回」。✅ A5 登入裝置頁：深色紅色 `#FF453A`→`#FF6961`（4.09→4.94）、OAuth 說明卡降一階底色。✅ A6 已連結 App：Chip 取目前主題底色、圖示對齊標題。✅ A7 健檢卡同寬（紅燈 720 vs 175）。✅ A9 公開分享頁大字級主按鈕獨立一列。⚪ **A10 已取消**：改走單一 tint（維持 Apple 的做法，預設分頁列選中標籤 4.39:1 記為已知例外，「提高對比」時才加深，見 #550）；#545 先前加的 `onPrimaryContainer` 特例已回退。✅ A11 補標籤：日期條、搜尋欄、收藏列。
 - **紅燈證據**（各項在實作前實際看到的失敗輸出）：A1 `Expected: null / Actual: <Closure _submit>`（建立鈕原本可按）；A2 找不到錯誤圖示與「返回」；A5 對比 `4.090967…`（深色紅字）；A6 `chip.backgroundColor` 為 null；A7 `Expected 720.0 / Actual 175.0`；A9 `Expected ≥ 414.0 / Actual 350.0`；A10 對比 `4.389355…`（與工具掃描 4.39 一致）；A11 `labeledTapTargetGuideline` 回報確切節點（日期條 `Rect 0,0 177×48`、收藏列、探索頁 `Rect 16,128 → 784,188`）。
 - **審查後的調整**：① A2 原本手刻圖示加文字，改為重用 `TpStateView`（票文要求重用既有錯誤態元件）。② A11 搜尋欄原本全域在 `AppSearchField` 加 label，審查指出可能讓其他畫面念兩遍；我用語意樹傾印確認：探索頁外層 `[tap]` 節點 label 為空，但在最小環境下 label 會與 hint 合併成「搜尋地點⏎搜尋地點」。改為選擇性參數 `semanticLabel`，只有探索頁傳。**仍需用真機 VoiceOver 確認探索頁搜尋欄的朗讀不重複**（外層節點「搜尋地點」加內層欄位 hint，是兩個元素，不是同一個念兩遍，但我沒用真正的 VoiceOver 驗過）。③ 淺色選中前景改用 `tintDeep` 後，App 內並存兩個棕色：一般前景仍是 `primary #8A6038`，分頁列與日期條選中字是較深的 `#6F4C2C`。這是為了對中性選取底達 4.5:1 的刻意差異，設計上要不要統一由你決定。④ 深色 `destructiveBackground`（錯誤面板底）仍是 `#FF453A` 的 20% alpha，沒有跟著換色，只換了文字用的 destructive；這是刻意的（底色飽和度不動），但錯誤面板文字對比靠的是文字色變亮。
@@ -47,7 +48,7 @@
 | A1 ✅ | `auth-signup` | F5 | 空表單、未勾同意時「建立」仍可按（`account_flow_screens.dart:145` 是 `primaryActionEnabled: !_submitting`） | 欄位未通過驗證或未勾同意時停用，與 web 對齊（web 已是停用外觀加就地說明） | 程式碼 |
 | A2 ✅ | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7 | 有說明原因，但只有一行灰字，沒有圖示、重試或返回；底部分頁列仍顯示（`add_to_trip_screen.dart:76,90`） | 改用專案既有的錯誤態元件，附「返回」；分頁列的處理與 A4 一起決定 | 程式碼加看圖 |
 | A3 ✅ | `trip-edit` | D10、G5 | 同一個有「取消」的表單，部分欄位按「儲存」才生效、日期與天數立即生效 | 統一成「全部按儲存才生效」，或拿掉「取消」改成即時儲存 | 看圖 |
-| A4 | `entry-add`／`entry-edit`／`entry-copy`／`entry-move` | D12、D15 | modal 式表單下方仍顯示底部分頁列 | 改成真正的 modal 呈現（sheet 或全螢幕覆蓋，自然蓋住分頁列）。注意 D15 要求不要隱藏或停用 tab bar，所以不是在路由上單純關掉分頁列，要先決定這些表單屬於「分頁內的頁面」還是「modal」 | 看圖 |
+| A4 ✅ | `entry-add`／`entry-edit`／`entry-copy`／`entry-move` | D12、D15 | modal 式表單下方仍顯示底部分頁列 | 改成真正的 modal 呈現（sheet 或全螢幕覆蓋，自然蓋住分頁列）。注意 D15 要求不要隱藏或停用 tab bar，所以不是在路由上單純關掉分頁列，要先決定這些表單屬於「分頁內的頁面」還是「modal」 | 看圖 |
 | A5 ✅ | `account-sessions` | C1 | 「管理已連結應用」文字 4.36:1，低於 4.5:1；該卡疑似帶按下或焦點外框 | 調深文字色或換 token；確認外框是否為殘留焦點 | 像素加看圖 |
 | A6 ✅ | `account-connected-apps` | C4、H2 | 深色下 scope 標籤沒有膠囊底；列內圖示與標題錯位 | 補深色底色 token；對齊圖示與標題基線 | 看圖 |
 | A7 ✅ | `trip-health-findings` | 版面 | 第二張建議卡只有第一張一半寬 | 兩張卡同寬（檢查 Row／Expanded） | 看圖 |
@@ -119,7 +120,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 | A1 | `auth-signup` | F5：HIG/entering-data |
 | A2 | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7：HIG/feedback；「缺下一步動作」**無一手來源**，是專案內的可用性判斷 |
 | A3 | `trip-edit` | D10：HIG/sheets；G5：HIG/feedback |
-| A4 | `entry-add`、`entry-edit`、`entry-copy`、`entry-move` | D12：HIG/modality；D15：HIG/tab-bars |
+| A4 ✅ | `entry-add`、`entry-edit`、`entry-copy`、`entry-move` | D12：HIG/modality；D15：HIG/tab-bars |
 | A5 | `account-sessions` | C1：HIG/accessibility |
 | A6 | `account-connected-apps` | C4：HIG/color；H2：HIG/dark-mode |
 | A7 | `trip-health-findings` | 無（版面問題，無對應 HIG 條目） |
