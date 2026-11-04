@@ -1217,18 +1217,23 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoSearchTextField(
-      key: widget.fieldKey,
-      controller: widget.controller,
-      placeholder: widget.placeholder,
-      suffixIcon: _SearchClearIcon(
-        semanticLabel: CupertinoLocalizations.of(context).clearButtonLabel,
+    // CupertinoSearchTextField 只把 placeholder 放在 hint，外層可點擊節點沒有名稱，
+    // VoiceOver 讀不出這個欄位是什麼；補上與 placeholder 相同的 label（#544 A11）。
+    return Semantics(
+      label: widget.placeholder,
+      child: CupertinoSearchTextField(
+        key: widget.fieldKey,
+        controller: widget.controller,
+        placeholder: widget.placeholder,
+        suffixIcon: _SearchClearIcon(
+          semanticLabel: CupertinoLocalizations.of(context).clearButtonLabel,
+        ),
+        onChanged: _changed,
+        onSubmitted: _submitted,
+        autofocus: widget.autofocus,
+        enabled: widget.enabled,
+        backgroundColor: widget.embedded ? Colors.transparent : null,
       ),
-      onChanged: _changed,
-      onSubmitted: _submitted,
-      autofocus: widget.autofocus,
-      enabled: widget.enabled,
-      backgroundColor: widget.embedded ? Colors.transparent : null,
     );
   }
 }
