@@ -275,6 +275,35 @@ void main() {
       expect(textTheme.bodyLarge?.fontFamily, isNot(contains('Inter')));
     });
 
+    test('兩種主題的每個字階角色都 ≥ 11pt 且中文不加字距（B1 守門）', () {
+      for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        final t = theme.textTheme;
+        final roles = {
+          'displaySmall': t.displaySmall,
+          'headlineMedium': t.headlineMedium,
+          'headlineSmall': t.headlineSmall,
+          'titleLarge': t.titleLarge,
+          'titleMedium': t.titleMedium,
+          'titleSmall': t.titleSmall,
+          'bodyLarge': t.bodyLarge,
+          'bodyMedium': t.bodyMedium,
+          'bodySmall': t.bodySmall,
+          'labelLarge': t.labelLarge,
+          'labelMedium': t.labelMedium,
+          'labelSmall': t.labelSmall,
+        };
+        for (final entry in roles.entries) {
+          expect(entry.value, isNotNull, reason: '${entry.key} 沒有定義');
+          expect(
+            entry.value!.fontSize!,
+            greaterThanOrEqualTo(11),
+            reason: '${theme.brightness.name} ${entry.key}',
+          );
+          expect(entry.value!.letterSpacing, 0, reason: entry.key);
+        }
+      }
+    });
+
     testWidgets('app 用到的字階全部有定義且 letterSpacing 為 0', (tester) async {
       late TextTheme textTheme;
       await tester.pumpWidget(

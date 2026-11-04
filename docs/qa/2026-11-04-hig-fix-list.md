@@ -57,7 +57,7 @@
 
 | A12 | `collab-load-failed` | F5 | 「新增」鈕在 Email 為空時仍可按（`collab_screen.dart:300` 是 `onPressed: state.adding ? null : …`），與註冊頁修正前同一個問題 | 與 A1 同樣做法：欄位未填時停用 | 程式碼加獨立複核 |
 | A13 | `explore-search-failed` | G6 | 錯誤訊息只有「搜尋失敗,請稍後再試」，沒說原因（`explore_controller.dart:182,189`） | 依錯誤類型給原因（斷線、被限流、伺服器錯誤） | 程式碼加獨立複核 |
-| A14 ✅ | 全 App 字級 | B1 | **已改**：字階對照 Apple 預設字階（正文 `bodyLarge` 17、`bodyMedium` 15、`bodySmall` 13、`titleMedium` 17、`labelLarge` 17；其餘不變）。chip、分段控制、狀態橫幅、地圖底部 POI 卡、選單快捷動作、Day 標頭的計數、設定列副標維持原字級（這些是依舊字級校準的 chrome，17pt 會讓分段控制退成直排、橫幅在極端字級溢位）。沒明寫字級的 `Text` 會吃 `Material` 預設的 `bodyMedium`，新增 chrome 時要明寫 | 見 `DESIGN.md` §16.3 與 `app_theme_test` 的字階契約 | 紅燈（titleMedium 預期 17、實際 15）→ 全量測試與 102 場景重拍 |
+| A14 ✅ | 全 App 字級 | B1 | **已改**：字階對照 Apple 預設字階（正文 `bodyLarge` 17、`bodyMedium` 15、`bodySmall` 13、`titleMedium` 17、`labelLarge` 17；其餘不變）。chip、`TpTag`、分段控制、聊天與離線的狀態橫幅、地圖底部的兩張 POI 卡、選單快捷動作維持原字級（幾何依舊字級校準，理由見 `DESIGN.md` §16.3）；設定列副標與 Day 標頭計數是 HIG 的層級選擇。**已知限制**：聊天橫幅不限高也不可捲動，AX5 下仍會溢位（既有限制，未解決）；`ax-chat-2x` 第四個建議鈕實際高 96pt、只有 43pt 在捲動區內（量測限制，已量渲染尺寸驗證）。沒明寫字級的 `Text` 會吃 `Material` 預設的 `bodyMedium`，新增 chrome 時要明寫 | 見 `DESIGN.md` §16.3 與 `app_theme_test` 的字階契約 | 紅燈（titleMedium 預期 17、實際 15）→ 全量測試與 102 場景重拍 |
 | A15 | 減少動態效果 | I | 兩處動畫沒有降級：分享頁建立連結後捲回頂端 250ms（`share_screen.dart:274`）、更多選單按壓縮放 150ms（`tp_more_menu.dart:760`）。其餘我查到的捲動與進度動畫都有 `disableAnimationsOf` 判斷 | 補 `disableAnimationsOf` 判斷，與 `chat_screen.dart` 的作法一致 | 程式碼（靜態稽核，未涵蓋全部動畫） |
 
 **與專案決策有張力，需要你決定要不要改規則，不建議直接改程式：** `account-home`、`account-home-security` 的生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。這些都是已知的專案決定。

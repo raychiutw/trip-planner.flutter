@@ -138,6 +138,11 @@ void main() {
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
       await tester.pump();
     }
+    expect(
+      memberAction.hitTestable(),
+      findsOneWidget,
+      reason: '捲動後仍點不到，不是測試機制的問題而是真的到不了',
+    );
     await tester.tap(memberAction);
     await tester.pumpAndSettle();
     expect(find.text('共編成員'), findsWidgets);
@@ -157,6 +162,7 @@ void main() {
       await tester.drag(contentScroll, const Offset(0, -120));
       await tester.pump();
     }
+    expect(revoke.hitTestable(), findsOneWidget, reason: '捲動後仍點不到「撤銷」');
     await tester.pumpAndSettle();
     await tester.tap(revoke);
     await tester.pumpAndSettle();

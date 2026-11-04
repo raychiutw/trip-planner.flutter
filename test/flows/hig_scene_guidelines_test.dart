@@ -43,8 +43,9 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'share-created-card': {'(無標籤) 40x40'},
   'share-create-failed': {'(無標籤) 40x40'},
   'share-list-load-failed': {'(無標籤) 40x40'},
-  // 2 倍字級下建議鈕區（SingleChildScrollView）剛好放不下第四個鈕，語意樹的矩形被捲動區下緣
-  // 裁掉 1pt（43 而非 44）。這是量測限制（裁切後的尺寸），鈕本身捲得進來；字階對照 HIG 後才出現。
+  // 2 倍字級下建議鈕區（SingleChildScrollView，下緣 611.4）放不下第四個鈕：鈕實際高 96pt、
+  // 上緣 568，只有 43.4pt 在可見範圍內，語意樹的矩形被捲動區裁成 43。這是量測限制（裁切後的
+  // 尺寸，已用渲染尺寸驗證），鈕本身捲得進來；字階對照 HIG 後才出現。
   'ax-chat-2x': {'加入適合親子的水族館行程 345x43'},
   'offline-banner-network': {'搜尋行程 361x36'},
   'offline-banner-pending': {'搜尋行程 361x36', '立即重試 100x40'},

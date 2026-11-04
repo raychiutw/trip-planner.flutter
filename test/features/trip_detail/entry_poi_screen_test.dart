@@ -664,6 +664,11 @@ void main() {
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
       await tester.pump();
     }
+    expect(
+      editMaster.hitTestable(),
+      findsOneWidget,
+      reason: '捲動後仍點不到，不是測試機制的問題而是真的到不了',
+    );
     await tester.tap(editMaster);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull, reason: '編輯 sheet 初始版面');

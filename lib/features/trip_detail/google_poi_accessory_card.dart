@@ -40,7 +40,9 @@ class GooglePoiAccessoryCard extends StatelessWidget {
                     name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    // 與行程 POI 卡同為緊湊的底部 accessory：高度固定 88，扣掉 44 的開啟鈕只剩 44，
+                    // 兩行 17pt（22 行高）剛好 44 沒有餘裕；維持 15pt 兩行（40）。
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w700,
                     ),

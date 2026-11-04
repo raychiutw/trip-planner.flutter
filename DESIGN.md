@@ -361,7 +361,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：時間、數量與日期需要對齊時可使用 tabular figures。（[Typography](https://developer.apple.com/design/human-interface-guidelines/typography) 全頁沒有 tabular figures 的敘述，且本條本身是「可」；原標「HIG 必須」，已改標。）
 - **Tripline 決策**：不使用 Large Title。
 - **Tripline 決策（字階，#544 A14）**：字階對照 Apple 預設（Large）字階——`displaySmall` 28（Title1）、`headlineMedium` 22（Title2）、`headlineSmall` 20（Title3）、`titleLarge`／`titleMedium`／`bodyLarge`／`labelLarge` 17（Headline、Body、按鈕）、`bodyMedium` 15（Subheadline）、`bodySmall`／`titleSmall` 13（Footnote）、`labelMedium` 12（Caption1）、`labelSmall` 11（Caption2，螢幕文字下限）。原本整組小一級（正文 15／13／12），與檢查表 B1「正文預設 17pt」不符。
-- **Tripline 決策（刻意維持較小字級的 chrome）**：導覽與浮動 chrome 的高度是依舊字級校準的，這幾處明寫較小字級而不跟著上移——狀態橫幅文字（`bodySmall` 13）、地圖底部 POI accessory（標題 15、meta 12）、選單快捷動作的短文字（`bodySmall` 13）、時間軸 Day 標頭下的「N 個停留點」（13）、設定列的副標與值（`bodyMedium` 15）。沒明寫字級的 `Text` 會吃 `Material` 預設的 `bodyMedium`（現為 15），新增 chrome 時要明寫。
+- **Tripline 決策（刻意維持較小字級的元件）**：分兩種理由。① **幾何依舊字級校準**：chip、`TpTag` 與分段控制（15pt 半粗體；17pt 時分段控制五個選項放不下一列會退成直排）、狀態橫幅（聊天與離線，13pt；橫幅區塊不限高也不可捲動，AX5 下本來就會比螢幕高，改回 15 只會更早發生，限高加捲動另案處理）、地圖底部 POI 卡與 Google POI 卡（accessory 高度固定，Google 卡扣掉 44 的開啟鈕只剩 44，兩行 17pt 剛好 44 沒有餘裕，維持 15pt）、選單快捷動作的短文字（三格並排，13pt）。② **層級選擇（跟 HIG 一致，不是遷就測試）**：設定列的副標與值用 Subheadline 15（標題 Body 17，要拉開層級）、Day 標頭下的「N 個停留點」用 Footnote 13（標題 20）。沒明寫字級的 `Text` 會吃 `Material` 預設的 `bodyMedium`（現為 15），新增 chrome 時要明寫。
 - **Tripline 決策（縮字例外）**：起訖時間（停留點卡與逐日標頭的 `09:30 - 11:00`，半形冒號與等寬數字；原 D1 定版的全形冒號因字距過寬於 0.33.0 改回半形）維持單行，AX 字級撐破卡片寬度時才以 `FittedBox.scaleDown` 等比縮小。這是全 App 唯一允許的縮字處；其餘一律換行、重排或增高，不得縮字。
 
 ### 16.4 Icons 與 touch target

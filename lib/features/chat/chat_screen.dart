@@ -1220,8 +1220,9 @@ class _Banner extends StatelessWidget {
                 liveRegion: true,
                 child: Text(
                   text,
-                  // 狀態橫幅用 footnote 13：沒明寫字級的 Text 會吃 Material 預設的 bodyMedium（現在是 15），
-                  // 極端字級（AX5）下三個橫幅疊起來會比螢幕高。
+                  // 狀態橫幅用 footnote 13，維持改字階前的幾何：沒明寫字級的 Text 會吃 Material 預設的
+                  // bodyMedium（現在是 15），而橫幅區塊不限高也不可捲動，AX5 下三個橫幅疊起來本來就
+                  // 會比螢幕高（既有限制，不是這次造成；只是 15 會讓它更早發生）。真正的解法是限高加捲動，另案。
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onErrorContainer,
                   ),

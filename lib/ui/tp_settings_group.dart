@@ -155,6 +155,8 @@ class TpSettingsRow extends StatelessWidget {
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: TpSpacing.s1),
+                    // HIG 設定列：標題 Body 17、副標與值 Subheadline 15（bodyMedium），
+                    // 兩者要拉開層級；若副標也用 bodyLarge（17）就和標題一樣大。
                     Text(
                       subtitle!,
                       style: theme.textTheme.bodyMedium?.copyWith(
