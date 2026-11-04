@@ -6,15 +6,15 @@
 
 證據強度：**程式碼**＝對照過原始碼；**像素**＝量過；**看圖**＝只有目視，改之前建議先在真機或模擬器再確認一次。
 
-## 一、先修證據（場景本身有問題）
+## 一、證據修正（S1～S3 已完成並重拍）
 
-這三項不修，截圖就不能當作對應畫面的證據；都是測試端的改動，不影響 App 行為。
+三項都是測試端的改動，不影響 App 行為。已修、重拍並換入 `2026-11-04-hig-screenshots/`，各自用 mutation 驗過 proof 會轉紅。
 
 | # | 場景 | 問題 | 建議修改 | 驗證 |
 |---|---|---|---|---|
-| S1 | `auth-reset-password-expired` | stub 丟 `expired`，畫面只認 `RESET_TOKEN_INVALID`／`MISSING`，顯示的是「暫時無法處理」，不是過期提示（程式碼，`account_flow_screens.dart:541-546`） | 場景 stub 改丟畫面認得的 code | 重拍後畫面出現過期提示文字；`hig_scene_guidelines_test` 仍綠 |
-| S2 | `trip-map-route-failed` | 與 `trip-map` 位元組完全相同（SHA-1），沒有失敗畫面 | 讓路線 stub 真的失敗，並讓 proof 確認是「路線失敗」的那個元素 | 重拍後 SHA-1 不同，且畫面看得到失敗提示 |
-| S3 | `ax-favorites-2x` | 沒有 `act` 餵收藏資料流（對照 `favorites` 場景），只拍到載入骨架（程式碼加看圖） | 補上與 `favorites` 相同的 `act` | 重拍後是 2x 的收藏清單 |
+| S1 ✅ | `auth-reset-password-expired` | stub 丟 `expired`，畫面只認 `RESET_TOKEN_INVALID`／`MISSING`，顯示的是「暫時無法處理」，不是過期提示（程式碼，`account_flow_screens.dart:541-546`） | 場景 stub 改丟畫面認得的 code | 重拍後畫面出現過期提示文字；`hig_scene_guidelines_test` 仍綠 |
+| S2 ✅ | `trip-map-route-failed` | 與 `trip-map` 位元組完全相同（SHA-1），沒有失敗畫面 | **根因**：fixture 每天只有一個有座標的停留點，`_routePairsForTab` 湊不出相鄰兩點，`fetchRoute` 從未被呼叫，失敗 stub 形同虛設。修法：場景給第 1 天補第二個有座標的停留點，proof 確認 `trip-map-route-error` | 重拍後 SHA-1 不同，且畫面看得到失敗提示 |
+| S3 ✅ | `ax-favorites-2x` | 沒有 `act` 餵收藏資料流（對照 `favorites` 場景），只拍到載入骨架（程式碼加看圖） | 補上與 `favorites` 相同的 `act` | 重拍後是 2x 的收藏清單 |
 
 另有兩個場景受限，不是缺陷：`trip-map`、`ax-trip-map-2x`、`global-map` 的地圖是測試用純色 fixture，玻璃元件的對比（量得 2.07～2.74:1）**不能當對真實地圖的結論**，要真機看。web 的 `trip-map`、`map` 場景擋掉了 Google Maps，畫面是錯誤態，同理。
 
@@ -55,7 +55,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 三之三、補掃：文字對比與 VoiceOver 標籤（工具量測）
 
-用 Flutter 內建的 `textContrastGuideline` 與 `labeledTapTargetGuideline` 掃 100 個場景（`components`、`ax-components-2x` 是元件示範頁，沒掃）× 淺深，共 200 次；66 次有項目未過。指令：`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=1`（只印 `HIGA11Y` 行，不是守門；沒帶旗標會 skip）。
+用 Flutter 內建的 `textContrastGuideline` 與 `labeledTapTargetGuideline` 掃 100 個場景（`components`、`ax-components-2x` 是元件示範頁，沒掃）× 淺深，共 200 次；66 次有項目未過。指令：`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`（只印 `HIGA11Y` 行，不是守門；沒帶旗標會 skip）。
 
 **限制：**對比由工具以渲染後像素取樣，半透明玻璃、對話框 blur 底、停用狀態的取樣不可靠；下表只收「對照截圖後仍成立」的項目。本輪沒有再另外手量，數值是工具輸出。
 
@@ -79,9 +79,9 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 | 項目 | 截圖 | 引用條目與一手來源 |
 |---|---|---|
-| S1 | `auth-reset-password-expired` | 無（場景缺陷，與 HIG 無關） |
+| S1 ✅ | `auth-reset-password-expired` | 無（場景缺陷，與 HIG 無關） |
 | S2 | `trip-map-route-failed`、`trip-map` | 無（場景缺陷） |
-| S3 | `ax-favorites-2x` | 無（場景缺陷） |
+| S3 ✅ | `ax-favorites-2x` | 無（場景缺陷） |
 | A1 | `auth-signup` | F5：HIG/entering-data |
 | A2 | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7：HIG/feedback；「缺下一步動作」**無一手來源**，是專案內的可用性判斷 |
 | A3 | `trip-edit` | D10：HIG/sheets；G5：HIG/feedback |
@@ -115,7 +115,7 @@ App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-scr
 
 ## 建議順序
 
-1. S1～S3（場景修好，之後重拍才有意義）。
+1. ~~S1～S3（場景修好並重拍）~~ 已完成。
 2. A1、A2、A4（行為性缺陷，有程式碼證據）、T1、T5～T7（工具量測，有確切節點）。
 3. A5～A9、W1～W5（視覺類，先在模擬器或瀏覽器再確認一次再改）。
 4. A3 與張力項目要先做決定。

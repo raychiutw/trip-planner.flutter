@@ -30,7 +30,8 @@ import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/poi_favorite.dart';
-import 'package:tripline/models/entry.dart' show TimelineEntry;
+import 'package:tripline/models/day.dart' show TripDay;
+import 'package:tripline/models/entry.dart' show EntryPoiInfo, TimelineEntry;
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
@@ -618,14 +619,25 @@ List<HigScene> higScenes() => [
     '#534',
     location: '/auth/password/reset?token=demo-token',
     loggedIn: false,
-    stub: (f) => when(
-      () => f.auth.resetPassword(
-        token: any(named: 'token'),
-        password: any(named: 'password'),
-      ),
-    ).thenThrow(ApiError(status: 400, code: 'expired', message: 'expired')),
+    stub: (f) =>
+        when(
+          () => f.auth.resetPassword(
+            token: any(named: 'token'),
+            password: any(named: 'password'),
+          ),
+        ).thenThrow(
+          ApiError(
+            status: 400,
+            code: 'RESET_TOKEN_INVALID',
+            message: 'invalid',
+          ),
+        ),
     act: _submitResetPassword,
-    proof: () => find.byKey(const ValueKey('reset-password-error')),
+    // 要證明的是「連結過期」那一種錯誤，不是任何一種錯誤（code 對不上時畫面會顯示通用的「暫時無法處理」）。
+    proof: () => find.descendant(
+      of: find.byKey(const ValueKey('reset-password-error')),
+      matching: find.textContaining('重設連結無效或已過期'),
+    ),
   ),
   HigScene(
     'auth-verify-email',
@@ -723,15 +735,51 @@ List<HigScene> higScenes() => [
     'trip-map-route-failed',
     '#418',
     location: '/trips/okinawa/map',
-    stub: (f) => when(
-      () => f.map.fetchRoute(
-        fromLat: any(named: 'fromLat'),
-        fromLng: any(named: 'fromLng'),
-        toLat: any(named: 'toLat'),
-        toLng: any(named: 'toLng'),
-        cancelToken: any(named: 'cancelToken'),
-      ),
-    ).thenAnswer((_) async => throw _failure),
+    stub: (f) {
+      // 預設 fixture 每天只有一個有座標的停留點，湊不出相鄰兩點，路線根本不會被抓取，
+      // 失敗提示也就不會出現。這裡給第 1 天補第二個有座標的停留點，並讓路線抓取失敗。
+      final day1 = releaseSmokeDays.first;
+      final days = [
+        TripDay(
+          id: day1.id,
+          dayNum: day1.dayNum,
+          title: day1.title,
+          version: day1.version,
+          timeline: [
+            ...day1.timeline,
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              version: 0,
+              startTime: '12:00',
+              endTime: '13:00',
+              title: '國際通',
+              master: const EntryPoiInfo(
+                poiId: 1003,
+                name: '國際通',
+                lat: 26.2142,
+                lng: 127.6879,
+                type: 'sight',
+              ),
+            ),
+          ],
+        ),
+        ...releaseSmokeDays.skip(1),
+      ];
+      when(
+        () => f.trips.watchDays('okinawa'),
+      ).thenAnswer((_) => Stream.value(days));
+      when(
+        () => f.map.fetchRoute(
+          fromLat: any(named: 'fromLat'),
+          fromLng: any(named: 'fromLng'),
+          toLat: any(named: 'toLat'),
+          toLng: any(named: 'toLng'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async => throw _failure);
+    },
+    proof: () => find.byKey(const ValueKey('trip-map-route-error')),
   ),
   const HigScene('trip-notes', '#419 #422', location: '/trips/okinawa/notes'),
   const HigScene('trip-print', '#419', location: '/trips/okinawa/print'),
@@ -1348,11 +1396,16 @@ List<HigScene> higScenes() => [
     location: '/trips/okinawa/print',
     textScale: 2.0,
   ),
-  const HigScene(
+  HigScene(
     'ax-favorites-2x',
     '#422',
     location: '/favorites',
     textScale: 2.0,
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+    },
+    // 沒有資料流就只會拍到載入骨架；要確認真的渲染出收藏清單。
+    proof: () => find.text('暖暮拉麵'),
   ),
   const HigScene(
     'ax-explore-2x',

@@ -1,5 +1,5 @@
 /// 收集用（不是守門）：對每個 mock 場景跑 Flutter 內建的文字對比（C1）與可點擊元素標籤（VoiceOver）檢查，
-/// 只印 `HIGA11Y` 行、不下斷言。沒帶 `--dart-define=HIG_COLLECT=1` 時整批 skip，避免變成永遠綠燈的假測試。
+/// 只印 `HIGA11Y` 行、不下斷言。沒帶 `--dart-define=HIG_COLLECT=true` 時整批 skip，避免變成永遠綠燈的假測試。
 /// `--dart-define=HIG_ONLY=a,b` 只跑指定場景。結果解讀見 `docs/qa/2026-11-04-hig-fix-list.md`。
 ///
 /// 限制：`textContrastGuideline` 以渲染後像素取樣；半透明玻璃、對話框 blur 底、停用狀態的取樣不可靠，
