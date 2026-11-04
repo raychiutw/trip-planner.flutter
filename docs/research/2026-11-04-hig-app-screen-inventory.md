@@ -78,22 +78,22 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | 部分 | `create-trip-date-picker` `note-edit-date-picker`（建立行程與筆記；編輯行程、分享仍無場景） |
 | `showAppTimePicker` | 筆記編輯 | 已有場景 | `note-edit-time-picker` |
 | `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音） |
-| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm` `share-revoke-confirm` `collab-remove-member-confirm` `timeline-delete-entry-confirm`（選單觸發的是 action sheet，不是 alert；只覆蓋行程、分享、共編、時間軸，其餘呼叫端仍無場景） `favorites-remove-confirm`（收藏移除，direct 來源，確認走 alert）|
+| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm` `share-revoke-confirm` `collab-remove-member-confirm` `timeline-delete-entry-confirm` `account-session-revoke-confirm` `developer-app-delete-confirm`（選單觸發的是 action sheet；詳情頁與編輯頁上的直接按鈕走 alert；停留點、筆記的『保留你的版本？』覆寫確認仍無場景） `favorites-remove-confirm`（收藏移除，direct 來源，確認走 alert）|
 | `showAppAlert` | 加入行程、帳號 | 部分 | `account-delete-preview-failed`（只覆蓋帳號；加入行程的衝突 alert 仍無場景） |
 | `showAppActionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppContentSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppScreenSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
-| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 部分 | `note-edit-sheet` `favorites-filter-sheet`（筆記與收藏篩選；聊天 AI 同意、探索、停留點 POI、交通編輯、衝突解決、分享、停留點編輯仍無場景） |
+| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 部分 | `note-edit-sheet` `favorites-filter-sheet` `chat-ai-consent-sheet` `explore-custom-region-sheet` `poi-info-edit-sheet` `travel-edit-sheet` `share-edit-sheet` `entry-edit-sheet`（只剩衝突解決 sheet 無場景） |
 | `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | 部分 | `favorites-removed-notice`（只覆蓋收藏移除成功；其餘畫面的通知仍無場景） |
 | `confirmAndRunIrreversibleAction` | 協作、分享 | 部分 | `share-revoke-confirm` `collab-remove-member-confirm` `collab-revoke-invite-confirm`（重新產生、刪除分享連結同一支元件，未各拍一張） |
-| `confirmAndDelete` | 停留點 POI、時間軸、筆記 | 部分 | `timeline-delete-entry-confirm`（POI 與筆記的呼叫端未拍） |
+| `confirmAndDelete` | 停留點 POI、時間軸、筆記 | 已有場景 | `timeline-delete-entry-confirm` `note-delete-confirm` `entry-alternate-remove-confirm` |
 | `showCupertinoDialog`（直接呼叫，帳號畫面） | 刪除帳號確認 | 已有場景 | `account-delete-dialog` |
-| `showCupertinoDialog`（直接呼叫，生物辨識登入列） | 開啟生物辨識確認 | **缺口** | 無 |
+| `showCupertinoDialog`（直接呼叫，生物辨識登入列） | 關閉生物辨識確認 | 已有場景 | `account-biometric-disable-confirm`（原清單寫成「開啟」確認；程式碼只有「關閉並登出」這一個確認，已更正） |
 
 ## 三、缺口摘要
 
 - 路由缺口 0 個，另有 1 個部分（#534～#536 補了 15 個）：`:favoriteId/add-to-trip` 只有無效 ID 狀態（正常載入狀態沒有場景）；另加上變更密碼（PR #530，尚未進 master）。
-- 彈出層缺口：幾乎全部。目前只有帳號刪除、登出確認、解除連結確認、刪除行程確認、聊天語音同意取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
+- 彈出層缺口：已補 23 個場景（日期與時間選擇器、確認框、表單 sheet、通知），剩衝突解決 sheet、sheet 內『保留你的版本？』覆寫確認、編輯行程放棄確認、加入行程衝突 alert 等需先造出特定狀態才會觸發的項目（見缺口文件第 1 節）。App 鎖開啟提示是全螢幕狀態，不算彈出層。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。

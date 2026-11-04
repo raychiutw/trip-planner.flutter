@@ -1,6 +1,6 @@
 # HIG 比對後的修改清單（#531）
 
-日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（114 個場景全看）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
+日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（125 個場景全看）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
 這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。**還沒有動任何程式碼**；排序是我的建議，開票與否由你決定。
 
@@ -61,8 +61,9 @@
 | A15 | 減少動態效果 | I | 兩處動畫沒有降級：分享頁建立連結後捲回頂端 250ms（`share_screen.dart:274`）、更多選單按壓縮放 150ms（`tp_more_menu.dart:760`）。其餘我查到的捲動與進度動畫都有 `disableAnimationsOf` 判斷 | 補 `disableAnimationsOf` 判斷，與 `chat_screen.dart` 的作法一致 | 程式碼（靜態稽核，未涵蓋全部動畫） |
 
 | A16 | `create-trip-date-picker`、`note-edit-date-picker` | D、版面 | 月曆日期選擇器（`CalendarDatePicker`）最後一週（29、30）被彈出層下緣裁掉只剩上半（11 月 30 天、5 週；彈出層高度固定） | 讓彈出層高度跟著月曆（6 週最多）或讓月曆可捲動；先在 5 週與 6 週的月份都驗證 | 看圖 |
-| A17 | `note-edit-sheet`（及同一表單的其他筆記區段） | F1、D12 | 表單欄位只有 placeholder、沒有常駐標籤，輸入後看不到欄位名稱；標題下有約 100pt 空白 | 欄位加常駐標籤（或浮動標籤）；查空白的來源 | 看圖 |
+| A17 | `note-edit-sheet`（及同一表單的其他筆記區段）、`poi-info-edit-sheet`、`entry-edit-sheet`、`travel-edit-sheet`、`explore-custom-region-sheet`（單一欄位、標題給上下文，風險低） | F1、D12 | 表單欄位只有 placeholder、沒有常駐標籤，輸入後看不到欄位名稱；標題下有約 100pt 空白 | 欄位加常駐標籤（或浮動標籤）；查空白的來源 | 看圖 |
 | A18 | `note-edit-sheet`、`favorites-filter-sheet`（compact 的 `showAppFormSheet`） | VoiceOver | sheet 背景遮罩是一個全螢幕、可點擊、沒有語意名稱的節點（`labeledTapTargetGuideline` 回報 `Rect 0,0 → 393×852`），VoiceOver 會停在無名元素上；來源是 compact sheet 的套件遮罩，沒有定位到程式碼 | 為遮罩提供名稱（如「關閉」），或排除遮罩的語意、只留「取消」為關閉入口 | 工具量測 |
+| A19 | `developer-app-delete-confirm`（編輯 OAuth 應用頁） | D、版面 | 場景裡編輯頁捲到底，「停用應用程式」鈕仍有一半在螢幕外（按鈕中心 y=894、螢幕高 874）。可能是 sheet 高度超出螢幕的版面問題，也可能是場景視窗的假象 | **先在真機確認**；若屬實，讓內容區底部留出可見空間（safe area 與 sheet 高度） | 看圖加量測，待真機 |
 
 **與專案決策有張力，需要你決定要不要改規則，不建議直接改程式：** `account-home`、`account-home-security` 的生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。這些都是已知的專案決定。
 
@@ -129,7 +130,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 清單覆蓋率
 
-App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 114 個畫面**；清單裡仍標「缺口」的彈出層（date／time picker、`showAppConfirm`、`showAppDestructiveConfirm`（只覆蓋部分呼叫端）、`showAppAlert`、`showAppFormSheet`、`showAppNotice` 等）沒有取證，不能因為本報告而視為通過。
+App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 125 個畫面**；清單裡仍標「缺口」的彈出層（date／time picker、`showAppConfirm`、`showAppDestructiveConfirm`（只覆蓋部分呼叫端）、`showAppAlert`、`showAppFormSheet`、`showAppNotice` 等）沒有取證，不能因為本報告而視為通過。
 
 ## 四、看過但判定沒問題的（避免重複討論）
 

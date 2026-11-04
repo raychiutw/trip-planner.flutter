@@ -55,6 +55,13 @@ const _knownTapTargetViolations = <String, Set<String>>{
   // 通知橫幅場景的底下是收藏頁，搜尋欄同 'favorites'。
   'favorites-filter-sheet': {'Drag handle 36x4'},
   'note-edit-sheet': {'Drag handle 36x4'},
+  'poi-info-edit-sheet': {'Drag handle 36x4'},
+  'entry-edit-sheet': {'Drag handle 36x4'},
+  'travel-edit-sheet': {'Drag handle 36x4'},
+  'explore-custom-region-sheet': {'Drag handle 36x4'},
+  'chat-ai-consent-sheet': {'Drag handle 36x4'},
+  // 「匿名分享」勾選框 40x40，與分享頁建立表單同一個元件（'share-manage'）。
+  'share-edit-sheet': {'(無標籤) 40x40', 'Drag handle 36x4'},
   'favorites-removed-notice': {'搜尋收藏 361x36'},
 };
 
@@ -70,6 +77,11 @@ const _scenesWithDialog = {
   'favorites-remove-confirm',
   'account-delete-preview-failed',
   'collab-revoke-invite-confirm',
+  'account-biometric-disable-confirm',
+  'account-session-revoke-confirm',
+  'developer-app-delete-confirm',
+  'note-delete-confirm',
+  'entry-alternate-remove-confirm',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。

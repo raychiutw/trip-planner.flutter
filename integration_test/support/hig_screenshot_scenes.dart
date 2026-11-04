@@ -527,6 +527,26 @@ Future<void> _tapKeyPrefix(WidgetTester tester, String prefix) async {
   await higSettle(tester);
 }
 
+/// 左滑刪除：拖開第一個 key 以 [prefix] 開頭的列，點出現的刪除鈕（要在確認框跳出前拍）。
+Future<void> _swipeDeleteFirst(WidgetTester tester, String prefix) async {
+  final finder = find.byWidgetPredicate(
+    (w) =>
+        w.key is ValueKey<String> &&
+        (w.key! as ValueKey<String>).value.startsWith(prefix),
+  );
+  expect(finder, findsWidgets, reason: 'key prefix $prefix');
+  final dismissKey = finder.first.evaluate().first.widget.key! as ValueKey;
+  await tester.ensureVisible(finder.first);
+  await tester.pump();
+  await tester.drag(finder.first, const Offset(-500, 0));
+  await higSettle(tester);
+  await tester.tap(
+    find.byKey(ValueKey<Object>(('swipe-delete-action', dismissKey))),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 Future<void> _tapText(WidgetTester tester, String text) async {
   final finder = find.text(text);
   expect(finder, findsWidgets, reason: 'text $text');
@@ -542,6 +562,42 @@ Future<void> _scrollDown(WidgetTester tester, [double dy = -600]) async {
   if (scrollables.evaluate().isEmpty) return;
   await tester.drag(scrollables.first, Offset(0, dy));
   await higSettle(tester);
+}
+
+/// 預設 fixture 每天只有一個有座標的停留點，這裡給第 1 天補第二個，湊出相鄰兩點
+/// （路線抓取、停留點之間的交通方式鈕都需要它）。
+void _day1WithTwoEntries(HigFakes f) {
+  final day1 = releaseSmokeDays.first;
+  final days = [
+    TripDay(
+      id: day1.id,
+      dayNum: day1.dayNum,
+      title: day1.title,
+      version: day1.version,
+      timeline: [
+        ...day1.timeline,
+        TimelineEntry(
+          id: 12,
+          sortOrder: 1,
+          version: 0,
+          startTime: '12:00',
+          endTime: '13:00',
+          title: '國際通',
+          master: const EntryPoiInfo(
+            poiId: 1003,
+            name: '國際通',
+            lat: 26.2142,
+            lng: 127.6879,
+            type: 'sight',
+          ),
+        ),
+      ],
+    ),
+    ...releaseSmokeDays.skip(1),
+  ];
+  when(
+    () => f.trips.watchDays('okinawa'),
+  ).thenAnswer((_) => Stream.value(days));
 }
 
 void _entryDetailOk(HigFakes f) =>
@@ -560,6 +616,28 @@ void _entryDetailOk(HigFakes f) =>
           startTime: '10:00',
           endTime: '11:00',
           title: '那霸機場',
+        ),
+      ),
+    );
+
+/// 停留點的地點管理頁：有正選與一個備選（編輯資訊、左滑移除備選才有東西可點）。
+void _entryWithPois(HigFakes f) =>
+    when(
+      () => f.fixture.trips.watchEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.value(
+        const TimelineEntry(
+          id: 11,
+          sortOrder: 0,
+          version: 1,
+          startTime: '10:00',
+          endTime: '11:00',
+          title: '那霸機場',
+          master: EntryPoiInfo(poiId: 1001, name: '那霸機場', type: 'sight'),
+          alternates: [EntryPoiInfo(poiId: 1002, name: '首里城', type: 'sight')],
         ),
       ),
     );
@@ -773,39 +851,8 @@ List<HigScene> higScenes() => [
     '#418',
     location: '/trips/okinawa/map',
     stub: (f) {
-      // 預設 fixture 每天只有一個有座標的停留點，湊不出相鄰兩點，路線根本不會被抓取，
-      // 失敗提示也就不會出現。這裡給第 1 天補第二個有座標的停留點，並讓路線抓取失敗。
-      final day1 = releaseSmokeDays.first;
-      final days = [
-        TripDay(
-          id: day1.id,
-          dayNum: day1.dayNum,
-          title: day1.title,
-          version: day1.version,
-          timeline: [
-            ...day1.timeline,
-            TimelineEntry(
-              id: 12,
-              sortOrder: 1,
-              version: 0,
-              startTime: '12:00',
-              endTime: '13:00',
-              title: '國際通',
-              master: const EntryPoiInfo(
-                poiId: 1003,
-                name: '國際通',
-                lat: 26.2142,
-                lng: 127.6879,
-                type: 'sight',
-              ),
-            ),
-          ],
-        ),
-        ...releaseSmokeDays.skip(1),
-      ];
-      when(
-        () => f.trips.watchDays('okinawa'),
-      ).thenAnswer((_) => Stream.value(days));
+      // 路線根本不會被抓取（湊不出相鄰兩點）就看不到失敗提示，所以補第二個停留點並讓抓取失敗。
+      _day1WithTwoEntries(f);
       when(
         () => f.map.fetchRoute(
           fromLat: any(named: 'fromLat'),
@@ -1333,6 +1380,146 @@ List<HigScene> higScenes() => [
       await _tapKeyPrefix(tester, 'entry-delete-');
     },
     proof: () => find.textContaining('相關交通時間將重新計算'),
+  ),
+
+  // ── 彈出層補強 3：帳號類的不可復原確認 ──
+  HigScene(
+    'account-biometric-disable-confirm',
+    '#531',
+    location: '/trips?account=home',
+    stub: (f) => f.biometric = _OkBiometric(),
+    act: (tester, f) async {
+      // 有生物辨識的裝置登入後會先跳 App 鎖與生物辨識登入兩個詢問，先都「稍後再說」。
+      for (var i = 0; i < 2 && find.text('稍後再說').evaluate().isNotEmpty; i++) {
+        await _tapText(tester, '稍後再說');
+      }
+      // 先開啟（驗證通過後 enabled=true），再按一次才會跳「關閉並登出」確認。
+      await _tapKey(tester, 'settings-biometric-login');
+      await _tapKey(tester, 'settings-biometric-login');
+    },
+    proof: () => find.byKey(const ValueKey('bio-disable-dialog')),
+  ),
+  HigScene(
+    'account-session-revoke-confirm',
+    '#531',
+    location: '/trips?account=sessions',
+    act: (tester, f) async {
+      await _tapKey(tester, 'account-session-row-s2');
+      await _tapKey(tester, 'account-session-revoke-s2');
+    },
+    proof: () => find.textContaining('這會立即移除此裝置的登入狀態'),
+  ),
+  HigScene(
+    'developer-app-delete-confirm',
+    '#531',
+    location: '/trips?account=developer-apps',
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'developer-app-row-');
+      await tester.drag(
+        find
+            .ancestor(
+              of: find.byKey(const Key('developer-app-name')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        const Offset(0, -2000),
+      );
+      await higSettle(tester);
+      // 場景畫面裡「停用應用程式」捲到底仍有一半在螢幕外（中心點 y=894，螢幕高 874），點不到，
+      // 所以直接觸發它的 onPressed。這個畫面現象本身記為待真機確認（修改清單 A19）。
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('developer-app-delete')),
+      );
+      button.onPressed!();
+      await higSettle(tester);
+    },
+    proof: () => find.textContaining('所有既有連線都將失效'),
+  ),
+
+  // ── 彈出層補強 4：左滑刪除確認與各表單 sheet ──
+  HigScene(
+    'note-delete-confirm',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async => _swipeDeleteFirst(tester, 'note-dismiss-'),
+    proof: () => find.text('刪除筆記'),
+  ),
+  HigScene(
+    'entry-alternate-remove-confirm',
+    '#531',
+    location: '/trips/okinawa/entries/11/pois',
+    stub: _entryWithPois,
+    act: (tester, f) async => _swipeDeleteFirst(tester, 'alt-swipe-'),
+    proof: () => find.text('移除備選景點？'),
+  ),
+  HigScene(
+    'poi-info-edit-sheet',
+    '#531',
+    location: '/trips/okinawa/entries/11/pois',
+    stub: _entryWithPois,
+    act: (tester, f) async => _tapKey(tester, 'poi-edit-master'),
+    proof: () => find.text('編輯地點資訊'),
+  ),
+  HigScene(
+    'entry-edit-sheet',
+    '#531',
+    location: '/trips/okinawa',
+    stub: _entryDetailOk,
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'entry-more-');
+      await _tapKeyPrefix(tester, 'entry-edit-');
+    },
+    proof: () => find.text('編輯停留點'),
+  ),
+  HigScene(
+    'travel-edit-sheet',
+    '#531',
+    location: '/trips/okinawa',
+    stub: _day1WithTwoEntries,
+    act: (tester, f) async => _tapKeyPrefix(tester, 'travel-'),
+    proof: () => find.text('交通方式'),
+  ),
+  HigScene(
+    'share-edit-sheet',
+    '#531',
+    location: '/share-trip/okinawa',
+    stub: (f) => when(() => f.share.fetchShares(any())).thenAnswer(
+      (_) async => const [
+        TripShare(id: 7, label: '給家人', visibleSections: ['timeline']),
+      ],
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'share-actions-7');
+      await _tapKey(tester, 'share-edit-btn-7');
+    },
+    proof: () => find.byKey(const ValueKey('share-edit-label')),
+  ),
+  HigScene(
+    'explore-custom-region-sheet',
+    '#531',
+    location: '/favorites/explore',
+    act: (tester, f) async {
+      await _tapText(tester, '全部地區 ▾');
+      await _tapText(tester, '自訂地區…');
+    },
+    proof: () => find.byKey(const ValueKey('explore-custom-region-field')),
+  ),
+  HigScene(
+    'chat-ai-consent-sheet',
+    '#531',
+    location: '/chat',
+    stub: (f) => when(
+      f.fixture.auth.fetchAiAuthorization,
+    ).thenAnswer((_) async => false),
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('chat-input')),
+        '幫我排 Day 1',
+      );
+      await tester.pump();
+      await _tapKey(tester, 'chat-send');
+    },
+    proof: () => find.byKey(const ValueKey('ai-consent-title')),
   ),
 
   // ── 邀請 ──
