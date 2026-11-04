@@ -66,6 +66,10 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'favorites-removed-notice': {'搜尋收藏 361x36'},
   'sync-conflict-sheet': {'Drag handle 36x4'},
   'sync-conflict-sheet-many': {'Drag handle 36x4'},
+  'entry-edit-sheet-remote-conflict': {'Drag handle 36x4'},
+  'entry-edit-overwrite-confirm': {'Drag handle 36x4'},
+  'note-edit-overwrite-confirm': {'Drag handle 36x4'},
+  'travel-edit-overwrite-confirm': {'Drag handle 36x4'},
 };
 
 /// 刻意在畫面上顯示對話框的場景。其餘場景若出現對話框，代表畫面被不相干的詢問蓋住
@@ -87,6 +91,9 @@ const _scenesWithDialog = {
   'entry-alternate-remove-confirm',
   'add-to-trip-time-conflict-alert',
   'trip-edit-delete-day-confirm',
+  'entry-edit-overwrite-confirm',
+  'note-edit-overwrite-confirm',
+  'travel-edit-overwrite-confirm',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。

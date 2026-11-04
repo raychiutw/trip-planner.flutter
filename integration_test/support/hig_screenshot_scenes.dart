@@ -35,9 +35,11 @@ import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/day.dart' show TripDay;
 import 'package:tripline/models/entry.dart' show EntryPoiInfo, TimelineEntry;
+import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
@@ -89,6 +91,15 @@ class HigFakes {
   /// 預設裝置沒有生物辨識：否則每個已登入場景都會被「要用 Face ID 登入嗎？」詢問蓋住，
   /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]／[_OkBiometric]。
   BiometricAuthenticator biometric = _NoBiometric();
+
+  /// 停留點詳情的 watch 流（[_entryDetailLive] 建立）：場景在 act 裡往裡面送「協作者的新版本」，
+  /// 造出編輯 sheet 的「遠端衝突」狀態。用 StreamController 而不是 Stream.value，是因為衝突要在
+  /// 使用者已經改了欄位之後才發生，順序無法靠一次性 stub 表達。
+  StreamController<TimelineEntry>? entryDetail;
+
+  /// 交通段目前「伺服器上的」內容：每次（重新）訂閱 watchSegments 都回這份。交通 sheet 是 409 後
+  /// 才 invalidate 並重新訂閱來取得對方版本，所以改這個欄位就等於協作者改了資料。
+  List<TripSegment> segmentsNow = const [];
 
   MockAuthRepositoryAlias get auth => fixture.auth;
   MockTripRepository get trips => fixture.trips;
@@ -635,6 +646,112 @@ void _day1WithTwoEntries(HigFakes f) {
   when(
     () => f.trips.watchDays('okinawa'),
   ).thenAnswer((_) => Stream.value(days));
+}
+
+/// 停留點詳情改走可手動送值的 StreamController（見 [HigFakes.entryDetail]）。
+void _entryDetailLive(HigFakes f) {
+  final c = StreamController<TimelineEntry>.broadcast();
+  addTearDown(c.close);
+  f.entryDetail = c;
+  when(
+    () => f.fixture.trips.watchEntry(
+      tripId: any(named: 'tripId'),
+      entryId: any(named: 'entryId'),
+    ),
+  ).thenAnswer((_) => c.stream);
+}
+
+const _higEntryBase = TimelineEntry(
+  id: 11,
+  sortOrder: 0,
+  version: 1,
+  startTime: '10:00',
+  endTime: '11:00',
+  title: '那霸機場',
+);
+
+/// 開停留點編輯 sheet → 改備註 → 協作者同時改了備註與起始時間（版本較新）。
+/// 備註兩邊都動 = 真衝突，起始時間只有對方動 = 直接採用（畫面上會變 9:30，當作「新版本確實進來了」的證據）。
+Future<void> _entryEditWithRemoteConflict(
+  WidgetTester tester,
+  HigFakes f,
+) async {
+  await _tapKeyPrefix(tester, 'entry-more-');
+  await _tapKeyPrefix(tester, 'entry-edit-');
+  f.entryDetail!.add(_higEntryBase);
+  await higSettle(tester);
+  await tester.enterText(find.byKey(const ValueKey('entry-edit-desc')), '我的草稿');
+  await tester.pump();
+  f.entryDetail!.add(
+    const TimelineEntry(
+      id: 11,
+      sortOrder: 0,
+      version: 2,
+      startTime: '09:30',
+      endTime: '11:00',
+      title: '那霸機場',
+      description: '協作者的備註',
+    ),
+  );
+  await higSettle(tester);
+}
+
+/// 筆記與交通沒有「即時推送」：都是第一次儲存吃 409，重新載入對方版本，第二次儲存才跳確認。
+/// 所以兩者的造法是「讓寫入回 409、讓重新載入回較新版本」，再連按兩次儲存。
+void _noteConflictStub(HigFakes f) {
+  when(
+    () => f.trips.updateNote(
+      NoteSection.flights,
+      tripId: any(named: 'tripId'),
+      rowId: any(named: 'rowId'),
+      fields: any(named: 'fields'),
+      expectedVersion: any(named: 'expectedVersion'),
+    ),
+  ).thenAnswer(
+    (_) async => throw const ApiError(
+      status: 409,
+      code: 'STALE_ENTRY',
+      message: '版本已更新',
+    ),
+  );
+  when(() => f.trips.fetchFreshNotes(any())).thenAnswer(
+    (_) async => const TripNotes(
+      flights: [TripFlight(id: 1, sortOrder: 0, version: 9, airline: '協作者航空')],
+    ),
+  );
+}
+
+void _travelConflictStub(HigFakes f) {
+  _day1WithTwoEntries(f);
+  f.segmentsNow = const [
+    TripSegment(
+      id: 50,
+      fromEntryId: 11,
+      toEntryId: 12,
+      mode: 'driving',
+      min: 10,
+      source: 'manual',
+      version: 1,
+    ),
+  ];
+  when(
+    () => f.trips.watchSegments(tripId: 'okinawa'),
+  ).thenAnswer((_) => Stream.value(f.segmentsNow));
+  when(
+    () => f.trips.updateSegment(
+      tripId: any(named: 'tripId'),
+      segmentId: any(named: 'segmentId'),
+      mode: any(named: 'mode'),
+      submode: any(named: 'submode'),
+      clearSubmode: any(named: 'clearSubmode'),
+      min: any(named: 'min'),
+      noTravel: any(named: 'noTravel'),
+      expectedVersion: any(named: 'expectedVersion'),
+    ),
+  ).thenAnswer(
+    (_) async =>
+        throw const ApiError(status: 409, code: 'STALE_ENTRY', message: '版本衝突'),
+  );
 }
 
 void _entryDetailOk(HigFakes f) =>
@@ -1613,6 +1730,76 @@ List<HigScene> higScenes() => [
       await _tapKeyPrefix(tester, 'entry-edit-');
     },
     proof: () => find.text('編輯停留點'),
+  ),
+  // 「保留你的版本？」三處確認：停留點靠即時推送，筆記與交通靠 409 後重新載入（見各 stub 的註解）。
+  // 確認框標題在三處（筆記是「保留你的修改？」）幾乎相同，所以 act 內另外斷言背景 sheet 的專屬文字。
+  HigScene(
+    'entry-edit-sheet-remote-conflict',
+    '#559',
+    location: '/trips/okinawa',
+    stub: _entryDetailLive,
+    act: _entryEditWithRemoteConflict,
+    // 9:30 只可能來自協作者的新版本，證明遠端更新已併進表單（與草稿同時存在）。
+    proof: () => find.textContaining('9:30'),
+  ),
+  HigScene(
+    'entry-edit-overwrite-confirm',
+    '#559',
+    location: '/trips/okinawa',
+    stub: _entryDetailLive,
+    act: (tester, f) async {
+      await _entryEditWithRemoteConflict(tester, f);
+      await _tapKey(tester, 'entry-edit-submit');
+      expect(find.text('編輯停留點'), findsWidgets, reason: '背景要是停留點編輯 sheet');
+      expect(find.textContaining('9:30'), findsWidgets, reason: '對方版本已進表單');
+    },
+    proof: () => find.text('保留我的版本'),
+  ),
+  HigScene(
+    'note-edit-overwrite-confirm',
+    '#561',
+    location: '/trips/okinawa/notes',
+    stub: _noteConflictStub,
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'note-dismiss-flights-');
+      await tester.enterText(
+        find.byKey(const ValueKey('note-field-airline')),
+        '我的草稿',
+      );
+      await tester.pump();
+      await _tapKey(tester, 'note-edit-submit');
+      await _tapKey(tester, 'note-edit-submit');
+      expect(find.text('我的草稿'), findsWidgets, reason: '背景要是筆記編輯 sheet 且保留草稿');
+    },
+    // 筆記的確認標題是「保留你的修改？」，與停留點、交通的「保留你的版本？」不同。
+    proof: () => find.text('保留我的修改'),
+  ),
+  HigScene(
+    'travel-edit-overwrite-confirm',
+    '#561',
+    location: '/trips/okinawa',
+    stub: _travelConflictStub,
+    act: (tester, f) async {
+      await _tapKey(tester, 'travel-edit-50');
+      await tester.enterText(find.byKey(const ValueKey('travel-min')), '25');
+      await tester.pump();
+      // 協作者在我們儲存前改了交通段：之後的重新載入才會拿到 v2。
+      f.segmentsNow = const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          min: 40,
+          source: 'manual',
+          version: 2,
+        ),
+      ];
+      await _tapKey(tester, 'travel-submit');
+      await _tapKey(tester, 'travel-submit');
+      expect(find.text('交通方式'), findsWidgets, reason: '背景要是交通編輯 sheet');
+    },
+    proof: () => find.text('協作者也更新了交通設定。繼續會以你目前的交通方式與分鐘數覆蓋對方版本。'),
   ),
   HigScene(
     'travel-edit-sheet',
