@@ -17,8 +17,9 @@ trips-list	bytesEqual=false	lumLight=247.7	lumDark=13.3	diffPixels=99.9%
 trips-list-load-failed	bytesEqual=false	lumLight=248.9	lumDark=9.9	diffPixels=99.9%
 trips-list-empty	bytesEqual=false	lumLight=247.0	lumDark=12.0	diffPixels=99.8%
 trip-create	bytesEqual=false	lumLight=248.6	lumDark=9.4	diffPixels=99.7%
-trip-edit	bytesEqual=false	lumLight=244.7	lumDark=11.6	diffPixels=99.6%
-trip-edit-load-failed	bytesEqual=false	lumLight=252.6	lumDark=2.6	diffPixels=100.0%
+trip-edit	bytesEqual=false	lumLight=242.8	lumDark=13.7	diffPixels=99.6%
+trip-edit-save-failed	bytesEqual=false	lumLight=242.5	lumDark=13.9	diffPixels=99.6%
+trip-edit-load-failed	bytesEqual=false	lumLight=252.5	lumDark=2.7	diffPixels=100.0%
 trip-timeline	bytesEqual=false	lumLight=243.5	lumDark=17.8	diffPixels=99.9%
 trip-map	bytesEqual=false	lumLight=212.9	lumDark=28.9	diffPixels=97.0%
 trip-map-route-failed	bytesEqual=false	lumLight=212.9	lumDark=28.9	diffPixels=97.0%

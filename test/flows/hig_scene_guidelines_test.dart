@@ -34,6 +34,7 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'trips-list-empty': {'搜尋行程 361x36'},
   'trip-create': {'搜尋地點（城市、景點） 305x36'},
   'trip-edit': {'搜尋地點（城市、景點） 305x36'},
+  'trip-edit-save-failed': {'搜尋地點（城市、景點） 305x36'},
   'favorites': {'搜尋收藏 361x36'},
   'favorites-load-failed': {'搜尋收藏 361x36'},
   'account-developer-app-new': {'(無標籤) 40x40'},

@@ -21,7 +21,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `/auth/password/reset` | ResetPasswordScreen | 已有場景 | `auth-reset-password` `auth-reset-password-success` `auth-reset-password-expired` |
 | `/auth/verify-email` | VerifyEmailScreen | 已有場景 | `auth-verify-email` `auth-verify-email-success` `auth-verify-email-incomplete` |
 | `/new-trip` | CreateTripScreen | 已有場景 | `trip-create` `ax-trip-create-2x` |
-| `/edit-trip/:tripId` | EditTripScreen | 已有場景 | `trip-edit` `trip-edit-load-failed` |
+| `/edit-trip/:tripId` | EditTripScreen | 已有場景 | `trip-edit` `trip-edit-save-failed` `trip-edit-load-failed` |
 | `/collab/:tripId` | CollabScreen | 已有場景 | `collab` `collab-load-failed` `collab-remove-member-confirm` `collab-revoke-invite-confirm` |
 | `/share-trip/:tripId` | ShareScreen | 已有場景 | `share-manage` `share-custom-expiry-missing` `share-created-card` `share-create-failed` `share-list-load-failed` `share-revoke-confirm` `ax-share-manage-2x` |
 | `/oauth/consent` | InvalidLinkScreen（固定提示文字） | 已有場景 | `oauth-consent-invalid` |

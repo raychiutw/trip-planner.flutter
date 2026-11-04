@@ -820,7 +820,7 @@ List<HigScene> higScenes() => [
   const HigScene('trip-create', '#424 #426', location: '/new-trip'),
   HigScene(
     'trip-edit',
-    '#417 #424',
+    '#417 #424 #546',
     location: '/edit-trip/okinawa',
     stub: (f) => when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
       (_) async => const Trip(
@@ -833,6 +833,45 @@ List<HigScene> higScenes() => [
         endDate: '2026-11-04',
       ),
     ),
+    proof: () => find.byKey(const ValueKey('edit-done')),
+  ),
+  HigScene(
+    'trip-edit-save-failed',
+    '#549',
+    location: '/edit-trip/okinawa',
+    stub: (f) {
+      when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
+        (_) async => const Trip(
+          id: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          description: '四天三夜',
+          lang: 'zh-TW',
+          startDate: '2026-11-01',
+          endDate: '2026-11-04',
+        ),
+      );
+      when(
+        () => f.trips.updateTrip(
+          any(),
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          lang: any(named: 'lang'),
+          published: any(named: 'published'),
+          destinations: any(named: 'destinations'),
+        ),
+      ).thenAnswer((_) async => throw _failure);
+    },
+    // 改標題後離開欄位 → 送出失敗：輸入保留，錯誤與「重試」就在標題欄位下方。
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('edit-title')),
+        '沖繩家族之旅（改）',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await higSettle(tester);
+    },
+    proof: () => find.byKey(const ValueKey('edit-retry-title')),
   ),
   HigScene(
     'trip-edit-load-failed',
