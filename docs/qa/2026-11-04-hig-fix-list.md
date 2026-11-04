@@ -75,8 +75,7 @@
 | W7 | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
 | W8 | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
 | W9 | `trips-list-error` | G6、G7 | 行程清單載入失敗只有一行字，沒有重試（`TripsListPage` 錯誤態沒有任何重試動作） | 補「重試」，行為與 App 的錯誤態一致 | 看圖加程式碼 |
-| W10 | `invite-invalid` | G6、G7 | 邀請連結無效（永久失效）卻只提供「重試載入」，也沒有回首頁或登入的出口 | 無效連結不給重試，改給「回首頁」或「登入」 | 看圖 |
-| W11 | `signup-check-email`、`invite` | B7 | 320px 加 200% 文字時橫向捲動（scrollWidth 354、366 對 320）；尚未定位是哪個元素 | 先定位再修；用 `hig-a11y-collect` 的重排檢查驗證 | 量測（未定位） |
+| W10 | `signup-check-email`、`invite` | B7 | 以「320px、html 字級 200%」近似量測有橫向捲動（scrollWidth 354、366 對 320），原因未定位；近似量法，是否構成 1.4.10 違規待驗證 | 先定位再修，並用瀏覽器縮放驗證 | 量測（未定位） |
 
 web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告「補掃」一節：重排與放大沒有橫向捲動；`explore` 搜尋欄的焦點樣式待目視確認；`landing` 的 200% 文字檢查沒有生效。
 
