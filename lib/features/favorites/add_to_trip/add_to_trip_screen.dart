@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart' show GoRouter;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -543,13 +544,50 @@ class _AddToTripRouteState extends StatelessWidget {
           ? const AppListLoadingSkeleton(
               key: ValueKey('add-to-trip-route-loading'),
             )
-          : Center(
-              child: Padding(
-                padding: const EdgeInsets.all(TpSpacing.s6),
-                child: Text(message ?? '載入失敗', textAlign: TextAlign.center),
+          : Semantics(
+              liveRegion: true,
+              container: true,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(TpSpacing.s6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 錯誤不只靠文字：加圖示，並給下一步（返回），不讓人卡在死路。
+                      Icon(
+                        CupertinoIcons.exclamationmark_circle,
+                        key: const ValueKey('add-to-trip-route-error-icon'),
+                        size: 40,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: TpSpacing.s3),
+                      Text(
+                        message ?? '載入失敗',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: TpSpacing.s4),
+                      FilledButton(
+                        key: const ValueKey('add-to-trip-route-back'),
+                        onPressed: () => _leave(context),
+                        child: const Text('返回'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
     );
+  }
+
+  /// 有上一頁就 pop；直接開啟（深連結）沒有上一頁時回收藏，避免按鈕沒反應。
+  static void _leave(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      GoRouter.maybeOf(context)?.go('/favorites');
+    }
   }
 }
 

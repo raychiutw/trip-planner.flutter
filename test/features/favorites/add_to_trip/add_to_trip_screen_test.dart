@@ -1229,6 +1229,43 @@ void main() {
     expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsOneWidget);
   });
 
+  testWidgets('route loader：錯誤態除了原因還有圖示與「返回」，按下會回到上一頁', (tester) async {
+    // 從啟動頁 push 進錯誤態，才有「上一頁」可回。
+    await tester.pumpWidget(
+      buildScoped(
+        Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AddToTripRouteScreen(
+                    uri: Uri.parse('/favorites/add-to-trip'),
+                  ),
+                ),
+              ),
+              child: const Text('launcher'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('launcher'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('add-to-trip-route-error-icon')),
+      findsOneWidget,
+    );
+    final back = find.byKey(const ValueKey('add-to-trip-route-back'));
+    expect(back, findsOneWidget, reason: '錯誤態要有下一步動作，不是只有一行字');
+
+    await tester.tap(back);
+    await tester.pumpAndSettle();
+    expect(find.text('launcher'), findsOneWidget);
+    expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsNothing);
+  });
+
   testWidgets('favorite mode：選 trip/day(預設)→ 送出呼叫 addFavoriteToTrip', (
     tester,
   ) async {
