@@ -15,15 +15,15 @@
 
 | 結論 | 場景數 |
 |---|---|
-| 符合 | 16 |
-| 未見明顯問題 | 40 |
-| 疑慮 | 10 |
+| 符合 | 33 |
+| 未見明顯問題 | 47 |
+| 疑慮 | 13 |
 | 張力（與檢查表建議衝突，但屬已知專案決策） | 3 |
-| 場景無效（截圖沒有證明想證明的畫面） | 2 |
-| 無法判讀 | 1 |
-| **未看** | **30** |
+| 場景無效（截圖沒有證明想證明的畫面） | 3 |
+| 無法判讀 | 3 |
+| 未看 | 0 |
 
-「未看」的 30 個：`ax-*` 共 20 個大字級場景、`components` 與 `global-map`，以及 `share-custom-expiry-missing`、`share-list-load-failed`、`invite-wrong-account`、`invite-logged-out`、`invite-load-failed`、`public-share-signed-in`、`add-to-trip-invalid-favorite`、`add-to-trip-missing-data`。**所以 B2（放大 200%）這一類完全沒有逐張檢查過。**「未見明顯問題」只代表目視沒看到，沒有量字級，也沒有逐一量對比。
+102 個場景全部看過（第一輪看 72 個，第二輪補看 30 個，含 20 個 `ax-*` 大字級場景）。B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-favorites-2x`、`ax-trip-map-2x` 除外，見發現 12 與逐場景），分段控制元件在大字級改垂直堆疊是刻意設計。「未見明顯問題」只代表目視沒看到，沒有量字級，也沒有逐一量對比。
 
 ## 需要處理的發現
 
@@ -39,8 +39,11 @@
 | 8 | `trip-health-findings` | 版面 | 第二張建議卡只有第一張一半寬 | 看圖 |
 | 9 | `oauth-consent-invalid` | D3 | 沒有返回鈕或導覽列，只有頁內連結 | 看圖 |
 | 10 | `trip-map`、`trip-map-route-failed` | C1 | 玻璃元件量得 2.07～2.74:1，但背景是測試用純色，**不能當作對真實地圖的結論** | 像素量測，結論受限 |
+| 11 | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G4、D12 | 錯誤態只有一行灰字，沒有圖示、重試或返回，底部分頁列仍顯示 | 看圖 |
+| 12 | `ax-favorites-2x` | — | 場景沒有餵資料流，只拍到載入骨架，不是 2x 的清單畫面 | 看圖加程式碼對照 `favorites` 場景 |
+| 13 | `ax-public-share-2x` | B2 | 「登入後複製行程」折行剩孤字，與圖示鈕擠同列 | 看圖 |
 
-第 2、3 項是**證據本身的缺陷**（場景沒有證明想證明的畫面），不是 App 缺陷。這兩個場景的守門（proof）只確認「畫面上有錯誤元素」，沒確認是想證明的那一種，需要修場景。
+第 2、3、12 項是**證據本身的缺陷**（場景沒有證明想證明的畫面），不是 App 缺陷。這兩個場景的守門（proof）只確認「畫面上有錯誤元素」，沒確認是想證明的那一種，需要修場景。
 
 與專案決策有張力（非新發現）：`account-home`、`account-home-security` 有生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。
 
@@ -62,8 +65,8 @@
 | `account-settings-notifications` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `account-settings-profile` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `add-to-trip-direct` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
-| `add-to-trip-invalid-favorite` | 未看 | — | — | 本輪未逐張檢視 |
-| `add-to-trip-missing-data` | 未看 | — | — | 本輪未逐張檢視 |
+| `add-to-trip-invalid-favorite` | 淺深已看 | 疑慮 | G4、D12 | 錯誤只有一行灰字「收藏 ID 無效」，沒有圖示、重試或返回；底部分頁列仍顯示（同發現 5） |
+| `add-to-trip-missing-data` | 淺深已看 | 疑慮 | G4、D12 | 同上：一行灰字，沒有下一步動作，底部分頁列仍顯示 |
 | `app-lock-enable-prompt` | 淺深已看 | 張力 | F7 | App 內詢問是否開啟 Face ID，與 F7 建議有張力（同上）；alert 結構符合 G2、G3 |
 | `app-lock-locked-ax-2x` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `app-lock-locked` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
@@ -79,31 +82,31 @@
 | `auth-verify-email-success` | 淺深已看 | 符合 | D3、D4 | 返回用標準符號、單一 prominent 動作在右上；文字說明齊全
 | `auth-verify-email` | 淺深已看 | 符合 | D3、D4 | 返回用標準符號、單一 prominent 動作在右上；文字說明齊全
 | `auth-welcome` | 淺深已看 | 符合 | F3 | 沒有密碼欄（OAuth 瀏覽器登入）；錯誤有文字說明（G6）。深色為純黑底 |
-| `ax-account-appearance-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-account-home-2x-bottom` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-account-home-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-account-notifications-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-chat-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-components-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-explore-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-favorites-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-invite-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-login-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-public-share-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-share-manage-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trip-create-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trip-map-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trip-notes-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trip-print-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trip-timeline-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trips-list-2x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-trips-list-3x` | 未看 | — | — | 本輪未逐張檢視 |
-| `ax-welcome-2x` | 未看 | — | — | 本輪未逐張檢視 |
+| `ax-account-appearance-2x` | 淺深已看 | 符合 | B2 | 2x 下選項不截斷，勾選清楚 |
+| `ax-account-home-2x-bottom` | 淺深已看 | 符合 | B2 | 捲到底仍完整，登出與刪除帳號的紅色在深淺兩色都清楚 |
+| `ax-account-home-2x` | 淺深已看 | 符合 | B2 | 長文換行、列高跟著長，沒有截斷，可捲動 |
+| `ax-account-notifications-2x` | 淺深已看 | 符合 | B2 | 說明文字換行，開關仍在右側可點 |
+| `ax-chat-2x` | 淺深已看 | 符合 | B2 | 建議按鈕折行不截斷，輸入列完整 |
+| `ax-components-2x` | 淺深已看 | 未見明顯問題 | B2 | 分段控制在大字級改垂直堆疊（`tp_segmented_control.dart:106` 的刻意設計）；選中態只靠底色 |
+| `ax-explore-2x` | 淺深已看 | 未見明顯問題 | B2 | 篩選膠囊橫向可捲，右側被截斷屬預期；卡片折行正常 |
+| `ax-favorites-2x` | 淺深已看 | 場景無效 | — | 沒有餵收藏資料流（對照 `favorites` 場景有 `act`），只拍到載入骨架，沒證明 2x 的清單畫面 |
+| `ax-invite-2x` | 淺深已看 | 符合 | B2 | 卡片與按鈕折行不截斷 |
+| `ax-login-2x` | 淺深已看 | 符合 | B2 | 按鈕與連結置中完整 |
+| `ax-public-share-2x` | 淺深已看 | 疑慮 | B2、版面 | 「登入後複製行程」折成兩行並剩孤字「程」，與兩個圖示鈕擠在同一列 |
+| `ax-share-manage-2x` | 淺深已看 | 符合 | B2 | 分段控制堆疊、標籤欄位不截斷 |
+| `ax-trip-create-2x` | 淺深已看 | 符合 | B2 | 日期欄位與分段控制堆疊，沒有截斷 |
+| `ax-trip-map-2x` | 淺深已看 | 無法判讀 | — | 背景是測試用地圖 fixture，玻璃元件的對比與層次不能下結論；底部卡片文字折行正常 |
+| `ax-trip-notes-2x` | 淺深已看 | 未見明顯問題 | B2 | 日期「星期日」折出孤字「日」，不影響閱讀 |
+| `ax-trip-print-2x` | 淺深已看 | 符合 | B2 | 內容折行正常 |
+| `ax-trip-timeline-2x` | 淺深已看 | 符合 | B2 | 時間軸與停留點卡片折行不截斷 |
+| `ax-trips-list-2x` | 淺深已看 | 符合 | B2 | 分段控制堆疊；卡片高度跟著長 |
+| `ax-trips-list-3x` | 淺深已看 | 未見明顯問題 | B2 | 標題折成兩行；底部分頁列蓋住最後一張卡（可捲動），標籤彼此貼近 |
+| `ax-welcome-2x` | 淺深已看 | 符合 | B2 | 大標與內文折行、按鈕完整 |
 | `chat-voice-consent` | 淺深已看 | 符合 | G2、G3、G4 | alert／action sheet 結構、取消在 leading、破壞性動作用紅字，目視符合 |
 | `chat` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `collab-load-failed` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `collab` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
-| `components` | 未看 | — | — | 本輪未逐張檢視 |
+| `components` | 淺深已看 | 未見明顯問題 | — | 元件示範頁；右上角 DEBUG 角標是 debug build 的標示，不是 App 問題 |
 | `entry-add` | 淺深已看 | 疑慮 | D12 | modal 式表單（取消／儲存在頂部）底下仍顯示底部分頁列；取消在左、完成在右（D8）符合 |
 | `entry-copy` | 淺深已看 | 疑慮 | D12 | modal 式表單（取消／儲存在頂部）底下仍顯示底部分頁列；取消在左、完成在右（D8）符合 |
 | `entry-edit` | 淺深已看 | 疑慮 | D12 | modal 式表單（取消／儲存在頂部）底下仍顯示底部分頁列；取消在左、完成在右（D8）符合 |
@@ -116,21 +119,21 @@
 | `favorites` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `global-map-empty` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `global-map-load-failed` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
-| `global-map` | 未看 | — | — | 本輪未逐張檢視 |
-| `invite-load-failed` | 未看 | — | — | 本輪未逐張檢視 |
-| `invite-logged-out` | 未看 | — | — | 本輪未逐張檢視 |
+| `global-map` | 淺深已看 | 無法判讀 | — | 背景是測試用地圖 fixture，不能當地圖畫面的證據 |
+| `invite-load-failed` | 淺深已看 | 未見明顯問題 | G4 | 有重試與「暫不加入」；淺色橫幅是高彩度鮭紅，與深色的深紅風格落差大 |
+| `invite-logged-out` | 淺深已看 | 符合 | F | 主要動作「註冊並加入」、次要「登入並加入」層級清楚 |
 | `invite-signed-in` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `invite-wrong-account-pending` | 淺深已看 | 符合 | G2、G3、G4 | alert／action sheet 結構、取消在 leading、破壞性動作用紅字，目視符合 |
-| `invite-wrong-account` | 未看 | — | — | 本輪未逐張檢視 |
+| `invite-wrong-account` | 淺深已看 | 符合 | G4 | 邀請帳號與目前帳號並列，動作是「切換帳號」 |
 | `oauth-consent-invalid` | 淺深已看 | 疑慮 | D3 | 無返回鈕也無關閉鈕，只有頁內「返回行程列表」連結；標題靠左無導覽列（InvalidLinkScreen 固定提示頁） |
 | `offline-banner-network` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `offline-banner-pending` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
-| `public-share-signed-in` | 未看 | — | — | 本輪未逐張檢視 |
+| `public-share-signed-in` | 淺深已看 | 符合 | E | 登入後主動作文字改為「複製到我的行程」 |
 | `public-share` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `share-create-failed` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `share-created-card` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
-| `share-custom-expiry-missing` | 未看 | — | — | 本輪未逐張檢視 |
-| `share-list-load-failed` | 未看 | — | — | 本輪未逐張檢視 |
+| `share-custom-expiry-missing` | 淺深已看 | 符合 | F5、G | 就地錯誤「請選擇到期日」，建立鈕停用 |
+| `share-list-load-failed` | 淺深已看 | 未見明顯問題 | G4 | 有就地錯誤與「重試」；錯誤文字約 12pt，偏小 |
 | `share-manage` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `trip-audit-empty` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `trip-audit-load-failed` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
@@ -153,7 +156,7 @@
 
 ## 沒做的事
 
-- 30 個場景沒看；B2 大字級整類沒檢查。
+- B2 只做了目視：沒有量實際字級倍率，也沒檢查系統「更大字體」在真機上的上限（模擬器以 textScale 2.0、3.0 模擬）。
 - 沒有量字級（B1）、沒有逐一量對比（C1、C2 只量了上面幾處）、沒有檢查 Increase Contrast、Reduce Motion、VoiceOver 標籤。
 - 目視判讀有主觀成分，上表「符合」是我看圖的結論，沒有第二人複核。
 - 場景是 mock 資料與測試用地圖，真實畫面（含真實地圖、鍵盤、系統 alert）需真機驗證。
