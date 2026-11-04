@@ -111,6 +111,8 @@ void main() {
         debugPrint('HIGTAP\t$name\t${violations.toList()..sort()}');
         // 收集模式：只印不斷言（失敗的測試收尾會多拖約 90 秒，整批掃描太慢）。
         if (_collectOnly) return;
+        // 先卸載畫面再斷言：失敗時若畫面還掛著，收尾會拖約 90 秒並連帶拖垮後面的場景。
+        await tester.pumpWidget(const SizedBox.shrink());
         final known = _knownTapTargetViolations[name] ?? const <String>{};
         expect(
           violations.difference(known),
