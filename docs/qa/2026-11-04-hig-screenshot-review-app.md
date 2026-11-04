@@ -65,8 +65,8 @@
 | `account-settings-notifications` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `account-settings-profile` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `add-to-trip-direct` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
-| `add-to-trip-invalid-favorite` | 淺深已看（重拍） | 符合 | G6、G7 | 重拍後有圖示、原因與「返回」鈕；底部分頁列仍顯示（屬 A4 待決定）（#544 A2 已修） |
-| `add-to-trip-missing-data` | 淺深已看（重拍） | 符合 | G6、G7 | 重拍後有圖示、原因與「返回」鈕；底部分頁列仍顯示（屬 A4 待決定）（#544 A2 已修） |
+| `add-to-trip-invalid-favorite` | 淺深已看（重拍） | 符合 | G6、G7 | 重拍後用專案的 TpStateView：警示圖示、原因與「返回」鈕；底部分頁列仍顯示（屬 A4 待決定）（#544 A2 已修） |
+| `add-to-trip-missing-data` | 淺深已看（重拍） | 符合 | G6、G7 | 重拍後用專案的 TpStateView：警示圖示、原因與「返回」鈕；底部分頁列仍顯示（屬 A4 待決定）（#544 A2 已修） |
 | `app-lock-enable-prompt` | 淺深已看 | 張力 | F7 | App 內詢問是否開啟 Face ID，與 F7 建議有張力（同上）；alert 結構符合 G2、G3 |
 | `app-lock-locked-ax-2x` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `app-lock-locked` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
