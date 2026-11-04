@@ -6,6 +6,7 @@ enum _HeaderContract {
   root,
   authenticatedDetail,
   modalForm,
+  instantSave,
   accountException,
   authException,
   publicException,
@@ -107,7 +108,7 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
     'CreateTripScreen': _HeaderContract.modalForm,
   },
   'lib/features/trips/edit/edit_trip_screen.dart': {
-    'EditTripScreen': _HeaderContract.modalForm,
+    'EditTripScreen': _HeaderContract.instantSave,
   },
   'lib/features/trips/health/trip_health_screen.dart': {
     'TripHealthScreen': _HeaderContract.authenticatedDetail,
@@ -219,11 +220,16 @@ void main() {
           !source.contains('TpAppBarRole.modalForm')) {
         violations.add('${entry.key}: modal/form 缺少 modalForm TpAppBar');
       }
+      if (contracts.contains(_HeaderContract.instantSave) &&
+          !source.contains('TpAppBarRole.modalInstant')) {
+        violations.add('${entry.key}: 即時儲存頁缺少 modalInstant TpAppBar');
+      }
       if (contracts.any(
             (contract) =>
                 contract == _HeaderContract.root ||
                 contract == _HeaderContract.authenticatedDetail ||
-                contract == _HeaderContract.modalForm,
+                contract == _HeaderContract.modalForm ||
+                contract == _HeaderContract.instantSave,
           ) &&
           (source.contains('SliverAppBar') || source.contains('largeTitle'))) {
         violations.add('${entry.key}: 不得使用 Large Title');

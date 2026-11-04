@@ -52,6 +52,7 @@ class DraftSession<D, R> extends ChangeNotifier {
   DraftSaved<R>? _lastSaved;
 
   D get draft => _draft;
+  D get baseline => _baseline;
   bool get dirty => !_equivalent(_draft, _baseline);
   bool get submitting => _submitting;
   bool get canSubmit => !_disposed && !_submitting && dirty;
