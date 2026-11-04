@@ -376,8 +376,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 | 外觀 | 背景 | 圖形 |
 |---|---|---|
-| Default | 木棕 `#A97A4A` | 奶油白 `#FFFBF5` |
-| Dark | 棕黑 `#1A140F` | 木棕 `#A97A4A` |
+| Default | 木棕 `#8A6038` | 奶油白 `#FFFBF5` |
+| Dark | 棕黑 `#1A140F` | 木棕 `#8A6038` |
 | Tinted | 等亮度灰 `#818181` | 白色（供系統著色） |
 
 - **Tripline 決策**：不預先裁圓角，由系統套用遮罩。
@@ -386,7 +386,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：Android 沿用既有 `mipmap-*/ic_launcher.png`，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
 - 所有 PNG 必須是正方形、正確像素尺寸且**不含 alpha**。
 
-木棕 `#A97A4A` 就是 GLOSSARY.md 定義的 tint（品牌柔褐）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。
+木棕 `#8A6038` 就是 GLOSSARY.md 定義的淺色 tint（品牌柔褐，全產品單一值）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。Dark 變體的圖形色沿用同一個值，不另用深色 tint `#D0A576`；Tinted 變體是給系統上色的灰階稿，不含品牌色。
+
+換色用 `tool/recolor_app_icon.swift`（macOS 內建 swift）：`bg` 換 Default 底色、`glyph` 換 Dark 圖形色，抗鋸齒邊緣會一併重混；Android 五種密度由 Default 主檔以 `sips -z <px> <px>` 縮放（48／72／96／144／192）。守門測試是 `test/docs/app_icon_brand_tint_test.dart`。web 圖示以同一份 iOS 主檔為準。
 
 ## 17. Motion 與 haptics
 
