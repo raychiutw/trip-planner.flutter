@@ -523,6 +523,35 @@ void main() {
       expect(await future, isTrue);
     });
 
+    for (final (name, theme, brightness, literal) in [
+      ('Light', AppTheme.light(), Brightness.light, 0xFFD70015),
+      ('Dark', AppTheme.dark(), Brightness.dark, 0xFFFF6961),
+    ]) {
+      testWidgets('alert 的破壞性動作畫出 $name Tripline 破壞性紅（#551）', (tester) async {
+        await tester.pumpWidget(
+          destructiveHost(
+            source: TpDestructiveConfirmSource.direct,
+            theme: theme,
+            platformBrightness: brightness,
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        Finder actionText(String label) => find.descendant(
+          of: find.widgetWithText(CupertinoDialogAction, label),
+          matching: find.text(label),
+        );
+        final painted = paintedColorOf(tester, actionText('刪除'));
+        expect(painted, isSameColorAs(Color(literal)));
+        // 取消不得跟著變紅，否則上一條在全紅時也會過。
+        expect(
+          paintedColorOf(tester, actionText('取消')),
+          isNot(isSameColorAs(Color(literal))),
+        );
+      });
+    }
+
     testWidgets('regular size class 不出貼底的 action sheet', (tester) async {
       // iPad 直向。regular size class 的判定沿用 `showAppContentSheet` 的
       // 同一條規則，不另訂寬度門檻。

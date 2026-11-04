@@ -180,6 +180,14 @@ Future<TimeOfDay?> showAppTimePicker(
   );
 }
 
+/// 確認框破壞性動作的文字樣式：Tripline 破壞性紅（#551）。
+///
+/// Cupertino 的 `isDestructiveAction` 在 alert 上固定畫 systemRed（淺色對白底
+/// 約 3.0～3.4:1），顏色來源在套件內、不吃 Theme；以 child 的 style 覆寫，
+/// 保留 `isDestructiveAction` 的語意與 adaptive 結構。
+TextStyle tpDestructiveActionStyle(BuildContext context) =>
+    TextStyle(color: Theme.of(context).colorScheme.error);
+
 /// 顯示 HIG「確認 / 取消」對話框,回傳使用者是否確認。
 ///
 /// 使用者關閉(點外部/返回)視同取消,回傳 `false`。
@@ -206,7 +214,12 @@ Future<bool> showAppConfirm(
           isDestructiveAction: isDestructive,
           isDefaultAction: !isDestructive,
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: Text(confirmLabel),
+          child: Text(
+            confirmLabel,
+            style: isDestructive
+                ? tpDestructiveActionStyle(dialogContext)
+                : null,
+          ),
         ),
       ],
     ),

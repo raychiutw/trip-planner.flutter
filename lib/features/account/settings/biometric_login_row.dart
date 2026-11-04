@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../app/app_lock.dart';
 import '../../../app/biometric_login.dart';
 import '../../../ui/tp_settings_group.dart';
@@ -42,7 +43,10 @@ class BiometricLoginRow extends ConsumerWidget {
               key: const ValueKey('bio-disable-confirm'),
               isDestructiveAction: true,
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('關閉並登出'),
+              child: Text(
+                '關閉並登出',
+                style: tpDestructiveActionStyle(dialogContext),
+              ),
             ),
           ],
         ),
