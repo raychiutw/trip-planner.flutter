@@ -284,7 +284,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
-      context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+      context.canPop()
+          ? context.pop()
+          : context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
     } on Exception {
       // 部分已寫入：時間軸必須重抓，否則看不到已成功的項目。
       if (_submitDone > 0) ref.invalidate(tripDaysProvider(widget.tripId));
@@ -308,7 +310,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     if (_mode == EntryAddMode.custom) {
       if (await _customFormController.submit() && mounted) {
         _customFormController.update(dirty: false);
-        context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+        context.canPop()
+            ? context.pop()
+            : context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
       }
       return;
     }

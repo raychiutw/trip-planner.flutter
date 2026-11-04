@@ -654,7 +654,7 @@ class _FindingCard extends StatelessWidget {
                       final entryId = target?.entryId;
                       if (entryId != null) {
                         final encodedTripId = Uri.encodeComponent(tripId);
-                        context.go(
+                        context.push(
                           '/trips/$encodedTripId/entries/$entryId/edit',
                         );
                         return;

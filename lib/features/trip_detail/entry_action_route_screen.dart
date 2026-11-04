@@ -248,7 +248,9 @@ class _EntryActionRouteScreenState
       }
       if (!mounted) return;
       ref.invalidate(tripDaysProvider(widget.tripId));
-      context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+      context.canPop()
+          ? context.pop()
+          : context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
     } on Exception {
       if (!mounted) return;
       setState(() {
