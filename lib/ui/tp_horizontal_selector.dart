@@ -41,11 +41,17 @@ class TpHorizontalSelector<T> extends StatefulWidget {
     required this.value,
     required this.options,
     required this.onSelected,
+    this.semanticLabel,
   });
 
   final T value;
   final List<TpScopeOption<T>> options;
   final ValueChanged<T> onSelected;
+
+  /// 整條選擇器的語意標籤（例如「行程日期」）。
+  ///
+  /// 沒有它時，套件提供的整條可點擊容器節點沒有名稱，VoiceOver 只會讀到「按鈕」。
+  final String? semanticLabel;
 
   /// 選擇器依目前 Dynamic Type 實際行高增高，且永遠保留 44pt 觸控高度。
   static double preferredHeight(BuildContext context) {
@@ -121,55 +127,58 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       child: Focus(
         focusNode: _focusNode,
         onKeyEvent: _handleKeyEvent,
-        child: TpNavigationGlassSelector(
-          segments: [
-            for (final option in widget.options)
-              GlassSegment(
-                id: option.value,
-                semanticLabel: option.semanticsLabel ?? option.label,
-                // 公開 icon 插槽保留水平內容、操作 key 與最小觸控高度。
-                // 自然尺寸、水平拖曳、切換選取與選取底皆由套件提供。
-                // 套件不回呼目前項目；只補再次點選，不參與水平拖曳。
-                icon: GestureDetector(
-                  excludeFromSemantics: true,
-                  onTap: option.value == widget.value
-                      ? () => widget.onSelected(option.value)
-                      : null,
-                  child: Semantics(
-                    key: option.key,
-                    // selected 與 label 唯一由套件提供，避免重複 flag 分裂節點。
-                    // 具名 action 可合併到原節點，不覆蓋套件的普通 tap。
-                    customSemanticsActions: option.value == widget.value
-                        ? {
-                            const CustomSemanticsAction(
-                              label: '重新選取目前範圍',
-                            ): () =>
-                                widget.onSelected(option.value),
-                          }
+        child: Semantics(
+          label: widget.semanticLabel,
+          child: TpNavigationGlassSelector(
+            segments: [
+              for (final option in widget.options)
+                GlassSegment(
+                  id: option.value,
+                  semanticLabel: option.semanticsLabel ?? option.label,
+                  // 公開 icon 插槽保留水平內容、操作 key 與最小觸控高度。
+                  // 自然尺寸、水平拖曳、切換選取與選取底皆由套件提供。
+                  // 套件不回呼目前項目；只補再次點選，不參與水平拖曳。
+                  icon: GestureDetector(
+                    excludeFromSemantics: true,
+                    onTap: option.value == widget.value
+                        ? () => widget.onSelected(option.value)
                         : null,
-                    child: ExcludeSemantics(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minWidth: TpSpacing.tapMin,
-                            minHeight: height - 4,
+                    child: Semantics(
+                      key: option.key,
+                      // selected 與 label 唯一由套件提供，避免重複 flag 分裂節點。
+                      // 具名 action 可合併到原節點，不覆蓋套件的普通 tap。
+                      customSemanticsActions: option.value == widget.value
+                          ? {
+                              const CustomSemanticsAction(
+                                label: '重新選取目前範圍',
+                              ): () =>
+                                  widget.onSelected(option.value),
+                            }
+                          : null,
+                      child: ExcludeSemantics(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: TpSpacing.tapMin,
+                              minHeight: height - 4,
+                            ),
+                            child: _OptionContent(option: option),
                           ),
-                          child: _OptionContent(option: option),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
-          selectedIndex: selectedIndex,
-          onSelected: (index) {
-            _focusNode.requestFocus();
-            widget.onSelected(widget.options[index].value);
-          },
-          height: height,
-          scrollController: _controller,
+            ],
+            selectedIndex: selectedIndex,
+            onSelected: (index) {
+              _focusNode.requestFocus();
+              widget.onSelected(widget.options[index].value);
+            },
+            height: height,
+            scrollController: _controller,
+          ),
         ),
       ),
     );

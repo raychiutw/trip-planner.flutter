@@ -321,6 +321,35 @@ void main() {
     );
   });
 
+  testWidgets('TpHorizontalSelector 每個可點擊節點都有語意標籤（VoiceOver，#544 A11）', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            value: 1,
+            semanticLabel: '行程日期',
+            options: const [
+              TpScopeOption(value: 0, label: '總覽'),
+              TpScopeOption(value: 1, label: 'Day 1'),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    expect(find.bySemanticsLabel('行程日期'), findsOneWidget);
+    // 加上整條標籤後，各選項自己的名稱仍要讀得到（不能被合併掉）。
+    expect(find.bySemanticsLabel('Day 1'), findsOneWidget);
+    expect(find.bySemanticsLabel('總覽'), findsOneWidget);
+    handle.dispose();
+  });
+
   testWidgets('TpHorizontalSelector 保留穩定操作 key、DAY 字級與點選', (tester) async {
     var selected = 0;
     await tester.pumpWidget(

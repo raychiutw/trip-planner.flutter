@@ -892,6 +892,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           left: TpSpacing.s3,
           right: TpSpacing.s3,
           child: TpHorizontalSelector<int>(
+            semanticLabel: '行程日期',
             key: const ValueKey('trip-map-day-selector'),
             value: _selectedTabIndex,
             options: [
