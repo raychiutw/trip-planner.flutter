@@ -67,9 +67,6 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'sync-conflict-sheet': {'Drag handle 36x4'},
   'sync-conflict-sheet-many': {'Drag handle 36x4'},
   'entry-edit-sheet-remote-conflict': {'Drag handle 36x4'},
-  'entry-edit-overwrite-confirm': {'Drag handle 36x4'},
-  'note-edit-overwrite-confirm': {'Drag handle 36x4'},
-  'travel-edit-overwrite-confirm': {'Drag handle 36x4'},
 };
 
 /// 刻意在畫面上顯示對話框的場景。其餘場景若出現對話框，代表畫面被不相干的詢問蓋住

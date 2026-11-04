@@ -31,7 +31,7 @@ App 125 個場景、web 36 個場景都逐張看過，也有自動掃描；但**
 
 **仍然沒有取證**（[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)仍標「缺口」或「部分」）：
 - 重新產生與刪除分享連結（同一支元件，只拍了撤銷）；`confirmAndDelete` 在停留點 POI 以外的其餘呼叫端（POI 備選已拍）。
-- sheet 內的「保留你的版本？」覆寫確認（停留點、筆記、交通三處，另有票）。（衝突解決 sheet 已由 #558 補 `sync-conflict-sheet`、`sync-conflict-sheet-many`，從離線橫幅進入；衝突紀錄是寫進場景記憶體 cacheStore，不是真實離線寫入佇列，時序仍未驗。加入行程衝突 alert 已由 #560 補 `add-to-trip-time-conflict-alert`。原稱「編輯行程放棄確認」**實為「刪除行程日」確認**：編輯行程已是即時儲存、沒有草稿可放棄，已由 #560 補 `trip-edit-delete-day-confirm`。）
+- sheet 內的「保留你的版本？」覆寫確認三處已由 #559／#561 補 `entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`，另拍 `entry-edit-sheet-remote-conflict`；狀態是測試替身造的（停留點靠詳情資料流送較新版本；筆記與交通靠 409 後重新載入），不是真實協作者同時編輯，真實時序未驗。（衝突解決 sheet 已由 #558 補 `sync-conflict-sheet`、`sync-conflict-sheet-many`，從離線橫幅進入；衝突紀錄是寫進場景記憶體 cacheStore，不是真實離線寫入佇列，時序仍未驗。加入行程衝突 alert 已由 #560 補 `add-to-trip-time-conflict-alert`。原稱「編輯行程放棄確認」**實為「刪除行程日」確認**：編輯行程已是即時儲存、沒有草稿可放棄，已由 #560 補 `trip-edit-delete-day-confirm`。）
 - `showAppConfirm` 在通知設定、停留點異動與帳號的「查看說明」；`showAppDatePicker` 在編輯行程與分享；`showAppNotice` 在其餘畫面。
 - 這些多半要先造出特定狀態（離線衝突、OCC 版本衝突）才會觸發，需要查各自的測試替身；工作量比已補的場景大。
 
