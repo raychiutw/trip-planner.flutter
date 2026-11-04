@@ -16,15 +16,15 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `/login` | LoginScreen | 已有場景 | `auth-login` `auth-login-error` `ax-login-2x` |
 | `/welcome` | WelcomeScreen | 已有場景 | `auth-welcome` `ax-welcome-2x` |
 | `/signup` | SignupScreen | 已有場景 | `auth-signup` |
-| `/signup/check-email` | EmailVerifyPendingScreen | **缺口** | 無 |
+| `/signup/check-email` | EmailVerifyPendingScreen | 已有場景 | `auth-check-email` |
 | `/login/forgot` | ForgotPasswordScreen | 已有場景 | `auth-forgot-password` |
-| `/auth/password/reset` | ResetPasswordScreen | **缺口** | 無 |
-| `/auth/verify-email` | VerifyEmailScreen | **缺口** | 無 |
+| `/auth/password/reset` | ResetPasswordScreen | 已有場景 | `auth-reset-password` `auth-reset-password-success` `auth-reset-password-expired` |
+| `/auth/verify-email` | VerifyEmailScreen | 已有場景 | `auth-verify-email` `auth-verify-email-success` `auth-verify-email-incomplete` |
 | `/new-trip` | CreateTripScreen | 已有場景 | `trip-create` `ax-trip-create-2x` |
 | `/edit-trip/:tripId` | EditTripScreen | 已有場景 | `trip-edit` `trip-edit-load-failed` |
 | `/collab/:tripId` | CollabScreen | **缺口** | 無 |
 | `/share-trip/:tripId` | ShareScreen | 已有場景 | `share-manage` `share-custom-expiry-missing` `share-created-card` `share-create-failed` `share-list-load-failed` `ax-share-manage-2x` |
-| `/oauth/consent` | InvalidLinkScreen（固定提示文字） | **缺口** | 無 |
+| `/oauth/consent` | InvalidLinkScreen（固定提示文字） | 已有場景 | `oauth-consent-invalid` |
 | `/invite` | InviteScreen | 已有場景 | `invite-signed-in` `invite-wrong-account` `invite-wrong-account-pending` `invite-load-failed` `invite-logged-out` `ax-invite-2x` |
 | `/s/:token` | PublicShareScreen | 已有場景 | `public-share` `public-share-signed-in` `ax-public-share-2x` |
 | `/chat` | ChatScreen | 已有場景 | `chat` `ax-chat-2x` |
@@ -78,7 +78,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | **缺口** | 無 |
 | `showAppTimePicker` | 筆記編輯 | **缺口** | 無 |
 | `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | **缺口** | 無 |
-| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | **缺口** | 無 |
+| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm`（只覆蓋帳號範圍的兩處） |
 | `showAppAlert` | 加入行程、帳號 | **缺口** | 無 |
 | `showAppActionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
@@ -93,7 +93,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 
 ## 三、缺口摘要
 
-- 路由缺口 14 個：`/signup/check-email`、`/auth/password/reset`、`/auth/verify-email`、`/collab/:tripId`、`/oauth/consent`、`health`、`audit`、`entries/*`（4 個）、`/map`、`:favoriteId/add-to-trip`、`add-to-trip`；加上變更密碼（PR #530）。
-- 彈出層缺口：幾乎全部。目前只有帳號刪除對話框取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
+- 路由缺口 10 個（#534 補了 4 個）：`/collab/:tripId`、`health`、`audit`、`entries/*`（4 個）、`/map`、`:favoriteId/add-to-trip`、`add-to-trip`；加上變更密碼（PR #530）。
+- 彈出層缺口：幾乎全部。目前只有帳號刪除、登出確認、解除連結確認三個取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。

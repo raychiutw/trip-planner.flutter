@@ -12,6 +12,7 @@
 /// 移除也會紅，逼著清單只減不增。
 library;
 
+import 'package:flutter/cupertino.dart' show CupertinoAlertDialog;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,6 +37,7 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'favorites': {'搜尋收藏 361x36'},
   'favorites-load-failed': {'搜尋收藏 361x36'},
   'account-developer-app-new': {'(無標籤) 40x40'},
+  'account-delete-dialog': {'目前密碼（重新驗證） 230x31'},
   'share-manage': {'(無標籤) 40x40'},
   'share-custom-expiry-missing': {'(無標籤) 40x40'},
   'share-created-card': {'(無標籤) 40x40'},
@@ -44,6 +46,16 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'offline-banner-network': {'搜尋行程 361x36'},
   'offline-banner-pending': {'搜尋行程 361x36', '立即重試 100x40'},
   'app-lock-enable-prompt': {'搜尋行程 361x36'},
+};
+
+/// 刻意在畫面上顯示對話框的場景。其餘場景若出現對話框，代表畫面被不相干的詢問蓋住
+/// （例如已登入場景預設會跳「要用 Face ID 登入嗎？」），截圖與量測都不是畫面本體。
+const _scenesWithDialog = {
+  'account-logout-confirm',
+  'account-connected-app-revoke-confirm',
+  'account-delete-dialog',
+  'invite-wrong-account-pending',
+  'app-lock-enable-prompt',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。
@@ -101,6 +113,7 @@ void main() {
       final handle = tester.ensureSemantics();
       try {
         late Set<String> violations;
+        late int dialogCount;
         await runHigScene(tester, scenes[name]!, ThemeMode.light, (_) async {
           // rootPipelineOwner.semanticsOwner 在此為 null（語意樹掛在子 owner），
           // 官方建議的替代寫法拿不到根節點，所以沿用 pipelineOwner。
@@ -108,12 +121,18 @@ void main() {
           final owner = tester.binding.pipelineOwner.semanticsOwner!;
           final root = owner.rootSemanticsNode!;
           violations = tapTargetViolations(root, 3.0, 2556);
+          dialogCount = find.byType(CupertinoAlertDialog).evaluate().length;
         });
         debugPrint('HIGTAP\t$name\t${violations.toList()..sort()}');
         // 收集模式：只印不斷言（失敗的測試收尾會多拖約 90 秒，整批掃描太慢）。
         if (_collectOnly) return;
         // 先卸載畫面再斷言：失敗時若畫面還掛著，收尾會拖約 90 秒並連帶拖垮後面的場景。
         await tester.pumpWidget(const SizedBox.shrink());
+        expect(
+          dialogCount > 0,
+          _scenesWithDialog.contains(name),
+          reason: '對話框數量 $dialogCount：場景被不相干的詢問蓋住，或漏登記 _scenesWithDialog',
+        );
         final known = _knownTapTargetViolations[name] ?? const <String>{};
         expect(
           violations.difference(known),

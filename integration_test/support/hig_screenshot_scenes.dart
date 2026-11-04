@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoAlertDialog;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -72,7 +73,10 @@ class HigFakes {
   /// App 鎖情境：非 null 時以此初始狀態啟動；[biometric] 預設永不回應，
   /// 畫面才會停在鎖定頁而不是自動解鎖。
   bool? appLockEnabled;
-  BiometricAuthenticator biometric = _PendingBiometric();
+
+  /// 預設裝置沒有生物辨識：否則每個已登入場景都會被「要用 Face ID 登入嗎？」詢問蓋住，
+  /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]／[_OkBiometric]。
+  BiometricAuthenticator biometric = _NoBiometric();
 
   MockAuthRepositoryAlias get auth => fixture.auth;
   MockTripRepository get trips => fixture.trips;
@@ -286,6 +290,16 @@ class HigFakes {
 
 typedef MockAuthRepositoryAlias = MockAuthRepository;
 
+/// 沒有生物辨識的裝置：不會跳出任何生物辨識詢問。
+class _NoBiometric implements BiometricAuthenticator {
+  @override
+  Future<BiometricKind?> availableKind() async => null;
+
+  @override
+  Future<BiometricOutcome> authenticate({required String reason}) =>
+      Completer<BiometricOutcome>().future;
+}
+
 /// 永遠等待使用者操作的驗證器(Face ID 裝置)。
 class _PendingBiometric implements BiometricAuthenticator {
   @override
@@ -382,6 +396,7 @@ class HigScene {
     this.act,
     this.textScale = 1.0,
     this.settle = true,
+    this.proof,
   });
 
   final String name;
@@ -394,6 +409,9 @@ class HigScene {
 
   /// false 時只固定跑幾幀（畫面上有永不停止的動畫，例如載入中）。
   final bool settle;
+
+  /// 證明場景真的渲染出預期畫面（不是空白或錯誤頁）。截圖前會斷言它至少找到一個 widget。
+  final Finder Function()? proof;
 }
 
 Future<void> higSettle(WidgetTester tester, {bool settle = true}) async {
@@ -436,12 +454,30 @@ Future<void> runHigScene(
     await scene.act!(tester, f);
     await higSettle(tester, settle: scene.settle);
   }
+  final proof = scene.proof;
+  if (proof != null) {
+    expect(proof(), findsWidgets, reason: '場景 ${scene.name} 沒有渲染出預期畫面');
+  }
   await capture(scene.name);
 }
 
 Future<void> _tapKey(WidgetTester tester, String key) async {
   final finder = find.byKey(ValueKey(key));
   expect(finder, findsWidgets, reason: 'key $key');
+  await tester.ensureVisible(finder.first);
+  await tester.pump();
+  await tester.tap(finder.first);
+  await higSettle(tester);
+}
+
+/// 點第一個 key 字串以 [prefix] 開頭的 widget（key 帶動態 id 時用）。
+Future<void> _tapKeyPrefix(WidgetTester tester, String prefix) async {
+  final finder = find.byWidgetPredicate(
+    (w) =>
+        w.key is ValueKey<String> &&
+        (w.key! as ValueKey<String>).value.startsWith(prefix),
+  );
+  expect(finder, findsWidgets, reason: 'key prefix $prefix');
   await tester.ensureVisible(finder.first);
   await tester.pump();
   await tester.tap(finder.first);
@@ -463,6 +499,19 @@ Future<void> _scrollDown(WidgetTester tester, [double dy = -600]) async {
   if (scrollables.evaluate().isEmpty) return;
   await tester.drag(scrollables.first, Offset(0, dy));
   await higSettle(tester);
+}
+
+Future<void> _submitResetPassword(WidgetTester tester, HigFakes f) async {
+  await tester.enterText(
+    find.byKey(const ValueKey('reset-password-field')),
+    'Passw0rd!x1',
+  );
+  await tester.enterText(
+    find.byKey(const ValueKey('reset-password-confirm-field')),
+    'Passw0rd!x1',
+  );
+  await tester.pump();
+  await _tapKey(tester, 'reset-password-submit-button');
 }
 
 final _failure = ApiError(status: 500, code: 'SERVER_ERROR', message: 'boom');
@@ -504,6 +553,94 @@ List<HigScene> higScenes() => [
     '#420 #424',
     location: '/login/forgot',
     loggedIn: false,
+  ),
+
+  HigScene(
+    'auth-check-email',
+    '#534',
+    location: '/signup/check-email?email=demo@example.com',
+    loggedIn: false,
+    proof: () => find.byKey(const ValueKey('verify-pending-page')),
+  ),
+  HigScene(
+    'auth-reset-password',
+    '#534',
+    location: '/auth/password/reset?token=demo-token',
+    loggedIn: false,
+    proof: () => find.byKey(const ValueKey('reset-password-field')),
+  ),
+  HigScene(
+    'auth-reset-password-success',
+    '#534',
+    location: '/auth/password/reset?token=demo-token',
+    loggedIn: false,
+    stub: (f) => when(
+      () => f.auth.resetPassword(
+        token: any(named: 'token'),
+        password: any(named: 'password'),
+      ),
+    ).thenAnswer((_) async => null),
+    act: _submitResetPassword,
+    proof: () => find.byKey(const ValueKey('reset-password-success')),
+  ),
+  HigScene(
+    'auth-reset-password-expired',
+    '#534',
+    location: '/auth/password/reset?token=demo-token',
+    loggedIn: false,
+    stub: (f) => when(
+      () => f.auth.resetPassword(
+        token: any(named: 'token'),
+        password: any(named: 'password'),
+      ),
+    ).thenThrow(ApiError(status: 400, code: 'expired', message: 'expired')),
+    act: _submitResetPassword,
+    proof: () => find.byKey(const ValueKey('reset-password-error')),
+  ),
+  HigScene(
+    'auth-verify-email',
+    '#534',
+    location: '/auth/verify-email?token=demo-token',
+    loggedIn: false,
+    proof: () => find.byKey(const ValueKey('verify-email-confirm-button')),
+  ),
+  HigScene(
+    'auth-verify-email-success',
+    '#534',
+    location: '/auth/verify-email?token=demo-token',
+    loggedIn: false,
+    stub: (f) =>
+        when(() => f.auth.verifyEmail(any())).thenAnswer((_) async => true),
+    act: (tester, f) async => _tapKey(tester, 'verify-email-confirm-button'),
+    proof: () => find.byKey(const ValueKey('verify-email-success')),
+  ),
+  HigScene(
+    'auth-verify-email-incomplete',
+    '#534',
+    location: '/auth/verify-email',
+    loggedIn: false,
+    proof: () => find.byKey(const ValueKey('verify-email-error')),
+  ),
+  HigScene(
+    'oauth-consent-invalid',
+    '#534',
+    location: '/oauth/consent',
+    loggedIn: false,
+    proof: () => find.text('請返回原本的瀏覽器，從該處重新完成授權。'),
+  ),
+  HigScene(
+    'account-logout-confirm',
+    '#534',
+    location: '/trips?account=sessions',
+    act: (tester, f) async => _tapKey(tester, 'account-sessions-logout'),
+    proof: () => find.text('登出帳號'),
+  ),
+  HigScene(
+    'account-connected-app-revoke-confirm',
+    '#534',
+    location: '/trips?account=connected-apps',
+    act: (tester, f) async => _tapKeyPrefix(tester, 'connected-app-revoke-'),
+    proof: () => find.byType(CupertinoAlertDialog),
   ),
 
   // ── 行程列表／建立／編輯 ──
@@ -899,14 +1036,20 @@ List<HigScene> higScenes() => [
     'app-lock-locked',
     '#462',
     location: '/trips',
-    stub: (f) => f.appLockEnabled = true,
+    stub: (f) {
+      f.appLockEnabled = true;
+      f.biometric = _PendingBiometric();
+    },
     settle: false,
   ),
   HigScene(
     'app-lock-locked-ax-2x',
     '#462 #422',
     location: '/trips',
-    stub: (f) => f.appLockEnabled = true,
+    stub: (f) {
+      f.appLockEnabled = true;
+      f.biometric = _PendingBiometric();
+    },
     textScale: 2.0,
     settle: false,
   ),
