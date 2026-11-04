@@ -35,9 +35,9 @@
 
 - ✅ **A3 行程編輯改即時儲存（#546、#549）**：採「拿掉取消、改即時儲存」。標題列只剩「完成」；標題與描述失焦或按「完成」才送出、打字中不送；目的地、語言、發布狀態改了立即送；日期平移與天數新增、刪除維持立即生效，刪除仍先確認且不可復原（ADR-0008）；移除「捨棄未儲存的變更」確認。失敗時保留輸入並在欄位下方就地顯示錯誤與「重試」；「完成」遇到未送出成功的變更會攔截（說出欄位，選「重試」或「放棄變更」）；標題清空不送出、就地提示「標題不能是空白」，按「完成」時還原成上次成功的值。離線時 `PUT /trips/:id` 本來就不進離線佇列，送出會失敗，與改版前相同，只是現在失敗就地可見並可重試。重拍 `trip-edit`、`trip-edit-load-failed`，新增 `trip-edit-save-failed`（淺深各看過）。A4（停留點表單的分頁列）與本項無關，見下一項。
 - ✅ **A4 停留點新增／編輯／複製／移動改為整頁 modal（#547）**：四條路由移到 shell 外（`fullscreenDialog`，與新增行程、編輯行程一致），網址不變、舊 web 連結別名照常；畫面沒有底部分頁列（路由測試以 `AppleRootTabBar` 不存在為守門，mutation 把路由搬回 shell 內會轉紅）。新增與複製／移動存檔後優先 pop 回進入前的畫面，健檢頁的編輯入口由 `go` 改 `push` 才能返回。複製與移動在 App 內沒有入口，只搬位置未刪除。重拍 `entry-add`、`entry-edit`、`entry-copy`、`entry-move`（淺深逐張看過，皆無分頁列）。
-- ✅ A1 註冊鈕：未勾同意停用並顯示說明。✅ A2 加入行程錯誤態：圖示加「返回」。✅ A5 登入裝置頁：深色紅色 `#FF453A`→`#FF6961`（4.09→4.94）、OAuth 說明卡降一階底色。✅ A6 已連結 App：Chip 取目前主題底色、圖示對齊標題。✅ A7 健檢卡同寬（紅燈 720 vs 175）。✅ A9 公開分享頁大字級主按鈕獨立一列。⚪ **A10 已取消**：改走單一 tint（維持 Apple 的做法，預設分頁列選中標籤 4.39:1 記為已知例外，「提高對比」時才加深，見 #550）；#545 先前加的 `onPrimaryContainer` 特例已回退。✅ A11 補標籤：日期條、搜尋欄、收藏列。
+- ✅ A1 註冊鈕：未勾同意停用並顯示說明。✅ A2 加入行程錯誤態：圖示加「返回」。✅ A5 登入裝置頁：深色紅色 `#FF453A`→`#FF6961`（4.09→4.94）、OAuth 說明卡降一階底色。✅ A6 已連結 App：Chip 取目前主題底色、圖示對齊標題。✅ A7 健檢卡同寬（紅燈 720 vs 175）。✅ A9 公開分享頁大字級主按鈕獨立一列。⚪ **A10 已取消**：改走單一 tint（維持 Apple 的做法，預設分頁列選中標籤 4.39:1 記為已知例外，「提高對比」時才加深）；#545 先前加的選中前景特例已回退。✅ **#550 完成**：提高對比時淺色 `primary` 改用 `#6F4C2C`（一般狀態與深色不變），見下方「#550／#551 複掃」。✅ **T2／#551 完成**：確認框破壞性動作改用 Tripline 破壞性紅。✅ A11 補標籤：日期條、搜尋欄、收藏列。
 - **紅燈證據**（各項在實作前實際看到的失敗輸出）：A1 `Expected: null / Actual: <Closure _submit>`（建立鈕原本可按）；A2 找不到錯誤圖示與「返回」；A5 對比 `4.090967…`（深色紅字）；A6 `chip.backgroundColor` 為 null；A7 `Expected 720.0 / Actual 175.0`；A9 `Expected ≥ 414.0 / Actual 350.0`；A10 對比 `4.389355…`（與工具掃描 4.39 一致）；A11 `labeledTapTargetGuideline` 回報確切節點（日期條 `Rect 0,0 177×48`、收藏列、探索頁 `Rect 16,128 → 784,188`）。
-- **審查後的調整**：① A2 原本手刻圖示加文字，改為重用 `TpStateView`（票文要求重用既有錯誤態元件）。② A11 搜尋欄原本全域在 `AppSearchField` 加 label，審查指出可能讓其他畫面念兩遍；我用語意樹傾印確認：探索頁外層 `[tap]` 節點 label 為空，但在最小環境下 label 會與 hint 合併成「搜尋地點⏎搜尋地點」。改為選擇性參數 `semanticLabel`，只有探索頁傳。**仍需用真機 VoiceOver 確認探索頁搜尋欄的朗讀不重複**（外層節點「搜尋地點」加內層欄位 hint，是兩個元素，不是同一個念兩遍，但我沒用真正的 VoiceOver 驗過）。③ 淺色選中前景改用 `tintDeep` 後，App 內並存兩個棕色：一般前景仍是 `primary #8A6038`，分頁列與日期條選中字是較深的 `#6F4C2C`。這是為了對中性選取底達 4.5:1 的刻意差異，設計上要不要統一由你決定。④ 深色 `destructiveBackground`（錯誤面板底）仍是 `#FF453A` 的 20% alpha，沒有跟著換色，只換了文字用的 destructive；這是刻意的（底色飽和度不動），但錯誤面板文字對比靠的是文字色變亮。
+- **審查後的調整**：① A2 原本手刻圖示加文字，改為重用 `TpStateView`（票文要求重用既有錯誤態元件）。② A11 搜尋欄原本全域在 `AppSearchField` 加 label，審查指出可能讓其他畫面念兩遍；我用語意樹傾印確認：探索頁外層 `[tap]` 節點 label 為空，但在最小環境下 label 會與 hint 合併成「搜尋地點⏎搜尋地點」。改為選擇性參數 `semanticLabel`，只有探索頁傳。**仍需用真機 VoiceOver 確認探索頁搜尋欄的朗讀不重複**（外層節點「搜尋地點」加內層欄位 hint，是兩個元素，不是同一個念兩遍，但我沒用真正的 VoiceOver 驗過）。③（已作廢）原先淺色選中前景改用 `tintDeep` 造成兩個棕並存；該特例已在 A10 取消時回退，現在一般狀態只有單一 tint，提高對比才換較深值（#550）。④ 深色 `destructiveBackground`（錯誤面板底）仍是 `#FF453A` 的 20% alpha，沒有跟著換色，只換了文字用的 destructive；這是刻意的（底色飽和度不動），但錯誤面板文字對比靠的是文字色變亮。
 - **A10 回退後的複掃**（同一支工具）：一般狀態未過 **52**＝分頁列 4.39:1 的 36 個場景（已知例外）加上範圍外的 16 項（對話框動作顏色、地圖 fixture）；標籤缺漏仍是 0。以「提高對比」重掃：未過 47，5 項改善、0 項變差，**分頁列那批仍是 4.39:1**，也就是目前的提高對比主題還沒有把 tint 加深，這正是 #550 要做的事。
 - ⚪ **A8 不改**：`oauth-consent-invalid` 是路由解析失敗與深連結的終點，本來就沒有上一頁，已有明確出口「返回行程列表」；`InvalidLinkScreen` 是 `secondary_authenticated_surfaces_hig_test` 明確登記的 `publicException`。加返回鈕沒有可回的目標。
 - **修正後複掃**（`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`，同一支工具）：未過次數 **66 → 16**；VoiceOver 標籤缺漏 **22 → 0**；分頁列 4.39:1 的 36 個場景 **→ 0**；`account-sessions` 三項全過。剩下 16 項全是「不在 #544 範圍」的兩類：確認對話框動作顏色（T2，`account-logout-confirm`、`account-connected-app-revoke-confirm`、`trip-delete-confirm`、`invite-wrong-account-pending`、`app-lock-enable-prompt`，另 `account-delete-dialog` 的「永久刪除」是停用態）與地圖 fixture（T4）。
@@ -96,8 +96,8 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 | # | 範圍 | 結果 | 判讀 |
 |---|---|---|---|
-| T1 | 底部分頁列「選中」的標籤（11pt），淺色，36 個場景（`trips-list`、`trip-timeline`、`favorites`、`explore`、`chat`、`entry-*`、`trip-health-*`、`trip-audit-*` 等） | 4.39:1，未達 4.5:1 | 同一個 accent 色小字，一處 token 就能修；深色沒有這個問題。`app-lock-enable-prompt` 的「稍後再說」「開啟」也是 4.37:1，同一類 |
-| T2 | 確認對話框的紅色或強調動作，淺色（`account-logout-confirm`「登出」3.00、`account-connected-app-revoke-confirm`「撤銷」3.14、`trip-delete-confirm`「刪除行程」3.39）；深色約 4.3～4.4 | 低於 4.5:1 | 這是 CupertinoAlertDialog 加 systemRed，與 iOS 原生同量級，屬於「與原生一致 vs 達到 WCAG」的張力，需你決定，不建議直接改 |
+| T1 ⚪已知例外（#550） | 底部分頁列「選中」的標籤（11pt），淺色，36 個場景（`trips-list`、`trip-timeline`、`favorites`、`explore`、`chat`、`entry-*`、`trip-health-*`、`trip-audit-*` 等） | 4.39:1，未達 4.5:1 | 決定**不改品牌色**，預設 4.39:1 記為已知例外（差 0.11，單一 tint 是產品決策；理由與數字見 `DESIGN.md` 16.1）；開啟「提高對比」後淺色前景改 `#6F4C2C`，該批降為 0。深色沒有這個問題。`app-lock-enable-prompt` 的「稍後再說」「開啟」也是 4.37:1，同一類 |
+| T2 ✅（#551） | 確認對話框的紅色或強調動作，淺色（`account-logout-confirm`「登出」3.00、`account-connected-app-revoke-confirm`「撤銷」3.14、`trip-delete-confirm`「刪除行程」3.39）；深色約 4.3～4.4 | 低於 4.5:1 | 已決定改用 Tripline 破壞性紅（淺 `#D70015`、深 `#FF6961`），以動作文字 style 覆寫 Cupertino 的 systemRed；action sheet 本來就用 error 色，實際只有 alert 要改。品牌色動作按鈕（對比約 4.0～4.4:1）屬已知例外，停用態不要求 |
 | T3 | `account-sessions`：「管理已連結應用」3.62:1（淺色，15pt）、「登出此帳號」4.09:1（深色）；`account-sessions-load-failed` 深色「無法載入登入裝置」3.95:1（13pt） | 低於 4.5:1 | 與先前手量的 4.36:1 同方向（取樣位置不同，數字不同，結論一樣：未達標）。已併入 A5 |
 | T4 | 地圖頁底部分頁列未選中標籤（`trip-map`、`global-map*`、`ax-trip-map-2x`，3.18～3.31，`global-map-empty`／`load-failed` 2.23～2.43） | 低於 4.5:1 | 背景是測試地圖 fixture，**不能下結論**，要真機 |
 | T5 | `trip-timeline`、`trip-map*`、`global-map`、`ax-*` 對應場景的「Day 分頁條」（`Rect 12,80 → 381,128`，可左右捲動與點擊） | 整條節點沒有語意標籤 | VoiceOver 會讀不出這條控制項；要找到對應 widget 補 `Semantics(label:)`（程式碼還沒查，只有節點座標） |
@@ -106,7 +106,21 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 **排除的誤報：**`account-delete-dialog`「永久刪除」1.89／2.00:1，截圖顯示它是密碼欄為空時的停用狀態（WCAG 對停用元件不要求對比），不算缺陷。
 
-建議處理：T1（一處 token）與 T5～T7（補標籤）已列為上面的 A10、A11；T2 列為張力；T4 等真機。
+建議處理：T1（已決定記為已知例外，見 #550）、T2（#551 已改）。原建議：T1（一處 token）與 T5～T7（補標籤）已列為上面的 A10、A11；T2 列為張力；T4 等真機。
+
+### #550／#551 複掃（同一支工具 `test/flows/hig_scene_a11y_collect_test.dart`，淺深各掃，248 個場景模式）
+
+| 掃描 | 改前未過 | 改後未過 | 備註 |
+|---|---|---|---|
+| 一般狀態（#551 的效果；#550 不改一般狀態） | 63 | 48 | 新增 0 項（逐項比對場景與模式）；#550 單獨改完後逐行與改前**完全相同** |
+| 提高對比 `HIG_HC=true` | 48（其中分頁列 4.39:1 共 39 項） | 8（分頁列 4.39:1 為 0） | #550 把 48 降到 8；#551 之後仍是 8，剩下的見下 |
+
+- 提高對比剩下 8 項，皆非本兩張票範圍：`account-delete-dialog`（停用態，淺深兩個）、四個 action sheet 場景（`trip-delete-confirm`、`share-revoke-confirm`、`collab-remove-member-confirm`、`timeline-delete-entry-confirm`）的 13pt 灰色標題與說明（blur 底取樣，不是破壞性動作本身）、`favorites-removed-notice`、`invite-wrong-account-pending`（品牌色按鈕，已知例外）。
+- 一般狀態剩下 48 項：分頁列選中標籤 4.39:1 共 33 項（已知例外）；其餘為停用態、地圖 fixture（T4）、action sheet 標題灰字、品牌色對話框按鈕（`app-lock-enable-prompt`、`invite-wrong-account-pending`、`developer-app-delete-confirm`）與通知列，皆不屬破壞性紅。
+- **紅燈證據**：#550 `Expected: Color(0xFF6F4C2C) / Actual: Color(0xFF8A6038)`（提高對比 primary 沒變）；#551 `Expected: matches color 0xFFD70015 / Actual: CupertinoDynamicColor systemRed`（淺深兩個測試皆紅，深色期望 `0xFFFF6961`）。
+- **mutation**：把 `primary` 改成永遠 `tintDeep` → 一般狀態回歸三個測試轉紅；把 `showAppConfirm` 破壞性樣式改回 null → 淺深兩個 #551 測試轉紅。
+- **重拍**（逐張看過，淺深各一）：`account-logout-confirm`、`account-connected-app-revoke-confirm`、`trip-delete-confirm`、`collab-revoke-invite-confirm`、`note-delete-confirm`、`favorites-remove-confirm`、`account-biometric-disable-confirm`、`account-session-revoke-confirm`、`entry-alternate-remove-confirm`（alert 的紅字改為統一的紅，不再偏橘）；`share-revoke-confirm`、`timeline-delete-entry-confirm` 是 action sheet，本來就是 error 色，重拍後與先前相同。提高對比新增 `trips-list-hc`、`trip-timeline-hc`（分頁列選中標籤與日期條選中字為較深棕；`HIG_HC=true` 於 `integration_test/hig_screenshots_test.dart`）。
+- **需要真機看的項目**：確認框的紅比 iOS 系統對話框略深（`#D70015` 對 systemRed `#FF3B30`）；提高對比開關下分頁列觀感。
 
 ## 三之二、證據連結與一手來源
 

@@ -326,6 +326,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **HIG 必須**：背景、surface、文字、separator、disabled 與語意狀態使用 dynamic system colors，不維護暖白／暖褐完整自訂 palette。
 - **Tripline 決策**：保留一個可適應 Light、Dark 與 Increased Contrast 的暖褐 app tint，只用於選取、link 與主要動作。
+- **Tripline 決策**：tint 全產品單一值（淺色 `#8A6038`、深色 `#D0A576`），不拆成文字棕與填色棕。系統開啟 Increased Contrast 時，淺色 tint 前景改用較深的 `#6F4C2C`（對中性選取底 6.09:1），深色不變；一般狀態外觀不變（#550）。
+- **已知例外（#550）**：預設狀態下，root tab bar「選中」標籤（11pt）對中性灰選取底（`#E5E5EA`）為 4.39:1，比小字 4.5:1 差 0.11。決定不為它改品牌色或另造文字專用棕，理由：單一 tint 是產品決策（與 Apple 一致）、差距小，且開啟 Increased Contrast 即達標。對話框內品牌色動作按鈕（「稍後再說」「開啟」「切換帳號」等，約 4.0～4.4:1）同屬此例外。回歸測試把 4.39:1 釘住（`test/theme/app_theme_test.dart`），數字變動要有意識地改。
+- **Tripline 決策**：確認框（alert）的破壞性動作用 Tripline 破壞性紅（淺 `#D70015`、深 `#FF6961`），不用 Cupertino 預設的 systemRed（淺色對白底約 3.0～3.4:1）。`CupertinoDialogAction.isDestructiveAction` 在 alert 上的色來自套件、不吃 Theme，所以以動作文字的 style 覆寫（`tpDestructiveActionStyle`），保留 `isDestructiveAction` 語意；action sheet 本來就用 error 色。停用態的破壞性按鈕維持灰（WCAG 不要求）（#551）。
 - **Tripline 決策**：淺色次要文字（`secondaryLabel`）不採 iOS 系統值（#3C3C43 @60%，對白底 3.44:1、對 #F2F2F7 3.29:1），改為 @75%，在白、secondary、tertiary 三層底色上都達 WCAG AA 4.5:1；深色維持系統值。由 `app_theme_test` 守門。destructive 紅字（對白底 3.55:1）維持系統值，未調整。
 - **HIG 必須**：destructive、warning、success 使用系統語意色，不套品牌 tint。
 - **Tripline 決策**：地圖 Day marker／route 可使用資料編碼色，但必須搭配編號或線型。

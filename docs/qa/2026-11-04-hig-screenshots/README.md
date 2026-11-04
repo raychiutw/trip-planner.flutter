@@ -34,3 +34,7 @@ flutter test integration_test/hig_screenshots_test.dart -d <UDID> \
 - 約 190 張沒有人或我逐張看過。
 - 觸控目標以外的檢查（字級、對比、標籤、Dynamic Type）沒有量測。
 - 舊截圖（`docs/qa/2026-10-hig-screenshots/`）沒有刪，兩批並存；已登入場景在 widget test 框架曾被生物辨識詢問蓋住（見 #540），這批重拍的截圖來自整合測試，沒有逐張確認是否同樣被蓋住。
+
+## 提高對比（#550）
+
+`--dart-define=HIG_HC=true` 以「提高對比」拍攝，檔名加 `-hc` 後綴（目前只有 `trips-list-hc`、`trip-timeline-hc`，看分頁列選中標籤與日期條選中字）。
