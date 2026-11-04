@@ -101,7 +101,8 @@ class DayHeader extends StatelessWidget {
           Text(day.displayTitle, style: theme.textTheme.headlineSmall),
         Text(
           summary,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          // 「N 個停留點」是標題下的 metadata，維持 footnote 13，不隨 body 上移。
+          style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w400,
             color: theme.colorScheme.onSurfaceVariant,
             fontFeatures: const [FontFeature.tabularFigures()],

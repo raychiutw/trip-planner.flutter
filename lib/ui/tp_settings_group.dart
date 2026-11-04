@@ -157,7 +157,7 @@ class TpSettingsRow extends StatelessWidget {
                     const SizedBox(height: TpSpacing.s1),
                     Text(
                       subtitle!,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -166,7 +166,7 @@ class TpSettingsRow extends StatelessWidget {
                     const SizedBox(height: TpSpacing.s1),
                     Text(
                       value!,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -184,7 +184,7 @@ class TpSettingsRow extends StatelessWidget {
                   textAlign: TextAlign.end,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),

@@ -263,12 +263,12 @@ void main() {
       expect(textTheme.headlineMedium?.fontSize, 22);
       expect(textTheme.headlineSmall?.fontSize, 20);
       expect(textTheme.titleLarge?.fontSize, 17);
-      expect(textTheme.titleMedium?.fontSize, 15);
+      expect(textTheme.titleMedium?.fontSize, 17); // Headline
       expect(textTheme.titleSmall?.fontSize, 13);
-      expect(textTheme.bodyLarge?.fontSize, 15);
-      expect(textTheme.bodyMedium?.fontSize, 13);
-      expect(textTheme.bodySmall?.fontSize, 12);
-      expect(textTheme.labelLarge?.fontSize, 15);
+      expect(textTheme.bodyLarge?.fontSize, 17); // Body：正文預設 17（B1）
+      expect(textTheme.bodyMedium?.fontSize, 15); // Subheadline
+      expect(textTheme.bodySmall?.fontSize, 13); // Footnote
+      expect(textTheme.labelLarge?.fontSize, 17); // 按鈕文字
       expect(textTheme.labelMedium?.fontSize, 12);
       expect(textTheme.labelSmall?.fontSize, 11);
       expect(textTheme.bodyLarge?.letterSpacing, 0);

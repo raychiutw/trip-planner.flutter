@@ -67,7 +67,11 @@ class TpChip extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: theme.textTheme.labelLarge?.copyWith(color: textColor),
+              // 控制項標籤（chip）維持 15pt 半粗體，不跟著按鈕的 17pt：一排 chip 要放得下。
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
           ),
         ),

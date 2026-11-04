@@ -280,9 +280,10 @@ abstract final class AppTheme {
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
+      // HIG headline：列標題與卡片標題。與 titleLarge 同為 17，靠權重與行高區分層級。
       titleMedium: TextStyle(
-        fontSize: 15,
-        height: 20 / 15,
+        fontSize: 17,
+        height: 22 / 17,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
@@ -294,28 +295,32 @@ abstract final class AppTheme {
         fontWeight: FontWeight.w600,
         letterSpacing: 0,
       ),
+      // HIG body：正文預設 17pt（檢查表 B1）。
       bodyLarge: TextStyle(
+        fontSize: 17,
+        height: 22 / 17,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0,
+      ),
+      // HIG subheadline：次要說明文字。
+      bodyMedium: TextStyle(
         fontSize: 15,
         height: 20 / 15,
         fontWeight: FontWeight.w400,
         letterSpacing: 0,
       ),
-      bodyMedium: TextStyle(
+      // HIG footnote：日期、數量等第三層資訊。
+      bodySmall: TextStyle(
         fontSize: 13,
         height: 18 / 13,
         fontWeight: FontWeight.w400,
         letterSpacing: 0,
-      ),
-      bodySmall: TextStyle(
-        fontSize: 12,
-        height: 16 / 12,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 0,
         fontFeatures: [FontFeature.tabularFigures()],
       ),
+      // 按鈕文字：iOS 的文字按鈕與主要按鈕用 body 17。
       labelLarge: TextStyle(
-        fontSize: 15,
-        height: 20 / 15,
+        fontSize: 17,
+        height: 22 / 17,
         fontWeight: FontWeight.w600,
         letterSpacing: 0,
       ),

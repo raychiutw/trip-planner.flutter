@@ -654,7 +654,17 @@ void main() {
     await _pump(tester, repo);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byKey(const ValueKey('poi-edit-master')));
+    // 最大字級下「編輯」鈕可能落在視窗之外；往上捲到點得到為止（與真人操作一致）。
+    final editMaster = find.byKey(const ValueKey('poi-edit-master'));
+    for (
+      var i = 0;
+      i < 12 && editMaster.hitTestable().evaluate().isEmpty;
+      i++
+    ) {
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
+      await tester.pump();
+    }
+    await tester.tap(editMaster);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull, reason: '編輯 sheet 初始版面');
     const note = '訂位備註包含多位旅伴與特殊需求，請櫃檯保留靠窗座位並確認抵達時間。';

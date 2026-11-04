@@ -1220,7 +1220,11 @@ class _Banner extends StatelessWidget {
                 liveRegion: true,
                 child: Text(
                   text,
-                  style: TextStyle(color: scheme.onErrorContainer),
+                  // 狀態橫幅用 footnote 13：沒明寫字級的 Text 會吃 Material 預設的 bodyMedium（現在是 15），
+                  // 極端字級（AX5）下三個橫幅疊起來會比螢幕高。
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
                 ),
               ),
             ),

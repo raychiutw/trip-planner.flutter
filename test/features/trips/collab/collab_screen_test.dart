@@ -128,7 +128,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final memberAction = find.byKey(const ValueKey('member-actions-2'));
-    await tester.ensureVisible(memberAction);
+    // 200% 字級下成員列很高（長 email 折很多行），垂直置中的選單鈕可能落在視窗之外；
+    // 與真人一樣往上捲，直到點得到為止（hitTestable 就是 tap 需要的條件）。
+    for (
+      var i = 0;
+      i < 12 && memberAction.hitTestable().evaluate().isEmpty;
+      i++
+    ) {
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
+      await tester.pump();
+    }
     await tester.tap(memberAction);
     await tester.pumpAndSettle();
     expect(find.text('共編成員'), findsWidgets);
@@ -143,7 +152,11 @@ void main() {
       of: find.byKey(const ValueKey('collab-content')),
       matching: find.byType(Scrollable),
     );
-    await tester.drag(contentScroll, const Offset(0, -400));
+    // 不寫死拖多遠：字級變大列會更高，捲到「撤銷」點得到為止。
+    for (var i = 0; i < 20 && revoke.hitTestable().evaluate().isEmpty; i++) {
+      await tester.drag(contentScroll, const Offset(0, -120));
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
     await tester.tap(revoke);
     await tester.pumpAndSettle();
