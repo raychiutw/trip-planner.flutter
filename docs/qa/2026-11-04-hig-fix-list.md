@@ -166,7 +166,7 @@ App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-scr
 - 沒量字級（B1）。對比：App 已用內建工具掃過（見三之三），web 沒有量。
 - VoiceOver 只做了「可點擊元素有沒有標籤」的靜態檢查，沒有真的用 VoiceOver 走過；Increase Contrast、Reduce Motion 沒檢查。
 - web：axe、320px 重排、200% 文字、鍵盤焦點已用工具掃過（有限制，見 web 報告），沒有 dialog 行為檢查；只跑 chromium，webkit 瀏覽器未安裝所以沒跑。
-- 彈出層：主要 helper 都已有場景（共補 31 個），仍標「部分」的呼叫端見 `docs/research/2026-11-04-hig-app-screen-inventory.md` 的缺口摘要。
+- 彈出層：主要 helper 都已有場景（共補 32 個），仍標「部分」的呼叫端見 `docs/research/2026-11-04-hig-app-screen-inventory.md` 的缺口摘要。
 - 「符合」與「未見明顯問題」是我目視的結論，沒有第二人複核。
 
 ## 建議順序

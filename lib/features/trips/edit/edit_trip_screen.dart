@@ -95,7 +95,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
           context,
           source: TpDestructiveConfirmSource.direct,
           title: '有變更尚未送出',
-          message: '$fields 還沒有送出成功。要再試一次，還是放棄這些變更並離開？',
+          message: '$fields還沒有送出成功。要再試一次，還是放棄這些變更並離開？',
           confirmLabel: '放棄變更',
           cancelLabel: '重試',
         );

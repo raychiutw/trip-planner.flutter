@@ -94,6 +94,6 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 ## 三、缺口摘要
 
 - 路由缺口 0 個，另有 1 個部分（#534～#536 補了 15 個）：`:favoriteId/add-to-trip` 只有無效 ID 狀態（正常載入狀態沒有場景）；另加上變更密碼（PR #530，尚未進 master）。
-- 彈出層：#531 補了 23 個，#558～#561 再補 8 個（衝突解決 sheet 兩個、加入行程時段衝突 alert、刪除行程日確認〔原稱編輯行程放棄確認〕、三處『保留你的版本？』覆寫確認、停留點遠端衝突狀態），共 31 個。`showAppFormSheet`、`showAppAlert` 的呼叫端已全數有場景。仍標「部分」的是 spec #557 範圍外的呼叫端：日期選擇器（編輯行程、分享）、`showAppConfirm` 四處、`showAppDestructiveConfirm` 一處（收藏批次移除；編輯行程的完成攔截框已有 `trip-edit-finish-blocked-confirm`）、`confirmAndRunIrreversibleAction`（重新產生、刪除分享連結）、`showAppNotice`（其餘畫面）。這些場景用測試替身造狀態的限制見缺口文件第 1 節。App 鎖開啟提示是全螢幕狀態，不算彈出層。
+- 彈出層：#531 補了 23 個，#558～#561 再補 8 個（衝突解決 sheet 兩個、加入行程時段衝突 alert、刪除行程日確認〔原稱編輯行程放棄確認〕、三處『保留你的版本？』覆寫確認、停留點遠端衝突狀態），另有編輯行程的完成攔截框 1 個，共 32 個。`showAppFormSheet`、`showAppAlert` 的呼叫端已全數有場景。仍標「部分」的是 spec #557 範圍外的呼叫端：日期選擇器（編輯行程、分享）、`showAppConfirm` 四處、`showAppDestructiveConfirm` 一處（收藏批次移除；編輯行程的完成攔截框已有 `trip-edit-finish-blocked-confirm`）、`confirmAndRunIrreversibleAction`（重新產生、刪除分享連結）、`showAppNotice`（其餘畫面）。這些場景用測試替身造狀態的限制見缺口文件第 1 節。App 鎖開啟提示是全螢幕狀態，不算彈出層。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。
