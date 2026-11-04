@@ -200,6 +200,45 @@ void main() {
     expect(find.byType(TpTag), findsAtLeastNWidgets(4));
   });
 
+  testWidgets('建議卡一律撐滿內容寬，不隨內容長短縮成不同寬度（#544 A7）', (tester) async {
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
+      (_) async => const TripHealthReport(
+        tripId: 'trip-1',
+        userId: 'user-1',
+        status: TripHealthStatus.completed,
+        createdAt: '2026-07-09T10:00:00Z',
+        findings: [
+          // 第一張有建議區塊（寬度撐滿），第二張只有短文字：舊行為下第二張會縮成一半寬。
+          TripHealthFinding(
+            severity: TripHealthSeverity.high,
+            title: '第一天行程過滿',
+            description: '10:00 到 21:00 之間沒有休息時間。',
+            suggestion: '把其中一個景點移到第二天。',
+          ),
+          TripHealthFinding(
+            severity: TripHealthSeverity.low,
+            title: '午餐尚未安排',
+            description: '第二天沒有用餐停留點。',
+          ),
+        ],
+        completedAt: '2026-07-09T10:01:00Z',
+      ),
+    );
+
+    await pumpScreen(tester);
+
+    final cards = find.descendant(
+      of: find.byKey(const ValueKey('trip-health-results')),
+      matching: find.byType(Card),
+    );
+    expect(cards, findsNWidgets(2));
+    expect(
+      tester.getSize(cards.at(1)).width,
+      tester.getSize(cards.at(0)).width,
+      reason: '兩張建議卡寬度要一致',
+    );
+  });
+
   testWidgets('用詞人話化:不外洩 POI／Day／原始代碼', (tester) async {
     when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
       (_) async => const TripHealthReport(
