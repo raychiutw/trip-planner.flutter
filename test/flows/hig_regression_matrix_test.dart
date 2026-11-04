@@ -71,6 +71,12 @@ Color _selectedPillColor(WidgetTester tester) => tester
     )
     .indicatorColor!;
 
+/// 導覽列選中前景：淺色用較深的同色系（對中性選取底 4.5:1），深色維持品牌 tint。
+Color _navSelectedForeground(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? scheme.onPrimaryContainer
+    : scheme.primary;
+
 void main() {
   for (final state in _states) {
     testWidgets('regular form sheet 保留置中限寬並採公開材質 ${state.name}', (
@@ -608,7 +614,7 @@ void main() {
       );
       expect(
         selectedLabels.map((text) => text.style?.color),
-        contains(theme.colorScheme.primary),
+        contains(_navSelectedForeground(theme.colorScheme)),
       );
       final firstSelection = await pixel('聊天');
       final unselected = await pixel('行程');
@@ -834,7 +840,7 @@ void main() {
       );
       expect(
         tester.widget<Text>(find.text('Day 2')).style?.color,
-        scheme.primary,
+        _navSelectedForeground(scheme),
       );
       if (expectsOpaqueGlass) {
         expect(selector.backgroundColor, scheme.surfaceContainerLow);
@@ -865,7 +871,7 @@ void main() {
         final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
           tabBar.selectedIconColor,
-          scheme.primary,
+          _navSelectedForeground(scheme),
           reason: '選取字符走品牌 tint,不是坐在柔褐上的 onPrimary',
         );
       }
@@ -899,8 +905,8 @@ void main() {
       // 品牌色改走前景：選取態的標籤是 tint，未選取維持中性次要前景。
       expect(
         tester.widget<Text>(find.text('Day 2')).style?.color,
-        scheme.primary,
-        reason: '選取態的標籤應是品牌 tint',
+        _navSelectedForeground(scheme),
+        reason: '選取態的標籤應是品牌 tint（淺色用較深的同色系以達 4.5:1，#544 A10）',
       );
       expect(
         tester.widget<Text>(find.text('Day 1')).style?.color,
