@@ -454,6 +454,31 @@ void main() {
       expect(find.text('保留這個標題'), findsOneWidget);
     });
 
+    testWidgets('兩個欄位都送出失敗：錯誤與重試只顯示一份（重試本來就送全部）', (tester) async {
+      when(
+        () => tripRepo.updateTrip(
+          any(),
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+        ),
+      ).thenAnswer((_) async => throw Exception('暫時無法連線'));
+      tester.view.physicalSize = const Size(800, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await openSheet(tester);
+      await tester.enterText(find.byKey(const ValueKey('edit-title')), '新標題');
+      await blur(tester);
+      await tester.pumpAndSettle();
+      final desc = find.byKey(const ValueKey('edit-desc'));
+      await scrollTo(tester, desc, 200);
+      await tester.enterText(desc, '新描述');
+      await blur(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text('儲存失敗,請稍後再試'), findsOneWidget);
+      expect(find.text('重試'), findsOneWidget);
+    });
+
     testWidgets('切換發布失敗：開關保留使用者的選擇並在旁邊顯示重試', (tester) async {
       when(
         () => tripRepo.updateTrip('okinawa', published: 0),

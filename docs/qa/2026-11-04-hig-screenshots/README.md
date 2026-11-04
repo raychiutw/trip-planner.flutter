@@ -1,7 +1,7 @@
 # App HIG 截圖（#531：#534～#536 新補場景＋既有場景重拍）
 
 iOS 模擬器 iPhone 17（iOS 27，Debug build，393×852 pt @3x），整合測試 `integration_test/hig_screenshots_test.dart` 產生，全程走 mock repository，不碰 prod。
-現有 134 個場景 × 淺／深 = 268 張 PNG，另有 `trips-list-hc`、`trip-timeline-hc` 的提高對比變體各淺深 2 張（共 4 張，不算場景），資料夾內共 272 張（縮到 603×1311 以控制體積）。其中 `components`、`ax-components-2x` 由整合測試自己拍，不在 `higScenes()` 內（`higScenes()` 為 132 個）。`report.tsv` 是**第一輪 102 個場景**當時的深淺色比對（全部 bytes 不同、像素差異 ≥ 98%、深色亮度明顯較低），之後新增的場景沒有補進去。數字由 `test/docs/hig_report_totals_test.dart` 對帳。
+現有 135 個場景 × 淺／深 = 270 張 PNG，另有 `trips-list-hc`、`trip-timeline-hc` 的提高對比變體各淺深 2 張（共 4 張，不算場景），資料夾內共 274 張（縮到 603×1311 以控制體積）。其中 `components`、`ax-components-2x` 由整合測試自己拍，不在 `higScenes()` 內（`higScenes()` 為 133 個）。`report.tsv` 是**第一輪 102 個場景**當時的深淺色比對（全部 bytes 不同、像素差異 ≥ 98%、深色亮度明顯較低），之後新增的場景沒有補進去。數字由 `test/docs/hig_report_totals_test.dart` 對帳。
 
 重跑：
 

@@ -1,6 +1,6 @@
 # HIG 比對後的修改清單（#531）
 
-日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（134 個場景全看；原為 125，後續各輪補到 134）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
+日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（135 個場景全看；原為 125，後續各輪補到 135）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
 這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。清單寫成時還沒動程式碼，之後已處理的項目標 ✅（A1～A7、A9、A11、A14、S1～S3、T2 等）、查過不改的標 ⚪；排序是我的建議，開票與否由你決定。
 
@@ -78,16 +78,18 @@
 
 | # | 場景 | 檢查表 | 問題 | 建議修改 | 強度 |
 |---|---|---|---|---|---|
-| W1 | `account-sessions`、`account-connected-apps`、`developer-apps` | 版面 | 頁面上方小標被固定頁首壓住而被裁切或重疊，桌機與手機都有 | 頁面內容區加上頁首高度的 `scroll-margin`／padding-top | 看圖 |
-| W2 | `trip-detail`（桌機） | E1 | 地圖面板錯誤態的「重試」是未套樣式的原生灰色按鈕 | 改用專案按鈕元件 | 看圖 |
-| W3 | `trip-detail`（手機） | 版面 | 移動方式膠囊超出右緣被截斷 | 允許換行或改成可橫向捲動並露出邊緣提示 | 看圖 |
-| W4 | `explore`（手機） | — | 篩選膠囊「Sight 1」與卡片類別「SIGHT」是未在地化的英文原值 | 類別 key 對照到中文標籤 | 看圖 |
-| W5 | `trips-new`（手機） | B | 日期欄位「選擇日期」字級明顯大於同頁其他 placeholder | 與其他欄位的 placeholder 字級對齊 | 看圖 |
-| W6 | `trip-detail` | WCAG 2.5.3 | 起訖時間 chip 的 `aria-label="編輯起訖時間"` 蓋掉可見時間文字（`EntryTimeChip.tsx:140`，9 個節點） | 讓 accessible name 以可見文字開頭，如「09:00–12:00，編輯起訖時間」 | axe 加程式碼 |
-| W7 | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
-| W8 | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
+| W1 ✅ 已處理 web#1580（PR 未合併） | `account-sessions`、`account-connected-apps`、`developer-apps` | 版面 | 頁面上方小標被固定頁首壓住而被裁切或重疊，桌機與手機都有 | 頁面內容區加上頁首高度的 `scroll-margin`／padding-top | 看圖 |
+| W2 ✅ 已處理 web#1580（PR 未合併） | `trip-detail`（桌機） | E1 | 地圖面板錯誤態的「重試」是未套樣式的原生灰色按鈕 | 改用專案按鈕元件 | 看圖 |
+| W3 ✅ 已處理 web#1580（PR 未合併） | `trip-detail`（手機） | 版面 | 移動方式膠囊超出右緣被截斷 | 允許換行或改成可橫向捲動並露出邊緣提示 | 看圖 |
+| W4 ✅ 已處理 web#1580（PR 未合併） | `explore`（手機） | — | 篩選膠囊「Sight 1」與卡片類別「SIGHT」是未在地化的英文原值 | 類別 key 對照到中文標籤 | 看圖 |
+| W5 ✅ 已處理 web#1580（PR 未合併） | `trips-new`（手機） | B | 日期欄位「選擇日期」字級明顯大於同頁其他 placeholder | 與其他欄位的 placeholder 字級對齊 | 看圖 |
+| W6 ✅ 已處理 web#1580（PR 未合併） | `trip-detail` | WCAG 2.5.3 | 起訖時間 chip 的 `aria-label="編輯起訖時間"` 蓋掉可見時間文字（`EntryTimeChip.tsx:140`，9 個節點） | 讓 accessible name 以可見文字開頭，如「09:00–12:00，編輯起訖時間」 | axe 加程式碼 |
+| W7 ✅ 已處理 web#1580（PR 未合併） | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
+| W8 ✅ 已處理 web#1580（PR 未合併） | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
 | W9 | `trips-list-error` | G6、G7 | 行程清單載入失敗只有一行字，沒有重試（`TripsListPage` 錯誤態沒有任何重試動作） | 補「重試」，行為與 App 的錯誤態一致 | 看圖加程式碼 |
 | W10 | `signup-check-email`、`invite` | B7 | 以「320px、html 字級 200%」近似量測有橫向捲動（scrollWidth 354、366 對 320），原因未定位；近似量法，是否構成 1.4.10 違規待驗證 | 先定位再修，並用瀏覽器縮放驗證 | 量測（未定位） |
+
+W1～W8 已由 web PR #1580 處理（W9、W10 未動）；該 PR 尚未合併，合併後再確認。
 
 web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告「補掃」一節：重排與放大沒有橫向捲動；`explore` 搜尋欄的焦點樣式待目視確認；`landing` 的 200% 文字檢查沒有生效。
 
@@ -95,7 +97,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 三之三、補掃：文字對比與 VoiceOver 標籤（工具量測）
 
-用 Flutter 內建的 `textContrastGuideline` 與 `labeledTapTargetGuideline` 掃當時的 100 個場景（後來場景增為 134；`components`、`ax-components-2x` 是元件示範頁，沒掃）× 淺深，共 200 次；66 次有項目未過。指令：`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`（只印 `HIGA11Y` 行，不是守門；沒帶旗標會 skip）。
+用 Flutter 內建的 `textContrastGuideline` 與 `labeledTapTargetGuideline` 掃當時的 100 個場景（後來場景增為 135；`components`、`ax-components-2x` 是元件示範頁，沒掃）× 淺深，共 200 次；66 次有項目未過。指令：`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`（只印 `HIGA11Y` 行，不是守門；沒帶旗標會 skip）。
 
 **限制：**對比由工具以渲染後像素取樣，半透明玻璃、對話框 blur 底、停用狀態的取樣不可靠；下表只收「對照截圖後仍成立」的項目。本輪沒有再另外手量，數值是工具輸出。
 
@@ -151,7 +153,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 清單覆蓋率
 
-App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 134 個畫面**；畫面清單裡標「部分」的彈出層（編輯行程與分享的日期選擇器、`showAppConfirm` 在通知設定與帳號查看說明等、`showAppNotice` 在其餘畫面、`showAppAlert` 的其餘呼叫端）沒有取證，不能因為本報告而視為通過；各場景用測試替身造狀態的限制見[缺口文件](2026-11-04-hig-verification-gaps.md)第 1 節。
+App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 135 個畫面**；畫面清單裡標「部分」的彈出層（編輯行程與分享的日期選擇器、`showAppConfirm` 在通知設定與帳號查看說明等、`showAppNotice` 在其餘畫面、`showAppAlert` 的其餘呼叫端）沒有取證，不能因為本報告而視為通過；各場景用測試替身造狀態的限制見[缺口文件](2026-11-04-hig-verification-gaps.md)第 1 節。
 
 ## 四、看過但判定沒問題的（避免重複討論）
 

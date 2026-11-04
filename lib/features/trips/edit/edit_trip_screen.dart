@@ -116,10 +116,13 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
   }
 
   /// 欄位旁的就地錯誤:只出現在送出失敗且仍未生效的欄位,附重試。
+  /// 多個欄位同時失敗時只在畫面最上方的那個欄位顯示一份(錯誤是整體的,重試也一律送全部)。
   Widget _fieldError(EditTripState state, EditField field) {
     final ctrl = _ctrl;
     final error = ctrl.saveError;
-    if (error == null || !ctrl.unsentFields.contains(field)) {
+    // EditField 宣告順序即畫面由上到下的順序。
+    final unsent = EditField.values.where(ctrl.unsentFields.contains);
+    if (error == null || unsent.isEmpty || unsent.first != field) {
       return const SizedBox.shrink();
     }
     return Padding(

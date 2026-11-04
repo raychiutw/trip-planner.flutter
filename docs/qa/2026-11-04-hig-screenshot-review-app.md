@@ -1,6 +1,6 @@
 # App 截圖逐張檢查報告（#531／#537 素材）
 
-檢查日期：2026-11-04。對象：[`2026-11-04-hig-screenshots/`](2026-11-04-hig-screenshots/) 的 134 個場景（淺色、深色各一張，iPhone 17 模擬器；另有 2 個場景的「提高對比」變體 `-hc` 圖，不算場景，見該資料夾 README）。依據：[HIG 檢查表](../research/2026-11-04-hig-screen-checklist.md)。
+檢查日期：2026-11-04。對象：[`2026-11-04-hig-screenshots/`](2026-11-04-hig-screenshots/) 的 135 個場景（淺色、深色各一張，iPhone 17 模擬器；另有 2 個場景的「提高對比」變體 `-hc` 圖，不算場景，見該資料夾 README）。依據：[HIG 檢查表](../research/2026-11-04-hig-screen-checklist.md)。
 
 ## 怎麼檢查的
 
@@ -15,7 +15,7 @@
 
 | 結論 | 場景數 |
 |---|---|
-| 符合 | 47 |
+| 符合 | 48 |
 | 未見明顯問題 | 52 |
 | 疑慮 | 15 |
 | 張力（與檢查表建議衝突，但屬已知專案決策） | 13 |
@@ -23,11 +23,11 @@
 | 無法判讀 | 3 |
 | 場景無效（截圖沒有證明想證明的畫面） | 0（原 3 個已修並重拍） |
 | 未看 | 0 |
-| **合計** | **134** |
+| **合計** | **135** |
 
 合計等於下方逐場景表的列數，也等於 `light/`、`dark/` 各自的非 `-hc` 截圖數與 `higScenes()` 的場景數；`test/docs/hig_report_totals_test.dart` 守住這個等式。
 
-134 個場景全部看過，分八輪：第一輪看 72 個、第二輪補看 30 個（含 20 個 `ax-*` 大字級場景）、第三輪補 8 個彈出層場景、第四輪補 4 個不可復原動作的確認框、第五輪補 11 個（生物辨識、登入裝置與開發者 App 的確認框、左滑刪除、六種表單 sheet）、第六輪（#546／#549）重拍 `trip-edit` 並補 `trip-edit-save-failed`（`trip-edit` 由疑慮轉符合，總數 +1）、第七輪（#558／#560）補 4 個：`sync-conflict-sheet`、`sync-conflict-sheet-many`、`add-to-trip-time-conflict-alert`、`trip-edit-delete-day-confirm`、第八輪（#559／#561）補 4 個：`entry-edit-sheet-remote-conflict`、`entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`。**#544 修正並全量重拍後**重算過一次判定（修正前：符合 34、疑慮 13）。上列各輪次的加總是 72＋30＋8＋4＋11＋1＋4＋4＝134。
+135 個場景全部看過，分九輪：第一輪看 72 個、第二輪補看 30 個（含 20 個 `ax-*` 大字級場景）、第三輪補 8 個彈出層場景、第四輪補 4 個不可復原動作的確認框、第五輪補 11 個（生物辨識、登入裝置與開發者 App 的確認框、左滑刪除、六種表單 sheet）、第六輪（#546／#549）重拍 `trip-edit` 並補 `trip-edit-save-failed`（`trip-edit` 由疑慮轉符合，總數 +1）、第七輪（#558／#560）補 4 個：`sync-conflict-sheet`、`sync-conflict-sheet-many`、`add-to-trip-time-conflict-alert`、`trip-edit-delete-day-confirm`、第八輪（#559／#561）補 4 個：`entry-edit-sheet-remote-conflict`、`entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`、第九輪（#549 補圖）補 1 個：`trip-edit-finish-blocked-confirm`。**#544 修正並全量重拍後**重算過一次判定（修正前：符合 34、疑慮 13）。上列各輪次的加總是 72＋30＋8＋4＋11＋1＋4＋4＋1＝135。
 
 B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-trip-map-2x` 因地圖是 fixture 除外），分段控制元件在大字級改垂直堆疊是刻意設計。「未見明顯問題」只代表目視沒看到，沒有量字級，也沒有逐一量對比。
 
@@ -152,6 +152,7 @@ B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-t
 | `trip-delete-confirm` | 淺深已看 | 符合 | G2、G3、G4 | alert／action sheet 結構、取消在 leading、破壞性動作用紅字，目視符合 |
 | `trip-edit-load-failed` | 淺深已看（重拍） | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `trip-edit-save-failed` | 淺深已看（#549 新增） | 符合 | G5、G6 | 改標題後離開欄位送出失敗：輸入保留，錯誤「儲存失敗,請稍後再試」與「重試」就在標題欄位正下方，不是一閃而過的通知 |
+| `trip-edit-finish-blocked-confirm` | 淺深已看（#549 補圖） | 符合 | G5、G6、D12 | 標題送出失敗後按「完成」被攔截：alert 標題「有變更尚未送出」、說明點名「標題」，左「重試」右紅色「放棄變更」（破壞性動作在右）；底下仍看得到欄位錯誤與重試。小瑕疵：說明文字「標題 還沒有送出成功」欄位名稱後多一個半形空格 |
 | `trip-edit` | 淺深已看（重拍） | 符合 | D10、G5 | 重拍後標題列只有右側「完成」，沒有「取消」與「儲存」；說明文字統一為「離開欄位自動儲存／改了就儲存」與「日期平移與天數操作立即生效；刪除天數無法復原」，不再混用兩種語意（#546 修正） |
 | `trip-health-findings` | 淺深已看（重拍） | 符合 | 版面 | 重拍後兩張建議卡同寬（#544 A7 已修） |
 | `trip-health-load-failed` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |

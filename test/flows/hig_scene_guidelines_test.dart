@@ -88,6 +88,7 @@ const _scenesWithDialog = {
   'entry-alternate-remove-confirm',
   'add-to-trip-time-conflict-alert',
   'trip-edit-delete-day-confirm',
+  'trip-edit-finish-blocked-confirm',
   'entry-edit-overwrite-confirm',
   'note-edit-overwrite-confirm',
   'travel-edit-overwrite-confirm',

@@ -1049,6 +1049,46 @@ List<HigScene> higScenes() => [
     proof: () => find.byKey(const ValueKey('edit-retry-title')),
   ),
   HigScene(
+    'trip-edit-finish-blocked-confirm',
+    '#549',
+    location: '/edit-trip/okinawa',
+    stub: (f) {
+      when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
+        (_) async => const Trip(
+          id: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          description: '四天三夜',
+          lang: 'zh-TW',
+          startDate: '2026-11-01',
+          endDate: '2026-11-04',
+        ),
+      );
+      when(
+        () => f.trips.updateTrip(
+          any(),
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          lang: any(named: 'lang'),
+          published: any(named: 'published'),
+          destinations: any(named: 'destinations'),
+        ),
+      ).thenAnswer((_) async => throw _failure);
+    },
+    // 改標題後離開欄位 → 送出失敗，接著按「完成」被攔截。
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('edit-title')),
+        '沖繩家族之旅（改）',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await higSettle(tester);
+      // 再按「完成」：送出仍失敗，攔截框說出未送出的欄位，選「重試」或「放棄變更」。
+      await _tapKey(tester, 'edit-done');
+    },
+    proof: () => find.text('有變更尚未送出'),
+  ),
+  HigScene(
     'trip-edit-load-failed',
     '#417',
     location: '/edit-trip/okinawa',
@@ -2019,7 +2059,8 @@ List<HigScene> higScenes() => [
       // 先選一筆，讓「套用所選版本」進入可按狀態。
       await _tapKey(tester, 'conflict-keep-ours-c0');
     },
-    proof: () => find.text('套用所選版本'),
+    // 第二筆衝突的按鈕只在多筆時才存在（單筆版只有 c0）。
+    proof: () => find.byKey(const ValueKey('conflict-keep-ours-c1')),
   ),
   const HigScene(
     'ax-welcome-2x',
