@@ -1,6 +1,6 @@
 # HIG 比對後的修改清單（#531）
 
-日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（110 個場景全看）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
+日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（114 個場景全看）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
 這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。**還沒有動任何程式碼**；排序是我的建議，開票與否由你決定。
 
@@ -129,7 +129,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 清單覆蓋率
 
-App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 110 個畫面**；清單裡仍標「缺口」的彈出層（date／time picker、`showAppConfirm`、`showAppDestructiveConfirm`、`showAppAlert`、`showAppFormSheet`、`showAppNotice` 等）沒有取證，不能因為本報告而視為通過。
+App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 114 個畫面**；清單裡仍標「缺口」的彈出層（date／time picker、`showAppConfirm`、`showAppDestructiveConfirm`（只覆蓋部分呼叫端）、`showAppAlert`、`showAppFormSheet`、`showAppNotice` 等）沒有取證，不能因為本報告而視為通過。
 
 ## 四、看過但判定沒問題的（避免重複討論）
 

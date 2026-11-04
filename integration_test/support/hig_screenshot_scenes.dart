@@ -1276,6 +1276,65 @@ List<HigScene> higScenes() => [
     proof: () => find.text('無法載入刪除資訊'),
   ),
 
+  // ── 彈出層補強 2：不可復原動作的確認（選單觸發走 action sheet、直接按鈕走 alert）──
+  HigScene(
+    'share-revoke-confirm',
+    '#531',
+    location: '/share-trip/okinawa',
+    stub: (f) => when(() => f.share.fetchShares(any())).thenAnswer(
+      (_) async => const [
+        TripShare(id: 7, label: '給家人', visibleSections: ['timeline']),
+      ],
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'share-actions-7');
+      await _tapKey(tester, 'share-revoke-7');
+    },
+    proof: () => find.textContaining('撤銷「給家人」'),
+  ),
+  HigScene(
+    'collab-remove-member-confirm',
+    '#531',
+    location: '/collab/okinawa',
+    stub: (f) => when(() => f.fixture.collab.fetchMembers(any())).thenAnswer(
+      (_) async => const [
+        TripMember(id: 1, email: 'ray@example.com', role: 'owner'),
+        TripMember(id: 2, email: 'mei@example.com', role: 'member'),
+      ],
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'member-actions-2');
+      await _tapKey(tester, 'member-remove-2');
+    },
+    proof: () => find.textContaining('移除「mei@example.com」'),
+  ),
+  HigScene(
+    'collab-revoke-invite-confirm',
+    '#531',
+    location: '/collab/okinawa',
+    stub: (f) => when(() => f.fixture.collab.fetchInvites(any())).thenAnswer(
+      (_) async => const [
+        TripInvite(
+          id: 'i-1',
+          invitedEmail: 'kai@example.com',
+          daysRemaining: 5,
+        ),
+      ],
+    ),
+    act: (tester, f) async => _tapText(tester, '撤銷'),
+    proof: () => find.textContaining('撤銷「kai@example.com」的邀請'),
+  ),
+  HigScene(
+    'timeline-delete-entry-confirm',
+    '#531',
+    location: '/trips/okinawa',
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'entry-more-');
+      await _tapKeyPrefix(tester, 'entry-delete-');
+    },
+    proof: () => find.textContaining('相關交通時間將重新計算'),
+  ),
+
   // ── 邀請 ──
   const HigScene(
     'invite-signed-in',

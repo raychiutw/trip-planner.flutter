@@ -69,6 +69,7 @@ const _scenesWithDialog = {
   'app-lock-enable-prompt',
   'favorites-remove-confirm',
   'account-delete-preview-failed',
+  'collab-revoke-invite-confirm',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。
