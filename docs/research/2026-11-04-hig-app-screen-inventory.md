@@ -77,14 +77,14 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 |---|---|---|---|
 | `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | 部分 | `create-trip-date-picker` `note-edit-date-picker`（建立行程與筆記；編輯行程、分享仍無場景） |
 | `showAppTimePicker` | 筆記編輯 | 已有場景 | `note-edit-time-picker` |
-| `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音） |
-| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm` `share-revoke-confirm` `collab-remove-member-confirm` `timeline-delete-entry-confirm` `account-session-revoke-confirm` `developer-app-delete-confirm` `trip-edit-delete-day-confirm`（編輯行程的刪除行程日；選單觸發的是 action sheet；詳情頁與編輯頁上的直接按鈕走 alert；停留點、筆記、交通的『保留你的版本？』覆寫確認已由 #559／#561 補 `entry-edit-overwrite-confirm` `note-edit-overwrite-confirm` `travel-edit-overwrite-confirm`） `favorites-remove-confirm`（收藏移除，direct 來源，確認走 alert）|
-| `showAppAlert` | 加入行程、帳號 | 部分 | `account-delete-preview-failed` `add-to-trip-time-conflict-alert`（帳號與加入行程時段衝突） |
+| `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音同意；聊天「無法使用語音輸入」、帳號「需要重新驗證才能刪除」、通知設定「允許通知」、停留點備選「設為正選？」四處仍無場景） |
+| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm` `share-revoke-confirm` `collab-remove-member-confirm` `timeline-delete-entry-confirm` `account-session-revoke-confirm` `developer-app-delete-confirm` `trip-edit-delete-day-confirm`（編輯行程的刪除行程日；選單觸發的是 action sheet；詳情頁與編輯頁上的直接按鈕走 alert；停留點、筆記、交通的『保留你的版本？』覆寫確認已由 #559／#561 補 `entry-edit-overwrite-confirm` `note-edit-overwrite-confirm` `travel-edit-overwrite-confirm`） `favorites-remove-confirm`（收藏移除，direct 來源，確認走 alert）（仍無場景：編輯行程「有變更尚未送出」放棄確認、收藏多選的批次移除）|
+| `showAppAlert` | 加入行程、帳號 | 已有場景（兩處呼叫端都有） | `account-delete-preview-failed` `add-to-trip-time-conflict-alert`（帳號與加入行程時段衝突） |
 | `showAppActionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppContentSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppScreenSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
-| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 部分 | `note-edit-sheet` `favorites-filter-sheet` `chat-ai-consent-sheet` `explore-custom-region-sheet` `poi-info-edit-sheet` `travel-edit-sheet` `share-edit-sheet` `entry-edit-sheet` `sync-conflict-sheet` `sync-conflict-sheet-many`（衝突解決 sheet 已有場景）`entry-edit-sheet-remote-conflict`（停留點遠端衝突狀態） |
+| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 已有場景（九處呼叫端都有） | `note-edit-sheet` `favorites-filter-sheet` `chat-ai-consent-sheet` `explore-custom-region-sheet` `poi-info-edit-sheet` `travel-edit-sheet` `share-edit-sheet` `entry-edit-sheet` `sync-conflict-sheet` `sync-conflict-sheet-many`（衝突解決 sheet 已有場景）`entry-edit-sheet-remote-conflict`（停留點遠端衝突狀態） |
 | `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | 部分 | `favorites-removed-notice`（只覆蓋收藏移除成功；其餘畫面的通知仍無場景） |
 | `confirmAndRunIrreversibleAction` | 協作、分享 | 部分 | `share-revoke-confirm` `collab-remove-member-confirm` `collab-revoke-invite-confirm`（重新產生、刪除分享連結同一支元件，未各拍一張） |
 | `confirmAndDelete` | 停留點 POI、時間軸、筆記 | 已有場景 | `timeline-delete-entry-confirm` `note-delete-confirm` `entry-alternate-remove-confirm` |
@@ -94,6 +94,6 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 ## 三、缺口摘要
 
 - 路由缺口 0 個，另有 1 個部分（#534～#536 補了 15 個）：`:favoriteId/add-to-trip` 只有無效 ID 狀態（正常載入狀態沒有場景）；另加上變更密碼（PR #530，尚未進 master）。
-- 彈出層缺口：已補 23 個場景（日期與時間選擇器、確認框、表單 sheet、通知），衝突解決 sheet、加入行程衝突 alert、刪除行程日確認（原稱編輯行程放棄確認）已由 #558／#560 補上，三處『保留你的版本？』覆寫確認與停留點遠端衝突狀態已由 #559／#561 補上（見缺口文件第 1 節）。App 鎖開啟提示是全螢幕狀態，不算彈出層。
+- 彈出層：#531 補了 23 個，#558～#561 再補 8 個（衝突解決 sheet 兩個、加入行程時段衝突 alert、刪除行程日確認〔原稱編輯行程放棄確認〕、三處『保留你的版本？』覆寫確認、停留點遠端衝突狀態），共 31 個。`showAppFormSheet`、`showAppAlert` 的呼叫端已全數有場景。仍標「部分」的是 spec #557 範圍外的呼叫端：日期選擇器（編輯行程、分享）、`showAppConfirm` 四處、`showAppDestructiveConfirm` 兩處（編輯行程放棄變更、收藏批次移除）、`confirmAndRunIrreversibleAction`（重新產生、刪除分享連結）、`showAppNotice`（其餘畫面）。這些場景用測試替身造狀態的限制見缺口文件第 1 節。App 鎖開啟提示是全螢幕狀態，不算彈出層。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。

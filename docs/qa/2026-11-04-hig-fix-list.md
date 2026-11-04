@@ -1,8 +1,8 @@
 # HIG 比對後的修改清單（#531）
 
-日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（125 個場景全看）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
+日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（134 個場景全看；原為 125，後續各輪補到 134）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
-這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。**還沒有動任何程式碼**；排序是我的建議，開票與否由你決定。
+這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。清單寫成時還沒動程式碼，之後已處理的項目標 ✅（A1～A7、A9、A11、A14、S1～S3、T2 等）、查過不改的標 ⚪；排序是我的建議，開票與否由你決定。
 
 證據強度：**程式碼**＝對照過原始碼；**像素**＝量過；**看圖**＝只有目視，改之前建議先在真機或模擬器再確認一次。
 
@@ -95,7 +95,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 三之三、補掃：文字對比與 VoiceOver 標籤（工具量測）
 
-用 Flutter 內建的 `textContrastGuideline` 與 `labeledTapTargetGuideline` 掃 100 個場景（`components`、`ax-components-2x` 是元件示範頁，沒掃）× 淺深，共 200 次；66 次有項目未過。指令：`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`（只印 `HIGA11Y` 行，不是守門；沒帶旗標會 skip）。
+用 Flutter 內建的 `textContrastGuideline` 與 `labeledTapTargetGuideline` 掃當時的 100 個場景（後來場景增為 134；`components`、`ax-components-2x` 是元件示範頁，沒掃）× 淺深，共 200 次；66 次有項目未過。指令：`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`（只印 `HIGA11Y` 行，不是守門；沒帶旗標會 skip）。
 
 **限制：**對比由工具以渲染後像素取樣，半透明玻璃、對話框 blur 底、停用狀態的取樣不可靠；下表只收「對照截圖後仍成立」的項目。本輪沒有再另外手量，數值是工具輸出。
 
@@ -151,7 +151,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 清單覆蓋率
 
-App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 125 個畫面**；清單裡仍標「缺口」的彈出層（date／time picker、`showAppConfirm`、`showAppDestructiveConfirm`（只覆蓋部分呼叫端）、`showAppAlert`、`showAppFormSheet`、`showAppNotice` 等）沒有取證，不能因為本報告而視為通過。
+App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 134 個畫面**；畫面清單裡標「部分」的彈出層（編輯行程與分享的日期選擇器、`showAppConfirm` 在通知設定與帳號查看說明等、`showAppNotice` 在其餘畫面、`showAppAlert` 的其餘呼叫端）沒有取證，不能因為本報告而視為通過；各場景用測試替身造狀態的限制見[缺口文件](2026-11-04-hig-verification-gaps.md)第 1 節。
 
 ## 四、看過但判定沒問題的（避免重複討論）
 
@@ -164,7 +164,7 @@ App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-scr
 - 沒量字級（B1）。對比：App 已用內建工具掃過（見三之三），web 沒有量。
 - VoiceOver 只做了「可點擊元素有沒有標籤」的靜態檢查，沒有真的用 VoiceOver 走過；Increase Contrast、Reduce Motion 沒檢查。
 - web：axe、320px 重排、200% 文字、鍵盤焦點已用工具掃過（有限制，見 web 報告），沒有 dialog 行為檢查；只跑 chromium，webkit 瀏覽器未安裝所以沒跑。
-- 彈出層（sheet、dialog、picker）大多沒有場景，見 `docs/research/2026-11-04-hig-app-screen-inventory.md` 的缺口摘要。
+- 彈出層：主要 helper 都已有場景（共補 31 個），仍標「部分」的呼叫端見 `docs/research/2026-11-04-hig-app-screen-inventory.md` 的缺口摘要。
 - 「符合」與「未見明顯問題」是我目視的結論，沒有第二人複核。
 
 ## 建議順序

@@ -1,7 +1,7 @@
 # App HIG 截圖（#531：#534～#536 新補場景＋既有場景重拍）
 
 iOS 模擬器 iPhone 17（iOS 27，Debug build，393×852 pt @3x），整合測試 `integration_test/hig_screenshots_test.dart` 產生，全程走 mock repository，不碰 prod。
-102 個場景 × 淺／深 = 204 張 PNG（縮到 603×1311 以控制體積）。`report.tsv` 是深淺色比對（全部 bytes 不同、像素差異 ≥ 98%、深色亮度明顯較低）。
+現有 134 個場景 × 淺／深 = 268 張 PNG，另有 `trips-list-hc`、`trip-timeline-hc` 的提高對比變體各淺深 2 張（共 4 張，不算場景），資料夾內共 272 張（縮到 603×1311 以控制體積）。其中 `components`、`ax-components-2x` 由整合測試自己拍，不在 `higScenes()` 內（`higScenes()` 為 132 個）。`report.tsv` 是**第一輪 102 個場景**當時的深淺色比對（全部 bytes 不同、像素差異 ≥ 98%、深色亮度明顯較低），之後新增的場景沒有補進去。數字由 `test/docs/hig_report_totals_test.dart` 對帳。
 
 重跑：
 
@@ -13,7 +13,7 @@ flutter test integration_test/hig_screenshots_test.dart -d <UDID> \
 
 **前置條件（這次卡了 20 分鐘才發現）**：`ios/Flutter/Secrets.xcconfig`（gitignored）必須存在。沒有它，App 一啟動就 `fatalError("Missing GOOGLE_MAPS_IOS_API_KEY build setting")`，`flutter test` 等不到 VM service 而無限等待、沒有任何錯誤輸出。新的 git worktree 不會帶這個檔案。
 
-## 我實際用眼睛看過的畫面（其餘 190+ 張沒有逐張檢視，只有深淺色的機器比對）
+## 第一輪我實際用眼睛看過的畫面（當時其餘 190+ 張沒有逐張檢視；之後各輪已逐張看完，見逐張檢查報告）
 
 淺色：`entry-edit`、`global-map`、`account-logout-confirm`、`auth-reset-password-success`、`collab`、`trip-health-findings`。
 （`chat-voice-consent`、`entry-add` 已縮圖但沒有開。）
@@ -31,7 +31,7 @@ flutter test integration_test/hig_screenshots_test.dart -d <UDID> \
 
 ## 沒做的
 
-- 約 190 張沒有人或我逐張看過。
+- （第一輪當時）約 190 張沒有人或我逐張看過；之後已逐張看完，結論在逐張檢查報告。
 - 觸控目標以外的檢查（字級、對比、標籤、Dynamic Type）沒有量測。
 - 舊截圖（`docs/qa/2026-10-hig-screenshots/`）沒有刪，兩批並存；已登入場景在 widget test 框架曾被生物辨識詢問蓋住（見 #540），這批重拍的截圖來自整合測試，沒有逐張確認是否同樣被蓋住。
 
