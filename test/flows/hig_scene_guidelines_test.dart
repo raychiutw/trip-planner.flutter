@@ -64,6 +64,8 @@ const _knownTapTargetViolations = <String, Set<String>>{
   // 「匿名分享」勾選框 40x40，與分享頁建立表單同一個元件（'share-manage'）。
   'share-edit-sheet': {'(無標籤) 40x40', 'Drag handle 36x4'},
   'favorites-removed-notice': {'搜尋收藏 361x36'},
+  'sync-conflict-sheet': {'Drag handle 36x4'},
+  'sync-conflict-sheet-many': {'Drag handle 36x4'},
 };
 
 /// 刻意在畫面上顯示對話框的場景。其餘場景若出現對話框，代表畫面被不相干的詢問蓋住
@@ -83,6 +85,8 @@ const _scenesWithDialog = {
   'developer-app-delete-confirm',
   'note-delete-confirm',
   'entry-alternate-remove-confirm',
+  'add-to-trip-time-conflict-alert',
+  'trip-edit-delete-day-confirm',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。

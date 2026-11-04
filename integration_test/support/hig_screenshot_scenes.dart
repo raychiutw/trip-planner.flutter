@@ -20,7 +20,8 @@ import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart' show AccountDeletionPreview;
 import 'package:tripline/api/poi_repository.dart';
-import 'package:tripline/api/cache/cache_store.dart' show QueuedMutation;
+import 'package:tripline/api/cache/cache_store.dart'
+    show ConflictRecord, QueuedMutation;
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
@@ -564,6 +565,42 @@ Future<void> _scrollDown(WidgetTester tester, [double dy = -600]) async {
   await higSettle(tester);
 }
 
+/// 把 [count] 筆「同欄位三方不同」的衝突紀錄寫進場景的 cacheStore。
+Future<void> _seedConflicts(WidgetTester tester, int count) async {
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(TriplineApp)),
+  );
+  const titles = ['首里城', '國際通散步', '美麗海水族館', '古宇利大橋', '瀨長島露台'];
+  for (var i = 0; i < count; i++) {
+    await container
+        .read(cacheStoreProvider)
+        .appendConflict(
+          ConflictRecord(
+            id: 'c$i',
+            type: 'update-entry',
+            path: '/trips/okinawa/entries/${i + 1}',
+            body: const {},
+            args: {'title': titles[i % titles.length]},
+            cacheKey: 'trips/okinawa',
+            ours: {
+              'title': titles[i % titles.length],
+              'startTime': '${10 + i}:00',
+              'description': '你離線時改的說明',
+            },
+            theirs: {
+              'title': '${titles[i % titles.length]}（協作者改名）',
+              'startTime': '${(8 + i).toString().padLeft(2, '0')}:30',
+              'description': '協作者改的說明',
+            },
+            newVersion: 3,
+            conflictFields: const ['title', 'startTime', 'description'],
+            createdAt: '2026-10-10T00:00:00Z',
+          ),
+        );
+  }
+  await higSettle(tester);
+}
+
 /// 預設 fixture 每天只有一個有座標的停留點，這裡給第 1 天補第二個，湊出相鄰兩點
 /// （路線抓取、停留點之間的交通方式鈕都需要它）。
 void _day1WithTwoEntries(HigFakes f) {
@@ -834,6 +871,27 @@ List<HigScene> higScenes() => [
       ),
     ),
     proof: () => find.byKey(const ValueKey('edit-done')),
+  ),
+  HigScene(
+    'trip-edit-delete-day-confirm',
+    '#560',
+    location: '/edit-trip/okinawa',
+    stub: (f) => when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
+      (_) async => const Trip(
+        id: 'okinawa',
+        name: 'okinawa',
+        title: '沖繩家族之旅',
+        description: '四天三夜',
+        lang: 'zh-TW',
+        startDate: '2026-11-01',
+        endDate: '2026-11-04',
+      ),
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'edit-delete-day-1');
+    },
+    // 標題「刪除行程日」只出現在確認框（列上的 tooltip 是「刪除 Day 1」）。
+    proof: () => find.text('刪除行程日'),
   ),
   HigScene(
     'trip-edit-save-failed',
@@ -1230,6 +1288,52 @@ List<HigScene> higScenes() => [
     location:
         '/favorites/add-to-trip?place_id=p1&name=%E7%BE%8E%E9%BA%97%E6%B5%B7%E6%B0%B4%E6%97%8F%E9%A4%A8&lat=26.69&lng=127.88',
     proof: () => find.byKey(const ValueKey('add-to-trip-submit')),
+  ),
+  // 預設行程、第 1 天、10:00–11:00 已選好；送出時後端以 409 帶 conflictWith 失敗。
+  // resolvePlace 失敗會退回只用 POI 地址組備註，不影響送出。
+  HigScene(
+    'add-to-trip-time-conflict-alert',
+    '#560',
+    location:
+        '/favorites/add-to-trip?place_id=p1&name=%E7%BE%8E%E9%BA%97%E6%B5%B7%E6%B0%B4%E6%97%8F%E9%A4%A8&lat=26.69&lng=127.88',
+    stub: (f) {
+      when(
+        () => f.poi.resolvePlace(any()),
+      ).thenAnswer((_) async => throw _failure);
+      when(
+        () => f.trips.addEntryToDay(
+          tripId: any(named: 'tripId'),
+          dayNum: any(named: 'dayNum'),
+          title: any(named: 'title'),
+          note: any(named: 'note'),
+          poiType: any(named: 'poiType'),
+          lat: any(named: 'lat'),
+          lng: any(named: 'lng'),
+          startTime: any(named: 'startTime'),
+          endTime: any(named: 'endTime'),
+          source: any(named: 'source'),
+        ),
+      ).thenAnswer(
+        (_) async => throw const ApiError(
+          status: 409,
+          code: 'CONFLICT',
+          message: 'conflict',
+          payload: {
+            'conflictWith': {
+              'entryId': 7,
+              'time': '10:30-11:30',
+              'title': '首里城',
+              'dayNum': 1,
+            },
+          },
+        ),
+      );
+    },
+    act: (tester, f) async {
+      await _tapKey(tester, 'add-to-trip-submit');
+    },
+    // 標題「時段衝突」只出現在 alert；頁面本體沒有這段文字。
+    proof: () => find.text('時段衝突'),
   ),
   HigScene(
     'add-to-trip-missing-data',
@@ -1704,6 +1808,31 @@ List<HigScene> higScenes() => [
     act: (tester, f) async {
       f.fixture.pendingCountStream.add(2);
     },
+  ),
+  // 離線橫幅在持久化衝突紀錄非空時出現「N 筆同步衝突」；紀錄直接寫進場景的
+  // cacheStore（與 logout_confirm 場景同做法，不碰生產程式碼），再從橫幅點進 sheet。
+  HigScene(
+    'sync-conflict-sheet',
+    '#558',
+    location: '/trips',
+    act: (tester, f) async {
+      await _seedConflicts(tester, 1);
+      await _tapText(tester, '檢視');
+    },
+    // 「套用所選版本」只出現在 sheet 標題列，橫幅與頁面上沒有。
+    proof: () => find.text('套用所選版本'),
+  ),
+  HigScene(
+    'sync-conflict-sheet-many',
+    '#558',
+    location: '/trips',
+    act: (tester, f) async {
+      await _seedConflicts(tester, 5);
+      await _tapText(tester, '檢視');
+      // 先選一筆，讓「套用所選版本」進入可按狀態。
+      await _tapKey(tester, 'conflict-keep-ours-c0');
+    },
+    proof: () => find.text('套用所選版本'),
   ),
   const HigScene(
     'ax-welcome-2x',

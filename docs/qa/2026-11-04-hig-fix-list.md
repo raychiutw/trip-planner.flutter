@@ -66,6 +66,8 @@
 | A17 | `note-edit-sheet`（及同一表單的其他筆記區段）、`poi-info-edit-sheet`、`entry-edit-sheet`、`travel-edit-sheet`、`explore-custom-region-sheet`（單一欄位、標題給上下文，風險低） | F1、D12 | 表單欄位只有 placeholder、沒有常駐標籤，輸入後看不到欄位名稱；標題下有約 100pt 空白 | 欄位加常駐標籤（或浮動標籤）；查空白的來源 | 看圖 |
 | A18 | `note-edit-sheet`、`favorites-filter-sheet`（compact 的 `showAppFormSheet`） | VoiceOver | sheet 背景遮罩是一個全螢幕、可點擊、沒有語意名稱的節點（`labeledTapTargetGuideline` 回報 `Rect 0,0 → 393×852`），VoiceOver 會停在無名元素上；來源是 compact sheet 的套件遮罩，沒有定位到程式碼 | 為遮罩提供名稱（如「關閉」），或排除遮罩的語意、只留「取消」為關閉入口 | 工具量測 |
 | A19 | `developer-app-delete-confirm`（編輯 OAuth 應用頁） | D、版面 | 場景裡編輯頁捲到底，「停用應用程式」鈕仍有一半在螢幕外（按鈕中心 y=894、螢幕高 874）。可能是 sheet 高度超出螢幕的版面問題，也可能是場景視窗的假象 | **先在真機確認**；若屬實，讓內容區底部留出可見空間（safe area 與 sheet 高度） | 看圖加量測，待真機 |
+| A20 | `sync-conflict-sheet`、`sync-conflict-sheet-many` | F、D12 | 逐筆選擇「用對方的／保留你的」後，已選項只靠按鈕填色深淺（實心對淡底）表示，沒有勾選記號或文字；色覺或對比不足時看不出選了哪一邊，且「套用」前沒有總結 | 已選項加勾選圖示或改用分段控制；或在卡片標出「已選：你的」 | 看圖 |
+| A21 | `add-to-trip-time-conflict-alert` | G2 | alert 說明折行不佳：全形括號「（10:30-11:30）」單獨起行、末行剩孤字「試。」（低嚴重度，與時間字串長度有關） | 把時段併入句中或縮短說明文字；改前在不同長度的標題與時段驗證 | 看圖 |
 
 **與專案決策有張力，需要你決定要不要改規則，不建議直接改程式：** `account-home`、`account-home-security` 的生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。這些都是已知的專案決定。
 
