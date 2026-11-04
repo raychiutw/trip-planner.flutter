@@ -4,18 +4,18 @@
 
 ## 一句話現況
 
-App 102 個場景、web 36 個場景都逐張看過，也有自動掃描；但**彈出層幾乎沒有取證、沒有用真的 VoiceOver 走過、地圖類畫面不能當證據、web 只跑 chromium**。所以「符合」只代表「這批畫面、這幾種檢查下沒看到問題」，不是 HIG 驗收通過。
+App 110 個場景、web 36 個場景都逐張看過，也有自動掃描；但**彈出層只補了 8 個、仍有大量缺口、沒有用真的 VoiceOver 走過、地圖類畫面不能當證據、web 只跑 chromium**。所以「符合」只代表「這批畫面、這幾種檢查下沒看到問題」，不是 HIG 驗收通過。
 
 | 項目 | 狀態 | 備註 |
 |---|---|---|
-| App 逐場景目視（102） | 完成 | 目視結論，下方有抽樣複核 |
+| App 逐場景目視（110） | 完成 | 目視結論，下方有抽樣複核 |
 | web 逐場景目視（36；其中 9 個的桌機寬沒看） | 大部分完成 | 見下 |
 | 觸控目標（A1） | 自動守門 | App、web 各有棘輪測試 |
 | 文字對比（C1）與 VoiceOver 標籤 | App 已自動掃描；web 用 axe | 剩對話框與地圖兩類是已知範圍外 |
-| 字級（B1） | 靜態稽核完成並已改（A14） | 正文 17pt；102 場景重拍並逐張抽看 |
+| 字級（B1） | 靜態稽核完成並已改（A14） | 正文 17pt；110 場景重拍並逐張抽看 |
 | 提高對比 | 已用同一支工具重掃 | 發現目前的提高對比主題沒有加深 tint |
 | 減少動態效果 | 靜態稽核（不完整） | 兩處未降級（A15） |
-| 彈出層取證 | **沒做** | 見第 1 節 |
+| 彈出層取證 | 補了 8 個，仍有大量缺口 | 見第 1 節 |
 | 真正的 VoiceOver | **沒做** | 見第 2 節的手動清單 |
 | web webkit | 已跑掃描，畫面差異沒比 | axe 與 chromium 一致 |
 | 地圖類畫面 | **不能取證** | 需真機 |
@@ -23,9 +23,16 @@ App 102 個場景、web 36 個場景都逐張看過，也有自動掃描；但**
 
 ## 1. 彈出層（sheet、dialog、picker、通知）
 
-**本輪沒有新增任何彈出層場景。** 現有場景裡有的：登出確認、撤銷已連結 App 確認、刪除行程確認、刪除帳號對話框、語音同意、App 鎖開啟提示。[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)的「彈出層」一節仍標「缺口」的 helper（日期與時間選擇器、`showAppConfirm`、`showAppAlert`、`showAppFormSheet`、`showAppNotice`、`confirmAndRunIrreversibleAction`、`confirmAndDelete` 等）**沒有取證，不能因為本報告而視為通過**。
+**第三輪補了 8 個場景**（皆有 proof、淺深各一張、逐張看過）：`create-trip-date-picker`、`note-edit-date-picker`（月曆日期選擇器）、`note-edit-time-picker`（時間滾輪）、`note-edit-sheet`（筆記表單 sheet）、`favorites-filter-sheet`（篩選 sheet）、`favorites-remove-confirm`（破壞性確認）、`favorites-removed-notice`（通知橫幅）、`account-delete-preview-failed`（alert）。這輪因此新增 3 項發現（A16 月曆被裁、A17 表單欄位沒有常駐標籤、A18 sheet 遮罩沒有名稱）。原有的彈出層場景：登出確認、撤銷已連結 App 確認、刪除行程確認、刪除帳號對話框、語音同意、App 鎖開啟提示。
 
-怎麼補：場景底座（`higScenes()` 的 `act`）可以在畫面上點按鈕再拍；每個 helper 至少需要一個能打開它的畫面與一個 `proof`。建議開一張票，依 HIG 的 alert、action sheet、picker 條目（G1～G5、D10～D13）逐一取證。
+**仍然沒有取證**（[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)仍標「缺口」或「部分」）：
+- `confirmAndRunIrreversibleAction`（協作與分享的不可復原動作，例如撤銷分享連結）、`confirmAndDelete`（時間軸與筆記的刪除）。
+- 生物辨識開啟確認的 `showCupertinoDialog`。
+- `showAppFormSheet` 的其餘呼叫端：聊天 AI 同意、探索、停留點 POI、交通編輯、衝突解決、分享、停留點編輯。
+- `showAppAlert` 在加入行程的衝突 alert；`showAppDatePicker` 在編輯行程與分享；`showAppNotice` 在其餘畫面；`showAppConfirm` 在通知設定與停留點異動。
+- 這些要從選單、長按或多步流程才會觸發（例如分享列的「⋯」選單再選撤銷），需要先查各自的觸發鍵與測試替身；工作量比上面 8 個大。
+
+**量測限制**：`textContrastGuideline` 對有橫幅蓋住畫面的場景會取到錯的前景與背景（`favorites-removed-notice` 的標題量到 1.00:1，實際是通知橫幅蓋住標題），這類場景的對比數字要對照截圖，不能直接採用。
 
 ## 2. 字級、提高對比、減少動態效果、VoiceOver
 

@@ -6,7 +6,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart'
-    show CupertinoActionSheet, CupertinoAlertDialog;
+    show
+        CupertinoActionSheet,
+        CupertinoAlertDialog,
+        CupertinoDatePicker,
+        CupertinoDatePickerMode,
+        CupertinoDialogAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -490,6 +495,22 @@ Future<void> _tapKey(WidgetTester tester, String key) async {
   await tester.pump();
   await tester.tap(finder.first);
   await higSettle(tester);
+}
+
+/// 與 [_tapKeyPrefix] 相同，但點完不 settle（給要在計時器消失前拍到畫面的場景）。
+Future<void> _tapKeyPrefixNoSettle(WidgetTester tester, String prefix) async {
+  final finder = find.byWidgetPredicate(
+    (w) =>
+        w.key is ValueKey<String> &&
+        (w.key! as ValueKey<String>).value.startsWith(prefix),
+  );
+  expect(finder, findsWidgets, reason: 'key prefix $prefix');
+  await tester.ensureVisible(finder.first);
+  await tester.pump();
+  await tester.tap(finder.first);
+  for (var i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
 
 /// 點第一個 key 字串以 [prefix] 開頭的 widget（key 帶動態 id 時用）。
@@ -1152,6 +1173,107 @@ List<HigScene> higScenes() => [
     location: '/chat',
     act: (tester, f) async => _tapKey(tester, 'chat-mic-button'),
     proof: () => find.text('使用語音輸入？'),
+  ),
+
+  // ── 彈出層補強（#531 驗證缺口：日期與時間選擇器、sheet、確認框、通知）──
+  HigScene(
+    'create-trip-date-picker',
+    '#531',
+    location: '/new-trip',
+    act: (tester, f) async => _tapKey(tester, 'create-date-start'),
+    proof: () => find.byType(CalendarDatePicker),
+  ),
+  HigScene(
+    'note-edit-sheet',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async => _tapKey(tester, 'note-add-flights'),
+    proof: () => find.text('新增航班'),
+  ),
+  HigScene(
+    'note-edit-date-picker',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async {
+      await _tapKey(tester, 'note-add-flights');
+      await _tapKey(tester, 'note-datetime-depart_at');
+    },
+    proof: () => find.byType(CalendarDatePicker),
+  ),
+  HigScene(
+    'note-edit-time-picker',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async {
+      await _tapKey(tester, 'note-add-flights');
+      await _tapKey(tester, 'note-datetime-depart_at');
+      // 日期選擇器按「完成」後，接著開時間選擇器。
+      await tester.tap(find.widgetWithText(TextButton, '完成').last);
+      await higSettle(tester);
+    },
+    proof: () => find.byWidgetPredicate(
+      (w) => w is CupertinoDatePicker && w.mode == CupertinoDatePickerMode.time,
+    ),
+  ),
+  HigScene(
+    'favorites-filter-sheet',
+    '#531',
+    location: '/favorites',
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+      await higSettle(tester);
+      await _tapKey(tester, 'favorites-sort-action');
+      await _tapKey(tester, 'favorites-filter-action');
+    },
+    proof: () => find.text('篩選收藏'),
+  ),
+  HigScene(
+    'favorites-remove-confirm',
+    '#531',
+    location: '/favorites',
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+      await higSettle(tester);
+      await _tapKeyPrefix(tester, 'favorite-remove-');
+    },
+    proof: () => find.descendant(
+      of: find.byType(CupertinoAlertDialog),
+      matching: find.textContaining('移除「'),
+    ),
+  ),
+
+  HigScene(
+    'favorites-removed-notice',
+    '#531',
+    location: '/favorites',
+    // 通知橫幅約 2.5 秒後自動消失；不等 pumpAndSettle（會等到它消失），改用固定時間的 pump。
+    settle: false,
+    stub: (f) => when(
+      () => f.fixture.favorites.deleteFavorite(any()),
+    ).thenAnswer((_) async {}),
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+      await higSettle(tester, settle: false);
+      await _tapKeyPrefixNoSettle(tester, 'favorite-remove-');
+      await tester.tap(find.widgetWithText(CupertinoDialogAction, '移除'));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    },
+    proof: () => find.textContaining('已移除'),
+  ),
+  HigScene(
+    'account-delete-preview-failed',
+    '#531',
+    location: '/trips?account=home',
+    stub: (f) => when(
+      f.fixture.auth.fetchAccountDeletionPreview,
+    ).thenAnswer((_) async => throw _failure),
+    act: (tester, f) async {
+      await _scrollDown(tester, -1200);
+      await _tapKey(tester, 'settings-delete-account');
+    },
+    proof: () => find.text('無法載入刪除資訊'),
   ),
 
   // ── 邀請 ──

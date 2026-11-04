@@ -75,17 +75,17 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 
 | helper | 呼叫畫面 | 狀態 | 場景 |
 |---|---|---|---|
-| `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | **缺口** | 無 |
-| `showAppTimePicker` | 筆記編輯 | **缺口** | 無 |
+| `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | 部分 | `create-trip-date-picker` `note-edit-date-picker`（建立行程與筆記；編輯行程、分享仍無場景） |
+| `showAppTimePicker` | 筆記編輯 | 已有場景 | `note-edit-time-picker` |
 | `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音） |
-| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm`（只覆蓋三處；從選單觸發的是 action sheet，不是 alert） |
-| `showAppAlert` | 加入行程、帳號 | **缺口** | 無 |
+| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm`（只覆蓋三處；從選單觸發的是 action sheet，不是 alert） `favorites-remove-confirm`（收藏移除，direct 來源，確認走 alert）|
+| `showAppAlert` | 加入行程、帳號 | 部分 | `account-delete-preview-failed`（只覆蓋帳號；加入行程的衝突 alert 仍無場景） |
 | `showAppActionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppContentSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppScreenSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
-| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | **缺口** | 無 |
-| `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | **缺口** | 無 |
+| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 部分 | `note-edit-sheet` `favorites-filter-sheet`（筆記與收藏篩選；聊天 AI 同意、探索、停留點 POI、交通編輯、衝突解決、分享、停留點編輯仍無場景） |
+| `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | 部分 | `favorites-removed-notice`（只覆蓋收藏移除成功；其餘畫面的通知仍無場景） |
 | `confirmAndRunIrreversibleAction` | 協作、分享 | **缺口** | 無 |
 | `confirmAndDelete` | 停留點 POI、時間軸、筆記 | **缺口** | 無 |
 | `showCupertinoDialog`（直接呼叫，帳號畫面） | 刪除帳號確認 | 已有場景 | `account-delete-dialog` |

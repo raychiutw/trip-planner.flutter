@@ -50,6 +50,12 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'offline-banner-network': {'搜尋行程 361x36'},
   'offline-banner-pending': {'搜尋行程 361x36', '立即重試 100x40'},
   'app-lock-enable-prompt': {'搜尋行程 361x36'},
+  // 彈出層場景：sheet 頂端的拖曳把手（36x4）來自 liquid_glass_widgets 套件，語意帶 onTap（點了關閉 sheet），
+  // 尺寸確實小於 44pt；lib/ 內沒有這個語意，要修得在套件層（A18 追蹤）。
+  // 通知橫幅場景的底下是收藏頁，搜尋欄同 'favorites'。
+  'favorites-filter-sheet': {'Drag handle 36x4'},
+  'note-edit-sheet': {'Drag handle 36x4'},
+  'favorites-removed-notice': {'搜尋收藏 361x36'},
 };
 
 /// 刻意在畫面上顯示對話框的場景。其餘場景若出現對話框，代表畫面被不相干的詢問蓋住
@@ -61,6 +67,8 @@ const _scenesWithDialog = {
   'chat-voice-consent',
   'invite-wrong-account-pending',
   'app-lock-enable-prompt',
+  'favorites-remove-confirm',
+  'account-delete-preview-failed',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。
