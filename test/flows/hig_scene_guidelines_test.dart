@@ -22,7 +22,7 @@ import '../../integration_test/support/hig_screenshot_scenes.dart';
 /// HIG Accessibility 頁：iOS 控制項預設 44×44 pt（檢查表 A1）。
 const _minTapTarget = 44.0;
 
-/// `--dart-define=HIG_COLLECT=1`：只印出各場景的違規，不下斷言，用來更新已知違規清單。
+/// `--dart-define=HIG_COLLECT=true`：只印出各場景的違規，不下斷言，用來更新已知違規清單。
 const _collectOnly = bool.fromEnvironment('HIG_COLLECT');
 
 /// 場景名稱 → 該場景已知的違規（`標籤 寬x高`，邏輯 pt、四捨五入到整數）。

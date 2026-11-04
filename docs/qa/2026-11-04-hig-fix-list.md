@@ -18,6 +18,17 @@
 
 另有兩個場景受限，不是缺陷：`trip-map`、`ax-trip-map-2x`、`global-map` 的地圖是測試用純色 fixture，玻璃元件的對比（量得 2.07～2.74:1）**不能當對真實地圖的結論**，要真機看。web 的 `trip-map`、`map` 場景擋掉了 Google Maps，畫面是錯誤態，同理。
 
+**mutation 證據**（commit `848d1387` 之前，把三處修正各自改回去：S1 code 改回 `expired`、S2 拿掉 `watchDays` stub、S3 拿掉 `act`，跑 `flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true --dart-define=HIG_ONLY=auth-reset-password-expired,trip-map-route-failed,ax-favorites-2x`）：
+
+```
+1 場景 auth-reset-password-expired 沒有渲染出預期畫面
+2 場景 ax-favorites-2x 沒有渲染出預期畫面
+2 場景 trip-map-route-failed 沒有渲染出預期畫面
+02:01 +0 -6: Some tests failed.
+```
+
+三個場景 × 淺深共 6 項失敗；`auth-reset-password-expired` 只印出 1 行訊息（另一項失敗的訊息沒有被輸出，原因我沒追）。改回正確版本後同一指令 6 項全過。
+
 ## 二、App 要改的
 
 | # | 場景 | 檢查表 | 問題 | 建議修改 | 強度 |
@@ -80,7 +91,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 | 項目 | 截圖 | 引用條目與一手來源 |
 |---|---|---|
 | S1 ✅ | `auth-reset-password-expired` | 無（場景缺陷，與 HIG 無關） |
-| S2 | `trip-map-route-failed`、`trip-map` | 無（場景缺陷） |
+| S2 ✅ | `trip-map-route-failed`、`trip-map` | 無（場景缺陷） |
 | S3 ✅ | `ax-favorites-2x` | 無（場景缺陷） |
 | A1 | `auth-signup` | F5：HIG/entering-data |
 | A2 | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7：HIG/feedback；「缺下一步動作」**無一手來源**，是專案內的可用性判斷 |

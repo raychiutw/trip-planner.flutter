@@ -38,7 +38,7 @@
 | 7 | `account-connected-apps` | C4、H2 | 深色下 scope 標籤沒有膠囊底；列內圖示與標題錯位 | 看圖 |
 | 8 | `trip-health-findings` | 版面 | 第二張建議卡只有第一張一半寬 | 看圖 |
 | 9 | `oauth-consent-invalid` | D3 | 沒有返回鈕或導覽列，只有頁內連結 | 看圖 |
-| 10 | `trip-map`、`trip-map-route-failed` | C1 | 玻璃元件量得 2.07～2.74:1，但背景是測試用純色，**不能當作對真實地圖的結論** | 像素量測，結論受限 |
+| 10 | `trip-map`、`trip-map-route-failed`（重拍前的舊圖） | C1 | 玻璃元件量得 2.07～2.74:1，但背景是測試用純色，**不能當作對真實地圖的結論** | 像素量測，結論受限 |
 | 11 | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7 | 錯誤有說明原因（G6 符合），但只有一行灰字，沒有圖示、重試或返回，底部分頁列仍顯示；「缺下一步動作」在檢查表沒有直接對應條目 | 看圖 |
 | 12 | `ax-favorites-2x` | — | **已修**：場景沒有餵資料流，只拍到載入骨架，不是 2x 的清單畫面 | 看圖加程式碼對照 `favorites` 場景 |
 | 13 | `ax-public-share-2x` | B2 | 「登入後複製行程」折行剩孤字，與圖示鈕擠同列 | 看圖 |
