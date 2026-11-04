@@ -54,6 +54,7 @@ const _scenesWithDialog = {
   'account-logout-confirm',
   'account-connected-app-revoke-confirm',
   'account-delete-dialog',
+  'chat-voice-consent',
   'invite-wrong-account-pending',
   'app-lock-enable-prompt',
 };

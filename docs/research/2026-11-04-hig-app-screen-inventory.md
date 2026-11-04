@@ -40,11 +40,11 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `entries/:eid/copy` | EntryActionRouteScreen | **缺口** | 無 |
 | `entries/:eid/move` | EntryActionRouteScreen | **缺口** | 無 |
 | `entries/:eid/pois` | EntryPoiScreen | **缺口** | 無 |
-| `/map` | GlobalMapScreen | **缺口** | 無（`trip-map` 是行程內的地圖，不是這個全域地圖） |
+| `/map` | GlobalMapScreen | 已有場景 | `global-map` `global-map-empty` `global-map-load-failed` |
 | `/favorites` | FavoritesScreen | 已有場景 | `favorites` `favorites-load-failed` `ax-favorites-2x` |
 | `explore` | ExploreScreen | 已有場景 | `explore` `explore-empty-results` `explore-search-failed` `ax-explore-2x` |
-| `:favoriteId/add-to-trip` | AddToTripRouteScreen | **缺口** | 無 |
-| `add-to-trip` | AddToTripRouteScreen | **缺口** | 無 |
+| `:favoriteId/add-to-trip` | AddToTripRouteScreen | 部分 | `add-to-trip-invalid-favorite`（只有無效 ID 狀態；正常載入狀態沒有場景） |
+| `add-to-trip` | AddToTripRouteScreen | 已有場景 | `add-to-trip-direct` `add-to-trip-missing-data` |
 
 ### 帳號畫面（不是獨立路由）
 
@@ -77,8 +77,8 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 |---|---|---|---|
 | `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | **缺口** | 無 |
 | `showAppTimePicker` | 筆記編輯 | **缺口** | 無 |
-| `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | **缺口** | 無 |
-| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm`（只覆蓋帳號範圍的兩處） |
+| `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音） |
+| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm`（只覆蓋三處；從選單觸發的是 action sheet，不是 alert） |
 | `showAppAlert` | 加入行程、帳號 | **缺口** | 無 |
 | `showAppActionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
@@ -93,7 +93,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 
 ## 三、缺口摘要
 
-- 路由缺口 10 個（#534 補了 4 個）：`/collab/:tripId`、`health`、`audit`、`entries/*`（4 個）、`/map`、`:favoriteId/add-to-trip`、`add-to-trip`；加上變更密碼（PR #530）。
-- 彈出層缺口：幾乎全部。目前只有帳號刪除、登出確認、解除連結確認三個取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
+- 路由缺口 7 個，另有 1 個部分（#534、#535 補了 7 個）：`/collab/:tripId`、`health`、`audit`、`entries/*`（4 個）；`:favoriteId/add-to-trip` 只有無效 ID 狀態；加上變更密碼（PR #530）。
+- 彈出層缺口：幾乎全部。目前只有帳號刪除、登出確認、解除連結確認、刪除行程確認、聊天語音同意取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。

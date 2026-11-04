@@ -5,7 +5,8 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoAlertDialog;
+import 'package:flutter/cupertino.dart'
+    show CupertinoActionSheet, CupertinoAlertDialog;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -834,6 +835,67 @@ List<HigScene> higScenes() => [
       await _scrollDown(tester, -1200);
       await _tapKey(tester, 'settings-delete-account');
     },
+  ),
+
+  // ── #535：全域地圖、加入行程、確認對話框 ──
+  HigScene(
+    'global-map',
+    '#535',
+    location: '/map?tripId=okinawa',
+    proof: () => find.byKey(const ValueKey('global-trip-map-okinawa')),
+  ),
+  HigScene(
+    'global-map-empty',
+    '#535',
+    location: '/map',
+    stub: (f) => when(
+      f.trips.watchMyTrips,
+    ).thenAnswer((_) => Stream.value(const <TripSummary>[])),
+    proof: () => find.text('尚無行程'),
+  ),
+  HigScene(
+    'global-map-load-failed',
+    '#535',
+    location: '/map',
+    stub: (f) =>
+        when(f.trips.watchMyTrips).thenAnswer((_) => Stream.error(_failure)),
+    proof: () => find.text('載入失敗'),
+  ),
+  HigScene(
+    'add-to-trip-direct',
+    '#535',
+    location:
+        '/favorites/add-to-trip?place_id=p1&name=%E7%BE%8E%E9%BA%97%E6%B5%B7%E6%B0%B4%E6%97%8F%E9%A4%A8&lat=26.69&lng=127.88',
+    proof: () => find.byKey(const ValueKey('add-to-trip-submit')),
+  ),
+  HigScene(
+    'add-to-trip-missing-data',
+    '#535',
+    location: '/favorites/add-to-trip',
+    proof: () => find.text('景點資料缺漏，請從探索頁重新進入'),
+  ),
+  HigScene(
+    'add-to-trip-invalid-favorite',
+    '#535',
+    location: '/favorites/0/add-to-trip',
+    proof: () => find.text('收藏 ID 無效'),
+  ),
+  HigScene(
+    'trip-delete-confirm',
+    '#535',
+    location: '/trips',
+    act: (tester, f) async {
+      await _tapKey(tester, 'trip-card-more-okinawa');
+      await _tapKey(tester, 'trip-menu-delete-okinawa');
+    },
+    proof: () => find.byType(CupertinoActionSheet),
+  ),
+  HigScene(
+    'chat-voice-consent',
+    '#535',
+    location: '/chat',
+    act: (tester, f) async => _tapKey(tester, 'chat-mic-button'),
+    proof: () => find.text('使用語音輸入？'),
   ),
 
   // ── 邀請 ──
