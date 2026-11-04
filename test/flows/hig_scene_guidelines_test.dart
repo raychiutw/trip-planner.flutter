@@ -14,9 +14,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 import '../../integration_test/support/hig_screenshot_scenes.dart';
 
@@ -104,8 +102,11 @@ void main() {
       try {
         late Set<String> violations;
         await runHigScene(tester, scenes[name]!, ThemeMode.light, (_) async {
-          final root =
-              tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!;
+          // rootPipelineOwner.semanticsOwner 在此為 null（語意樹掛在子 owner），
+          // 官方建議的替代寫法拿不到根節點，所以沿用 pipelineOwner。
+          // ignore: deprecated_member_use
+          final owner = tester.binding.pipelineOwner.semanticsOwner!;
+          final root = owner.rootSemanticsNode!;
           violations = tapTargetViolations(root, 3.0, 2556);
         });
         debugPrint('HIGTAP\t$name\t${violations.toList()..sort()}');
