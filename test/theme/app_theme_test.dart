@@ -190,6 +190,41 @@ void main() {
     });
   });
 
+  group('提高對比的單一 tint 變體（#550）', () {
+    // 分頁列選取膠囊底：中性灰 tertiary（#E5E5EA）。
+    final capsule = TpSystemColorsLight.tertiary;
+
+    test('一般狀態 tint 不變（回歸）：淺 #8A6038、深 #D0A576', () {
+      expect(AppTheme.light().colorScheme.primary, const Color(0xFF8A6038));
+      expect(AppTheme.dark().colorScheme.primary, const Color(0xFFD0A576));
+    });
+
+    test('一般狀態對選取底 4.39:1，是已知例外（不為它改品牌色）', () {
+      final ratio = wcagContrast(
+        AppTheme.light().colorScheme.primary,
+        const Color(0x00000000),
+        under: capsule,
+      );
+      expect(ratio, closeTo(4.39, 0.01));
+    });
+
+    test('提高對比：淺色 tint 前景改為 #6F4C2C，對選取底達 4.5:1', () {
+      final primary = AppTheme.light(highContrast: true).colorScheme.primary;
+      expect(primary, const Color(0xFF6F4C2C));
+      expect(
+        wcagContrast(primary, const Color(0x00000000), under: capsule),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    test('提高對比：深色 tint 不變', () {
+      expect(
+        AppTheme.dark(highContrast: true).colorScheme.primary,
+        const Color(0xFFD0A576),
+      );
+    });
+  });
+
   group('元件 theme 規格', () {
     test('Card 與 AppBar 使用 hairline，互動控制使用 tint', () {
       for (final theme in [AppTheme.light(), AppTheme.dark()]) {
