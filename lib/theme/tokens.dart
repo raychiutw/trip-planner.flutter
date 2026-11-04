@@ -57,7 +57,10 @@ abstract final class TpSystemColorsDark {
   static const separator = Color(0x5C545458);
   static const opaqueSeparator = Color(0x99545458);
 
-  static const destructive = Color(0xFFFF453A);
+  /// iOS 深色系統紅（#FF453A）當文字對 sheet 內 grouped 卡片（#2C2C2E）只有 4.09:1、
+  /// 對錯誤面板 3.95:1；改用 Apple 的深色高對比紅 #FF6961（4.94:1／4.77:1），
+  /// 與淺色改用 #D70015 同一個理由（#469、#544）。
+  static const destructive = Color(0xFFFF6961);
   static const destructiveBackground = Color(0x33FF453A);
   static const success = Color(0xFF30D158);
   static const warning = Color(0xFFFF9F0A);

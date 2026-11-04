@@ -6,6 +6,37 @@ import 'package:tripline/theme/tokens.dart';
 import '../helpers/contrast.dart';
 
 void main() {
+  test('深色紅色文字在三層底色與錯誤面板上都達 4.5:1（#544 A5）', () {
+    final scheme = AppTheme.dark().colorScheme;
+    // 三層底色：一般 surface、grouped 卡片，以及 sheet 內上移一階的卡片（elevated）。
+    for (final (name, bg) in [
+      ('surface', TpSystemColorsDark.background),
+      ('grouped', TpSystemColorsDark.secondary),
+      ('elevated grouped', TpSystemColorsDark.tertiary),
+    ]) {
+      expect(
+        wcagContrast(scheme.error, const Color(0x00000000), under: bg),
+        greaterThanOrEqualTo(4.5),
+        reason: '紅色文字（登出、刪除）在 $name 上',
+      );
+    }
+    // 錯誤面板：errorContainer 疊在 surface／grouped 上，onErrorContainer 文字。
+    for (final (name, under) in [
+      ('surface', TpSystemColorsDark.background),
+      ('grouped', TpSystemColorsDark.secondary),
+    ]) {
+      expect(
+        wcagContrast(
+          scheme.onErrorContainer,
+          scheme.errorContainer,
+          under: under,
+        ),
+        greaterThanOrEqualTo(4.5),
+        reason: '錯誤面板文字在 $name 上',
+      );
+    }
+  });
+
   test('淺色次要文字在三層底色上都達 WCAG AA 4.5:1', () {
     final scheme = AppTheme.light().colorScheme;
     for (final bg in [
