@@ -3,9 +3,9 @@ library;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart' show GoRouter;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart' show GoRouter;
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
@@ -547,34 +547,12 @@ class _AddToTripRouteState extends StatelessWidget {
           : Semantics(
               liveRegion: true,
               container: true,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(TpSpacing.s6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 錯誤不只靠文字：加圖示，並給下一步（返回），不讓人卡在死路。
-                      Icon(
-                        CupertinoIcons.exclamationmark_circle,
-                        key: const ValueKey('add-to-trip-route-error-icon'),
-                        size: 40,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: TpSpacing.s3),
-                      Text(
-                        message ?? '載入失敗',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: TpSpacing.s4),
-                      FilledButton(
-                        key: const ValueKey('add-to-trip-route-back'),
-                        onPressed: () => _leave(context),
-                        child: const Text('返回'),
-                      ),
-                    ],
-                  ),
-                ),
+              // 重用專案的錯誤態元件（圖示、原因、下一步動作），不讓人卡在只有一行字的死路。
+              child: TpStateView(
+                kind: TpStateKind.error,
+                title: message ?? '載入失敗',
+                actionLabel: '返回',
+                onAction: () => _leave(context),
               ),
             ),
     );

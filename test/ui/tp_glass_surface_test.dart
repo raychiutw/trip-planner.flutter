@@ -6,10 +6,6 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart' show TpSystemColorsDark;
 import 'package:tripline/ui/tp_glass_surface.dart';
 
-/// 掃三條水平線，回傳「邊緣峰值與內部填色的差」。
-///
-/// 與模擬器截圖的量法一致：`pixelRatio: 3` 對齊 iPhone 的 @3x，1pt 的細邊在
-/// 實體像素上是 3px，取最左側 8px 內偏離內部填色最遠的那一點。
 /// WCAG 2.x 對比（不透明色）。
 double _contrast(Color a, Color b) {
   final l1 = a.computeLuminance();
@@ -19,6 +15,10 @@ double _contrast(Color a, Color b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/// 掃三條水平線，回傳「邊緣峰值與內部填色的差」。
+///
+/// 與模擬器截圖的量法一致：`pixelRatio: 3` 對齊 iPhone 的 @3x，1pt 的細邊在
+/// 實體像素上是 3px，取最左側 8px 內偏離內部填色最遠的那一點。
 void main() {
   group('導覽列選中標籤對比（HIG C1；11pt 屬小字，需 4.5:1）', () {
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {

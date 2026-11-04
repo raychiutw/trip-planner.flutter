@@ -145,6 +145,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     fieldKey: const ValueKey('explore-search-field'),
                     controller: _searchController,
                     placeholder: '搜尋地點',
+                    semanticLabel: '搜尋地點',
                     debounce: const Duration(milliseconds: 300),
                     onChanged: _searchAsTyped,
                     onSubmitted: (_) => _submitSearch(),

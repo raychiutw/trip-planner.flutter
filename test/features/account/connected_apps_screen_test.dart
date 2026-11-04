@@ -105,6 +105,11 @@ void main() {
       reason: '不能退回 chipTheme（它不會跟著 sheet 的 elevated 配色走）',
     );
     expect(chip.backgroundColor, isNot(cardColor));
+    // 明確是目前（elevated）主題的 surfaceContainerHigh，不是任意一個非 null 的色。
+    expect(
+      chip.backgroundColor,
+      AppTheme.elevated(base.colorScheme).surfaceContainerHigh,
+    );
   });
 
   testWidgets('顯示 AI owner 授權卡，成功後刷新清單', (tester) async {

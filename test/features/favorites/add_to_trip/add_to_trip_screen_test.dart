@@ -23,6 +23,7 @@ import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_state_view.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
@@ -1253,11 +1254,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('add-to-trip-route-error-icon')),
-      findsOneWidget,
-    );
-    final back = find.byKey(const ValueKey('add-to-trip-route-back'));
+    // 重用專案的錯誤態元件：有圖示、原因與下一步動作。
+    final state = tester.widget<TpStateView>(find.byType(TpStateView));
+    expect(state.kind, TpStateKind.error);
+    final back = find.text('返回');
     expect(back, findsOneWidget, reason: '錯誤態要有下一步動作，不是只有一行字');
 
     await tester.tap(back);
