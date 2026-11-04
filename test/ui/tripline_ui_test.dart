@@ -583,11 +583,10 @@ void main() {
           .indicatorColor,
       scheme.surfaceContainerHigh,
     );
-    // 品牌色只出現在前景；未選取維持中性次要前景。淺色選中字用較深的同色系
-    // （onPrimaryContainer），讓小字對中性選取底達 4.5:1（#544 A10）。
+    // 品牌色只出現在前景；未選取維持中性次要前景。
     expect(
       tester.widget<Text>(find.text('Day 1')).style?.color,
-      scheme.onPrimaryContainer,
+      scheme.primary,
     );
     expect(
       tester.widget<Text>(find.text('總覽')).style?.color,

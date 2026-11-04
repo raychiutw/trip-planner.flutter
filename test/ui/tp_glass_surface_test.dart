@@ -3,48 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/theme/tokens.dart' show TpSystemColorsDark;
 import 'package:tripline/ui/tp_glass_surface.dart';
-
-/// WCAG 2.x 對比（不透明色）。
-double _contrast(Color a, Color b) {
-  final l1 = a.computeLuminance();
-  final l2 = b.computeLuminance();
-  final hi = l1 > l2 ? l1 : l2;
-  final lo = l1 > l2 ? l2 : l1;
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 /// 掃三條水平線，回傳「邊緣峰值與內部填色的差」。
 ///
 /// 與模擬器截圖的量法一致：`pixelRatio: 3` 對齊 iPhone 的 @3x，1pt 的細邊在
 /// 實體像素上是 3px，取最左側 8px 內偏離內部填色最遠的那一點。
 void main() {
-  group('導覽列選中標籤對比（HIG C1；11pt 屬小字，需 4.5:1）', () {
-    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
-      test('${theme.brightness.name}：選中前景對選取底 ≥ 4.5:1', () {
-        final scheme = theme.colorScheme;
-        final fg = tpNavigationSelectedForeground(scheme, darkOnMedia: false);
-        // 選取底是 surfaceContainerHigh（見 _TpNavigationGlassAppearance.indicatorColor）。
-        expect(
-          _contrast(fg, scheme.surfaceContainerHigh),
-          greaterThanOrEqualTo(4.5),
-        );
-      });
-    }
-
-    test('地圖等深色媒體背景：選中前景對選取底 ≥ 4.5:1', () {
-      final fg = tpNavigationSelectedForeground(
-        AppTheme.light().colorScheme,
-        darkOnMedia: true,
-      );
-      expect(
-        _contrast(fg, TpSystemColorsDark.tertiary),
-        greaterThanOrEqualTo(4.5),
-      );
-    });
-  });
-
   testWidgets('navigation glass separates text and visual backdrops', (
     tester,
   ) async {

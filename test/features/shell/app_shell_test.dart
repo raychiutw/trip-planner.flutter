@@ -227,7 +227,7 @@ void main() {
         );
         expect(
           selectedLabels.map((label) => label.style?.color),
-          contains(AppTheme.light().colorScheme.onPrimaryContainer),
+          contains(AppTheme.light().colorScheme.primary),
         );
         final boundary =
             boundaryKey.currentContext!.findRenderObject()!
@@ -1164,7 +1164,7 @@ void main() {
       );
 
       // 品牌色只出現在前景：字符與標籤。
-      expect(glass.selectedIconColor, scheme.onPrimaryContainer);
+      expect(glass.selectedIconColor, scheme.primary);
 
       final icons = tester.widgetList<Icon>(
         find.descendant(
