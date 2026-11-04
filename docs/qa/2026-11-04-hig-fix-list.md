@@ -31,19 +31,26 @@
 
 ## 二、App 要改的
 
+**#544 處理結果**（分支 `fix/hig-app-544`，每項先紅燈再實作；✅＝已修，⚪＝查過不改，A3／A4 要先決定，沒動）：
+
+- ✅ A1 註冊鈕：未勾同意停用並顯示說明。✅ A2 加入行程錯誤態：圖示加「返回」。✅ A5 登入裝置頁：深色紅色 `#FF453A`→`#FF6961`（4.09→4.94）、OAuth 說明卡降一階底色。✅ A6 已連結 App：Chip 取目前主題底色、圖示對齊標題。✅ A7 健檢卡同寬（紅燈 720 vs 175）。✅ A9 公開分享頁大字級主按鈕獨立一列。✅ A10 分頁列選中標籤淺色改 `onPrimaryContainer`（4.389→約 6:1）。✅ A11 補標籤：日期條、搜尋欄、收藏列。
+- ⚪ **A8 不改**：`oauth-consent-invalid` 是路由解析失敗與深連結的終點，本來就沒有上一頁，已有明確出口「返回行程列表」；`InvalidLinkScreen` 是 `secondary_authenticated_surfaces_hig_test` 明確登記的 `publicException`。加返回鈕沒有可回的目標。
+- **修正後複掃**（`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`，同一支工具）：未過次數 **66 → 16**；VoiceOver 標籤缺漏 **22 → 0**；分頁列 4.39:1 的 36 個場景 **→ 0**；`account-sessions` 三項全過。剩下 16 項全是「不在 #544 範圍」的兩類：確認對話框動作顏色（T2，`account-logout-confirm`、`account-connected-app-revoke-confirm`、`trip-delete-confirm`、`invite-wrong-account-pending`、`app-lock-enable-prompt`，另 `account-delete-dialog` 的「永久刪除」是停用態）與地圖 fixture（T4）。
+- 修了 A10 之後，**`app-lock-enable-prompt` 的 4.37:1 沒有跟著消失**：它是 `CupertinoAlertDialog` 的動作按鈕，屬 T2，不是分頁列那個 token。
+
 | # | 場景 | 檢查表 | 問題 | 建議修改 | 強度 |
 |---|---|---|---|---|---|
-| A1 | `auth-signup` | F5 | 空表單、未勾同意時「建立」仍可按（`account_flow_screens.dart:145` 是 `primaryActionEnabled: !_submitting`） | 欄位未通過驗證或未勾同意時停用，與 web 對齊（web 已是停用外觀加就地說明） | 程式碼 |
-| A2 | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7 | 有說明原因，但只有一行灰字，沒有圖示、重試或返回；底部分頁列仍顯示（`add_to_trip_screen.dart:76,90`） | 改用專案既有的錯誤態元件，附「返回」；分頁列的處理與 A4 一起決定 | 程式碼加看圖 |
+| A1 ✅ | `auth-signup` | F5 | 空表單、未勾同意時「建立」仍可按（`account_flow_screens.dart:145` 是 `primaryActionEnabled: !_submitting`） | 欄位未通過驗證或未勾同意時停用，與 web 對齊（web 已是停用外觀加就地說明） | 程式碼 |
+| A2 ✅ | `add-to-trip-invalid-favorite`、`add-to-trip-missing-data` | G6、G7 | 有說明原因，但只有一行灰字，沒有圖示、重試或返回；底部分頁列仍顯示（`add_to_trip_screen.dart:76,90`） | 改用專案既有的錯誤態元件，附「返回」；分頁列的處理與 A4 一起決定 | 程式碼加看圖 |
 | A3 | `trip-edit` | D10、G5 | 同一個有「取消」的表單，部分欄位按「儲存」才生效、日期與天數立即生效 | 統一成「全部按儲存才生效」，或拿掉「取消」改成即時儲存 | 看圖 |
 | A4 | `entry-add`／`entry-edit`／`entry-copy`／`entry-move` | D12、D15 | modal 式表單下方仍顯示底部分頁列 | 改成真正的 modal 呈現（sheet 或全螢幕覆蓋，自然蓋住分頁列）。注意 D15 要求不要隱藏或停用 tab bar，所以不是在路由上單純關掉分頁列，要先決定這些表單屬於「分頁內的頁面」還是「modal」 | 看圖 |
-| A5 | `account-sessions` | C1 | 「管理已連結應用」文字 4.36:1，低於 4.5:1；該卡疑似帶按下或焦點外框 | 調深文字色或換 token；確認外框是否為殘留焦點 | 像素加看圖 |
-| A6 | `account-connected-apps` | C4、H2 | 深色下 scope 標籤沒有膠囊底；列內圖示與標題錯位 | 補深色底色 token；對齊圖示與標題基線 | 看圖 |
-| A7 | `trip-health-findings` | 版面 | 第二張建議卡只有第一張一半寬 | 兩張卡同寬（檢查 Row／Expanded） | 看圖 |
-| A8 | `oauth-consent-invalid` | D3 | 沒有返回鈕或導覽列，只有頁內連結 | 補返回；或確認這頁只能由系統瀏覽器進入而不需要 | 看圖 |
-| A9 | `ax-public-share-2x` | B2 | 「登入後複製行程」折成兩行並剩孤字「程」，與兩個圖示鈕擠同列（`public_share_screen.dart:247`） | 大字級時按鈕換到獨立一列 | 看圖 |
-| A10 | 有分頁列的 36 個淺色場景 | C1 | 選中分頁標籤（11pt）4.39:1，未達 4.5:1；`app-lock-enable-prompt` 的小字動作 4.37:1（T1） | 調深淺色的 accent 文字 token；改前先量新值 | 工具量測 |
-| A11 | `trip-timeline`（Day 分頁條）、`favorites`（每列）、`explore`（一個全寬可點節點） | VoiceOver | 可點擊節點沒有語意標籤（T5～T7） | 先定位到 widget，再補 `Semantics(label:)`；補完把掃描結果由 66 次未過降下來 | 工具量測 |
+| A5 ✅ | `account-sessions` | C1 | 「管理已連結應用」文字 4.36:1，低於 4.5:1；該卡疑似帶按下或焦點外框 | 調深文字色或換 token；確認外框是否為殘留焦點 | 像素加看圖 |
+| A6 ✅ | `account-connected-apps` | C4、H2 | 深色下 scope 標籤沒有膠囊底；列內圖示與標題錯位 | 補深色底色 token；對齊圖示與標題基線 | 看圖 |
+| A7 ✅ | `trip-health-findings` | 版面 | 第二張建議卡只有第一張一半寬 | 兩張卡同寬（檢查 Row／Expanded） | 看圖 |
+| A8 ⚪ | `oauth-consent-invalid` | D3 | 沒有返回鈕或導覽列，只有頁內連結 | 補返回；或確認這頁只能由系統瀏覽器進入而不需要 | 看圖 |
+| A9 ✅ | `ax-public-share-2x` | B2 | 「登入後複製行程」折成兩行並剩孤字「程」，與兩個圖示鈕擠同列（`public_share_screen.dart:247`） | 大字級時按鈕換到獨立一列 | 看圖 |
+| A10 ✅ | 有分頁列的 36 個淺色場景 | C1 | 選中分頁標籤（11pt）4.39:1，未達 4.5:1；`app-lock-enable-prompt` 的小字動作 4.37:1（T1） | 調深淺色的 accent 文字 token；改前先量新值 | 工具量測 |
+| A11 ✅ | `trip-timeline`（Day 分頁條）、`favorites`（每列）、`explore`（一個全寬可點節點） | VoiceOver | 可點擊節點沒有語意標籤（T5～T7） | 先定位到 widget，再補 `Semantics(label:)`；補完把掃描結果由 66 次未過降下來 | 工具量測 |
 
 **與專案決策有張力，需要你決定要不要改規則，不建議直接改程式：** `account-home`、`account-home-security` 的生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。這些都是已知的專案決定。
 
