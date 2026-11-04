@@ -249,7 +249,7 @@ class HigFakes {
   }
 
   /// 與 `AppFlowFixture.app` 相同的 override 鏈，再補 account／share／poi 與網路訊號。
-  Widget buildApp({double textScale = 1.0}) {
+  Widget buildApp({double textScale = 1.0, bool highContrast = false}) {
     final f = fixture;
     final app = ProviderScope(
       key: UniqueKey(),
@@ -289,8 +289,12 @@ class HigFakes {
       ],
       child: const TriplineApp(),
     );
-    if (textScale == 1.0) return app;
-    return _TextScaled(scale: textScale, child: app);
+    if (textScale == 1.0 && !highContrast) return app;
+    return _TextScaled(
+      scale: textScale,
+      highContrast: highContrast,
+      child: app,
+    );
   }
 }
 
@@ -323,15 +327,24 @@ class _OkBiometric extends _PendingBiometric {
       BiometricOutcome.success;
 }
 
+/// 以 MediaQuery 覆寫模擬系統設定：文字大小、提高對比。
 class _TextScaled extends StatelessWidget {
-  const _TextScaled({required this.scale, required this.child});
+  const _TextScaled({
+    required this.scale,
+    required this.child,
+    this.highContrast = false,
+  });
 
   final double scale;
+  final bool highContrast;
   final Widget child;
 
   @override
   Widget build(BuildContext context) => MediaQuery(
-    data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+    data: MediaQuery.of(context).copyWith(
+      textScaler: TextScaler.linear(scale),
+      highContrast: highContrast,
+    ),
     child: child,
   );
 }
@@ -443,12 +456,15 @@ Future<void> runHigScene(
   WidgetTester tester,
   HigScene scene,
   ThemeMode mode,
-  HigCapture capture,
-) async {
+  HigCapture capture, {
+  bool highContrast = false,
+}) async {
   final f = HigFakes.create(mode: mode, loggedIn: scene.loggedIn);
   addTearDown(f.fixture.dispose);
   await scene.stub?.call(f);
-  await tester.pumpWidget(f.buildApp(textScale: scene.textScale));
+  await tester.pumpWidget(
+    f.buildApp(textScale: scene.textScale, highContrast: highContrast),
+  );
   await higSettle(tester, settle: scene.settle);
   final loc = scene.location;
   if (loc != null) {

@@ -14,6 +14,9 @@ import '../../integration_test/support/hig_screenshot_scenes.dart';
 const _only = String.fromEnvironment('HIG_ONLY');
 const _collect = bool.fromEnvironment('HIG_COLLECT');
 
+/// `--dart-define=HIG_HC=true`：以「提高對比」重掃（MaterialApp 會改用 highContrastTheme）。
+const _highContrast = bool.fromEnvironment('HIG_HC');
+
 void main() {
   final only = _only.isEmpty ? null : _only.split(',').toSet();
   for (final scene in higScenes()) {
@@ -33,7 +36,7 @@ void main() {
               debugPrint(
                 'HIGA11Y\t${scene.name}\t${mode.name}\tcontrast=${c.passed ? "ok" : c.reason?.replaceAll("\n", " | ")}\tlabel=${l.passed ? "ok" : l.reason?.replaceAll("\n", " | ")}',
               );
-            });
+            }, highContrast: _highContrast);
             await tester.pumpWidget(const SizedBox.shrink());
           } finally {
             handle.dispose();

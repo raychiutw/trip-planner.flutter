@@ -33,9 +33,10 @@
 
 **#544 處理結果**（分支 `fix/hig-app-544`，每項先紅燈再實作；✅＝已修，⚪＝查過不改，A3／A4 要先決定，沒動）：
 
-- ✅ A1 註冊鈕：未勾同意停用並顯示說明。✅ A2 加入行程錯誤態：圖示加「返回」。✅ A5 登入裝置頁：深色紅色 `#FF453A`→`#FF6961`（4.09→4.94）、OAuth 說明卡降一階底色。✅ A6 已連結 App：Chip 取目前主題底色、圖示對齊標題。✅ A7 健檢卡同寬（紅燈 720 vs 175）。✅ A9 公開分享頁大字級主按鈕獨立一列。✅ A10 分頁列選中標籤淺色改 `onPrimaryContainer`（4.389→約 6:1）。✅ A11 補標籤：日期條、搜尋欄、收藏列。
+- ✅ A1 註冊鈕：未勾同意停用並顯示說明。✅ A2 加入行程錯誤態：圖示加「返回」。✅ A5 登入裝置頁：深色紅色 `#FF453A`→`#FF6961`（4.09→4.94）、OAuth 說明卡降一階底色。✅ A6 已連結 App：Chip 取目前主題底色、圖示對齊標題。✅ A7 健檢卡同寬（紅燈 720 vs 175）。✅ A9 公開分享頁大字級主按鈕獨立一列。⚪ **A10 已取消**：改走單一 tint（維持 Apple 的做法，預設分頁列選中標籤 4.39:1 記為已知例外，「提高對比」時才加深，見 #550）；#545 先前加的 `onPrimaryContainer` 特例已回退。✅ A11 補標籤：日期條、搜尋欄、收藏列。
 - **紅燈證據**（各項在實作前實際看到的失敗輸出）：A1 `Expected: null / Actual: <Closure _submit>`（建立鈕原本可按）；A2 找不到錯誤圖示與「返回」；A5 對比 `4.090967…`（深色紅字）；A6 `chip.backgroundColor` 為 null；A7 `Expected 720.0 / Actual 175.0`；A9 `Expected ≥ 414.0 / Actual 350.0`；A10 對比 `4.389355…`（與工具掃描 4.39 一致）；A11 `labeledTapTargetGuideline` 回報確切節點（日期條 `Rect 0,0 177×48`、收藏列、探索頁 `Rect 16,128 → 784,188`）。
 - **審查後的調整**：① A2 原本手刻圖示加文字，改為重用 `TpStateView`（票文要求重用既有錯誤態元件）。② A11 搜尋欄原本全域在 `AppSearchField` 加 label，審查指出可能讓其他畫面念兩遍；我用語意樹傾印確認：探索頁外層 `[tap]` 節點 label 為空，但在最小環境下 label 會與 hint 合併成「搜尋地點⏎搜尋地點」。改為選擇性參數 `semanticLabel`，只有探索頁傳。**仍需用真機 VoiceOver 確認探索頁搜尋欄的朗讀不重複**（外層節點「搜尋地點」加內層欄位 hint，是兩個元素，不是同一個念兩遍，但我沒用真正的 VoiceOver 驗過）。③ 淺色選中前景改用 `tintDeep` 後，App 內並存兩個棕色：一般前景仍是 `primary #8A6038`，分頁列與日期條選中字是較深的 `#6F4C2C`。這是為了對中性選取底達 4.5:1 的刻意差異，設計上要不要統一由你決定。④ 深色 `destructiveBackground`（錯誤面板底）仍是 `#FF453A` 的 20% alpha，沒有跟著換色，只換了文字用的 destructive；這是刻意的（底色飽和度不動），但錯誤面板文字對比靠的是文字色變亮。
+- **A10 回退後的複掃**（同一支工具）：一般狀態未過 **52**＝分頁列 4.39:1 的 36 個場景（已知例外）加上範圍外的 16 項（對話框動作顏色、地圖 fixture）；標籤缺漏仍是 0。以「提高對比」重掃：未過 47，5 項改善、0 項變差，**分頁列那批仍是 4.39:1**，也就是目前的提高對比主題還沒有把 tint 加深，這正是 #550 要做的事。
 - ⚪ **A8 不改**：`oauth-consent-invalid` 是路由解析失敗與深連結的終點，本來就沒有上一頁，已有明確出口「返回行程列表」；`InvalidLinkScreen` 是 `secondary_authenticated_surfaces_hig_test` 明確登記的 `publicException`。加返回鈕沒有可回的目標。
 - **修正後複掃**（`flutter test test/flows/hig_scene_a11y_collect_test.dart --dart-define=HIG_COLLECT=true`，同一支工具）：未過次數 **66 → 16**；VoiceOver 標籤缺漏 **22 → 0**；分頁列 4.39:1 的 36 個場景 **→ 0**；`account-sessions` 三項全過。剩下 16 項全是「不在 #544 範圍」的兩類：確認對話框動作顏色（T2，`account-logout-confirm`、`account-connected-app-revoke-confirm`、`trip-delete-confirm`、`invite-wrong-account-pending`、`app-lock-enable-prompt`，另 `account-delete-dialog` 的「永久刪除」是停用態）與地圖 fixture（T4）。
 - 修了 A10 之後，**`app-lock-enable-prompt` 的 4.37:1 沒有跟著消失**：它是 `CupertinoAlertDialog` 的動作按鈕，屬 T2，不是分頁列那個 token。
@@ -51,8 +52,13 @@
 | A7 ✅ | `trip-health-findings` | 版面 | 第二張建議卡只有第一張一半寬 | 兩張卡同寬（檢查 Row／Expanded） | 看圖 |
 | A8 ⚪ | `oauth-consent-invalid` | D3 | 沒有返回鈕或導覽列，只有頁內連結 | 補返回；或確認這頁只能由系統瀏覽器進入而不需要 | 看圖 |
 | A9 ✅ | `ax-public-share-2x` | B2 | 「登入後複製行程」折成兩行並剩孤字「程」，與兩個圖示鈕擠同列（`public_share_screen.dart:247`） | 大字級時按鈕換到獨立一列 | 看圖 |
-| A10 ✅ | 有分頁列的 36 個淺色場景 | C1 | 選中分頁標籤（11pt）4.39:1，未達 4.5:1；`app-lock-enable-prompt` 的小字動作 4.37:1（T1） | 調深淺色的 accent 文字 token；改前先量新值 | 工具量測 |
+| A10 ⚪ | 有分頁列的 36 個淺色場景 | C1 | 選中分頁標籤（11pt）4.39:1，未達 4.5:1；`app-lock-enable-prompt` 的小字動作 4.37:1（T1） | 調深淺色的 accent 文字 token；改前先量新值 | 工具量測 |
 | A11 ✅ | `trip-timeline`（Day 分頁條）、`favorites`（每列）、`explore`（一個全寬可點節點） | VoiceOver | 可點擊節點沒有語意標籤（T5～T7） | 先定位到 widget，再補 `Semantics(label:)`；補完把掃描結果由 66 次未過降下來 | 工具量測 |
+
+| A12 | `collab-load-failed` | F5 | 「新增」鈕在 Email 為空時仍可按（`collab_screen.dart:300` 是 `onPressed: state.adding ? null : …`），與註冊頁修正前同一個問題 | 與 A1 同樣做法：欄位未填時停用 | 程式碼加獨立複核 |
+| A13 | `explore-search-failed` | G6 | 錯誤訊息只有「搜尋失敗,請稍後再試」，沒說原因（`explore_controller.dart:182,189`） | 依錯誤類型給原因（斷線、被限流、伺服器錯誤） | 程式碼加獨立複核 |
+| A14 | 全 App 字級 | B1 | 檢查表要求正文預設 17pt；App 的主題 `bodyLarge` 15、`bodyMedium` 13、`titleSmall` 13、`bodySmall` 12，比 iOS 的 body 17、footnote 13、caption 12 小一級。螢幕上的最小字級是 11pt（符合下限）。**要你決定**：這是 App 為了資訊密度做的刻意取捨，還是要拉回 17 | 決定後才動；有代價（版面全面換行、截圖全部重拍） | 程式碼（`app_theme.dart:259-329`） |
+| A15 | 減少動態效果 | I | 兩處動畫沒有降級：分享頁建立連結後捲回頂端 250ms（`share_screen.dart:274`）、更多選單按壓縮放 150ms（`tp_more_menu.dart:760`）。其餘我查到的捲動與進度動畫都有 `disableAnimationsOf` 判斷 | 補 `disableAnimationsOf` 判斷，與 `chat_screen.dart` 的作法一致 | 程式碼（靜態稽核，未涵蓋全部動畫） |
 
 **與專案決策有張力，需要你決定要不要改規則，不建議直接改程式：** `account-home`、`account-home-security` 的生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。這些都是已知的專案決定。
 
@@ -68,6 +74,9 @@
 | W6 | `trip-detail` | WCAG 2.5.3 | 起訖時間 chip 的 `aria-label="編輯起訖時間"` 蓋掉可見時間文字（`EntryTimeChip.tsx:140`，9 個節點） | 讓 accessible name 以可見文字開頭，如「09:00–12:00，編輯起訖時間」 | axe 加程式碼 |
 | W7 | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
 | W8 | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
+| W9 | `trips-list-error` | G6、G7 | 行程清單載入失敗只有一行字，沒有重試（`TripsListPage` 錯誤態沒有任何重試動作） | 補「重試」，行為與 App 的錯誤態一致 | 看圖加程式碼 |
+| W10 | `invite-invalid` | G6、G7 | 邀請連結無效（永久失效）卻只提供「重試載入」，也沒有回首頁或登入的出口 | 無效連結不給重試，改給「回首頁」或「登入」 | 看圖 |
+| W11 | `signup-check-email`、`invite` | B7 | 320px 加 200% 文字時橫向捲動（scrollWidth 354、366 對 320）；尚未定位是哪個元素 | 先定位再修；用 `hig-a11y-collect` 的重排檢查驗證 | 量測（未定位） |
 
 web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告「補掃」一節：重排與放大沒有橫向捲動；`explore` 搜尋欄的焦點樣式待目視確認；`landing` 的 200% 文字檢查沒有生效。
 
