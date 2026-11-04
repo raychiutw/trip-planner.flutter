@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
+import '../../app/pop_or_go.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'trip_providers.dart';
@@ -56,11 +56,7 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
     _formController.update(dirty: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
-      }
+      context.popOrGoTrip(widget.tripId);
     });
   }
 

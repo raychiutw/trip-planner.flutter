@@ -51,8 +51,9 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     _descFocus.addListener(_onBlur(_descFocus));
   }
 
-  VoidCallback _onBlur(FocusNode node) =>
-      () => !node.hasFocus ? unawaited(_ctrl.save()) : null;
+  VoidCallback _onBlur(FocusNode node) => () {
+    if (!node.hasFocus) unawaited(_ctrl.save());
+  };
 
   @override
   void dispose() {
@@ -81,7 +82,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     _finishing = true;
     try {
       final ctrl = _ctrl;
-      if (ctrl.titleBlank) {
+      if (ref.read(editTripControllerProvider(widget.tripId)).titleBlank) {
         ctrl.restoreTitle();
         _titleCtl.text = ref
             .read(editTripControllerProvider(widget.tripId))
@@ -208,7 +209,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     ),
                     onChanged: ctrl.setTitle,
                   ),
-                  if (ctrl.titleBlank)
+                  if (state.titleBlank)
                     Padding(
                       padding: const EdgeInsets.only(top: TpSpacing.s1),
                       child: Semantics(

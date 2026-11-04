@@ -351,11 +351,11 @@ EntryAddMode _entryAddModeFromQuery(
   return fallback;
 }
 
-/// 所有停留點操作共用的外部 ID 解析；無效值不進入資料畫面。
 /// shell 外整頁 modal 的轉場(自下滑入),與新增/編輯行程一致。
 Page<void> _modalPage(Widget child) =>
     MaterialPage<void>(fullscreenDialog: true, child: child);
 
+/// 所有停留點操作共用的外部 ID 解析；無效值不進入資料畫面。
 Widget _entryRoute(
   GoRouterState state,
   Widget Function(String tripId, int entryId) build,

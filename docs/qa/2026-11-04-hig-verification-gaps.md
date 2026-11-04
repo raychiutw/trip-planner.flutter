@@ -40,6 +40,7 @@ App 134 個場景、web 36 個場景都逐張看過，也有自動掃描；但**
 **不屬 #557 範圍、仍標「部分」的呼叫端**（[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)的「部分」列，不是真機問題，只是還沒拍）：
 - 重新產生與刪除分享連結（同一支 `confirmAndRunIrreversibleAction`，只拍了撤銷）；`confirmAndDelete` 已三處都有場景。
 - `showAppDestructiveConfirm`：編輯行程「有變更尚未送出」放棄確認、收藏多選批次移除。
+  - 另注意：#557 原稱的「編輯行程放棄確認」，實際取證的 `trip-edit-delete-day-confirm` 是**刪除行程日**確認，不是放棄變更；此處的放棄確認仍然沒有場景（畫面清單第 97 行同註）。
 - `showAppConfirm`：聊天「無法使用語音輸入」、帳號「需要重新驗證才能刪除」、通知設定「允許通知」、停留點備選「設為正選？」。
 - `showAppDatePicker` 在編輯行程與分享；`showAppNotice` 在其餘畫面。
 

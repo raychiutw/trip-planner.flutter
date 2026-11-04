@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
+import '../../app/pop_or_go.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
@@ -248,9 +248,7 @@ class _EntryActionRouteScreenState
       }
       if (!mounted) return;
       ref.invalidate(tripDaysProvider(widget.tripId));
-      context.canPop()
-          ? context.pop()
-          : context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+      context.popOrGoTrip(widget.tripId);
     } on Exception {
       if (!mounted) return;
       setState(() {

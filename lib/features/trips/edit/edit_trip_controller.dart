@@ -35,6 +35,7 @@ class EditTripState {
     this.daysMutating = false,
     this.error,
     this.saved = false,
+    this.titleBlank = false,
   });
 
   final bool loading;
@@ -61,6 +62,9 @@ class EditTripState {
   /// 目前欄位已與 baseline 一致，不是允許關閉的提交憑證。
   final bool saved;
 
+  /// 標題欄位目前是空白:不送出,畫面就地提示。放在 state 裡才會觸發重建。
+  final bool titleBlank;
+
   EditTripState copyWith({
     bool? loading,
     bool? loadFailed,
@@ -70,6 +74,7 @@ class EditTripState {
     bool? shifting,
     bool? daysMutating,
     Object? error = _sentinel,
+    bool? titleBlank,
   }) {
     return EditTripState(
       loading: loading ?? this.loading,
@@ -88,6 +93,7 @@ class EditTripState {
       daysMutating: daysMutating ?? this.daysMutating,
       error: error == _sentinel ? this.error : error as String?,
       saved: saved,
+      titleBlank: titleBlank ?? this.titleBlank,
     );
   }
 
@@ -111,6 +117,7 @@ class EditTripState {
       shifting: shifting,
       daysMutating: daysMutating,
       error: error,
+      titleBlank: titleBlank,
     );
   }
 
@@ -263,13 +270,8 @@ class EditTripController extends Notifier<EditTripState> {
     }
   }
 
-  bool _titleBlank = false;
-
-  /// 標題目前是空白:不送出,畫面就地提示。
-  bool get titleBlank => _titleBlank;
-
   void setTitle(String v) {
-    _titleBlank = v.trim().isEmpty;
+    state = state.copyWith(titleBlank: v.trim().isEmpty);
     _session?.edit(_session!.draft.copyWith(title: v));
   }
 
@@ -277,7 +279,7 @@ class EditTripController extends Notifier<EditTripState> {
   void restoreTitle() {
     final s = _session;
     if (s == null) return;
-    _titleBlank = false;
+    state = state.copyWith(titleBlank: false);
     s.edit(s.draft.copyWith(title: s.baseline.title));
   }
 
@@ -355,12 +357,15 @@ class EditTripController extends Notifier<EditTripState> {
   /// 無變更不送空 body；提交中的再次操作交由 session 擋下。
   Future<DraftSaved<void>?> save() async => _session?.submit();
 
+  /// flush 最多重送幾輪:送出期間使用者又改了欄位會再髒,超過就放棄回報未完成。
+  static const _flushMaxRounds = 5;
+
   /// 按「完成」:等進行中的送出結束,再把剩下的變更送完。true=全部已生效,
   /// false=有欄位送出失敗(輸入仍保留,錯誤由 [saveError] 提供)。
   Future<bool> flush() async {
     final s = _session;
     if (s == null) return true;
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < _flushMaxRounds; i++) {
       if (s.submitting) {
         final idle = Completer<void>();
         void listener() {

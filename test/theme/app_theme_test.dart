@@ -205,7 +205,8 @@ void main() {
         const Color(0x00000000),
         under: capsule,
       );
-      expect(ratio, closeTo(4.39, 0.01));
+      // 只守「仍略低於 AA 4.5」這個已知狀態，不釘死小數，避免微調 tint 就誤報。
+      expect(ratio, inInclusiveRange(4.3, 4.49));
     });
 
     test('提高對比：淺色 tint 前景改為 #6F4C2C，對選取底達 4.5:1', () {

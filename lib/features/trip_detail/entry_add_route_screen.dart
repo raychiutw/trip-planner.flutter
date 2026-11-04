@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
+import '../../app/pop_or_go.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/day.dart';
 import '../../models/poi_note.dart';
@@ -284,9 +284,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
-      context.canPop()
-          ? context.pop()
-          : context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+      context.popOrGoTrip(widget.tripId);
     } on Exception {
       // 部分已寫入：時間軸必須重抓，否則看不到已成功的項目。
       if (_submitDone > 0) ref.invalidate(tripDaysProvider(widget.tripId));
@@ -310,9 +308,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     if (_mode == EntryAddMode.custom) {
       if (await _customFormController.submit() && mounted) {
         _customFormController.update(dirty: false);
-        context.canPop()
-            ? context.pop()
-            : context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+        context.popOrGoTrip(widget.tripId);
       }
       return;
     }
