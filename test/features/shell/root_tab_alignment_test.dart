@@ -71,7 +71,7 @@ void main() {
         )
         .map((text) => text.style?.color)
         .toSet();
-    expect(colors, contains(AppTheme.light().colorScheme.primary));
+    expect(colors, contains(AppTheme.light().colorScheme.onPrimaryContainer));
   });
 
   testWidgets('320pt 與300%文字保留標籤實際字級及44pt觸控區', (tester) async {

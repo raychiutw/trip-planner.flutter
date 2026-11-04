@@ -211,6 +211,21 @@ bool _usesOpaqueGlass(BuildContext context) =>
     MediaQuery.highContrastOf(context) ||
     AppAccessibilityScope.reduceTransparencyOf(context);
 
+/// 導覽列選中項目的前景色。
+///
+/// 選取底是中性灰（`surfaceContainerHigh`），淺色下 `primary` 對它只有 4.39:1，
+/// 低於 11pt 小字需要的 4.5:1（HIG C1），所以淺色改用同色系較深的 `onPrimaryContainer`
+/// （`tintDeep`，約 6:1）。深色的 `primary` 本來就夠，維持不變。
+Color tpNavigationSelectedForeground(
+  ColorScheme scheme, {
+  required bool darkOnMedia,
+}) {
+  if (darkOnMedia) return TpSystemColorsDark.tint;
+  return scheme.brightness == Brightness.light
+      ? scheme.onPrimaryContainer
+      : scheme.primary;
+}
+
 enum _TpNavigationGlassRole { bar, mediaIcon, dateSelector }
 
 /// 所有導覽角色共用的配對決策；光學值仍由既有設定函式提供。
@@ -241,7 +256,10 @@ class _TpNavigationGlassAppearance {
                     : scheme.onSurface.withValues(alpha: 1)
               : scheme.onSurfaceVariant
         : tpBarForeground(context, onMedia: onMedia);
-    selectedForeground = darkOnMedia ? TpSystemColorsDark.tint : scheme.primary;
+    selectedForeground = tpNavigationSelectedForeground(
+      scheme,
+      darkOnMedia: darkOnMedia,
+    );
     indicatorColor = darkOnMedia
         ? TpSystemColorsDark.tertiary
         : scheme.surfaceContainerHigh;
