@@ -1237,6 +1237,13 @@ List<HigScene> higScenes() => [
     '#424',
     location: '/trips?account=profile',
   ),
+  HigScene(
+    'account-change-password',
+    '#529',
+    location: '/trips?account=home',
+    act: (tester, f) async => _tapKey(tester, 'settings-change-password'),
+    proof: () => find.byKey(const ValueKey('change-password-current')),
+  ),
   const HigScene(
     'account-settings-notifications',
     '#425',

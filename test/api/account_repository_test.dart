@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/user.dart';
@@ -50,6 +51,53 @@ void main() {
 
     expect(updatedUser.displayName, '新名字');
   });
+
+  test(
+    'changePassword：POST /account/password 帶 current_password／new_password',
+    () async {
+      dioAdapter.onPost(
+        '/account/password',
+        (server) => server.reply(200, {'ok': true}),
+        data: {
+          'current_password': 'old-pass-1234',
+          'new_password': 'new-pass-5678',
+        },
+      );
+
+      await accountRepository.changePassword(
+        currentPassword: 'old-pass-1234',
+        newPassword: 'new-pass-5678',
+      );
+    },
+  );
+
+  test(
+    'changePassword：目前密碼錯回 403，丟 ApiError 並保留錯誤碼（不轉成 null、不當成登入過期）',
+    () async {
+      dioAdapter.onPost(
+        '/account/password',
+        (server) => server.reply(403, {
+          'error': {
+            'code': 'CHANGE_PASSWORD_CURRENT_INVALID',
+            'message': '目前密碼不正確',
+          },
+        }),
+        data: {'current_password': 'wrong', 'new_password': 'new-pass-5678'},
+      );
+
+      await expectLater(
+        accountRepository.changePassword(
+          currentPassword: 'wrong',
+          newPassword: 'new-pass-5678',
+        ),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.status, 'status', 403)
+              .having((e) => e.code, 'code', 'CHANGE_PASSWORD_CURRENT_INVALID'),
+        ),
+      );
+    },
+  );
 
   test('fetchAccountSessions：GET /account/sessions 解析登入裝置', () async {
     dioAdapter.onGet(

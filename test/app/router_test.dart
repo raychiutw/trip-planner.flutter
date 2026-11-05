@@ -29,6 +29,7 @@ import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
+import 'package:tripline/features/account/settings/change_password_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
@@ -218,6 +219,8 @@ ProviderContainer _buildContainer({
   final container = ProviderContainer(
     retry: disableAutomaticRetry ? (_, _) => null : null,
     overrides: [
+      // Account sheet 掛載時會取 hasPassword（決定是否顯示「變更密碼」）；路由測試與它無關，預設隔離掉。
+      accountHasPasswordProvider.overrideWith((ref) async => false),
       ...extraOverrides,
       if (authRepository != null)
         authRepositoryProvider.overrideWithValue(authRepository),

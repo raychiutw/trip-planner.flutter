@@ -1,6 +1,6 @@
 # HIG 比對後的修改清單（#531）
 
-日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（135 個場景全看；原為 125，後續各輪補到 135）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
+日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（136 個場景全看；原為 125，後續各輪補到 136）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
 這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。清單寫成時還沒動程式碼，之後已處理的項目標 ✅（A1～A7、A9、A11、A14、S1～S3、T2 等）、查過不改的標 ⚪；排序是我的建議，開票與否由你決定。
 
