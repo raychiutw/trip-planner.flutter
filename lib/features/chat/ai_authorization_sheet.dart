@@ -1,3 +1,5 @@
+// 注意：本檔的 ValueKey（`ai-consent-title`、`ai-consent-authorize` 等）屬於「AI 操作授權」，
+// 不是「AI 資料同意」（後者是 `ai-data-consent-*`）。為了 HIG 場景與守門清單穩定，保留舊名。
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 

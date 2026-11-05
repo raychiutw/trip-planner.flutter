@@ -456,15 +456,24 @@ void main() {
       thrower = () => _submitterGate;
       await pumpFlow(tester);
       await tapGo(tester);
-      for (var i = 0; i <= kAiConsentMaxReprompts; i++) {
+      // 這個情境（事前不知道要同意）sheet 總共出現 2 次、action 共 3 次，之後放棄。
+      for (var i = 0; i < 2; i++) {
+        expect(
+          find.byKey(const ValueKey('ai-data-consent-accept')),
+          findsOneWidget,
+          reason: '第 ${i + 1} 次 sheet',
+        );
         await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
         await tester.pumpAndSettle();
       }
 
-      verify(
-        () => repo.accept('ai-data-v1'),
-      ).called(kAiConsentMaxReprompts + 1);
-      expect(calls, kAiConsentMaxReprompts + 2);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+        reason: '用完上限不再彈第 3 次',
+      );
+      verify(() => repo.accept('ai-data-v1')).called(2);
+      expect(calls, 3);
       expect(outcome, isNull);
       expect(find.text(kAiConsentUnavailableMessage), findsOneWidget);
     });
