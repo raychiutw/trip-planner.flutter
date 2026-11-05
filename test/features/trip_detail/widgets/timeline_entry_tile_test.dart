@@ -682,7 +682,10 @@ void main() {
       );
 
       expect(find.text('20:50 - 21:50'), findsOneWidget);
-      expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 15);
+      expect(
+        tester.widget<Text>(find.text('那覇空港')).style?.fontSize,
+        17,
+      ); // 條目標題 = HIG body
       expect(kTimelineRailWidth, 32);
       expect(
         find.byKey(const ValueKey('timeline-entry-d1-43')),

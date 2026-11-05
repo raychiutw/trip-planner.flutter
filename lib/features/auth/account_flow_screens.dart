@@ -142,7 +142,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       primaryActionLabel: _submitting ? '建立中…' : '建立',
       primaryActionKey: const ValueKey('signup-submit-button'),
       onPrimaryAction: _submit,
-      primaryActionEnabled: !_submitting,
+      // 必填未完成時主要動作停用（HIG F5），與 web 一致：沒勾同意就不能建立，原因由下方說明交代。
+      primaryActionEnabled: !_submitting && _privacyConsent,
       child: Form(
         key: _formKey,
         child: AutofillGroup(
@@ -253,6 +254,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         child: const Text('查看個資條款'),
                       ),
                     ),
+                    if (!_privacyConsent)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 12),
+                        child: Text(
+                          '請先同意個資條款，才能建立帳號。',
+                          key: const ValueKey('signup-consent-hint'),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
                     if (field.errorText != null || _privacyConsentError != null)
                       Padding(
                         padding: const EdgeInsetsDirectional.only(start: 12),

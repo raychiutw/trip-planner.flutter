@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/providers.dart';
 import '../theme/tokens.dart';
 import '../ui/tp_filled_button.dart';
+import 'adaptive.dart';
 import 'app_lock.dart';
 import 'biometric_login.dart';
 
@@ -190,7 +191,10 @@ class _HostDialog extends StatelessWidget {
               isDefaultAction: !destructive,
               isDestructiveAction: destructive,
               onPressed: onConfirm,
-              child: Text(confirmLabel),
+              child: Text(
+                confirmLabel,
+                style: destructive ? tpDestructiveActionStyle(context) : null,
+              ),
             ),
           ],
         ),

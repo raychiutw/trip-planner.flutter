@@ -101,6 +101,18 @@ void main() {
     ).called(1);
   });
 
+  test('標題清空 → state.titleBlank 為 true（觸發重建），還原後回 false', () async {
+    final c = makeC();
+    final ctrl = await loaded(c);
+    expect(c.read(editTripControllerProvider('okinawa')).titleBlank, isFalse);
+
+    ctrl.setTitle('  ');
+    expect(c.read(editTripControllerProvider('okinawa')).titleBlank, isTrue);
+
+    ctrl.restoreTitle();
+    expect(c.read(editTripControllerProvider('okinawa')).titleBlank, isFalse);
+  });
+
   test('改回原值 → hasChanges false、save 不打 API', () async {
     final c = makeC();
     final ctrl = await loaded(c);

@@ -1,0 +1,108 @@
+# HIG 取證的缺口與現況（#531）
+
+日期：2026-11-04。這份文件只回答一件事：**截圖驗證做到哪、還沒做什麼、之後怎麼補**。逐場景結論看[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)，要改什麼看[修改清單](2026-11-04-hig-fix-list.md)，web 的結果在 trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`。
+
+## 一句話現況
+
+App 135 個場景、web 36 個場景都逐張看過，也有自動掃描；但**彈出層補了 32 個、仍有缺口（真機與時序類，另有少數不屬 #557 範圍的呼叫端）、沒有用真的 VoiceOver 走過、地圖類畫面不能當證據、web 只跑 chromium**。所以「符合」只代表「這批畫面、這幾種檢查下沒看到問題」，不是 HIG 驗收通過。
+
+| 項目 | 狀態 | 備註 |
+|---|---|---|
+| App 逐場景目視（135） | 完成 | 目視結論，下方有抽樣複核 |
+| web 逐場景目視（36；其中 9 個的桌機寬沒看） | 大部分完成 | 見下 |
+| 觸控目標（A1） | 自動守門 | App、web 各有棘輪測試 |
+| 文字對比（C1）與 VoiceOver 標籤 | App 已自動掃描；web 用 axe | 剩對話框與地圖兩類是已知範圍外 |
+| 字級（B1） | 靜態稽核完成並已改（A14） | 正文 17pt；當時的 102 個場景重拍並逐張抽看（現為 135） |
+| 提高對比 | 已用同一支工具重掃 | 發現目前的提高對比主題沒有加深 tint |
+| 減少動態效果 | 靜態稽核（不完整） | 兩處未降級（A15） |
+| 彈出層取證 | 補了 32 個（#531 的 23＋#558～#561 的 8＋完成攔截框 1），仍有缺口 | 見第 1 節 |
+| 真正的 VoiceOver | **沒做** | 見第 2 節的手動清單 |
+| web webkit | 已跑掃描，畫面差異沒比 | axe 與 chromium 一致 |
+| 地圖類畫面 | **不能取證** | 需真機 |
+| 第二人複核 | 用獨立子代理抽樣做了一輪 | 不等於人工複核，見第 5 節 |
+
+## 1. 彈出層（sheet、dialog、picker、通知）
+
+**第五輪再補 11 個**：`account-biometric-disable-confirm`、`account-session-revoke-confirm`、`developer-app-delete-confirm`、`note-delete-confirm`、`entry-alternate-remove-confirm`（確認框）；`poi-info-edit-sheet`、`entry-edit-sheet`、`travel-edit-sheet`、`share-edit-sheet`、`explore-custom-region-sheet`、`chat-ai-consent-sheet`（表單 sheet）。新發現 A19（編輯 OAuth 應用頁的停用鈕捲到底仍被切，待真機）；A17（欄位只有 placeholder）在四個 sheet 重現。**限制**：`developer-app-delete-confirm` 因按鈕點不到，是直接呼叫 `onPressed` 觸發；生物辨識場景要先關掉登入後的兩個詢問，且「開啟」那一步依賴場景的假驗證器。
+
+**第四輪再補 4 個不可復原動作的確認框**：`share-revoke-confirm`、`collab-remove-member-confirm`（選單觸發的 action sheet）、`collab-revoke-invite-confirm`（直接按鈕觸發的 alert）、`timeline-delete-entry-confirm`；皆有 proof、淺深各一張、逐張看過。共同觀察：「撤銷」紅字在 alert 與 action sheet 的色調不同（alert 偏橘），都屬 T2（#551）。
+
+**第三輪補了 8 個場景**（皆有 proof、淺深各一張、逐張看過）：`create-trip-date-picker`、`note-edit-date-picker`（月曆日期選擇器）、`note-edit-time-picker`（時間滾輪）、`note-edit-sheet`（筆記表單 sheet）、`favorites-filter-sheet`（篩選 sheet）、`favorites-remove-confirm`（破壞性確認）、`favorites-removed-notice`（通知橫幅）、`account-delete-preview-failed`（alert）。這輪因此新增 3 項發現（A16 月曆被裁、A17 表單欄位沒有常駐標籤、A18 sheet 遮罩沒有名稱）。原有的彈出層場景：登出確認、撤銷已連結 App 確認、刪除行程確認、刪除帳號對話框、語音同意、App 鎖開啟提示。
+
+**仍然沒有取證（真機與時序類，自動取證做不到）：**
+- **真實離線寫入佇列的時序**：`sync-conflict-sheet`、`sync-conflict-sheet-many` 的衝突紀錄是直接寫進場景記憶體的 cacheStore，不是由真實的「離線寫入 → 重新連線 → 後端回 409 → 紀錄衝突」流程產生；佇列何時重送、衝突何時浮現、橫幅何時出現的實際時序沒驗。
+- **真實協作者同時編輯的時序**：`entry-edit-sheet-remote-conflict` 靠詳情資料流（StreamController）送「版本較新」的資料；`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm` 靠寫入回 409、重新載入回較新版本，連按兩次儲存；`entry-edit-overwrite-confirm` 同停留點。三者皆為測試替身造的靜止狀態，不是兩個真實使用者的交錯，也不含 snackbar 與使用者編輯到一半被更新的過程。
+- **加入行程時段衝突**（`add-to-trip-time-conflict-alert`）：後端 409 是 stub 的，行程、第 1 天、10:00–11:00 是畫面預設值，不是逐步選取；真實後端對衝突的判定與回傳內容沒驗。
+- **真機 VoiceOver**：這些出錯時刻的彈出層標題、說明、按鈕朗讀順序與破壞性動作提示，只做了「可點擊節點有標籤」的靜態掃描，沒有用 VoiceOver 走過（見第 2 節手動清單）。
+- **地圖類畫面**：見第 4 節，要真機。
+- 直接呼叫 `onPressed` 的捷徑：`developer-app-delete-confirm` 是因按鈕點不到而直接觸發；生物辨識場景依賴假驗證器。
+
+**不屬 #557 範圍、仍標「部分」的呼叫端**（[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)的「部分」列，不是真機問題，只是還沒拍）：
+- 重新產生與刪除分享連結（同一支 `confirmAndRunIrreversibleAction`，只拍了撤銷）；`confirmAndDelete` 已三處都有場景。
+- `showAppDestructiveConfirm`：收藏多選批次移除（編輯行程「有變更尚未送出」攔截框已有 `trip-edit-finish-blocked-confirm`）。
+  - 另注意：#557 原稱的「編輯行程放棄確認」，實際取證的 `trip-edit-delete-day-confirm` 是**刪除行程日**確認，不是放棄變更；該攔截確認後來由 `trip-edit-finish-blocked-confirm` 補上場景。
+- `showAppConfirm`：聊天「無法使用語音輸入」、帳號「需要重新驗證才能刪除」、通知設定「允許通知」、停留點備選「設為正選？」。
+- `showAppDatePicker` 在編輯行程與分享；`showAppNotice` 在其餘畫面。
+
+**補場景的歷史**（#531 的 23 個；#558～#561 的 8 個見上與逐張檢查報告）：新發現 A16～A19 來自 #531 各輪；#558～#561 新發現 A20～A24（已選項只靠填色、時段衝突說明折行、覆寫確認三處用字不一致、遠端衝突欄位無提示、交通確認孤字）。
+
+**量測限制**：`textContrastGuideline` 對有橫幅蓋住畫面的場景會取到錯的前景與背景（`favorites-removed-notice` 的標題量到 1.00:1，實際是通知橫幅蓋住標題），這類場景的對比數字要對照截圖，不能直接採用。
+
+## 2. 字級、提高對比、減少動態效果、VoiceOver
+
+**字級（B1）：**
+- 螢幕上的最小字級是 11pt（主題 `labelSmall`，分頁列與 chip 標籤），符合「≥ 11pt」。
+- 明寫的 8～10pt 只出現在 `trip_pdf_service.dart`（PDF 列印輸出，不是螢幕文字），視為例外。
+- **正文字級原本比檢查表的預設 17pt 小一級**（`bodyLarge` 15、`bodyMedium` 13、`bodySmall` 12）。**已改（A14）**：字階對照 Apple 預設，正文 17、次要 15、第三層 13。字階上移後有約 27 個既有測試失敗（含變體 41 項）：絕大多數是靠「讓對應元件維持原字級」解掉，沒有改測試；實際改動測試的只有五處（字階契約與時間軸標題斷言改成 17、協作與 POI 兩個測試改為捲到可點再點、棘輪登記 `ax-chat-2x`）。真正的版面問題有五處：分段控制退成直排、聊天橫幅與離線橫幅在極端字級的高度、地圖底部兩張 POI 卡的固定高度、`TpTag` 大過同排文字。**仍存在的限制**：聊天橫幅區塊不限高也不可捲動，AX5 下三個橫幅疊起來本來就會比螢幕高（既有限制，不是這次造成），沒有解決；Google POI 卡沒有 AX5 的溢位測試。詳見修改清單 A14 與 `DESIGN.md` §16.3。
+
+**提高對比：** 用場景底座的新開關（`--dart-define=HIG_HC=true`）把 200 個場景×主題以「提高對比」重掃：未過次數 52 降到 47（5 項改善、0 項變差）。**分頁列選中標籤仍是 4.39:1**，代表目前的提高對比主題沒有加深 tint，這是 #550 要做的事。
+
+**減少動態效果：**
+- 靜態稽核：查到的捲動與進度動畫多數有 `disableAnimationsOf` 判斷；兩處沒有（A15）。這個稽核**只涵蓋我用關鍵字搜得到的動畫元件**，不是全部動畫。
+- 我另外試過用「場景穩定後還在跑的 ticker 數」做自動量測，結果 200 個場景一律有 ticker（包含一般狀態），**這個量法無法區分任何事，已棄用，不能當證據**。
+
+**VoiceOver：**
+- 自動：`labeledTapTargetGuideline` 掃過全部場景，可點擊節點缺標籤的次數是 0（修正前是 22）。這只證明「有名稱」，**不證明朗讀順序、名稱好不好懂、有沒有重複**。
+- 沒做：真的開 VoiceOver 走過。建議你在真機驗證這幾件事（我無法代做）：
+  1. 探索頁搜尋欄：朗讀是否重複念「搜尋地點」（外層節點有名稱、內層欄位有 hint，是兩個元素）。
+  2. 時間軸上方的日期條：念「行程日期」之後，各個 Day 是否可左右滑動選取，且「Day 1，已選取」之類的狀態念得出來。
+  3. 收藏清單每一列：念出地點名稱，且「移除」「更多選項」是獨立可操作的元素。
+  4. 行程備註的排序：用「上移」「下移」自訂動作能不能排序。
+  5. 確認對話框（登出、撤銷、刪除）：標題、說明、按鈕的朗讀順序與破壞性動作的提示。
+
+## 3. web
+
+做了：新增 9 個場景（登入失敗、登入限流、註冊後查看信箱、重設密碼、驗證信、邀請有效與無效、行程清單空與錯誤態），手機寬淺深都看過；新增 2 項發現（W9 行程清單錯誤態沒有重試、W10 兩頁 200% 文字橫向捲動且未定位）。**另有一項（邀請無效只給重試）是我的 stub 用了不存在的錯誤碼造成的假發現，經獨立審查指出、對照真實契約（410＋`INVITATION_INVALID`）後已撤回並重拍。**場景底座支援 `stub`／`act`／`proofText`，每個新場景有 proof，避免拍到的不是想取證的狀態。
+
+**沒做：**
+- **webkit（Safari）**：已安裝（你同意後下載 Playwright 的 WebKit，78.9 MiB）並以桌機 webkit 跑完 36 場景 × 4 的截圖與 axe／重排／縮放／焦點掃描：**axe 違規集合與 chromium 完全相同**（`trips-new` 的 ARIA 與標籤、`trip-print` 對比、時間 chip 標籤）、320px 重排無溢位、200% 文字同樣兩頁溢位（`signup-check-email` 354、`invite` 366，兩個瀏覽器數字一樣）、焦點無樣式同樣只有 `explore` 搜尋欄。**注意**：webkit 下有 6 個場景 Tab 一個都跳不到（`landing`、`login-error`、`login-rate-limited`、`signup-check-email`、`invite`、`invite-invalid`），那是 Safari 預設不 Tab 到連結與按鈕的行為，不能直接當缺陷。**沒做**：chromium 與 webkit 的**畫面差異（逐張比對版面）**沒有比，只比了掃描結果。
+- 這 9 個新場景的**桌機寬畫面我沒有逐張看**（只有 proof 與 axe）。
+- 仍沒有場景：分享頁（`/s/:token`）、oauth 同意與授權頁、各種 dialog 的行為、註冊與忘記密碼的限流。
+- axe 標為「需人工」的項目沒有逐筆複核（見 web 報告）。
+- 沒有實際用螢幕閱讀器走過。
+
+另外一項工具面的修正：web 棘輪原本把「寬×高」當鍵，輸入框寬度會隨建置環境差 11px 而無故紅燈；改成只比對「標籤＋最短邊」，並用兩個變異驗證仍會轉紅。
+
+## 4. 地圖類畫面
+
+**不能當證據，要真機。** App 的地圖是測試用純色 fixture（畫面上寫著「Google Map fixture」），玻璃元件的對比、地圖手勢、標記與路線的視覺都無法由截圖判斷；web 的場景擋掉了 Google Maps，畫面是「地圖暫停服務」錯誤態。受影響的場景：App 的 `trip-map`、`trip-map-route-failed`、`global-map*`、`ax-trip-map-2x`；web 的 `map`、`trip-map`。
+
+## 5. 第二人複核（用獨立子代理抽樣）
+
+**做法**：分層抽樣 26 個 App 場景（符合 10、未見明顯問題 10、疑慮／張力／無法判讀各 2）。一個全新的子代理在**看不到我的結論**（明令禁止讀報告、修改清單、issue）的情況下，只依檢查表與圖片逐張判定，我再逐張比對。
+
+| 比對 | 張數 |
+|---|---|
+| 完全一致 | 8 |
+| 相鄰一級（符合與未見明顯問題互換） | 10 |
+| 複核者比我鬆 | 3（其中 2 張是我標「張力」的設定頁，複核者標疑慮，實質相同） |
+| **複核者比我嚴（我可能漏看）** | **5** |
+
+那 5 張我逐一對照程式碼，沒有直接採信也沒有直接駁回：
+- `collab-load-failed`：**成立**，「新增」鈕 Email 為空仍可按（A12）。
+- `explore-search-failed`：**成立但輕微**，錯誤訊息沒說原因（A13）。
+- `ax-trips-list-3x`：**判斷分歧**（分段控制在大字級堆疊占掉大半首屏、頂部標題膠囊不隨字級放大）；堆疊是刻意設計，標題膠囊不放大我沒有判定是否違規，留給你。
+- `account-connected-apps`：**不成立**，「撤銷」按鈕最小尺寸程式碼寫 44×44，且撤銷有獨立的確認對話框；複核者只看靜態圖，看不到點擊區與流程。
+- `trip-notes`：**不成立**，排序有「上移」「下移」自訂語意動作（`reorderable_row.dart`），輔助技術有替代路徑。
+
+**這個複核的限制要講清楚**：複核者也是 Claude，不是人，它的盲點可能和我相似；它只看靜態圖，量不出點擊區與實際對比；抽樣 26 張不等於當時全部 102 張。所以它能抓到我漏看的（確實抓到兩個真問題），**不能證明沒有漏看**。要真正的「第二人」，仍需要人工看一輪。

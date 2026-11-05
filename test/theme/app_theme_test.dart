@@ -6,6 +6,37 @@ import 'package:tripline/theme/tokens.dart';
 import '../helpers/contrast.dart';
 
 void main() {
+  test('深色紅色文字在三層底色與錯誤面板上都達 4.5:1（#544 A5）', () {
+    final scheme = AppTheme.dark().colorScheme;
+    // 三層底色：一般 surface、grouped 卡片，以及 sheet 內上移一階的卡片（elevated）。
+    for (final (name, bg) in [
+      ('surface', TpSystemColorsDark.background),
+      ('grouped', TpSystemColorsDark.secondary),
+      ('elevated grouped', TpSystemColorsDark.tertiary),
+    ]) {
+      expect(
+        wcagContrast(scheme.error, const Color(0x00000000), under: bg),
+        greaterThanOrEqualTo(4.5),
+        reason: '紅色文字（登出、刪除）在 $name 上',
+      );
+    }
+    // 錯誤面板：errorContainer 疊在 surface／grouped 上，onErrorContainer 文字。
+    for (final (name, under) in [
+      ('surface', TpSystemColorsDark.background),
+      ('grouped', TpSystemColorsDark.secondary),
+    ]) {
+      expect(
+        wcagContrast(
+          scheme.onErrorContainer,
+          scheme.errorContainer,
+          under: under,
+        ),
+        greaterThanOrEqualTo(4.5),
+        reason: '錯誤面板文字在 $name 上',
+      );
+    }
+  });
+
   test('淺色次要文字在三層底色上都達 WCAG AA 4.5:1', () {
     final scheme = AppTheme.light().colorScheme;
     for (final bg in [
@@ -159,6 +190,42 @@ void main() {
     });
   });
 
+  group('提高對比的單一 tint 變體（#550）', () {
+    // 分頁列選取膠囊底：中性灰 tertiary（#E5E5EA）。
+    final capsule = TpSystemColorsLight.tertiary;
+
+    test('一般狀態 tint 不變（回歸）：淺 #8A6038、深 #D0A576', () {
+      expect(AppTheme.light().colorScheme.primary, const Color(0xFF8A6038));
+      expect(AppTheme.dark().colorScheme.primary, const Color(0xFFD0A576));
+    });
+
+    test('一般狀態對選取底 4.39:1，是已知例外（不為它改品牌色）', () {
+      final ratio = wcagContrast(
+        AppTheme.light().colorScheme.primary,
+        const Color(0x00000000),
+        under: capsule,
+      );
+      // 只守「仍略低於 AA 4.5」這個已知狀態，不釘死小數，避免微調 tint 就誤報。
+      expect(ratio, inInclusiveRange(4.3, 4.49));
+    });
+
+    test('提高對比：淺色 tint 前景改為 #6F4C2C，對選取底達 4.5:1', () {
+      final primary = AppTheme.light(highContrast: true).colorScheme.primary;
+      expect(primary, const Color(0xFF6F4C2C));
+      expect(
+        wcagContrast(primary, const Color(0x00000000), under: capsule),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    test('提高對比：深色 tint 不變', () {
+      expect(
+        AppTheme.dark(highContrast: true).colorScheme.primary,
+        const Color(0xFFD0A576),
+      );
+    });
+  });
+
   group('元件 theme 規格', () {
     test('Card 與 AppBar 使用 hairline，互動控制使用 tint', () {
       for (final theme in [AppTheme.light(), AppTheme.dark()]) {
@@ -232,16 +299,45 @@ void main() {
       expect(textTheme.headlineMedium?.fontSize, 22);
       expect(textTheme.headlineSmall?.fontSize, 20);
       expect(textTheme.titleLarge?.fontSize, 17);
-      expect(textTheme.titleMedium?.fontSize, 15);
+      expect(textTheme.titleMedium?.fontSize, 17); // Headline
       expect(textTheme.titleSmall?.fontSize, 13);
-      expect(textTheme.bodyLarge?.fontSize, 15);
-      expect(textTheme.bodyMedium?.fontSize, 13);
-      expect(textTheme.bodySmall?.fontSize, 12);
-      expect(textTheme.labelLarge?.fontSize, 15);
+      expect(textTheme.bodyLarge?.fontSize, 17); // Body：正文預設 17（B1）
+      expect(textTheme.bodyMedium?.fontSize, 15); // Subheadline
+      expect(textTheme.bodySmall?.fontSize, 13); // Footnote
+      expect(textTheme.labelLarge?.fontSize, 17); // 按鈕文字
       expect(textTheme.labelMedium?.fontSize, 12);
       expect(textTheme.labelSmall?.fontSize, 11);
       expect(textTheme.bodyLarge?.letterSpacing, 0);
       expect(textTheme.bodyLarge?.fontFamily, isNot(contains('Inter')));
+    });
+
+    test('兩種主題的每個字階角色都 ≥ 11pt 且中文不加字距（B1 守門）', () {
+      for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        final t = theme.textTheme;
+        final roles = {
+          'displaySmall': t.displaySmall,
+          'headlineMedium': t.headlineMedium,
+          'headlineSmall': t.headlineSmall,
+          'titleLarge': t.titleLarge,
+          'titleMedium': t.titleMedium,
+          'titleSmall': t.titleSmall,
+          'bodyLarge': t.bodyLarge,
+          'bodyMedium': t.bodyMedium,
+          'bodySmall': t.bodySmall,
+          'labelLarge': t.labelLarge,
+          'labelMedium': t.labelMedium,
+          'labelSmall': t.labelSmall,
+        };
+        for (final entry in roles.entries) {
+          expect(entry.value, isNotNull, reason: '${entry.key} 沒有定義');
+          expect(
+            entry.value!.fontSize!,
+            greaterThanOrEqualTo(11),
+            reason: '${theme.brightness.name} ${entry.key}',
+          );
+          expect(entry.value!.letterSpacing, 0, reason: entry.key);
+        }
+      }
     });
 
     testWidgets('app 用到的字階全部有定義且 letterSpacing 為 0', (tester) async {

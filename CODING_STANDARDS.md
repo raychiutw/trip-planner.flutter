@@ -230,7 +230,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 對比
 
-- 導覽玻璃上的 15–17pt 文字（`titleLarge` 17 / `titleMedium`、`bodyLarge` 15）必須對**實際合成後**的背景達 4.5:1，不是對 token 的名目色。玻璃是半透明的，底下捲什麼過去就合成什麼。
+- 導覽玻璃上的 15–17pt 文字（`titleLarge`／`titleMedium`／`bodyLarge`／`labelLarge` 17、`bodyMedium` 15）必須對**實際合成後**的背景達 4.5:1，不是對 token 的名目色。玻璃是半透明的，底下捲什麼過去就合成什麼。
 - 100% 與 200% Dynamic Type 兩種字級都要驗；驗收方式是拿高對比黑白內容捲過浮動 header，確認下層字詞不可辨識且前景仍達 4.5:1。
 - `Increase Contrast` 或 `Reduce Transparency` 任一開啟時，玻璃使用不透明系統背景。`tpResolveGlassSettings` 提供 alpha `1` 的語意色，`tpGlassQuality` 明確選擇 `GlassQuality.minimal`，避開 shader、折射與高光；不可只把 blur 歸零，1.x 的 `blur: 0` 仍是光學玻璃。兩個輸入各自以實際背景像素及操作測試驗證。
 - 一般模式不描邊；只有 `Increase Contrast` 才補實心邊（`tpGlassEdgeColor`，`lib/ui/tp_glass_surface.dart:179`）。

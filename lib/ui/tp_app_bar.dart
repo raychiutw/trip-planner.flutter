@@ -12,7 +12,16 @@ export 'tp_more_menu.dart';
 export 'tp_glass_surface.dart'
     show TpHeaderTitle, TpToolbarActionGroup, TpToolbarGlassButton;
 
-enum TpAppBarRole { standalone, detail, publicDetail, modalContent, modalForm }
+enum TpAppBarRole {
+  standalone,
+  detail,
+  publicDetail,
+  modalContent,
+  modalForm,
+
+  /// 即時儲存的整頁 modal:沒有草稿可放棄,所以沒有「取消」,只有右側「完成」。
+  modalInstant,
+}
 
 /// The single spacing owner for one or more compact header actions.
 /// 固定 bar 與浮動 header(tp_root_scaffold)共用的動作列;只給這兩個檔用。
@@ -216,6 +225,11 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
          'modalForm requires Cancel and a primary action.',
        ),
        assert(
+         role != TpAppBarRole.modalInstant ||
+             (onCancel == null && onPrimaryAction != null),
+         'modalInstant has a primary action and no Cancel.',
+       ),
+       assert(
          (primaryActionLabel == null) == (onPrimaryAction == null),
          'primaryActionLabel and onPrimaryAction must be supplied together.',
        );
@@ -274,7 +288,9 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     ];
     final barActions = <Widget>[
       ...headerActions,
-      if (largeSheetScope != null && role != TpAppBarRole.modalForm)
+      if (largeSheetScope != null &&
+          role != TpAppBarRole.modalForm &&
+          role != TpAppBarRole.modalInstant)
         KeyedSubtree(
           key: const ValueKey('app-sheet-close'),
           child: TpToolbarGlassButton(
@@ -329,6 +345,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   ) {
     switch (role) {
       case TpAppBarRole.standalone:
+      case TpAppBarRole.modalInstant:
         return null;
       case TpAppBarRole.detail:
       case TpAppBarRole.publicDetail:

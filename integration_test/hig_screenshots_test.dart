@@ -24,6 +24,9 @@ import 'support/hig_screenshot_scenes.dart';
 const _shotDir = String.fromEnvironment('HIG_SHOT_DIR');
 const _only = String.fromEnvironment('HIG_ONLY');
 
+/// `--dart-define=HIG_HC=true`：以「提高對比」拍攝，檔名加 `-hc` 後綴。
+const _highContrast = bool.fromEnvironment('HIG_HC');
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -93,8 +96,9 @@ void main() {
     for (final scene in higScenes()) {
       if (_only.isNotEmpty && !scene.name.contains(_only)) continue;
       await pair(
-        scene.name,
-        (mode, cap) => runHigScene(tester, scene, mode, cap),
+        _highContrast ? '${scene.name}-hc' : scene.name,
+        (mode, cap) =>
+            runHigScene(tester, scene, mode, cap, highContrast: _highContrast),
       );
     }
     if (_only.isEmpty || 'components'.contains(_only)) {

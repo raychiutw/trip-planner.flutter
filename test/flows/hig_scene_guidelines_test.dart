@@ -22,7 +22,7 @@ import '../../integration_test/support/hig_screenshot_scenes.dart';
 /// HIG Accessibility 頁：iOS 控制項預設 44×44 pt（檢查表 A1）。
 const _minTapTarget = 44.0;
 
-/// `--dart-define=HIG_COLLECT=1`：只印出各場景的違規，不下斷言，用來更新已知違規清單。
+/// `--dart-define=HIG_COLLECT=true`：只印出各場景的違規，不下斷言，用來更新已知違規清單。
 const _collectOnly = bool.fromEnvironment('HIG_COLLECT');
 
 /// 場景名稱 → 該場景已知的違規（`標籤 寬x高`，邏輯 pt、四捨五入到整數）。
@@ -34,6 +34,7 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'trips-list-empty': {'搜尋行程 361x36'},
   'trip-create': {'搜尋地點（城市、景點） 305x36'},
   'trip-edit': {'搜尋地點（城市、景點） 305x36'},
+  'trip-edit-save-failed': {'搜尋地點（城市、景點） 305x36'},
   'favorites': {'搜尋收藏 361x36'},
   'favorites-load-failed': {'搜尋收藏 361x36'},
   'account-developer-app-new': {'(無標籤) 40x40'},
@@ -43,9 +44,29 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'share-created-card': {'(無標籤) 40x40'},
   'share-create-failed': {'(無標籤) 40x40'},
   'share-list-load-failed': {'(無標籤) 40x40'},
+  // 2 倍字級下建議鈕區（SingleChildScrollView，下緣 611.4）放不下第四個鈕：鈕實際高 96pt、
+  // 上緣 568，只有 43.4pt 在可見範圍內，語意樹的矩形被捲動區裁成 43。這是量測限制（裁切後的
+  // 尺寸，已用渲染尺寸驗證），鈕本身捲得進來；字階對照 HIG 後才出現。
+  'ax-chat-2x': {'加入適合親子的水族館行程 345x43'},
   'offline-banner-network': {'搜尋行程 361x36'},
   'offline-banner-pending': {'搜尋行程 361x36', '立即重試 100x40'},
   'app-lock-enable-prompt': {'搜尋行程 361x36'},
+  // 彈出層場景：sheet 頂端的拖曳把手（36x4）來自 liquid_glass_widgets 套件，語意帶 onTap（點了關閉 sheet），
+  // 尺寸確實小於 44pt；lib/ 內沒有這個語意，要修得在套件層（A18 追蹤）。
+  // 通知橫幅場景的底下是收藏頁，搜尋欄同 'favorites'。
+  'favorites-filter-sheet': {'Drag handle 36x4'},
+  'note-edit-sheet': {'Drag handle 36x4'},
+  'poi-info-edit-sheet': {'Drag handle 36x4'},
+  'entry-edit-sheet': {'Drag handle 36x4'},
+  'travel-edit-sheet': {'Drag handle 36x4'},
+  'explore-custom-region-sheet': {'Drag handle 36x4'},
+  'chat-ai-consent-sheet': {'Drag handle 36x4'},
+  // 「匿名分享」勾選框 40x40，與分享頁建立表單同一個元件（'share-manage'）。
+  'share-edit-sheet': {'(無標籤) 40x40', 'Drag handle 36x4'},
+  'favorites-removed-notice': {'搜尋收藏 361x36'},
+  'sync-conflict-sheet': {'Drag handle 36x4'},
+  'sync-conflict-sheet-many': {'Drag handle 36x4'},
+  'entry-edit-sheet-remote-conflict': {'Drag handle 36x4'},
 };
 
 /// 刻意在畫面上顯示對話框的場景。其餘場景若出現對話框，代表畫面被不相干的詢問蓋住
@@ -57,6 +78,20 @@ const _scenesWithDialog = {
   'chat-voice-consent',
   'invite-wrong-account-pending',
   'app-lock-enable-prompt',
+  'favorites-remove-confirm',
+  'account-delete-preview-failed',
+  'collab-revoke-invite-confirm',
+  'account-biometric-disable-confirm',
+  'account-session-revoke-confirm',
+  'developer-app-delete-confirm',
+  'note-delete-confirm',
+  'entry-alternate-remove-confirm',
+  'add-to-trip-time-conflict-alert',
+  'trip-edit-delete-day-confirm',
+  'trip-edit-finish-blocked-confirm',
+  'entry-edit-overwrite-confirm',
+  'note-edit-overwrite-confirm',
+  'travel-edit-overwrite-confirm',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。

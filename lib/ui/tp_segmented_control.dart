@@ -46,7 +46,9 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
         ? Color.alphaBlend(scheme.onSurface.withValues(alpha: 0.14), trackColor)
         : scheme.surface;
 
-    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+    // 分段控制的標籤維持 15pt 半粗體（iOS 的分段控制本來就用小字）；17pt 時
+    // 五個選項放不下一列，會退成直排佔掉大半畫面。
+    final labelStyle = theme.textTheme.bodyMedium?.copyWith(
       fontWeight: FontWeight.w600,
     );
     Widget segmentFor(T key, {required bool stacked}) => TpTapTarget(
@@ -79,8 +81,8 @@ class TpSegmentedControl<T extends Object> extends StatelessWidget {
               options[key]!,
               maxLines: stacked ? null : 1,
               textAlign: TextAlign.center,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: key == value ? FontWeight.w600 : null,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
                 color: enabled
                     ? scheme.onSurface
                     : scheme.onSurface.withAlpha(TpDisabled.contentAlpha),

@@ -181,6 +181,8 @@ class _ConnectedAppTile extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       key: Key('connected-app-row-${app.clientId}'),
+      // 多行內容時圖示對齊標題那一行，不是垂直置中在整列中間。
+      titleAlignment: ListTileTitleAlignment.top,
       leading: const Icon(CupertinoIcons.square_grid_2x2, size: 22),
       title: Text(app.appName),
       subtitle: Padding(
@@ -198,6 +200,9 @@ class _ConnectedAppTile extends StatelessWidget {
                   Chip(
                     label: Text(oauthScopeLabel(scope)),
                     visualDensity: VisualDensity.compact,
+                    // 明確取目前主題的 surfaceContainerHigh：chipTheme 在建主題時就定死，
+                    // 不會跟著帳號 sheet 的 elevated 配色上移，深色下會與卡片同色而隱形。
+                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
                   ),
               ],
             ),

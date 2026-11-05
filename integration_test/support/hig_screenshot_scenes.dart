@@ -6,7 +6,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart'
-    show CupertinoActionSheet, CupertinoAlertDialog;
+    show
+        CupertinoActionSheet,
+        CupertinoAlertDialog,
+        CupertinoDatePicker,
+        CupertinoDatePickerMode,
+        CupertinoDialogAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +20,8 @@ import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart' show AccountDeletionPreview;
 import 'package:tripline/api/poi_repository.dart';
-import 'package:tripline/api/cache/cache_store.dart' show QueuedMutation;
+import 'package:tripline/api/cache/cache_store.dart'
+    show ConflictRecord, QueuedMutation;
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
@@ -29,8 +35,11 @@ import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/poi_favorite.dart';
-import 'package:tripline/models/entry.dart' show TimelineEntry;
+import 'package:tripline/models/day.dart' show TripDay;
+import 'package:tripline/models/entry.dart' show EntryPoiInfo, TimelineEntry;
+import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
@@ -82,6 +91,15 @@ class HigFakes {
   /// 預設裝置沒有生物辨識：否則每個已登入場景都會被「要用 Face ID 登入嗎？」詢問蓋住，
   /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]／[_OkBiometric]。
   BiometricAuthenticator biometric = _NoBiometric();
+
+  /// 停留點詳情的 watch 流（[_entryDetailLive] 建立）：場景在 act 裡往裡面送「協作者的新版本」，
+  /// 造出編輯 sheet 的「遠端衝突」狀態。用 StreamController 而不是 Stream.value，是因為衝突要在
+  /// 使用者已經改了欄位之後才發生，順序無法靠一次性 stub 表達。
+  StreamController<TimelineEntry>? entryDetail;
+
+  /// 交通段目前「伺服器上的」內容：每次（重新）訂閱 watchSegments 都回這份。交通 sheet 是 409 後
+  /// 才 invalidate 並重新訂閱來取得對方版本，所以改這個欄位就等於協作者改了資料。
+  List<TripSegment> segmentsNow = const [];
 
   MockAuthRepositoryAlias get auth => fixture.auth;
   MockTripRepository get trips => fixture.trips;
@@ -248,7 +266,7 @@ class HigFakes {
   }
 
   /// 與 `AppFlowFixture.app` 相同的 override 鏈，再補 account／share／poi 與網路訊號。
-  Widget buildApp({double textScale = 1.0}) {
+  Widget buildApp({double textScale = 1.0, bool highContrast = false}) {
     final f = fixture;
     final app = ProviderScope(
       key: UniqueKey(),
@@ -288,8 +306,12 @@ class HigFakes {
       ],
       child: const TriplineApp(),
     );
-    if (textScale == 1.0) return app;
-    return _TextScaled(scale: textScale, child: app);
+    if (textScale == 1.0 && !highContrast) return app;
+    return _TextScaled(
+      scale: textScale,
+      highContrast: highContrast,
+      child: app,
+    );
   }
 }
 
@@ -322,15 +344,24 @@ class _OkBiometric extends _PendingBiometric {
       BiometricOutcome.success;
 }
 
+/// 以 MediaQuery 覆寫模擬系統設定：文字大小、提高對比。
 class _TextScaled extends StatelessWidget {
-  const _TextScaled({required this.scale, required this.child});
+  const _TextScaled({
+    required this.scale,
+    required this.child,
+    this.highContrast = false,
+  });
 
   final double scale;
+  final bool highContrast;
   final Widget child;
 
   @override
   Widget build(BuildContext context) => MediaQuery(
-    data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+    data: MediaQuery.of(context).copyWith(
+      textScaler: TextScaler.linear(scale),
+      highContrast: highContrast,
+    ),
     child: child,
   );
 }
@@ -442,12 +473,15 @@ Future<void> runHigScene(
   WidgetTester tester,
   HigScene scene,
   ThemeMode mode,
-  HigCapture capture,
-) async {
+  HigCapture capture, {
+  bool highContrast = false,
+}) async {
   final f = HigFakes.create(mode: mode, loggedIn: scene.loggedIn);
   addTearDown(f.fixture.dispose);
   await scene.stub?.call(f);
-  await tester.pumpWidget(f.buildApp(textScale: scene.textScale));
+  await tester.pumpWidget(
+    f.buildApp(textScale: scene.textScale, highContrast: highContrast),
+  );
   await higSettle(tester, settle: scene.settle);
   final loc = scene.location;
   if (loc != null) {
@@ -475,6 +509,22 @@ Future<void> _tapKey(WidgetTester tester, String key) async {
   await higSettle(tester);
 }
 
+/// 與 [_tapKeyPrefix] 相同，但點完不 settle（給要在計時器消失前拍到畫面的場景）。
+Future<void> _tapKeyPrefixNoSettle(WidgetTester tester, String prefix) async {
+  final finder = find.byWidgetPredicate(
+    (w) =>
+        w.key is ValueKey<String> &&
+        (w.key! as ValueKey<String>).value.startsWith(prefix),
+  );
+  expect(finder, findsWidgets, reason: 'key prefix $prefix');
+  await tester.ensureVisible(finder.first);
+  await tester.pump();
+  await tester.tap(finder.first);
+  for (var i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
 /// 點第一個 key 字串以 [prefix] 開頭的 widget（key 帶動態 id 時用）。
 Future<void> _tapKeyPrefix(WidgetTester tester, String prefix) async {
   final finder = find.byWidgetPredicate(
@@ -487,6 +537,26 @@ Future<void> _tapKeyPrefix(WidgetTester tester, String prefix) async {
   await tester.pump();
   await tester.tap(finder.first);
   await higSettle(tester);
+}
+
+/// 左滑刪除：拖開第一個 key 以 [prefix] 開頭的列，點出現的刪除鈕（要在確認框跳出前拍）。
+Future<void> _swipeDeleteFirst(WidgetTester tester, String prefix) async {
+  final finder = find.byWidgetPredicate(
+    (w) =>
+        w.key is ValueKey<String> &&
+        (w.key! as ValueKey<String>).value.startsWith(prefix),
+  );
+  expect(finder, findsWidgets, reason: 'key prefix $prefix');
+  final dismissKey = finder.first.evaluate().first.widget.key! as ValueKey;
+  await tester.ensureVisible(finder.first);
+  await tester.pump();
+  await tester.drag(finder.first, const Offset(-500, 0));
+  await higSettle(tester);
+  await tester.tap(
+    find.byKey(ValueKey<Object>(('swipe-delete-action', dismissKey))),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {
@@ -506,6 +576,184 @@ Future<void> _scrollDown(WidgetTester tester, [double dy = -600]) async {
   await higSettle(tester);
 }
 
+/// 把 [count] 筆「同欄位三方不同」的衝突紀錄寫進場景的 cacheStore。
+Future<void> _seedConflicts(WidgetTester tester, int count) async {
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(TriplineApp)),
+  );
+  const titles = ['首里城', '國際通散步', '美麗海水族館', '古宇利大橋', '瀨長島露台'];
+  for (var i = 0; i < count; i++) {
+    await container
+        .read(cacheStoreProvider)
+        .appendConflict(
+          ConflictRecord(
+            id: 'c$i',
+            type: 'update-entry',
+            path: '/trips/okinawa/entries/${i + 1}',
+            body: const {},
+            args: {'title': titles[i % titles.length]},
+            cacheKey: 'trips/okinawa',
+            ours: {
+              'title': titles[i % titles.length],
+              'startTime': '${10 + i}:00',
+              'description': '你離線時改的說明',
+            },
+            theirs: {
+              'title': '${titles[i % titles.length]}（協作者改名）',
+              'startTime': '${(8 + i).toString().padLeft(2, '0')}:30',
+              'description': '協作者改的說明',
+            },
+            newVersion: 3,
+            conflictFields: const ['title', 'startTime', 'description'],
+            createdAt: '2026-10-10T00:00:00Z',
+          ),
+        );
+  }
+  await higSettle(tester);
+}
+
+/// 預設 fixture 每天只有一個有座標的停留點，這裡給第 1 天補第二個，湊出相鄰兩點
+/// （路線抓取、停留點之間的交通方式鈕都需要它）。
+void _day1WithTwoEntries(HigFakes f) {
+  final day1 = releaseSmokeDays.first;
+  final days = [
+    TripDay(
+      id: day1.id,
+      dayNum: day1.dayNum,
+      title: day1.title,
+      version: day1.version,
+      timeline: [
+        ...day1.timeline,
+        TimelineEntry(
+          id: 12,
+          sortOrder: 1,
+          version: 0,
+          startTime: '12:00',
+          endTime: '13:00',
+          title: '國際通',
+          master: const EntryPoiInfo(
+            poiId: 1003,
+            name: '國際通',
+            lat: 26.2142,
+            lng: 127.6879,
+            type: 'sight',
+          ),
+        ),
+      ],
+    ),
+    ...releaseSmokeDays.skip(1),
+  ];
+  when(
+    () => f.trips.watchDays('okinawa'),
+  ).thenAnswer((_) => Stream.value(days));
+}
+
+/// 停留點詳情改走可手動送值的 StreamController（見 [HigFakes.entryDetail]）。
+void _entryDetailLive(HigFakes f) {
+  final c = StreamController<TimelineEntry>.broadcast();
+  addTearDown(c.close);
+  f.entryDetail = c;
+  when(
+    () => f.fixture.trips.watchEntry(
+      tripId: any(named: 'tripId'),
+      entryId: any(named: 'entryId'),
+    ),
+  ).thenAnswer((_) => c.stream);
+}
+
+const _higEntryBase = TimelineEntry(
+  id: 11,
+  sortOrder: 0,
+  version: 1,
+  startTime: '10:00',
+  endTime: '11:00',
+  title: '那霸機場',
+);
+
+/// 開停留點編輯 sheet → 改備註 → 協作者同時改了備註與起始時間（版本較新）。
+/// 備註兩邊都動 = 真衝突，起始時間只有對方動 = 直接採用（畫面上會變 9:30，當作「新版本確實進來了」的證據）。
+Future<void> _entryEditWithRemoteConflict(
+  WidgetTester tester,
+  HigFakes f,
+) async {
+  await _tapKeyPrefix(tester, 'entry-more-');
+  await _tapKeyPrefix(tester, 'entry-edit-');
+  f.entryDetail!.add(_higEntryBase);
+  await higSettle(tester);
+  await tester.enterText(find.byKey(const ValueKey('entry-edit-desc')), '我的草稿');
+  await tester.pump();
+  f.entryDetail!.add(
+    const TimelineEntry(
+      id: 11,
+      sortOrder: 0,
+      version: 2,
+      startTime: '09:30',
+      endTime: '11:00',
+      title: '那霸機場',
+      description: '協作者的備註',
+    ),
+  );
+  await higSettle(tester);
+}
+
+/// 筆記與交通沒有「即時推送」：都是第一次儲存吃 409，重新載入對方版本，第二次儲存才跳確認。
+/// 所以兩者的造法是「讓寫入回 409、讓重新載入回較新版本」，再連按兩次儲存。
+void _noteConflictStub(HigFakes f) {
+  when(
+    () => f.trips.updateNote(
+      NoteSection.flights,
+      tripId: any(named: 'tripId'),
+      rowId: any(named: 'rowId'),
+      fields: any(named: 'fields'),
+      expectedVersion: any(named: 'expectedVersion'),
+    ),
+  ).thenAnswer(
+    (_) async => throw const ApiError(
+      status: 409,
+      code: 'STALE_ENTRY',
+      message: '版本已更新',
+    ),
+  );
+  when(() => f.trips.fetchFreshNotes(any())).thenAnswer(
+    (_) async => const TripNotes(
+      flights: [TripFlight(id: 1, sortOrder: 0, version: 9, airline: '協作者航空')],
+    ),
+  );
+}
+
+void _travelConflictStub(HigFakes f) {
+  _day1WithTwoEntries(f);
+  f.segmentsNow = const [
+    TripSegment(
+      id: 50,
+      fromEntryId: 11,
+      toEntryId: 12,
+      mode: 'driving',
+      min: 10,
+      source: 'manual',
+      version: 1,
+    ),
+  ];
+  when(
+    () => f.trips.watchSegments(tripId: 'okinawa'),
+  ).thenAnswer((_) => Stream.value(f.segmentsNow));
+  when(
+    () => f.trips.updateSegment(
+      tripId: any(named: 'tripId'),
+      segmentId: any(named: 'segmentId'),
+      mode: any(named: 'mode'),
+      submode: any(named: 'submode'),
+      clearSubmode: any(named: 'clearSubmode'),
+      min: any(named: 'min'),
+      noTravel: any(named: 'noTravel'),
+      expectedVersion: any(named: 'expectedVersion'),
+    ),
+  ).thenAnswer(
+    (_) async =>
+        throw const ApiError(status: 409, code: 'STALE_ENTRY', message: '版本衝突'),
+  );
+}
+
 void _entryDetailOk(HigFakes f) =>
     when(
       () => f.fixture.trips.watchEntry(
@@ -522,6 +770,28 @@ void _entryDetailOk(HigFakes f) =>
           startTime: '10:00',
           endTime: '11:00',
           title: '那霸機場',
+        ),
+      ),
+    );
+
+/// 停留點的地點管理頁：有正選與一個備選（編輯資訊、左滑移除備選才有東西可點）。
+void _entryWithPois(HigFakes f) =>
+    when(
+      () => f.fixture.trips.watchEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.value(
+        const TimelineEntry(
+          id: 11,
+          sortOrder: 0,
+          version: 1,
+          startTime: '10:00',
+          endTime: '11:00',
+          title: '那霸機場',
+          master: EntryPoiInfo(poiId: 1001, name: '那霸機場', type: 'sight'),
+          alternates: [EntryPoiInfo(poiId: 1002, name: '首里城', type: 'sight')],
         ),
       ),
     );
@@ -618,14 +888,25 @@ List<HigScene> higScenes() => [
     '#534',
     location: '/auth/password/reset?token=demo-token',
     loggedIn: false,
-    stub: (f) => when(
-      () => f.auth.resetPassword(
-        token: any(named: 'token'),
-        password: any(named: 'password'),
-      ),
-    ).thenThrow(ApiError(status: 400, code: 'expired', message: 'expired')),
+    stub: (f) =>
+        when(
+          () => f.auth.resetPassword(
+            token: any(named: 'token'),
+            password: any(named: 'password'),
+          ),
+        ).thenThrow(
+          ApiError(
+            status: 400,
+            code: 'RESET_TOKEN_INVALID',
+            message: 'invalid',
+          ),
+        ),
     act: _submitResetPassword,
-    proof: () => find.byKey(const ValueKey('reset-password-error')),
+    // 要證明的是「連結過期」那一種錯誤，不是任何一種錯誤（code 對不上時畫面會顯示通用的「暫時無法處理」）。
+    proof: () => find.descendant(
+      of: find.byKey(const ValueKey('reset-password-error')),
+      matching: find.textContaining('重設連結無效或已過期'),
+    ),
   ),
   HigScene(
     'auth-verify-email',
@@ -693,7 +974,7 @@ List<HigScene> higScenes() => [
   const HigScene('trip-create', '#424 #426', location: '/new-trip'),
   HigScene(
     'trip-edit',
-    '#417 #424',
+    '#417 #424 #546',
     location: '/edit-trip/okinawa',
     stub: (f) => when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
       (_) async => const Trip(
@@ -706,6 +987,106 @@ List<HigScene> higScenes() => [
         endDate: '2026-11-04',
       ),
     ),
+    proof: () => find.byKey(const ValueKey('edit-done')),
+  ),
+  HigScene(
+    'trip-edit-delete-day-confirm',
+    '#560',
+    location: '/edit-trip/okinawa',
+    stub: (f) => when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
+      (_) async => const Trip(
+        id: 'okinawa',
+        name: 'okinawa',
+        title: '沖繩家族之旅',
+        description: '四天三夜',
+        lang: 'zh-TW',
+        startDate: '2026-11-01',
+        endDate: '2026-11-04',
+      ),
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'edit-delete-day-1');
+    },
+    // 標題「刪除行程日」只出現在確認框（列上的 tooltip 是「刪除 Day 1」）。
+    proof: () => find.text('刪除行程日'),
+  ),
+  HigScene(
+    'trip-edit-save-failed',
+    '#549',
+    location: '/edit-trip/okinawa',
+    stub: (f) {
+      when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
+        (_) async => const Trip(
+          id: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          description: '四天三夜',
+          lang: 'zh-TW',
+          startDate: '2026-11-01',
+          endDate: '2026-11-04',
+        ),
+      );
+      when(
+        () => f.trips.updateTrip(
+          any(),
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          lang: any(named: 'lang'),
+          published: any(named: 'published'),
+          destinations: any(named: 'destinations'),
+        ),
+      ).thenAnswer((_) async => throw _failure);
+    },
+    // 改標題後離開欄位 → 送出失敗：輸入保留，錯誤與「重試」就在標題欄位下方。
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('edit-title')),
+        '沖繩家族之旅（改）',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await higSettle(tester);
+    },
+    proof: () => find.byKey(const ValueKey('edit-retry-title')),
+  ),
+  HigScene(
+    'trip-edit-finish-blocked-confirm',
+    '#549',
+    location: '/edit-trip/okinawa',
+    stub: (f) {
+      when(() => f.trips.fetchTrip('okinawa')).thenAnswer(
+        (_) async => const Trip(
+          id: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          description: '四天三夜',
+          lang: 'zh-TW',
+          startDate: '2026-11-01',
+          endDate: '2026-11-04',
+        ),
+      );
+      when(
+        () => f.trips.updateTrip(
+          any(),
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          lang: any(named: 'lang'),
+          published: any(named: 'published'),
+          destinations: any(named: 'destinations'),
+        ),
+      ).thenAnswer((_) async => throw _failure);
+    },
+    // 改標題後離開欄位 → 送出失敗，接著按「完成」被攔截。
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('edit-title')),
+        '沖繩家族之旅（改）',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await higSettle(tester);
+      // 再按「完成」：送出仍失敗，攔截框說出未送出的欄位，選「重試」或「放棄變更」。
+      await _tapKey(tester, 'edit-done');
+    },
+    proof: () => find.text('有變更尚未送出'),
   ),
   HigScene(
     'trip-edit-load-failed',
@@ -723,15 +1104,20 @@ List<HigScene> higScenes() => [
     'trip-map-route-failed',
     '#418',
     location: '/trips/okinawa/map',
-    stub: (f) => when(
-      () => f.map.fetchRoute(
-        fromLat: any(named: 'fromLat'),
-        fromLng: any(named: 'fromLng'),
-        toLat: any(named: 'toLat'),
-        toLng: any(named: 'toLng'),
-        cancelToken: any(named: 'cancelToken'),
-      ),
-    ).thenAnswer((_) async => throw _failure),
+    stub: (f) {
+      // 路線根本不會被抓取（湊不出相鄰兩點）就看不到失敗提示，所以補第二個停留點並讓抓取失敗。
+      _day1WithTwoEntries(f);
+      when(
+        () => f.map.fetchRoute(
+          fromLat: any(named: 'fromLat'),
+          fromLng: any(named: 'fromLng'),
+          toLat: any(named: 'toLat'),
+          toLng: any(named: 'toLng'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer((_) async => throw _failure);
+    },
+    proof: () => find.byKey(const ValueKey('trip-map-route-error')),
   ),
   const HigScene('trip-notes', '#419 #422', location: '/trips/okinawa/notes'),
   const HigScene('trip-print', '#419', location: '/trips/okinawa/print'),
@@ -1060,6 +1446,52 @@ List<HigScene> higScenes() => [
         '/favorites/add-to-trip?place_id=p1&name=%E7%BE%8E%E9%BA%97%E6%B5%B7%E6%B0%B4%E6%97%8F%E9%A4%A8&lat=26.69&lng=127.88',
     proof: () => find.byKey(const ValueKey('add-to-trip-submit')),
   ),
+  // 預設行程、第 1 天、10:00–11:00 已選好；送出時後端以 409 帶 conflictWith 失敗。
+  // resolvePlace 失敗會退回只用 POI 地址組備註，不影響送出。
+  HigScene(
+    'add-to-trip-time-conflict-alert',
+    '#560',
+    location:
+        '/favorites/add-to-trip?place_id=p1&name=%E7%BE%8E%E9%BA%97%E6%B5%B7%E6%B0%B4%E6%97%8F%E9%A4%A8&lat=26.69&lng=127.88',
+    stub: (f) {
+      when(
+        () => f.poi.resolvePlace(any()),
+      ).thenAnswer((_) async => throw _failure);
+      when(
+        () => f.trips.addEntryToDay(
+          tripId: any(named: 'tripId'),
+          dayNum: any(named: 'dayNum'),
+          title: any(named: 'title'),
+          note: any(named: 'note'),
+          poiType: any(named: 'poiType'),
+          lat: any(named: 'lat'),
+          lng: any(named: 'lng'),
+          startTime: any(named: 'startTime'),
+          endTime: any(named: 'endTime'),
+          source: any(named: 'source'),
+        ),
+      ).thenAnswer(
+        (_) async => throw const ApiError(
+          status: 409,
+          code: 'CONFLICT',
+          message: 'conflict',
+          payload: {
+            'conflictWith': {
+              'entryId': 7,
+              'time': '10:30-11:30',
+              'title': '首里城',
+              'dayNum': 1,
+            },
+          },
+        ),
+      );
+    },
+    act: (tester, f) async {
+      await _tapKey(tester, 'add-to-trip-submit');
+    },
+    // 標題「時段衝突」只出現在 alert；頁面本體沒有這段文字。
+    proof: () => find.text('時段衝突'),
+  ),
   HigScene(
     'add-to-trip-missing-data',
     '#535',
@@ -1088,6 +1520,376 @@ List<HigScene> higScenes() => [
     location: '/chat',
     act: (tester, f) async => _tapKey(tester, 'chat-mic-button'),
     proof: () => find.text('使用語音輸入？'),
+  ),
+
+  // ── 彈出層補強（#531 驗證缺口：日期與時間選擇器、sheet、確認框、通知）──
+  HigScene(
+    'create-trip-date-picker',
+    '#531',
+    location: '/new-trip',
+    act: (tester, f) async => _tapKey(tester, 'create-date-start'),
+    proof: () => find.byType(CalendarDatePicker),
+  ),
+  HigScene(
+    'note-edit-sheet',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async => _tapKey(tester, 'note-add-flights'),
+    proof: () => find.text('新增航班'),
+  ),
+  HigScene(
+    'note-edit-date-picker',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async {
+      await _tapKey(tester, 'note-add-flights');
+      await _tapKey(tester, 'note-datetime-depart_at');
+    },
+    proof: () => find.byType(CalendarDatePicker),
+  ),
+  HigScene(
+    'note-edit-time-picker',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async {
+      await _tapKey(tester, 'note-add-flights');
+      await _tapKey(tester, 'note-datetime-depart_at');
+      // 日期選擇器按「完成」後，接著開時間選擇器。
+      await tester.tap(find.widgetWithText(TextButton, '完成').last);
+      await higSettle(tester);
+    },
+    proof: () => find.byWidgetPredicate(
+      (w) => w is CupertinoDatePicker && w.mode == CupertinoDatePickerMode.time,
+    ),
+  ),
+  HigScene(
+    'favorites-filter-sheet',
+    '#531',
+    location: '/favorites',
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+      await higSettle(tester);
+      await _tapKey(tester, 'favorites-sort-action');
+      await _tapKey(tester, 'favorites-filter-action');
+    },
+    proof: () => find.text('篩選收藏'),
+  ),
+  HigScene(
+    'favorites-remove-confirm',
+    '#531',
+    location: '/favorites',
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+      await higSettle(tester);
+      await _tapKeyPrefix(tester, 'favorite-remove-');
+    },
+    proof: () => find.descendant(
+      of: find.byType(CupertinoAlertDialog),
+      matching: find.textContaining('移除「'),
+    ),
+  ),
+
+  HigScene(
+    'favorites-removed-notice',
+    '#531',
+    location: '/favorites',
+    // 通知橫幅約 2.5 秒後自動消失；不等 pumpAndSettle（會等到它消失），改用固定時間的 pump。
+    settle: false,
+    stub: (f) => when(
+      () => f.fixture.favorites.deleteFavorite(any()),
+    ).thenAnswer((_) async {}),
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+      await higSettle(tester, settle: false);
+      await _tapKeyPrefixNoSettle(tester, 'favorite-remove-');
+      await tester.tap(find.widgetWithText(CupertinoDialogAction, '移除'));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    },
+    proof: () => find.textContaining('已移除'),
+  ),
+  HigScene(
+    'account-delete-preview-failed',
+    '#531',
+    location: '/trips?account=home',
+    stub: (f) => when(
+      f.fixture.auth.fetchAccountDeletionPreview,
+    ).thenAnswer((_) async => throw _failure),
+    act: (tester, f) async {
+      await _scrollDown(tester, -1200);
+      await _tapKey(tester, 'settings-delete-account');
+    },
+    proof: () => find.text('無法載入刪除資訊'),
+  ),
+
+  // ── 彈出層補強 2：不可復原動作的確認（選單觸發走 action sheet、直接按鈕走 alert）──
+  HigScene(
+    'share-revoke-confirm',
+    '#531',
+    location: '/share-trip/okinawa',
+    stub: (f) => when(() => f.share.fetchShares(any())).thenAnswer(
+      (_) async => const [
+        TripShare(id: 7, label: '給家人', visibleSections: ['timeline']),
+      ],
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'share-actions-7');
+      await _tapKey(tester, 'share-revoke-7');
+    },
+    proof: () => find.textContaining('撤銷「給家人」'),
+  ),
+  HigScene(
+    'collab-remove-member-confirm',
+    '#531',
+    location: '/collab/okinawa',
+    stub: (f) => when(() => f.fixture.collab.fetchMembers(any())).thenAnswer(
+      (_) async => const [
+        TripMember(id: 1, email: 'ray@example.com', role: 'owner'),
+        TripMember(id: 2, email: 'mei@example.com', role: 'member'),
+      ],
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'member-actions-2');
+      await _tapKey(tester, 'member-remove-2');
+    },
+    proof: () => find.textContaining('移除「mei@example.com」'),
+  ),
+  HigScene(
+    'collab-revoke-invite-confirm',
+    '#531',
+    location: '/collab/okinawa',
+    stub: (f) => when(() => f.fixture.collab.fetchInvites(any())).thenAnswer(
+      (_) async => const [
+        TripInvite(
+          id: 'i-1',
+          invitedEmail: 'kai@example.com',
+          daysRemaining: 5,
+        ),
+      ],
+    ),
+    act: (tester, f) async => _tapText(tester, '撤銷'),
+    proof: () => find.textContaining('撤銷「kai@example.com」的邀請'),
+  ),
+  HigScene(
+    'timeline-delete-entry-confirm',
+    '#531',
+    location: '/trips/okinawa',
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'entry-more-');
+      await _tapKeyPrefix(tester, 'entry-delete-');
+    },
+    proof: () => find.textContaining('相關交通時間將重新計算'),
+  ),
+
+  // ── 彈出層補強 3：帳號類的不可復原確認 ──
+  HigScene(
+    'account-biometric-disable-confirm',
+    '#531',
+    location: '/trips?account=home',
+    stub: (f) => f.biometric = _OkBiometric(),
+    act: (tester, f) async {
+      // 有生物辨識的裝置登入後會先跳 App 鎖與生物辨識登入兩個詢問，先都「稍後再說」。
+      for (var i = 0; i < 2 && find.text('稍後再說').evaluate().isNotEmpty; i++) {
+        await _tapText(tester, '稍後再說');
+      }
+      // 先開啟（驗證通過後 enabled=true），再按一次才會跳「關閉並登出」確認。
+      await _tapKey(tester, 'settings-biometric-login');
+      await _tapKey(tester, 'settings-biometric-login');
+    },
+    proof: () => find.byKey(const ValueKey('bio-disable-dialog')),
+  ),
+  HigScene(
+    'account-session-revoke-confirm',
+    '#531',
+    location: '/trips?account=sessions',
+    act: (tester, f) async {
+      await _tapKey(tester, 'account-session-row-s2');
+      await _tapKey(tester, 'account-session-revoke-s2');
+    },
+    proof: () => find.textContaining('這會立即移除此裝置的登入狀態'),
+  ),
+  HigScene(
+    'developer-app-delete-confirm',
+    '#531',
+    location: '/trips?account=developer-apps',
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'developer-app-row-');
+      await tester.drag(
+        find
+            .ancestor(
+              of: find.byKey(const Key('developer-app-name')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        const Offset(0, -2000),
+      );
+      await higSettle(tester);
+      // 場景畫面裡「停用應用程式」捲到底仍有一半在螢幕外（中心點 y=894，螢幕高 874），點不到，
+      // 所以直接觸發它的 onPressed。這個畫面現象本身記為待真機確認（修改清單 A19）。
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('developer-app-delete')),
+      );
+      button.onPressed!();
+      await higSettle(tester);
+    },
+    proof: () => find.textContaining('所有既有連線都將失效'),
+  ),
+
+  // ── 彈出層補強 4：左滑刪除確認與各表單 sheet ──
+  HigScene(
+    'note-delete-confirm',
+    '#531',
+    location: '/trips/okinawa/notes',
+    act: (tester, f) async => _swipeDeleteFirst(tester, 'note-dismiss-'),
+    proof: () => find.text('刪除筆記'),
+  ),
+  HigScene(
+    'entry-alternate-remove-confirm',
+    '#531',
+    location: '/trips/okinawa/entries/11/pois',
+    stub: _entryWithPois,
+    act: (tester, f) async => _swipeDeleteFirst(tester, 'alt-swipe-'),
+    proof: () => find.text('移除備選景點？'),
+  ),
+  HigScene(
+    'poi-info-edit-sheet',
+    '#531',
+    location: '/trips/okinawa/entries/11/pois',
+    stub: _entryWithPois,
+    act: (tester, f) async => _tapKey(tester, 'poi-edit-master'),
+    proof: () => find.text('編輯地點資訊'),
+  ),
+  HigScene(
+    'entry-edit-sheet',
+    '#531',
+    location: '/trips/okinawa',
+    stub: _entryDetailOk,
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'entry-more-');
+      await _tapKeyPrefix(tester, 'entry-edit-');
+    },
+    proof: () => find.text('編輯停留點'),
+  ),
+  // 「保留你的版本？」三處確認：停留點靠即時推送，筆記與交通靠 409 後重新載入（見各 stub 的註解）。
+  // 確認框標題在三處（筆記是「保留你的修改？」）幾乎相同，所以 act 內另外斷言背景 sheet 的專屬文字。
+  HigScene(
+    'entry-edit-sheet-remote-conflict',
+    '#559',
+    location: '/trips/okinawa',
+    stub: _entryDetailLive,
+    act: _entryEditWithRemoteConflict,
+    // 9:30 只可能來自協作者的新版本，證明遠端更新已併進表單（與草稿同時存在）。
+    proof: () => find.textContaining('9:30'),
+  ),
+  HigScene(
+    'entry-edit-overwrite-confirm',
+    '#559',
+    location: '/trips/okinawa',
+    stub: _entryDetailLive,
+    act: (tester, f) async {
+      await _entryEditWithRemoteConflict(tester, f);
+      await _tapKey(tester, 'entry-edit-submit');
+      expect(find.text('編輯停留點'), findsWidgets, reason: '背景要是停留點編輯 sheet');
+      expect(find.textContaining('9:30'), findsWidgets, reason: '對方版本已進表單');
+    },
+    proof: () => find.text('保留我的版本'),
+  ),
+  HigScene(
+    'note-edit-overwrite-confirm',
+    '#561',
+    location: '/trips/okinawa/notes',
+    stub: _noteConflictStub,
+    act: (tester, f) async {
+      await _tapKeyPrefix(tester, 'note-dismiss-flights-');
+      await tester.enterText(
+        find.byKey(const ValueKey('note-field-airline')),
+        '我的草稿',
+      );
+      await tester.pump();
+      await _tapKey(tester, 'note-edit-submit');
+      await _tapKey(tester, 'note-edit-submit');
+      expect(find.text('我的草稿'), findsWidgets, reason: '背景要是筆記編輯 sheet 且保留草稿');
+    },
+    // 筆記的確認標題是「保留你的修改？」，與停留點、交通的「保留你的版本？」不同。
+    proof: () => find.text('保留我的修改'),
+  ),
+  HigScene(
+    'travel-edit-overwrite-confirm',
+    '#561',
+    location: '/trips/okinawa',
+    stub: _travelConflictStub,
+    act: (tester, f) async {
+      await _tapKey(tester, 'travel-edit-50');
+      await tester.enterText(find.byKey(const ValueKey('travel-min')), '25');
+      await tester.pump();
+      // 協作者在我們儲存前改了交通段：之後的重新載入才會拿到 v2。
+      f.segmentsNow = const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          min: 40,
+          source: 'manual',
+          version: 2,
+        ),
+      ];
+      await _tapKey(tester, 'travel-submit');
+      await _tapKey(tester, 'travel-submit');
+      expect(find.text('交通方式'), findsWidgets, reason: '背景要是交通編輯 sheet');
+    },
+    proof: () => find.text('協作者也更新了交通設定。繼續會以你目前的交通方式與分鐘數覆蓋對方版本。'),
+  ),
+  HigScene(
+    'travel-edit-sheet',
+    '#531',
+    location: '/trips/okinawa',
+    stub: _day1WithTwoEntries,
+    act: (tester, f) async => _tapKeyPrefix(tester, 'travel-'),
+    proof: () => find.text('交通方式'),
+  ),
+  HigScene(
+    'share-edit-sheet',
+    '#531',
+    location: '/share-trip/okinawa',
+    stub: (f) => when(() => f.share.fetchShares(any())).thenAnswer(
+      (_) async => const [
+        TripShare(id: 7, label: '給家人', visibleSections: ['timeline']),
+      ],
+    ),
+    act: (tester, f) async {
+      await _tapKey(tester, 'share-actions-7');
+      await _tapKey(tester, 'share-edit-btn-7');
+    },
+    proof: () => find.byKey(const ValueKey('share-edit-label')),
+  ),
+  HigScene(
+    'explore-custom-region-sheet',
+    '#531',
+    location: '/favorites/explore',
+    act: (tester, f) async {
+      await _tapText(tester, '全部地區 ▾');
+      await _tapText(tester, '自訂地區…');
+    },
+    proof: () => find.byKey(const ValueKey('explore-custom-region-field')),
+  ),
+  HigScene(
+    'chat-ai-consent-sheet',
+    '#531',
+    location: '/chat',
+    stub: (f) => when(
+      f.fixture.auth.fetchAiAuthorization,
+    ).thenAnswer((_) async => false),
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('chat-input')),
+        '幫我排 Day 1',
+      );
+      await tester.pump();
+      await _tapKey(tester, 'chat-send');
+    },
+    proof: () => find.byKey(const ValueKey('ai-consent-title')),
   ),
 
   // ── 邀請 ──
@@ -1234,6 +2036,32 @@ List<HigScene> higScenes() => [
       f.fixture.pendingCountStream.add(2);
     },
   ),
+  // 離線橫幅在持久化衝突紀錄非空時出現「N 筆同步衝突」；紀錄直接寫進場景的
+  // cacheStore（與 logout_confirm 場景同做法，不碰生產程式碼），再從橫幅點進 sheet。
+  HigScene(
+    'sync-conflict-sheet',
+    '#558',
+    location: '/trips',
+    act: (tester, f) async {
+      await _seedConflicts(tester, 1);
+      await _tapText(tester, '檢視');
+    },
+    // 「套用所選版本」只出現在 sheet 標題列，橫幅與頁面上沒有。
+    proof: () => find.text('套用所選版本'),
+  ),
+  HigScene(
+    'sync-conflict-sheet-many',
+    '#558',
+    location: '/trips',
+    act: (tester, f) async {
+      await _seedConflicts(tester, 5);
+      await _tapText(tester, '檢視');
+      // 先選一筆，讓「套用所選版本」進入可按狀態。
+      await _tapKey(tester, 'conflict-keep-ours-c0');
+    },
+    // 第二筆衝突的按鈕只在多筆時才存在（單筆版只有 c0）。
+    proof: () => find.byKey(const ValueKey('conflict-keep-ours-c1')),
+  ),
   const HigScene(
     'ax-welcome-2x',
     '#422',
@@ -1348,11 +2176,16 @@ List<HigScene> higScenes() => [
     location: '/trips/okinawa/print',
     textScale: 2.0,
   ),
-  const HigScene(
+  HigScene(
     'ax-favorites-2x',
     '#422',
     location: '/favorites',
     textScale: 2.0,
+    act: (tester, f) async {
+      f.favoritesStream.add(releaseSmokeFavorites);
+    },
+    // 沒有資料流就只會拍到載入骨架；要確認真的渲染出收藏清單。
+    proof: () => find.text('暖暮拉麵'),
   ),
   const HigScene(
     'ax-explore-2x',

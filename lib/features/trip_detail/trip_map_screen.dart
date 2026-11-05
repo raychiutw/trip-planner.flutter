@@ -892,6 +892,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           left: TpSpacing.s3,
           right: TpSpacing.s3,
           child: TpHorizontalSelector<int>(
+            semanticLabel: '行程日期',
             key: const ValueKey('trip-map-day-selector'),
             value: _selectedTabIndex,
             options: [
@@ -1140,7 +1141,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                         Text(
                           stop.entry.title,
                           key: ValueKey('entry-card-title-${stop.entry.id}'),
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          // 緊湊的底部 accessory：高度是依 15／12pt 校準的（_poiAccessoryHeight），
+                          // 這張卡維持原字級，不隨 titleMedium／bodySmall 上移。
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             color: primaryColor,
                             fontWeight: current
                                 ? FontWeight.w700
@@ -1161,8 +1164,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                               ),
                             ],
                           ),
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: theme.textTheme.labelMedium?.copyWith(
                             color: secondaryColor,
+                            fontWeight: FontWeight.w400,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),

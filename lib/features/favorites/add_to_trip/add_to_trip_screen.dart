@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart' show GoRouter;
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
@@ -543,13 +544,28 @@ class _AddToTripRouteState extends StatelessWidget {
           ? const AppListLoadingSkeleton(
               key: ValueKey('add-to-trip-route-loading'),
             )
-          : Center(
-              child: Padding(
-                padding: const EdgeInsets.all(TpSpacing.s6),
-                child: Text(message ?? '載入失敗', textAlign: TextAlign.center),
+          : Semantics(
+              liveRegion: true,
+              container: true,
+              // 重用專案的錯誤態元件（圖示、原因、下一步動作），不讓人卡在只有一行字的死路。
+              child: TpStateView(
+                kind: TpStateKind.error,
+                title: message ?? '載入失敗',
+                actionLabel: '返回',
+                onAction: () => _leave(context),
               ),
             ),
     );
+  }
+
+  /// 有上一頁就 pop；直接開啟（深連結）沒有上一頁時回收藏，避免按鈕沒反應。
+  static void _leave(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      GoRouter.maybeOf(context)?.go('/favorites');
+    }
   }
 }
 

@@ -194,6 +194,29 @@ void main() {
     ).thenAnswer((_) async => 'cln-trip-1');
   });
 
+  testWidgets('一般字級：列印、PDF 與複製鈕同一列；大字級：複製鈕換到獨立一列（#544 A9）', (tester) async {
+    Rect rect(String key) => tester.getRect(find.byKey(ValueKey(key)));
+
+    await pumpScreen(tester);
+    expect(
+      rect('public-share-clone').center.dy,
+      closeTo(rect('public-share-print').center.dy, 1),
+      reason: '一般字級維持同一列',
+    );
+
+    await pumpScreen(tester, textScale: 2);
+    expect(
+      rect('public-share-clone').top,
+      greaterThanOrEqualTo(rect('public-share-print').bottom),
+      reason: '大字級下主按鈕要在圖示鈕之下，不與兩顆圖示鈕擠同列而折出孤字',
+    );
+    expect(
+      rect('public-share-clone').width,
+      greaterThan(rect('public-share-print').width * 4),
+      reason: '獨立一列後撐滿寬度',
+    );
+  });
+
   testWidgets('長中文筆記在窄寬大字級可捲到底並開啟與複製', (tester) async {
     final launched = <String>[];
     String? copied;

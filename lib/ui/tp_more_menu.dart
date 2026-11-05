@@ -493,7 +493,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     );
   }
 
-  /// 唯一的 role → 顏色映射點；清單項目用 bodyLarge，快捷動作短文字用 bodyMedium。
+  /// 唯一的 role → 顏色映射點；清單項目用 bodyLarge（17），快捷動作短文字用 bodySmall（13，三格並排放得下）。
   TextStyle _itemStyle(
     BuildContext context,
     TpActionItem<T> item, {
@@ -501,7 +501,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   }) {
     final theme = Theme.of(context);
     final base = quick
-        ? theme.textTheme.bodyMedium!
+        ? theme.textTheme.bodySmall!
         : theme.textTheme.bodyLarge!;
     return base.copyWith(
       fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,

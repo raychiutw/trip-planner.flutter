@@ -21,6 +21,7 @@ import '../../models/note_content.dart';
 import '../trip_detail/note_content_field.dart';
 import '../../models/share.dart';
 import '../../theme/tokens.dart';
+import '../../ui/dynamic_type.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_state_view.dart';
 import '../trip_detail/trip_pdf_service.dart';
@@ -201,8 +202,9 @@ class _ShareContent extends StatelessWidget {
       children: [
         _ShareHero(share: share),
         const SizedBox(height: TpSpacing.s4),
-        Row(
-          children: [
+        _ShareActions(
+          largeText: isLargeTextScale(context),
+          iconButtons: [
             IconButton.filledTonal(
               key: const ValueKey('public-share-print'),
               tooltip: '列印',
@@ -227,28 +229,24 @@ class _ShareContent extends StatelessWidget {
                   : const Icon(CupertinoIcons.doc_text),
             ),
             const SizedBox(width: TpSpacing.s2),
-            Expanded(
-              child: FilledButton.icon(
-                key: const ValueKey('public-share-clone'),
-                onPressed: cloning ? null : onClone,
-                icon: cloning
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(CupertinoIcons.doc_on_doc),
-                label: Text(
-                  cloning
-                      ? '複製中…'
-                      : isLoggedIn
-                      ? '複製到我的行程'
-                      : '登入後複製行程',
-                ),
-              ),
-            ),
           ],
+          cloneButton: FilledButton.icon(
+            key: const ValueKey('public-share-clone'),
+            onPressed: cloning ? null : onClone,
+            icon: cloning
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                  )
+                : const Icon(CupertinoIcons.doc_on_doc),
+            label: Text(
+              cloning
+                  ? '複製中…'
+                  : isLoggedIn
+                  ? '複製到我的行程'
+                  : '登入後複製行程',
+            ),
+          ),
         ),
         if (cloneError != null) ...[
           const SizedBox(height: TpSpacing.s3),
@@ -696,4 +694,40 @@ String _localizedTime(BuildContext context, String value) {
     TimeOfDay(hour: hour, minute: minute),
     alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
   );
+}
+
+/// 列印、PDF 兩顆圖示鈕加上主要的「複製」鈕。
+///
+/// 一般字級同一列；大字級（Dynamic Type AX）單列塞不下，複製鈕的文字會折出孤字，
+/// 所以主按鈕換到獨立一列撐滿寬度，圖示鈕留在上方一列（#544 A9）。
+class _ShareActions extends StatelessWidget {
+  const _ShareActions({
+    required this.largeText,
+    required this.iconButtons,
+    required this.cloneButton,
+  });
+
+  final bool largeText;
+  final List<Widget> iconButtons;
+  final Widget cloneButton;
+
+  @override
+  Widget build(BuildContext context) {
+    if (largeText) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: iconButtons),
+          const SizedBox(height: TpSpacing.s2),
+          cloneButton,
+        ],
+      );
+    }
+    return Row(
+      children: [
+        ...iconButtons,
+        Expanded(child: cloneButton),
+      ],
+    );
+  }
 }

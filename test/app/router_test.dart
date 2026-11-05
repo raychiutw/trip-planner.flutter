@@ -368,6 +368,47 @@ void main() {
     );
   });
 
+  testWidgets('停留點新增／編輯／複製／移動是 shell 外整頁 modal,沒有分頁列', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/trips/trip-1');
+    await tester.pumpAndSettle();
+    expect(find.byType(AppleRootTabBar), findsOneWidget, reason: '對照:行程頁有分頁列');
+    for (final entry in {
+      '/trips/trip-1/entries/new?day=1&mode=search': EntryAddRouteScreen,
+      '/trip/trip-1/add-stop': EntryAddRouteScreen,
+      '/trips/trip-1/entries/11/edit': EntryEditRouteScreen,
+      '/trip/trip-1/stop/11/edit': EntryEditRouteScreen,
+      '/trips/trip-1/entries/11/copy': EntryActionRouteScreen,
+      '/trip/trip-1/stop/11/copy': EntryActionRouteScreen,
+      '/trips/trip-1/entries/11/move': EntryActionRouteScreen,
+      '/trip/trip-1/stop/11/move': EntryActionRouteScreen,
+    }.entries) {
+      router.go(entry.key);
+      await tester.pumpAndSettle();
+      expect(find.byType(entry.value), findsOneWidget, reason: entry.key);
+      expect(find.byType(AppleRootTabBar), findsNothing, reason: entry.key);
+    }
+    // 返回堆疊:push 進來,pop 回到進入前的行程頁(分頁列回來)。
+    router.go('/trips/trip-1');
+    await tester.pumpAndSettle();
+    unawaited(router.push('/trips/trip-1/entries/11/edit'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(EntryEditRouteScreen), findsNothing);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
+  });
+
   testWidgets('重設新 token 隔離舊請求與成功狀態', (tester) async {
     final auth = _MockAuthRepository();
     final pending = Completer<String?>();
@@ -1295,7 +1336,7 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('新增停留點'), findsWidgets);
-    expect(find.byType(AppleRootTabBar), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsNothing);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

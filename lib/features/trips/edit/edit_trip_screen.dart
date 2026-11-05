@@ -1,5 +1,5 @@
-/// 編輯行程:標題 + 目的地 + 日期/天數 + 描述 + 語言 + 發布 + 明確儲存。
-/// 儲存成功且沒有後續輸入時才返回。
+/// 編輯行程:標題 + 目的地 + 日期/天數 + 描述 + 語言 + 發布,即時儲存(見 GLOSSARY)。
+/// 只有「完成」:未送出的變更會先送完,失敗則攔截,讓使用者重試或放棄。
 library;
 
 import 'dart:async';
@@ -32,39 +32,148 @@ class EditTripScreen extends ConsumerStatefulWidget {
 }
 
 class _EditTripScreenState extends ConsumerState<EditTripScreen> {
-  final _dismissController = AppUnsavedChangesController();
+  final _titleCtl = TextEditingController();
+  final _descCtl = TextEditingController();
+  final _titleFocus = FocusNode();
+  final _descFocus = FocusNode();
+  bool _seeded = false;
+  bool _discard = false;
+  bool _finishing = false;
+
+  EditTripController get _ctrl =>
+      ref.read(editTripControllerProvider(widget.tripId).notifier);
+
+  @override
+  void initState() {
+    super.initState();
+    // 文字欄位失焦即送出;打字中不送。
+    _titleFocus.addListener(_onBlur(_titleFocus));
+    _descFocus.addListener(_onBlur(_descFocus));
+  }
+
+  VoidCallback _onBlur(FocusNode node) => () {
+    if (!node.hasFocus) unawaited(_ctrl.save());
+  };
+
+  @override
+  void dispose() {
+    _titleCtl.dispose();
+    _descCtl.dispose();
+    _titleFocus.dispose();
+    _descFocus.dispose();
+    super.dispose();
+  }
+
+  /// 載入完成後把初值灌進欄位一次;之後欄位文字由使用者主導。
+  void _seed(EditTripState state) {
+    if (state.loading || state.loadFailed) {
+      _seeded = false;
+      return;
+    }
+    if (_seeded) return;
+    _seeded = true;
+    _titleCtl.text = state.title;
+    _descCtl.text = state.description;
+  }
+
+  /// 「完成」與系統返回共用:先把未送出的變更送完;失敗就攔截讓使用者選重試或放棄。
+  Future<void> _finish() async {
+    if (_finishing) return;
+    _finishing = true;
+    try {
+      final ctrl = _ctrl;
+      if (ref.read(editTripControllerProvider(widget.tripId)).titleBlank) {
+        ctrl.restoreTitle();
+        _titleCtl.text = ref
+            .read(editTripControllerProvider(widget.tripId))
+            .title;
+      }
+      while (!await ctrl.flush()) {
+        if (!mounted) return;
+        final fields = ctrl.unsentFields.map((f) => f.label).join('、');
+        final discard = await showAppDestructiveConfirm(
+          context,
+          source: TpDestructiveConfirmSource.direct,
+          title: '有變更尚未送出',
+          message: '$fields還沒有送出成功。要再試一次，還是放棄這些變更並離開？',
+          confirmLabel: '放棄變更',
+          cancelLabel: '重試',
+        );
+        if (!mounted) return;
+        if (discard) {
+          setState(() => _discard = true);
+          break;
+        }
+      }
+      if (!mounted) return;
+      HapticFeedback.lightImpact();
+      // 等 PopScope 依最新狀態重建,再真的離開。
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) closeAppRouteOrSheet(context);
+    } finally {
+      _finishing = false;
+    }
+  }
+
+  /// 欄位旁的就地錯誤:只出現在送出失敗且仍未生效的欄位,附重試。
+  /// 多個欄位同時失敗時只在畫面最上方的那個欄位顯示一份(錯誤是整體的,重試也一律送全部)。
+  Widget _fieldError(EditTripState state, EditField field) {
+    final ctrl = _ctrl;
+    final error = ctrl.saveError;
+    // EditField 宣告順序即畫面由上到下的順序。
+    final unsent = EditField.values.where(ctrl.unsentFields.contains);
+    if (error == null || unsent.isEmpty || unsent.first != field) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: TpSpacing.s1),
+      child: Semantics(
+        liveRegion: true,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                error,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+            TextButton(
+              key: ValueKey('edit-retry-${field.name}'),
+              onPressed: state.saving ? null : () => unawaited(ctrl.save()),
+              child: const Text('重試'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 離散操作(切換、選擇、增減目的地):改完立刻送。
+  void _commitNow(VoidCallback change) {
+    change();
+    unawaited(_ctrl.save());
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(editTripControllerProvider(widget.tripId));
     final ctrl = ref.read(editTripControllerProvider(widget.tripId).notifier);
+    _seed(state);
 
-    return AppUnsavedChangesGuard(
-      controller: _dismissController,
-      hasChanges: ctrl.hasChanges,
-      dismissalEnabled: !state.saving,
+    return PopScope(
+      canPop: _discard || !ctrl.hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_finish());
+      },
       child: Scaffold(
         appBar: TpAppBar(
           role: state.loadFailed
               ? TpAppBarRole.modalContent
-              : TpAppBarRole.modalForm,
+              : TpAppBarRole.modalInstant,
           title: const Text('編輯行程'),
-          onCancel: state.loadFailed ? null : _dismissController.requestPop,
-          primaryActionLabel: state.loadFailed ? null : '儲存',
-          primaryActionKey: const ValueKey('edit-save'),
-          primaryActionEnabled: ctrl.hasChanges && !state.saving,
-          onPrimaryAction: state.loadFailed
-              ? null
-              : () async {
-                  final saved = await ctrl.save();
-                  if (!mounted || saved == null) return;
-                  HapticFeedback.lightImpact();
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && ctrl.canFinish(saved)) {
-                      closeAppRouteOrSheet(context);
-                    }
-                  });
-                },
+          primaryActionLabel: state.loadFailed ? null : '完成',
+          primaryActionKey: const ValueKey('edit-done'),
+          onPrimaryAction: state.loadFailed ? null : () => unawaited(_finish()),
         ),
         bottomNavigationBar: state.saving
             ? Padding(
@@ -90,28 +199,46 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
             : ListView(
                 padding: const EdgeInsets.all(TpSpacing.s4),
                 children: [
-                  const Text('標題、目的地、描述、語言與發布狀態需按「儲存」才會生效。'),
+                  const Text('標題與描述離開欄位時自動儲存；目的地、語言與發布狀態改了就會儲存。'),
                   const SizedBox(height: TpSpacing.s3),
                   _title(context, '行程標題'),
                   TextFormField(
                     key: const ValueKey('edit-title'),
-                    initialValue: state.title,
+                    controller: _titleCtl,
+                    focusNode: _titleFocus,
                     decoration: const InputDecoration(
                       hintText: '例如:2026 沖繩自駕',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: ctrl.setTitle,
                   ),
+                  if (state.titleBlank)
+                    Padding(
+                      padding: const EdgeInsets.only(top: TpSpacing.s1),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          '標題不能是空白',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                  _fieldError(state, EditField.title),
                   const SizedBox(height: TpSpacing.s5),
                   _title(context, '目的地'),
                   DestinationPicker(
                     destinations: state.destinations,
-                    onAdd: ctrl.addDestination,
-                    onRemove: ctrl.removeDestination,
-                    onReorder: ctrl.reorderDestination,
+                    onAdd: (d) => _commitNow(() => ctrl.addDestination(d)),
+                    onRemove: (i) =>
+                        _commitNow(() => ctrl.removeDestination(i)),
+                    onReorder: (o, n) =>
+                        _commitNow(() => ctrl.reorderDestination(o, n)),
                   ),
+                  _fieldError(state, EditField.destinations),
                   const SizedBox(height: TpSpacing.s5),
-                  const Text('日期平移與天數新增、刪除會立即生效，取消不會還原。'),
+                  const Text('日期平移與天數新增、刪除會立即生效；刪除天數無法復原。'),
                   const SizedBox(height: TpSpacing.s3),
                   _title(context, '出發日期'),
                   _ShiftDateSection(
@@ -159,7 +286,8 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                   _title(context, '描述（用於 SEO,選填）'),
                   TextFormField(
                     key: const ValueKey('edit-desc'),
-                    initialValue: state.description,
+                    controller: _descCtl,
+                    focusNode: _descFocus,
                     minLines: 2,
                     maxLines: 5,
                     maxLength: 2000,
@@ -168,14 +296,16 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     ),
                     onChanged: ctrl.setDescription,
                   ),
+                  _fieldError(state, EditField.description),
                   const SizedBox(height: TpSpacing.s4),
                   TpPickerField<String>(
                     key: const ValueKey('edit-lang'),
                     label: '顯示語言',
                     value: state.lang,
                     options: _langs,
-                    onChanged: ctrl.setLang,
+                    onChanged: (v) => _commitNow(() => ctrl.setLang(v)),
                   ),
+                  _fieldError(state, EditField.lang),
                   const SizedBox(height: TpSpacing.s2),
                   if (state.canTogglePublished)
                     SwitchListTile.adaptive(
@@ -184,12 +314,10 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                       subtitle: const Text('開啟時，任何知道網址的人都能看到完整行程，包含訂房與緊急聯絡人。'),
                       contentPadding: EdgeInsets.zero,
                       value: state.published,
-                      onChanged: ctrl.setPublished,
+                      onChanged: (v) => _commitNow(() => ctrl.setPublished(v)),
                     ),
-                  for (final error in [
-                    ctrl.saveError,
-                    state.error,
-                  ].nonNulls) ...[
+                  _fieldError(state, EditField.published),
+                  for (final error in [state.error].nonNulls) ...[
                     const SizedBox(height: TpSpacing.s2),
                     Semantics(
                       liveRegion: true,

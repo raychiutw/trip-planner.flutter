@@ -180,6 +180,14 @@ Future<TimeOfDay?> showAppTimePicker(
   );
 }
 
+/// 確認框破壞性動作的文字樣式：Tripline 破壞性紅（#551）。
+///
+/// Cupertino 的 `isDestructiveAction` 在 alert 上固定畫 systemRed（淺色對白底
+/// 約 3.0～3.4:1），顏色來源在套件內、不吃 Theme；以 child 的 style 覆寫，
+/// 保留 `isDestructiveAction` 的語意與 adaptive 結構。
+TextStyle tpDestructiveActionStyle(BuildContext context) =>
+    TextStyle(color: Theme.of(context).colorScheme.error);
+
 /// 顯示 HIG「確認 / 取消」對話框,回傳使用者是否確認。
 ///
 /// 使用者關閉(點外部/返回)視同取消,回傳 `false`。
@@ -206,7 +214,12 @@ Future<bool> showAppConfirm(
           isDestructiveAction: isDestructive,
           isDefaultAction: !isDestructive,
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: Text(confirmLabel),
+          child: Text(
+            confirmLabel,
+            style: isDestructive
+                ? tpDestructiveActionStyle(dialogContext)
+                : null,
+          ),
         ),
       ],
     ),
@@ -1168,6 +1181,7 @@ class AppSearchField extends StatefulWidget {
     this.fieldKey,
     required this.controller,
     required this.placeholder,
+    this.semanticLabel,
     this.onChanged,
     this.onSubmitted,
     this.debounce,
@@ -1180,6 +1194,9 @@ class AppSearchField extends StatefulWidget {
   final Key? fieldKey;
   final TextEditingController controller;
   final String placeholder;
+
+  /// 外層可點擊節點的語意名稱；只有外層節點沒有名稱的畫面才需要傳（見 [build]）。
+  final String? semanticLabel;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final Duration? debounce;
@@ -1217,7 +1234,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoSearchTextField(
+    final field = CupertinoSearchTextField(
       key: widget.fieldKey,
       controller: widget.controller,
       placeholder: widget.placeholder,
@@ -1230,6 +1247,11 @@ class _AppSearchFieldState extends State<AppSearchField> {
       enabled: widget.enabled,
       backgroundColor: widget.embedded ? Colors.transparent : null,
     );
+    final label = widget.semanticLabel;
+    // 有些版面下，CupertinoSearchTextField 外層的可點擊節點沒有名稱（探索頁實測：
+    // 外層 [tap] 節點 label 為空，內層文字欄才有 hint），VoiceOver 會停在一個讀不出名稱的元素上。
+    // 只在需要的畫面明確傳入；全域一律加 label 時，其他畫面（外層節點已合併）會把名稱念兩遍（#544 A11）。
+    return label == null ? field : Semantics(label: label, child: field);
   }
 }
 

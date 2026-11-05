@@ -604,70 +604,79 @@ class _FindingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final target = finding.actionTarget;
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TpRadius.md),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: TpSpacing.s2,
-              runSpacing: TpSpacing.s2,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _SeverityChip(severity: finding.severity),
-                if (finding.dimension != null)
-                  TpTag(label: _dimensionLabel(finding.dimension!)),
+    // 外層 Column 是 crossAxisAlignment.start，Card 會依內容縮寬；撐滿才讓每張卡同寬。
+    return SizedBox(
+      width: double.infinity,
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TpRadius.md),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: TpSpacing.s2,
+                runSpacing: TpSpacing.s2,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _SeverityChip(severity: finding.severity),
+                  if (finding.dimension != null)
+                    TpTag(label: _dimensionLabel(finding.dimension!)),
+                ],
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                finding.title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Text(finding.description),
+              if (finding.suggestion != null) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(TpSpacing.s3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(TpRadius.md),
+                  ),
+                  child: Text('建議：${finding.suggestion}'),
+                ),
               ],
-            ),
-            const SizedBox(height: TpSpacing.s2),
-            Text(finding.title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: TpSpacing.s2),
-            Text(finding.description),
-            if (finding.suggestion != null) ...[
-              const SizedBox(height: TpSpacing.s3),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(TpSpacing.s3),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(TpRadius.md),
-                ),
-                child: Text('建議：${finding.suggestion}'),
-              ),
-            ],
-            if (target?.entryId != null || target?.day != null) ...[
-              const SizedBox(height: TpSpacing.s3),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    final entryId = target?.entryId;
-                    if (entryId != null) {
+              if (target?.entryId != null || target?.day != null) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final entryId = target?.entryId;
+                      if (entryId != null) {
+                        final encodedTripId = Uri.encodeComponent(tripId);
+                        context.push(
+                          '/trips/$encodedTripId/entries/$entryId/edit',
+                        );
+                        return;
+                      }
+                      final day = target?.day;
                       final encodedTripId = Uri.encodeComponent(tripId);
-                      context.go('/trips/$encodedTripId/entries/$entryId/edit');
-                      return;
-                    }
-                    final day = target?.day;
-                    final encodedTripId = Uri.encodeComponent(tripId);
-                    context.go(
-                      Uri(
-                        path: '/trips/$encodedTripId',
-                        queryParameters: day == null
-                            ? null
-                            : {'day': day.toString()},
-                      ).toString(),
-                    );
-                  },
-                  icon: const Icon(CupertinoIcons.arrow_right),
-                  label: Text(_entryTargetLabel(target)),
+                      context.go(
+                        Uri(
+                          path: '/trips/$encodedTripId',
+                          queryParameters: day == null
+                              ? null
+                              : {'day': day.toString()},
+                        ).toString(),
+                      );
+                    },
+                    icon: const Icon(CupertinoIcons.arrow_right),
+                    label: Text(_entryTargetLabel(target)),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

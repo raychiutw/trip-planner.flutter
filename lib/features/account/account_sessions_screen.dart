@@ -229,7 +229,9 @@ class _SessionsInfoPanel extends StatelessWidget {
       key: const Key('account-sessions-oauth-note'),
       padding: const EdgeInsets.all(TpSpacing.s4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        // 說明卡裡有品牌色的連結按鈕；底色用 grouped 那一階，淺色下品牌色對它 4.9:1，
+        // 對最高階填充（#D1D1D6）只有 3.62:1，達不到小字 4.5:1（#544 A5）。
+        color: colorScheme.surfaceContainerLow,
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
