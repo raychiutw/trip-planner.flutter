@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/error_message.dart';
+import '../../../models/ai_data_consent.dart';
 import '../../../models/note_section.dart';
 import '../../../models/notes.dart';
 import '../../../models/trip_request.dart';
@@ -278,6 +279,9 @@ class NotesAiController extends Notifier<NotesAiState> {
   }
 
   /// 守衛只看**這一種**:全域守衛會讓「按鈕按得下去但什麼都沒送出」。
+  ///
+  /// 缺 AI 資料同意被 server 擋下時不是失敗：這一種退回閒置（沒有 job），並丟
+  /// [AiConsentRequiredException] 讓畫面就地同意後重試。
   Future<void> generate(NoteGenerationType type) async {
     if (_disposed || state.of(type).isBusy) return;
     final run = _run;
@@ -308,6 +312,12 @@ class NotesAiController extends Notifier<NotesAiState> {
       _watch(job.requestId, type);
     } catch (error) {
       // 攔 Error 與 Exception 兩類:解析非預期回應丟的是 TypeError。
+      if (error is AiConsentRequiredException) {
+        if (!_disposed && run == _run) {
+          _set(type, (j) => j.copyWith(phase: NotesAiPhase.idle));
+        }
+        rethrow;
+      }
       if (_disposed || run != _run) return;
       if (error is ApiError && error.code == notesAiJobActiveCode) {
         // 後端說同一份文件已經有 job 在跑 —— 那正是使用者要的結果,不是失敗。

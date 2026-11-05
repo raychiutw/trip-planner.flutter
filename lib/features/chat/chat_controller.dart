@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../api/requests_repository.dart';
+import '../../models/ai_data_consent.dart';
 import '../../models/trip_request.dart';
 import '../../models/user.dart';
 import '../favorites/favorites_providers.dart';
@@ -228,6 +229,9 @@ class ChatController extends Notifier<ChatState> {
   }
 
   /// 送訊息:樂觀加 temp row → POST 換真 row → 非終態交給 lifecycle。
+  ///
+  /// 缺 AI 資料同意被 server 擋下時，拿掉 temp row 並丟 [AiConsentRequiredException]
+  /// （不是送出失敗，不顯示錯誤橫幅；server 沒有建立 request），由呼叫端就地同意後重送。
   Future<void> send(String text) async {
     final t = text.trim();
     if (t.isEmpty || state.sending) return;
@@ -260,6 +264,17 @@ class ChatController extends Notifier<ChatState> {
       } else {
         _watch(row.id);
       }
+    } on AiConsentRequiredException {
+      if (!_disposed) {
+        state = state.copyWith(
+          requests: [
+            for (final r in state.requests)
+              if (r.id != temp.id) r,
+          ],
+          sending: false,
+        );
+      }
+      rethrow;
     } on Exception catch (e) {
       if (_disposed) return;
       state = state.copyWith(

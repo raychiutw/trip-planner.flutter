@@ -17,7 +17,10 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
+import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/note_section.dart';
+import 'package:tripline/models/user.dart';
+import '../../helpers/ai_data_consent_fixtures.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -25,6 +28,12 @@ import 'package:tripline/theme/app_theme.dart';
 class _MockTripRepository extends Mock implements TripRepository {}
 
 class _MockRequestsRepository extends Mock implements RequestsRepository {}
+
+class _StubAuth extends AuthNotifier {
+  @override
+  Future<UserInfo?> build() async =>
+      const UserInfo(id: 'u1', email: 'a@b.c', emailVerified: true);
+}
 
 TripNotes _sampleNotes() {
   return const TripNotes(
@@ -261,6 +270,7 @@ Widget _buildScreen(
   TextScaler? textScaler,
   bool disableAnimations = false,
   bool stubAiState = true,
+  MockAiDataConsentRepo? consent,
 }) {
   // ai-state 對絕大多數測試是背景雜訊:預設成功回空,只有專門測隔離的那條
   // 傳 `stubAiState: false` 自己 stub 成 throw。放這裡而不是每條測試各補一次。
@@ -285,6 +295,10 @@ Widget _buildScreen(
       tripRepositoryProvider.overrideWithValue(effectiveRepo),
       if (requestsRepo != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepo),
+      if (consent != null) ...[
+        authStateProvider.overrideWith(_StubAuth.new),
+        aiDataConsentRepositoryProvider.overrideWithValue(consent),
+      ],
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.light(),
@@ -2348,5 +2362,160 @@ void main() {
     expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsOneWidget);
     expect(_aiButtonAction(tester, 'note-ai-tips'), isNull);
     expect(_aiButtonAction(tester, 'note-ai-emergency'), isNotNull);
+  });
+
+  group('AI 資料同意', () {
+    late _MockTripRepository repo;
+    late _MockRequestsRepository requestsRepo;
+    late MockAiDataConsentRepo consent;
+
+    const tipsJob = TripNoteAiJob(
+      jobId: 7,
+      requestId: 99,
+      tripId: 'trip-1',
+      docType: NoteGenerationType.tips,
+    );
+
+    setUp(() {
+      repo = _MockTripRepository();
+      requestsRepo = _MockRequestsRepository();
+      consent = MockAiDataConsentRepo();
+      when(
+        () => requestsRepo.watchRequestEvents(99),
+      ).thenAnswer((_) => const Stream<TripRequestEvent>.empty());
+    });
+
+    Future<void> tapTips(WidgetTester tester) async {
+      await tester.pumpWidget(
+        _buildScreen(
+          _sampleNotes(),
+          repo: repo,
+          requestsRepo: requestsRepo,
+          consent: consent,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('行前須知'));
+      await tester.pumpAndSettle();
+      final button = find.byKey(const ValueKey('note-ai-tips'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      // 生成中有永不停止的 spinner，不能 pumpAndSettle。
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    void verifyNoGenerate() => verifyNever(
+      () => repo.generateNotes(any(), tripId: any(named: 'tripId')),
+    );
+
+    testWidgets('旗標關閉：不跳資料同意，直接生成', (tester) async {
+      when(consent.fetch).thenAnswer(
+        (_) async =>
+            aiConsentFixture(AiDataConsentStatus.none, enforced: false),
+      );
+      when(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).thenAnswer((_) async => tipsJob);
+      await tapTips(tester);
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      verify(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).called(1);
+    });
+
+    testWidgets('未同意：先跳資料同意，同意前不發 AI mutation；取消後不生成', (tester) async {
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.stale));
+      await tapTips(tester);
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+      verifyNoGenerate();
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-cancel')));
+      await tester.pumpAndSettle();
+      verifyNoGenerate();
+      verifyNever(() => consent.accept(any()));
+      expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
+    });
+
+    testWidgets('同意 → 接續生成恰好一次', (tester) async {
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.none));
+      when(
+        () => consent.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      when(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).thenAnswer((_) async => tipsJob);
+      await tapTips(tester);
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pump();
+      await tester.pump();
+
+      verify(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).called(1);
+    });
+
+    testWidgets('server 403 送出者缺同意：就地同意後只重啟一次，中間不顯示失敗', (tester) async {
+      var reads = 0;
+      when(consent.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? aiConsentFixture(AiDataConsentStatus.valid, enforced: false)
+            : aiConsentFixture(AiDataConsentStatus.none),
+      );
+      when(
+        () => consent.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      var attempt = 0;
+      when(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).thenAnswer((_) async {
+        if (attempt++ == 0) throw submitterGate;
+        return tipsJob;
+      });
+      await tapTips(tester);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('生成失敗'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pump();
+      await tester.pump();
+
+      verify(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).called(2);
+    });
+
+    testWidgets('旅伴被 owner 擋下：顯示 owner 尚未同意，不留 pending、不顯示失敗', (tester) async {
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      when(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).thenThrow(ownerGate);
+      await tapTips(tester);
+
+      expect(find.textContaining('行程擁有者尚未同意 AI 資料處理'), findsWidgets);
+      expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
+      expect(find.textContaining('生成失敗'), findsNothing);
+      verify(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).called(1);
+    });
   });
 }

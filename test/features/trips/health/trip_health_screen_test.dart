@@ -10,7 +10,10 @@ import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
+import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/user.dart';
+import '../../../helpers/ai_data_consent_fixtures.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/trip.dart';
@@ -23,6 +26,12 @@ import 'package:tripline/ui/tp_tag.dart';
 class MockTripRepository extends Mock implements TripRepository {}
 
 class MockRequestsRepository extends Mock implements RequestsRepository {}
+
+class _StubAuth extends AuthNotifier {
+  @override
+  Future<UserInfo?> build() async =>
+      const UserInfo(id: 'u1', email: 'a@b.c', emailVerified: true);
+}
 
 void main() {
   late MockTripRepository repository;
@@ -48,6 +57,7 @@ void main() {
     ThemeData? theme,
     TextScaler textScaler = TextScaler.noScaling,
     bool settle = true,
+    MockAiDataConsentRepo? consent,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -55,6 +65,10 @@ void main() {
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
           requestsRepositoryProvider.overrideWithValue(requestsRepo),
+          if (consent != null) ...[
+            authStateProvider.overrideWith(_StubAuth.new),
+            aiDataConsentRepositoryProvider.overrideWithValue(consent),
+          ],
         ],
         child: MaterialApp(
           theme: theme ?? AppTheme.light(),
@@ -735,5 +749,132 @@ void main() {
 
     expect(find.text('東京旅行'), findsOneWidget);
     expect(find.text('沖繩家族旅行'), findsNothing);
+  });
+
+  group('AI 資料同意', () {
+    const started = TripHealthReport(
+      tripId: 'trip-1',
+      userId: 'user-1',
+      status: TripHealthStatus.pending,
+      requestId: 43,
+      createdAt: '2026-07-09T10:02:00Z',
+    );
+
+    // 啟動中按鈕有永不停止的 spinner，不能 pumpAndSettle。
+    Future<void> settleFixed(WidgetTester tester) async {
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    Future<void> tapStart(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('trip-health-start-button')));
+      await settleFixed(tester);
+    }
+
+    testWidgets('旗標關閉：不跳資料同意，直接啟動健檢', (tester) async {
+      final consent = MockAiDataConsentRepo();
+      when(consent.fetch).thenAnswer(
+        (_) async =>
+            aiConsentFixture(AiDataConsentStatus.none, enforced: false),
+      );
+      when(
+        () => repository.startHealthCheck('trip-1'),
+      ).thenAnswer((_) async => started);
+      await pumpScreen(tester, consent: consent);
+      await tapStart(tester);
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      verify(() => repository.startHealthCheck('trip-1')).called(1);
+    });
+
+    testWidgets('未同意：先跳資料同意，同意前不發 AI mutation；取消後不啟動', (tester) async {
+      final consent = MockAiDataConsentRepo();
+      when(consent.fetch).thenAnswer(
+        (_) async => aiConsentFixture(AiDataConsentStatus.withdrawn),
+      );
+      await pumpScreen(tester, consent: consent);
+      await tapStart(tester);
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+      verifyNever(() => repository.startHealthCheck(any()));
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-cancel')));
+      await settleFixed(tester);
+      verifyNever(() => repository.startHealthCheck(any()));
+      verifyNever(() => consent.accept(any()));
+      expect(find.byKey(const ValueKey('trip-health-empty')), findsOneWidget);
+    });
+
+    testWidgets('同意 → 接續啟動健檢恰好一次', (tester) async {
+      final consent = MockAiDataConsentRepo();
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.none));
+      when(
+        () => consent.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      when(
+        () => repository.startHealthCheck('trip-1'),
+      ).thenAnswer((_) async => started);
+      await pumpScreen(tester, consent: consent);
+      await tapStart(tester);
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await settleFixed(tester);
+
+      verify(() => repository.startHealthCheck('trip-1')).called(1);
+      expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+    });
+
+    testWidgets('server 403 送出者缺同意：就地同意後只重啟一次', (tester) async {
+      final consent = MockAiDataConsentRepo();
+      var reads = 0;
+      when(consent.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? aiConsentFixture(AiDataConsentStatus.valid, enforced: false)
+            : aiConsentFixture(AiDataConsentStatus.none),
+      );
+      when(
+        () => consent.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      var attempt = 0;
+      when(() => repository.startHealthCheck('trip-1')).thenAnswer((_) async {
+        if (attempt++ == 0) throw submitterGate;
+        return started;
+      });
+      await pumpScreen(tester, consent: consent);
+      await tapStart(tester);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await settleFixed(tester);
+
+      verify(() => repository.startHealthCheck('trip-1')).called(2);
+      expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+    });
+
+    testWidgets('旅伴被 owner 擋下：顯示 owner 尚未同意，不顯示失敗、不排隊', (tester) async {
+      final consent = MockAiDataConsentRepo();
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      when(() => repository.startHealthCheck('trip-1')).thenThrow(ownerGate);
+      await pumpScreen(tester, consent: consent);
+      await tapStart(tester);
+
+      expect(find.textContaining('行程擁有者尚未同意 AI 資料處理'), findsWidgets);
+      expect(find.byKey(const ValueKey('trip-health-pending')), findsNothing);
+      expect(find.textContaining('觸發健檢失敗'), findsNothing);
+      verify(() => repository.startHealthCheck('trip-1')).called(1);
+    });
   });
 }

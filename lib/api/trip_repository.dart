@@ -17,6 +17,7 @@ import '../models/trip_audit.dart';
 import '../models/trip_doc.dart';
 import '../models/trip_health.dart';
 import '../models/trip_poi_health.dart';
+import 'ai_data_consent_repository.dart';
 import 'api_client.dart';
 import 'cache_read_policy.dart';
 import 'cache/offline_op.dart';
@@ -192,9 +193,11 @@ class TripRepository {
   }
 
   /// POST /trips/:id/health-check（啟動 AI 健檢）。
+  ///
+  /// 受管制 AI 入口：缺 AI 資料同意時丟 [AiConsentRequiredException]。
   Future<TripHealthReport> startHealthCheck(String id) async {
-    final body = await _client.post(
-      '/trips/${Uri.encodeComponent(id)}/health-check',
+    final body = await translateAiConsentGate(
+      () => _client.post('/trips/${Uri.encodeComponent(id)}/health-check'),
     );
     final report = _optionalHealthReport(body);
     if (report == null) {
@@ -428,14 +431,18 @@ class TripRepository {
 
   /// POST /trips/:id/notes/:type/generate（啟動 AI 產生筆記 job）。
   ///
+  /// 受管制 AI 入口：缺 AI 資料同意時丟 [AiConsentRequiredException]。
+  ///
   /// 回應解析全部交給 [TripNoteAiJob.fromJson];非預期 body 走預設值而不是丟
   /// `TypeError`，畫面層不需要知道任何 json key。
   Future<TripNoteAiJob> generateNotes(
     NoteGenerationType type, {
     required String tripId,
   }) async {
-    final body = await _client.post(
-      '/trips/${Uri.encodeComponent(tripId)}/notes/${type.pathSegment}/generate',
+    final body = await translateAiConsentGate(
+      () => _client.post(
+        '/trips/${Uri.encodeComponent(tripId)}/notes/${type.pathSegment}/generate',
+      ),
     );
     return TripNoteAiJob.fromJson(
       body is Map ? Map<String, dynamic>.from(body) : const {},

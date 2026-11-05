@@ -17,7 +17,9 @@ import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
+import '../../helpers/ai_data_consent_fixtures.dart';
 import '../../helpers/fake_oauth.dart';
+import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 
@@ -50,6 +52,7 @@ void main() {
     WidgetTester tester, {
     UserInfo user = verifiedUser,
     AppVersion version = const AppVersion(version: '0.9.1', buildNumber: '12'),
+    MockAiDataConsentRepo? consent,
   }) async {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => user);
     // 內容較長，放大測試視窗確保全部 row 都在畫面內。
@@ -65,6 +68,9 @@ void main() {
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           appVersionProvider.overrideWith((ref) => Future.value(version)),
+          aiDataConsentRepositoryProvider.overrideWithValue(
+            consent ?? unenforcedConsentRepo(),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -722,6 +728,42 @@ void main() {
 
       expect(find.byKey(rowKey), findsNothing);
       expect(find.byKey(const ValueKey('settings-sessions')), findsOneWidget);
+    });
+  });
+
+  group('AI 與資料', () {
+    testWidgets('旗標關閉或讀不到狀態：設定頁完全不出現這一列', (tester) async {
+      final off = MockAiDataConsentRepo();
+      when(off.fetch).thenAnswer(
+        (_) async =>
+            aiConsentFixture(AiDataConsentStatus.none, enforced: false),
+      );
+      await pumpAccountScreen(tester, consent: off);
+      expect(find.byKey(const ValueKey('settings-ai-data')), findsNothing);
+
+      await pumpAccountScreen(tester);
+      expect(find.byKey(const ValueKey('settings-ai-data')), findsNothing);
+    });
+
+    testWidgets('旗標開啟：顯示 AI 與資料列與目前狀態，點進去是設定畫面', (tester) async {
+      final on = MockAiDataConsentRepo();
+      when(
+        on.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      await pumpAccountScreen(tester, consent: on);
+
+      final row = find.byKey(const ValueKey('settings-ai-data'));
+      expect(row, findsOneWidget);
+      expect(tester.widget<TpSettingsRow>(row).title, 'AI 與資料');
+      expect(tester.widget<TpSettingsRow>(row).subtitle, 'AI 助理已開啟');
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ai-data-settings-withdraw')),
+        findsOneWidget,
+      );
     });
   });
 }

@@ -23,6 +23,7 @@ import '../../../theme/tokens.dart';
 import '../../../ui/tp_tag.dart';
 import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../ai_consent/ai_data_consent_flow.dart';
 import '../../requests/request_lifecycle.dart';
 
 /// Shows the latest AI health report and lets the user start a new check.
@@ -167,10 +168,14 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       _requestTerminated = false;
     });
     try {
-      final report = await ref
-          .read(tripRepositoryProvider)
-          .startHealthCheck(tripId);
-      if (!_isCurrent(generation, tripId)) return;
+      // 資料同意先於 AI mutation；取消、owner 未同意或換行程時 report 為 null（沒有啟動）。
+      final report = await runWithAiDataConsent<TripHealthReport>(
+        context,
+        ref,
+        isCurrent: () => _isCurrent(generation, tripId),
+        action: () => ref.read(tripRepositoryProvider).startHealthCheck(tripId),
+      );
+      if (!_isCurrent(generation, tripId) || report == null) return;
       setState(() => _report = report);
     } on Exception catch (error) {
       if (!_isCurrent(generation, tripId)) return;

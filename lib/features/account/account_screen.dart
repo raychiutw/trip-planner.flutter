@@ -20,6 +20,8 @@ import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_settings_group.dart';
 import 'account_sessions_screen.dart';
+import '../ai_consent/ai_data_consent_controller.dart';
+import '../ai_consent/ai_data_settings_screen.dart';
 import 'connected_apps_screen.dart';
 import 'developer_apps_screen.dart';
 import 'settings/app_lock_row.dart';
@@ -251,6 +253,17 @@ class _SettingsGroup extends ConsumerWidget {
               title: '已連結的應用程式',
               onTap: () => open(const ConnectedAppsScreen()),
             ),
+            // 旗標關閉（server 不強制）或讀不到狀態時整列不出現，與沒有這個功能時相同。
+            if (ref.watch(aiDataConsentProvider) case AsyncData(
+              value: final consent?,
+            ) when consent.enforced)
+              TpSettingsRow(
+                key: const ValueKey('settings-ai-data'),
+                leading: const Icon(CupertinoIcons.sparkles),
+                title: 'AI 與資料',
+                subtitle: aiDataConsentHeadline(consent.status),
+                onTap: () => open(const AiDataSettingsScreen()),
+              ),
             TpSettingsRow(
               key: const ValueKey('settings-developer-apps'),
               leading: const Icon(

@@ -4,6 +4,7 @@ library;
 import 'dart:convert';
 
 import '../models/trip_request.dart';
+import 'ai_data_consent_repository.dart';
 import 'api_client.dart';
 
 class RequestsRepository {
@@ -38,13 +39,17 @@ class RequestsRepository {
   }
 
   /// POST /requests（body camelCase）→ 201 新 row（或 30s 去重回 200 既有 row）。
+  ///
+  /// 受管制 AI 入口：缺 AI 資料同意時丟 [AiConsentRequiredException]（server 不建 request）。
   Future<TripRequest> sendRequest({
     required String tripId,
     required String message,
   }) async {
-    final body = await _client.post(
-      '/requests',
-      body: {'tripId': tripId, 'message': message},
+    final body = await translateAiConsentGate(
+      () => _client.post(
+        '/requests',
+        body: {'tripId': tripId, 'message': message},
+      ),
     );
     return TripRequest.fromJson(body as Map<String, dynamic>);
   }
