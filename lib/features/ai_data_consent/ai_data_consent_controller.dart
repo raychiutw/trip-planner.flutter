@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/ai_data_consent_repository.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/ai_data_consent.dart';
@@ -55,7 +56,7 @@ class AiDataConsentController extends AsyncNotifier<AiDataConsent?> {
           .accept(shown.currentVersion);
       if (ref.mounted) state = AsyncData(next);
     } on ApiError catch (e) {
-      if (e.code == 'AI_CONSENT_VERSION_MISMATCH') await refresh();
+      if (isAiConsentVersionMismatch(e)) await refresh();
       rethrow;
     }
   }
@@ -64,5 +65,24 @@ class AiDataConsentController extends AsyncNotifier<AiDataConsent?> {
   Future<void> withdraw() async {
     final next = await ref.read(aiDataConsentRepositoryProvider).withdraw();
     if (ref.mounted) state = AsyncData(next);
+  }
+}
+
+/// 版本在使用者閱讀期間被更新（409）時顯示的提示。
+const kAiConsentVersionChangedMessage = '說明已更新，請確認新版內容後再同意。';
+
+/// 執行同意／撤回動作：成功回 null，失敗回可直接顯示的訊息。
+/// 呼叫端只管 setState，不必各自重寫 try/catch 與固定字串。
+Future<String?> aiConsentActionError(
+  Future<void> Function() run, {
+  required String failure,
+}) async {
+  try {
+    await run();
+    return null;
+  } on Exception catch (e) {
+    return isAiConsentVersionMismatch(e)
+        ? kAiConsentVersionChangedMessage
+        : failure;
   }
 }

@@ -115,6 +115,36 @@ void main() {
     });
   });
 
+  group('409 版本競態判斷', () {
+    test('只有 409 且 code 為 AI_CONSENT_VERSION_MISMATCH 才算', () {
+      expect(
+        isAiConsentVersionMismatch(
+          ApiError.fromResponse(409, {
+            'error': {'code': 'AI_CONSENT_VERSION_MISMATCH', 'message': 'm'},
+          }),
+        ),
+        isTrue,
+      );
+      expect(
+        isAiConsentVersionMismatch(
+          ApiError.fromResponse(500, {
+            'error': {'code': 'AI_CONSENT_VERSION_MISMATCH', 'message': 'm'},
+          }),
+        ),
+        isFalse,
+      );
+      expect(
+        isAiConsentVersionMismatch(
+          ApiError.fromResponse(409, {
+            'error': {'code': 'OTHER', 'message': 'm'},
+          }),
+        ),
+        isFalse,
+      );
+      expect(isAiConsentVersionMismatch(StateError('x')), isFalse);
+    });
+  });
+
   group('403 閘門錯誤碼 → 型別化例外', () {
     test('AI_CONSENT_REQUIRED：送出者，帶所需版本與送出者狀態', () {
       final gate = aiConsentGateFrom(

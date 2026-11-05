@@ -20,10 +20,22 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/reports_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/oauth_tokens.dart';
+import 'package:tripline/models/user.dart';
 
 import '../helpers/fake_oauth.dart';
 
 class _MockOAuthRepo extends Mock implements OAuthRepository {}
+
+class _MockAuthRepo extends Mock implements AuthRepository {}
+
+/// 可以由測試切換「目前登入的是誰」的 AuthNotifier。
+class _SwitchableAuthNotifier extends AuthNotifier {
+  _SwitchableAuthNotifier(this._initial);
+  final UserInfo? _initial;
+  @override
+  Future<UserInfo?> build() async => _initial;
+  void switchTo(UserInfo? user) => state = AsyncData(user);
+}
 
 /// 簽章不重要（只驗 claims）的 id_token。
 String _idToken({
@@ -328,6 +340,42 @@ void main() {
       expect(container.read(authStateProvider).value, isNull);
       expect(await cache.readResponse('trip-cache'), isNull);
       expect(await store.read(), isNull);
+    });
+  });
+
+  group('accountHasPasswordProvider', () {
+    test('換成另一個帳號登入要重新取，不沿用上一個帳號的結果', () async {
+      const googleOnly = UserInfo(id: 'u2', email: 'g@x.com');
+      final authRepo = _MockAuthRepo();
+      var calls = 0;
+      when(() => authRepo.fetchAccountDeletionPreview()).thenAnswer((_) async {
+        calls++;
+        return AccountDeletionPreview(
+          hasPassword: calls == 1,
+          tripsOwned: 0,
+          collaboratorsAffected: 0,
+        );
+      });
+      final notifier = _SwitchableAuthNotifier(
+        const UserInfo(id: 'u1', email: 'p@x.com'),
+      );
+      final container = ProviderContainer(
+        retry: (_, _) => null,
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepo),
+          authStateProvider.overrideWith(() => notifier),
+        ],
+      );
+      addTearDown(container.dispose);
+      final sub = container.listen(accountHasPasswordProvider, (_, _) {});
+      addTearDown(sub.close);
+
+      await container.read(authStateProvider.future); // notifier 先建起來，才能切換使用者
+      expect(await container.read(accountHasPasswordProvider.future), isTrue);
+
+      notifier.switchTo(googleOnly);
+      expect(await container.read(accountHasPasswordProvider.future), isFalse);
+      expect(calls, 2);
     });
   });
 }

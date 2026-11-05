@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripline/features/chat/ai_consent_sheet.dart';
+import 'package:tripline/features/chat/ai_authorization_sheet.dart';
 
 void main() {
   testWidgets('Cancel closes AI consent without authorizing', (tester) async {
@@ -11,7 +11,7 @@ void main() {
         home: Builder(
           builder: (context) => FilledButton(
             onPressed: () async {
-              result = await showAiConsentSheet(
+              result = await showAiAuthorizationSheet(
                 context,
                 message: '幫我重排行程',
                 onAuthorize: () async {
@@ -47,7 +47,7 @@ void main() {
         home: Builder(
           builder: (context) => FilledButton(
             onPressed: () async {
-              result = await showAiConsentSheet(
+              result = await showAiAuthorizationSheet(
                 context,
                 message: '幫我重排行程',
                 onAuthorize: () async => true,

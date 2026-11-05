@@ -229,3 +229,19 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(
   AuthNotifier.new,
 );
+
+/// 這個帳號有沒有 local 密碼（只用 Google 登入的帳號沒有，不該顯示「變更密碼」）。
+///
+/// 目前**借用** `GET /account`（帳號刪除預覽）回的 `hasPassword`，後端沒有專屬端點；
+/// 日後有的話只改這一處。取不到就當作沒有：呼叫端的入口列 loading／error 刻意不畫任何東西，
+/// 只比對 `AsyncData(value: true)`。
+///
+/// 依「目前登入的使用者」重新取：登出後換另一個帳號登入，不能沿用上一個帳號的結果。
+final accountHasPasswordProvider = FutureProvider<bool>((ref) async {
+  final userId = ref.watch(authStateProvider.select((s) => s.value?.id));
+  if (userId == null) return false;
+  final preview = await ref
+      .watch(authRepositoryProvider)
+      .fetchAccountDeletionPreview();
+  return preview.hasPassword;
+});

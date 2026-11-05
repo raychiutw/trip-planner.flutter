@@ -7,7 +7,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/ai_data_consent_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/features/ai_consent/ai_data_consent_flow.dart';
+import 'package:tripline/features/ai_data_consent/ai_data_consent_controller.dart';
+import 'package:tripline/features/ai_data_consent/ai_data_consent_flow.dart';
 import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -54,6 +55,11 @@ class _StubAuth extends AuthNotifier {
       const UserInfo(id: 'u1', email: 'a@b.c', emailVerified: true);
 }
 
+class _SignedOutAuth extends AuthNotifier {
+  @override
+  Future<UserInfo?> build() async => null;
+}
+
 class _Harness extends ConsumerWidget {
   const _Harness({required this.run});
 
@@ -82,13 +88,16 @@ void main() {
     WidgetTester tester, {
     String? keptMessage,
     bool Function()? isCurrent,
+    bool signedIn = true,
   }) async {
     calls = 0;
     outcome = null;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authStateProvider.overrideWith(_StubAuth.new),
+          authStateProvider.overrideWith(
+            signedIn ? _StubAuth.new : _SignedOutAuth.new,
+          ),
           aiDataConsentRepositoryProvider.overrideWithValue(repo),
         ],
         child: MaterialApp(
@@ -126,6 +135,19 @@ void main() {
   });
 
   group('旗標關閉或讀不到狀態：行為與沒有這個功能時完全相同', () {
+    testWidgets('未登入：完全不介入，不讀同意狀態、不跳 sheet，直接執行一次', (tester) async {
+      await pumpFlow(tester, signedIn: false);
+      await tapGo(tester);
+
+      verifyNever(repo.fetch);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      expect(calls, 1);
+      expect(outcome, isTrue);
+    });
+
     testWidgets('enforced=false：不跳 sheet、直接執行一次', (tester) async {
       when(repo.fetch).thenAnswer(
         (_) async => _consent(AiDataConsentStatus.none, enforced: false),
@@ -284,6 +306,7 @@ void main() {
 
       expect(find.text('新版標題'), findsOneWidget);
       expect(find.text('版本 ai-data-v2'), findsOneWidget);
+      expect(find.text(kAiConsentVersionChangedMessage), findsOneWidget);
       expect(calls, 0);
     });
 
@@ -382,6 +405,77 @@ void main() {
       expect(calls, 1);
       expect(outcome, isNull);
       verifyNever(() => repo.accept(any()));
+    });
+
+    testWidgets('同意後重送，版本又被更新而再被擋：重新讀取並再詢問一次，接續成功', (tester) async {
+      var reads = 0;
+      when(repo.fetch).thenAnswer((_) async {
+        final n = reads++;
+        if (n == 0) return _consent(AiDataConsentStatus.valid, enforced: false);
+        return n == 1
+            ? _consent(AiDataConsentStatus.none)
+            : _consent(AiDataConsentStatus.stale, version: 'ai-data-v2');
+      });
+      when(() => repo.accept(any())).thenAnswer(
+        (inv) async => _consent(
+          AiDataConsentStatus.valid,
+          version: inv.positionalArguments.first as String,
+        ),
+      );
+      var gates = 2;
+      thrower = () => gates-- > 0 ? _submitterGate : null;
+      await pumpFlow(tester);
+      await tapGo(tester);
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+        reason: '第二次被擋要重新彈 sheet，不是直接顯示無法確認',
+      );
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.accept('ai-data-v2')).called(1);
+      expect(calls, 3);
+      expect(outcome, isTrue);
+      expect(find.text(kAiConsentUnavailableMessage), findsNothing);
+    });
+
+    testWidgets('一直被擋：再詢問有上限，用完顯示無法確認、不無限迴圈', (tester) async {
+      var reads = 0;
+      when(repo.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? _consent(AiDataConsentStatus.valid, enforced: false)
+            : _consent(AiDataConsentStatus.none),
+      );
+      when(
+        () => repo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      thrower = () => _submitterGate;
+      await pumpFlow(tester);
+      await tapGo(tester);
+      // 這個情境（事前不知道要同意）sheet 總共出現 2 次、action 共 3 次，之後放棄。
+      for (var i = 0; i < 2; i++) {
+        expect(
+          find.byKey(const ValueKey('ai-data-consent-accept')),
+          findsOneWidget,
+          reason: '第 ${i + 1} 次 sheet',
+        );
+        await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+        await tester.pumpAndSettle();
+      }
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+        reason: '用完上限不再彈第 3 次',
+      );
+      verify(() => repo.accept('ai-data-v1')).called(2);
+      expect(calls, 3);
+      expect(outcome, isNull);
+      expect(find.text(kAiConsentUnavailableMessage), findsOneWidget);
     });
 
     testWidgets('重讀不到說明文字：不猜、不繞過閘門，顯示無法確認', (tester) async {

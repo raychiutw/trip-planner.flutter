@@ -2501,6 +2501,152 @@ void main() {
       ).called(2);
     });
 
+    // 重試路徑（失敗面板、逾時面板）與首次生成走同一個同意流程：同意在兩次
+    // 嘗試之間被撤回／升版時，要就地彈同意 sheet，不能變成未捕捉的非同步例外。
+    void stubConsentRevokedAfterFirstRead() {
+      var reads = 0;
+      when(consent.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? aiConsentFixture(AiDataConsentStatus.valid, enforced: false)
+            : aiConsentFixture(AiDataConsentStatus.none),
+      );
+      when(
+        () => consent.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+    }
+
+    void stubGenerate(List<Object> outcomes) {
+      var attempt = 0;
+      when(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).thenAnswer((_) async {
+        final outcome = outcomes[attempt++];
+        if (outcome is TripNoteAiJob) return outcome;
+        throw outcome;
+      });
+    }
+
+    void verifyGenerateCalls(int times) => verify(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).called(times);
+
+    testWidgets('失敗重試遇到同意已撤回：就地同意後只重試一次', (tester) async {
+      _useTallViewport(tester);
+      stubConsentRevokedAfterFirstRead();
+      stubGenerate([
+        const ApiError(status: 500, code: 'X', message: 'boom'),
+        submitterGate,
+        tipsJob,
+      ]);
+      await tapTips(tester);
+      expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('notes-ai-retry')));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+
+      // sheet 滑入動畫要走完才點得到；背景有永不停止的 spinner，不能 pumpAndSettle。
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pump();
+      await tester.pump();
+      verifyGenerateCalls(3);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('失敗重試被 owner 擋下：只告知，不再重試', (tester) async {
+      _useTallViewport(tester);
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      stubGenerate([
+        const ApiError(status: 500, code: 'X', message: 'boom'),
+        ownerGate,
+      ]);
+      await tapTips(tester);
+
+      await tester.tap(find.byKey(const ValueKey('notes-ai-retry')));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.textContaining('行程擁有者尚未同意 AI 資料處理'), findsWidgets);
+      verifyGenerateCalls(2);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('逾時重試遇到同意已撤回：就地同意後只重試一次', (tester) async {
+      _useTallViewport(tester);
+      final mocks = _parallelAiMocks();
+      repo = mocks.repo;
+      requestsRepo = mocks.requestsRepo;
+      stubConsentRevokedAfterFirstRead();
+      // 重試成功換新的 request（不同 requestId），避免同一條進度通道被重複訂閱。
+      stubGenerate([
+        tipsJob,
+        submitterGate,
+        const TripNoteAiJob(
+          jobId: 8,
+          requestId: 100,
+          tripId: 'trip-1',
+          docType: NoteGenerationType.tips,
+        ),
+      ]);
+      var state = 0;
+      when(() => repo.fetchNotesAiState('trip-1')).thenAnswer((_) async {
+        return state++ == 0
+            ? const TripNoteAiState()
+            : const TripNoteAiState(
+                jobs: [
+                  TripNoteAiJob(
+                    jobId: 7,
+                    requestId: 99,
+                    docType: NoteGenerationType.tips,
+                    status: TripNoteAiJobStatus.timedOut,
+                    errorCode: 'NOTES_AI_JOB_STALE',
+                    errorMessage: 'AI 生成超過 10 分鐘',
+                  ),
+                ],
+              );
+      });
+      await tester.pumpWidget(
+        _buildScreen(
+          _sampleNotes(),
+          repo: repo,
+          requestsRepo: requestsRepo,
+          stubAiState: false,
+          consent: consent,
+        ),
+      );
+      await tester.pump();
+      await _startTips(tester);
+      mocks.tipsEvents.add(
+        const TripRequestEvent(status: RequestStatus.failed, error: '逾時'),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('notes-ai-timeout')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('notes-ai-timeout-retry')));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+
+      // sheet 滑入動畫要走完才點得到；背景有永不停止的 spinner，不能 pumpAndSettle。
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pump();
+      await tester.pump();
+      verifyGenerateCalls(3);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('旅伴被 owner 擋下：顯示 owner 尚未同意，不留 pending、不顯示失敗', (tester) async {
       when(
         consent.fetch,

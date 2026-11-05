@@ -22,7 +22,7 @@ import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
 import 'notes/note_field_spec.dart';
 import 'notes/notes_ai_controller.dart';
-import '../ai_consent/ai_data_consent_flow.dart';
+import '../ai_data_consent/ai_data_consent_flow.dart';
 import '../requests/request_lifecycle.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
@@ -155,7 +155,12 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
                       message: '這次生成超過 10 分鐘沒有完成，已經停止。可以再試一次。',
                       onRetry: () {
                         controller.dismiss(type);
-                        unawaited(controller.generate(type));
+                        _generateNotesWithConsent(
+                          context,
+                          ref,
+                          tripId: widget.tripId,
+                          type: type,
+                        );
                       },
                       onDismiss: () => controller.dismiss(type),
                     ),
@@ -174,7 +179,12 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
                           ai.of(type).failureMessage ?? notesAiFallbackMessage,
                       onRetry: () {
                         controller.dismiss(type);
-                        unawaited(controller.generate(type));
+                        _generateNotesWithConsent(
+                          context,
+                          ref,
+                          tripId: widget.tripId,
+                          type: type,
+                        );
                       },
                       onDismiss: () => controller.dismiss(type),
                     ),
@@ -299,6 +309,25 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     });
   }
 }
+
+/// 筆記 AI 生成的唯一入口（首次與逾時／失敗重試共用）。
+///
+/// 資料同意先於 AI mutation；取消、owner 未同意時不生成，也不當成失敗。
+void _generateNotesWithConsent(
+  BuildContext context,
+  WidgetRef ref, {
+  required String tripId,
+  required NoteGenerationType type,
+}) => unawaited(
+  runWithAiDataConsent<bool>(
+    context,
+    ref,
+    action: () async {
+      await ref.read(notesAiControllerProvider(tripId).notifier).generate(type);
+      return true;
+    },
+  ),
+);
 
 /// 單一筆記 row 的資料：id/version（OCC）、editFields（編輯預填）、display（唯讀卡片）。
 class _NoteRowData {
@@ -823,19 +852,8 @@ class _NotesSection extends ConsumerWidget {
       for (final type in section.generationTypes)
         type: ai.of(type).exclusionCount,
     };
-    // 資料同意先於 AI mutation；取消、owner 未同意時不生成，也不當成失敗。
-    void onGenerateNotes(NoteGenerationType type) => unawaited(
-      runWithAiDataConsent<bool>(
-        context,
-        ref,
-        action: () async {
-          await ref
-              .read(notesAiControllerProvider(tripId).notifier)
-              .generate(type);
-          return true;
-        },
-      ),
-    );
+    void onGenerateNotes(NoteGenerationType type) =>
+        _generateNotesWithConsent(context, ref, tripId: tripId, type: type);
     return Card(
       key: ValueKey('notes-section-${section.name}'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
