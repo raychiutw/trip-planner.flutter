@@ -22,7 +22,7 @@ import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
 import 'notes/note_field_spec.dart';
 import 'notes/notes_ai_controller.dart';
-import '../ai_consent/ai_data_consent_flow.dart';
+import '../ai_data_consent/ai_data_consent_flow.dart';
 import '../requests/request_lifecycle.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';

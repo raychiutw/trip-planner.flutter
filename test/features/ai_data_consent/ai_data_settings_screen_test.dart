@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/features/ai_consent/ai_data_settings_screen.dart';
+import 'package:tripline/features/ai_data_consent/ai_data_settings_screen.dart';
 import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';

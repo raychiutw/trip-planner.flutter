@@ -1,7 +1,7 @@
 /// 就地「AI 資料同意」sheet：受管制入口被擋時在原畫面同意，同意後由呼叫端接續原操作。
 ///
 /// 說明文字與版本全部來自 server（[aiDataConsentProvider]），App 不寫死。
-/// 與「AI 操作授權」sheet（`showAiConsentSheet`）是兩個獨立概念。
+/// 與「AI 操作授權」sheet（`showAiAuthorizationSheet`）是兩個獨立概念。
 library;
 
 import 'package:flutter/material.dart';

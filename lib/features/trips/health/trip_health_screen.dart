@@ -23,7 +23,7 @@ import '../../../theme/tokens.dart';
 import '../../../ui/tp_tag.dart';
 import '../../../ui/tp_progress_bar.dart';
 import '../../../ui/tp_app_bar.dart';
-import '../../ai_consent/ai_data_consent_flow.dart';
+import '../../ai_data_consent/ai_data_consent_flow.dart';
 import '../../requests/request_lifecycle.dart';
 
 /// Shows the latest AI health report and lets the user start a new check.

@@ -5,7 +5,7 @@ import '../../app/adaptive.dart';
 import '../../theme/tokens.dart';
 
 /// 在第一次送出 AI 指令前顯示明確的 owner 授權說明。
-Future<bool> showAiConsentSheet(
+Future<bool> showAiAuthorizationSheet(
   BuildContext context, {
   required String message,
   required Future<bool> Function() onAuthorize,
@@ -20,7 +20,7 @@ Future<bool> showAiConsentSheet(
           submitKey: const ValueKey('ai-consent-authorize'),
           cancelKey: const ValueKey('ai-consent-cancel'),
           controller: controller,
-          builder: (_) => _AiConsentForm(
+          builder: (_) => _AiAuthorizationForm(
             controller: controller,
             message: message,
             onAuthorize: onAuthorize,
@@ -32,8 +32,8 @@ Future<bool> showAiConsentSheet(
   }
 }
 
-class _AiConsentForm extends StatefulWidget {
-  const _AiConsentForm({
+class _AiAuthorizationForm extends StatefulWidget {
+  const _AiAuthorizationForm({
     required this.controller,
     required this.message,
     required this.onAuthorize,
@@ -44,10 +44,10 @@ class _AiConsentForm extends StatefulWidget {
   final Future<bool> Function() onAuthorize;
 
   @override
-  State<_AiConsentForm> createState() => _AiConsentFormState();
+  State<_AiAuthorizationForm> createState() => _AiAuthorizationFormState();
 }
 
-class _AiConsentFormState extends State<_AiConsentForm> {
+class _AiAuthorizationFormState extends State<_AiAuthorizationForm> {
   String? _error;
 
   @override

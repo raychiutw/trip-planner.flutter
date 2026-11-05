@@ -31,7 +31,7 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
   'lib/features/account/settings/notifications_screen.dart': {
     'NotificationsScreen': _HeaderContract.accountException,
   },
-  'lib/features/ai_consent/ai_data_settings_screen.dart': {
+  'lib/features/ai_data_consent/ai_data_settings_screen.dart': {
     'AiDataSettingsScreen': _HeaderContract.authenticatedDetail,
   },
   'lib/features/account/settings/appearance_screen.dart': {

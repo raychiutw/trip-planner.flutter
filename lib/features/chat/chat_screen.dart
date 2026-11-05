@@ -24,9 +24,9 @@ import '../../ui/tp_state_view.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
-import '../ai_consent/ai_data_consent_flow.dart';
+import '../ai_data_consent/ai_data_consent_flow.dart';
 import '../requests/request_lifecycle.dart';
-import 'ai_consent_sheet.dart';
+import 'ai_authorization_sheet.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
@@ -447,7 +447,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     }
 
     if (_aiAuthorized != true) {
-      final authorized = await showAiConsentSheet(
+      final authorized = await showAiAuthorizationSheet(
         context,
         message: text,
         onAuthorize: () => ref.read(authRepositoryProvider).authorizeAi(),
