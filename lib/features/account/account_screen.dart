@@ -232,6 +232,7 @@ class _SettingsGroup extends ConsumerWidget {
           children: [
             const AppLockRow(),
             const BiometricLoginRow(),
+            // 能力探測列（不是內容資料）：loading／error 刻意不畫，見 [accountHasPasswordProvider]。
             if (ref.watch(accountHasPasswordProvider) case AsyncData(
               value: true,
             ))

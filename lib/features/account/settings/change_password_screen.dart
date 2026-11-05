@@ -22,25 +22,22 @@ import '../../../ui/tp_settings_group.dart';
 /// 與後端 `MIN_PASSWORD_LEN` 一致。
 const _minPasswordLength = 8;
 
-/// 這個帳號有沒有 local 密碼(GET /account 的 `hasPassword`)。
+const _rateLimitedCode = 'CHANGE_PASSWORD_RATE_LIMITED';
+
+/// server 變更密碼錯誤碼 → 文案（單一來源；限流另有帶等待時間的版本，見 [_rateLimitMessage]）。
 ///
-/// 只用 Google 登入的帳號沒有密碼可改,設定頁據此決定要不要顯示「變更密碼」。
-/// 取不到就當作沒有(不顯示入口,不影響其他設定):入口列的 loading／error 刻意不畫任何東西,
-/// 所以呼叫端只比對 `AsyncData(value: true)`,不走 `.when` 三態。
-///
-/// 依「目前登入的使用者」重新取:登出後換另一個帳號登入,不能沿用上一個帳號的結果。
-final accountHasPasswordProvider = FutureProvider<bool>((ref) async {
-  final userId = ref.watch(authStateProvider.select((s) => s.value?.id));
-  if (userId == null) return false;
-  final preview = await ref
-      .watch(authRepositoryProvider)
-      .fetchAccountDeletionPreview();
-  return preview.hasPassword;
-});
+/// `CHANGE_PASSWORD_TOO_SHORT`／`_SAME` 刻意不列：本地已在送出前擋下同樣的規則
+/// （[_ChangePasswordScreenState._localError]），server 若仍回這兩個碼，
+/// 由 [userFacingApiError] 採 server 給的繁中說明，沒有繁中才落到通用文案。
+const _errorMessageByCode = {
+  'CHANGE_PASSWORD_CURRENT_INVALID': '目前密碼不正確',
+  _rateLimitedCode: '嘗試次數過多，請稍後再試',
+  'CHANGE_PASSWORD_NO_PASSWORD': '此帳號以 Google 登入，沒有設定密碼',
+};
 
 /// 被限流且後端有給 Retry-After 時,告訴使用者要等多久(秒數 ≥ 60 換成分鐘,進位)。
 String? _rateLimitMessage(Object error) {
-  if (error is! ApiError || error.code != 'CHANGE_PASSWORD_RATE_LIMITED') {
+  if (error is! ApiError || error.code != _rateLimitedCode) {
     return null;
   }
   final seconds = error.retryAfterSeconds;
@@ -133,11 +130,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             userFacingApiError(
               error,
               fallback: '無法變更密碼，請稍後再試',
-              byCode: const {
-                'CHANGE_PASSWORD_CURRENT_INVALID': '目前密碼不正確',
-                'CHANGE_PASSWORD_RATE_LIMITED': '嘗試次數過多，請稍後再試',
-                'CHANGE_PASSWORD_NO_PASSWORD': '此帳號以 Google 登入，沒有設定密碼',
-              },
+              byCode: _errorMessageByCode,
             );
       });
       return;
