@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/ai_data_consent_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/features/ai_consent/ai_data_consent_controller.dart';
 import 'package:tripline/features/ai_consent/ai_data_consent_flow.dart';
 import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/user.dart';
@@ -284,6 +285,7 @@ void main() {
 
       expect(find.text('新版標題'), findsOneWidget);
       expect(find.text('版本 ai-data-v2'), findsOneWidget);
+      expect(find.text(kAiConsentVersionChangedMessage), findsOneWidget);
       expect(calls, 0);
     });
 

@@ -19,7 +19,7 @@ class AiDataConsentRepository {
 
   /// POST /account/ai-data-consent，帶使用者實際看到的版本。
   ///
-  /// 版本已更新回 409 `AI_CONSENT_VERSION_MISMATCH`，保留 [ApiError] 讓呼叫端重讀；
+  /// 版本已更新回 409（[isAiConsentVersionMismatch]），保留 [ApiError] 讓呼叫端重讀；
   /// 回應不是同意狀態就丟錯，不假裝已同意。
   Future<AiDataConsent> accept(String version) async => _required(
     await _client.post('/account/ai-data-consent', body: {'version': version}),
@@ -34,7 +34,15 @@ class AiDataConsentRepository {
       (throw const FormatException('Unexpected ai-data-consent response'));
 }
 
-/// 受管制入口 403 → 型別化結果；其他錯誤回 null。錯誤碼只在這裡比對。
+/// 同意時帶的版本已被更新（409 `AI_CONSENT_VERSION_MISMATCH`）。
+bool isAiConsentVersionMismatch(Object error) =>
+    error is ApiError &&
+    error.status == 409 &&
+    error.code == _versionMismatchCode;
+
+const _versionMismatchCode = 'AI_CONSENT_VERSION_MISMATCH';
+
+/// 受管制入口 403 → 型別化結果；其他錯誤回 null。AI 資料同意的錯誤碼只在本檔比對。
 AiConsentRequiredException? aiConsentGateFrom(Object error) {
   if (error is! ApiError || error.status != 403) return null;
   final party = switch (error.code) {

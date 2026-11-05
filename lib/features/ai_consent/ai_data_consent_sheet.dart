@@ -7,7 +7,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../api/api_error.dart';
 import '../../app/adaptive.dart';
 import '../../models/ai_data_consent.dart';
 import '../../theme/tokens.dart';
@@ -177,22 +176,12 @@ class _AiDataConsentFormState extends ConsumerState<AiDataConsentForm> {
 
   Future<bool> _accept() async {
     setState(() => _error = null);
-    try {
-      await ref.read(aiDataConsentProvider.notifier).accept();
-      return true;
-    } on ApiError catch (e) {
-      if (mounted) {
-        setState(
-          () => _error = e.code == 'AI_CONSENT_VERSION_MISMATCH'
-              ? '說明已更新，請確認新版內容後再同意。'
-              : '同意失敗，請稍後再試。',
-        );
-      }
-      return false;
-    } on Exception {
-      if (mounted) setState(() => _error = '同意失敗，請稍後再試。');
-      return false;
-    }
+    final error = await aiConsentActionError(
+      () => ref.read(aiDataConsentProvider.notifier).accept(),
+      failure: '同意失敗，請稍後再試。',
+    );
+    if (mounted) setState(() => _error = error);
+    return error == null;
   }
 
   @override

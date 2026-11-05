@@ -58,14 +58,16 @@ class _AiDataSettingsScreenState extends ConsumerState<AiDataSettingsScreen> {
       _busy = true;
       _error = null;
     });
-    try {
-      await ref.read(aiDataConsentProvider.notifier).withdraw();
-      if (mounted) showAppNotice(context, '已撤回 AI 資料同意');
-    } on Exception {
-      if (mounted) setState(() => _error = '撤回失敗，請稍後再試。');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final error = await aiConsentActionError(
+      () => ref.read(aiDataConsentProvider.notifier).withdraw(),
+      failure: '撤回失敗，請稍後再試。',
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = error;
+    });
+    if (error == null) showAppNotice(context, '已撤回 AI 資料同意');
   }
 
   @override
