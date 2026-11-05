@@ -11,6 +11,40 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  testWidgets('表單 sheet 內容貼著標題列，不再疊一份狀態列的上方留白', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(top: 177);
+    tester.view.viewPadding = const FakeViewPadding(top: 177);
+    addTearDown(tester.view.reset);
+    final form = AppSheetFormController();
+    addTearDown(form.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppFormSheet(
+              context,
+              title: '編輯',
+              submitLabel: '儲存',
+              controller: form,
+              // ListView 會自動吃 MediaQuery 的上方 padding，與實際表單一致。
+              builder: (_) => ListView(children: const [Text('第一個欄位')]),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    final header = tester.getRect(find.byType(TpSheetHeader));
+    final first = tester.getRect(find.text('第一個欄位'));
+    expect(first.top - header.bottom, lessThan(40));
+  });
+
   testWidgets('表單 Escape 與語意取消都先確認未儲存草稿', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

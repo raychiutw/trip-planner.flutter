@@ -42,6 +42,13 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
   String _role = 'member';
 
   @override
+  void initState() {
+    super.initState();
+    // Email 有沒有內容決定「新增」可不可按，輸入時要重建。
+    _email.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _email.dispose();
     super.dispose();
@@ -281,6 +288,17 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 isDense: true,
               ),
             ),
+            if (_email.text.trim().isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: TpSpacing.s1),
+                child: Text(
+                  '請先輸入 Email，才能新增成員。',
+                  key: const ValueKey('collab-email-hint'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
             const SizedBox(height: TpSpacing.s2),
             Wrap(
               spacing: TpSpacing.s2,
@@ -299,7 +317,9 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 ),
                 FilledButton(
                   key: const ValueKey('collab-add'),
-                  onPressed: state.adding ? null : () => _invite(state),
+                  onPressed: state.adding || _email.text.trim().isEmpty
+                      ? null
+                      : () => _invite(state),
                   child: state.adding
                       ? Semantics(
                           key: const ValueKey('collab-invite-progress'),

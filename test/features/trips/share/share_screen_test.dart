@@ -34,15 +34,19 @@ void main() {
     Future<void> Function(String url)? shareLink,
     ThemeData? theme,
     TextScaler? textScaler,
+    bool reduceMotion = false,
   }) => ProviderScope(
     retry: (retryCount, error) => null,
     overrides: [shareRepositoryProvider.overrideWithValue(repo)],
     child: MaterialApp(
       theme: theme ?? AppTheme.light(),
-      builder: textScaler == null
+      builder: textScaler == null && !reduceMotion
           ? null
           : (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              data: MediaQuery.of(context).copyWith(
+                textScaler: textScaler,
+                disableAnimations: reduceMotion,
+              ),
               child: child!,
             ),
       home: ShareScreen(tripId: 't', shareLink: shareLink),
@@ -324,6 +328,54 @@ void main() {
     expect(rect.top, greaterThanOrEqualTo(0));
     expect(rect.bottom, lessThanOrEqualTo(600));
     expect(tester.widget<Semantics>(card).properties.liveRegion, isTrue);
+  });
+
+  testWidgets('降低動態效果時建立後直接回到頂端，不經過動畫', (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    when(() => repo.fetchShares(any())).thenAnswer(
+      (_) async => [
+        for (var i = 1; i <= 8; i++) TripShare(id: i, label: '連結$i'),
+      ],
+    );
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(id: 99, token: 'tk', url: '/s/tk'),
+    );
+
+    await tester.pumpWidget(buildApp(reduceMotion: true));
+    await tester.pumpAndSettle();
+    final create = find.byKey(const ValueKey('share-create'));
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(create, 300, scrollable: scrollable);
+    await tester.pumpAndSettle();
+    expect(
+      tester.state<ScrollableState>(scrollable).position.pixels,
+      greaterThan(0),
+    );
+    double offset() =>
+        tester.state<ScrollableState>(scrollable).position.pixels;
+    await tester.tap(create);
+    // 只推進到 mock 回應與一幀，不給動畫時間：reduce motion 下要已離開原本的 647。
+    await tester.pump();
+    await tester.pump();
+    final first = offset();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(first, lessThan(100));
+    expect(offset(), first, reason: '不該還在動畫途中');
   });
 
   testWidgets('建立後顯示的分享網址用網頁 origin，不是 API origin', (tester) async {

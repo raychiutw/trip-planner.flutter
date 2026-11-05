@@ -217,6 +217,28 @@ void main() {
     expect(field.autofillHints, contains(AutofillHints.email));
   });
 
+  testWidgets('Email 未填（或只有空白）時「新增」停用並顯示說明，填了才啟用', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    FilledButton addButton() =>
+        tester.widget<FilledButton>(find.byKey(const ValueKey('collab-add')));
+    expect(addButton().onPressed, isNull);
+    expect(find.byKey(const ValueKey('collab-email-hint')), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('collab-email')), '  ');
+    await tester.pump();
+    expect(addButton().onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('collab-email')),
+      'b@x.com',
+    );
+    await tester.pump();
+    expect(addButton().onPressed, isNotNull);
+    expect(find.byKey(const ValueKey('collab-email-hint')), findsNothing);
+  });
+
   testWidgets('新增成員 → 輸入 email + 點新增 → invite', (tester) async {
     when(
       () => repo.invite(
@@ -233,6 +255,7 @@ void main() {
       find.byKey(const ValueKey('collab-email')),
       'b@x.com',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('collab-add')));
     await tester.pumpAndSettle();
 
@@ -286,6 +309,7 @@ void main() {
       'pending@x.com',
     );
     await tester.tap(find.widgetWithText(TpChip, '檢視成員'));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('collab-add')));
     await tester.pump();
 
@@ -348,6 +372,7 @@ void main() {
       find.byKey(const ValueKey('collab-email')),
       'retry@x.com',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('collab-add')));
     await tester.pumpAndSettle();
 

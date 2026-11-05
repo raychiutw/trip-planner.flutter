@@ -1306,6 +1306,34 @@ void main() {
   });
 
   group('選單快捷動作', () {
+    testWidgets('降低動態效果時快捷動作的按壓縮放與高亮漸變都不計時', (tester) async {
+      await tester.pumpWidget(
+        _menuHost(
+          items: _quickMenuItems,
+          quickActions: _quickActions,
+          onSelected: (_) {},
+          reduceMotion: true,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+
+      final quick = find.ancestor(
+        of: find.text('分享'),
+        matching: find.byType(AnimatedScale),
+      );
+      expect(quick, findsOneWidget);
+      expect(tester.widget<AnimatedScale>(quick).duration, Duration.zero);
+      final container = find.descendant(
+        of: quick,
+        matching: find.byType(AnimatedContainer),
+      );
+      expect(
+        tester.widget<AnimatedContainer>(container).duration,
+        Duration.zero,
+      );
+    });
+
     testWidgets('上排三格 icon＋短文字並排於清單之上，點選派發一次並關閉', (tester) async {
       final selected = <String>[];
       await tester.pumpWidget(

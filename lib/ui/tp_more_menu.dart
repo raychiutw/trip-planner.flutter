@@ -759,12 +759,12 @@ class _TpQuickActionButtonState extends State<_TpQuickActionButton> {
         onTap: widget.enabled ? widget.onTap : null,
         child: AnimatedScale(
           scale: widget.enablePressScale && _pressed ? 0.98 : 1,
-          duration: const Duration(milliseconds: 150),
+          duration: TpMotion.resolve(context, TpMotion.fast),
           curve: Curves.easeOutCubic,
           child: AnimatedContainer(
             duration: _pressed
                 ? Duration.zero
-                : const Duration(milliseconds: 150),
+                : TpMotion.resolve(context, TpMotion.fast),
             curve: Curves.easeOutCubic,
             margin: const EdgeInsets.symmetric(
               horizontal: _TpQuickActionButton._horizontalMargin,

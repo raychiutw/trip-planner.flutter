@@ -2,7 +2,7 @@
 
 日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（142 個場景全看；原為 125，後續各輪補到 142）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
-這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。清單寫成時還沒動程式碼，之後已處理的項目標 ✅（A1～A7、A9、A11、A14、S1～S3、T2 等）、查過不改的標 ⚪；排序是我的建議，開票與否由你決定。
+這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。清單寫成時還沒動程式碼，之後已處理的項目標 ✅（A1～A7、A9、A11、A12、A13、A14、A15、A16、A17、S1～S3、T2 等）、查過不改的標 ⚪；排序是我的建議，開票與否由你決定。
 
 證據強度：**程式碼**＝對照過原始碼；**像素**＝量過；**看圖**＝只有目視，改之前建議先在真機或模擬器再確認一次。
 
@@ -57,13 +57,13 @@
 | A10 ⚪ | 有分頁列的 36 個淺色場景 | C1 | 選中分頁標籤（11pt）4.39:1，未達 4.5:1；`app-lock-enable-prompt` 的小字動作 4.37:1（T1） | 調深淺色的 accent 文字 token；改前先量新值 | 工具量測 |
 | A11 ✅ | `trip-timeline`（Day 分頁條）、`favorites`（每列）、`explore`（一個全寬可點節點） | VoiceOver | 可點擊節點沒有語意標籤（T5～T7） | 先定位到 widget，再補 `Semantics(label:)`；補完把掃描結果由 66 次未過降下來 | 工具量測 |
 
-| A12 | `collab-load-failed` | F5 | 「新增」鈕在 Email 為空時仍可按（`collab_screen.dart:300` 是 `onPressed: state.adding ? null : …`），與註冊頁修正前同一個問題 | 與 A1 同樣做法：欄位未填時停用 | 程式碼加獨立複核 |
-| A13 | `explore-search-failed` | G6 | 錯誤訊息只有「搜尋失敗,請稍後再試」，沒說原因（`explore_controller.dart:182,189`） | 依錯誤類型給原因（斷線、被限流、伺服器錯誤） | 程式碼加獨立複核 |
+| A12 ✅ | `collab-load-failed` | F5 | **已改（#574）**：Email 未填（或只有空白）時「新增」停用，欄位下方就地說明「請先輸入 Email，才能新增成員。」，做法同 A1（監聽輸入框重建；說明在有內容後消失）。重拍 `collab` 淺深已看 | `collab_screen_test`「Email 未填…停用並顯示說明」 | 紅燈（按鈕可按、無說明）→ 綠燈 |
+| A13 ✅ | `explore-search-failed` | G6 | **已改（#574）**：斷線（`isOfflineError`）顯示「目前無法連線，請檢查網路後再試」；`ApiError` 走共用的 `userFacingApiError`（429「操作太頻繁，請稍後再試」、5xx「伺服器暫時無法處理，請稍後再試」，其餘落回「搜尋失敗,請稍後再試」）。場景現在顯示 5xx 那句，淺深已看 | `explore_screen_test` 三個依原因說明的案例 | 紅燈（三者都只顯示「搜尋失敗」）→ 綠燈 |
 | A14 ✅ | 全 App 字級 | B1 | **已改**：字階對照 Apple 預設字階（正文 `bodyLarge` 17、`bodyMedium` 15、`bodySmall` 13、`titleMedium` 17、`labelLarge` 17；其餘不變）。chip、`TpTag`、分段控制、聊天與離線的狀態橫幅、地圖底部的兩張 POI 卡、選單快捷動作維持原字級（幾何依舊字級校準，理由見 `DESIGN.md` §16.3）；設定列副標與 Day 標頭計數是 HIG 的層級選擇。**已知限制**：聊天橫幅不限高也不可捲動，AX5 下仍會溢位（既有限制，未解決）；`ax-chat-2x` 第四個建議鈕實際高 96pt、只有 43pt 在捲動區內（量測限制，已量渲染尺寸驗證）。沒明寫字級的 `Text` 會吃 `Material` 預設的 `bodyMedium`，新增 chrome 時要明寫 | 見 `DESIGN.md` §16.3 與 `app_theme_test` 的字階契約 | 紅燈（titleMedium 預期 17、實際 15）→ 全量測試與 102 場景重拍 |
-| A15 | 減少動態效果 | I | 兩處動畫沒有降級：分享頁建立連結後捲回頂端 250ms（`share_screen.dart:274`）、更多選單按壓縮放 150ms（`tp_more_menu.dart:760`）。其餘我查到的捲動與進度動畫都有 `disableAnimationsOf` 判斷 | 補 `disableAnimationsOf` 判斷，與 `chat_screen.dart` 的作法一致 | 程式碼（靜態稽核，未涵蓋全部動畫） |
+| A15 ✅ | 減少動態效果 | I | **已改（#574）**：分享頁建立連結後在減少動態效果下改 `jumpTo(0)`（等版面完成的下一幀再跳，否則被新內容高度修正推離頂端），與 `chat_screen.dart` 一致；更多選單快捷動作的按壓縮放與高亮漸變時長改走 `TpMotion.resolve`（原本縮放本來就被 `enablePressScale` 關掉，剩高亮漸變 150ms 沒降級）。全 `lib` 再掃過 `animateTo`／`Animated*`／`AnimationController`，其餘都已有 `disableAnimationsOf` 或 `TpMotion.resolve`，沒有其他漏網 | `share_screen_test`、`tp_app_bar_test` 各一個減少動態效果案例 | 紅燈（offset 仍在 647 動畫途中、時長 150ms）→ 綠燈；拿掉修正再跑會轉紅 |
 
-| A16 | `create-trip-date-picker`、`note-edit-date-picker` | D、版面 | 月曆日期選擇器（`CalendarDatePicker`）最後一週（29、30）被彈出層下緣裁掉只剩上半（11 月 30 天、5 週；彈出層高度固定） | 讓彈出層高度跟著月曆（6 週最多）或讓月曆可捲動；先在 5 週與 6 週的月份都驗證 | 看圖 |
-| A17 | `note-edit-sheet`（及同一表單的其他筆記區段）、`poi-info-edit-sheet`、`entry-edit-sheet`、`travel-edit-sheet`、`explore-custom-region-sheet`（單一欄位、標題給上下文，風險低） | F1、D12 | 表單欄位只有 placeholder、沒有常駐標籤，輸入後看不到欄位名稱；標題下有約 100pt 空白 | 欄位加常駐標籤（或浮動標籤）；查空白的來源 | 看圖 |
+| A16 ✅ | `create-trip-date-picker`、`note-edit-date-picker` | D、版面 | **已改（#574）**：`showAppDatePicker` 不再用固定 410pt 的 `SizedBox`（`CalendarDatePicker` 自己宣告 52+48×7=388pt，扣掉按鈕列後被擠壓、最後一週被裁）；改成內容決定高度，外包 `SingleChildScrollView` 讓大字級可捲動。重拍後 11 月（5 週）的 29、30 完整可見；6 週月份用 2026/8 在 widget test 驗證 | `adaptive_test` 兩個月份案例（2026/11、2026/8） | 紅燈（內部宣告 388pt、實際分到 362pt）→ 綠燈 |
+| A17 ✅（部分不成立） | `note-edit-sheet`、`poi-info-edit-sheet`、`entry-edit-sheet`、`travel-edit-sheet`、`explore-custom-region-sheet` | F1、D12 | **「只有 placeholder」不成立**：這幾張表單的欄位本來就用 `InputDecoration.labelText`（專案沒有自訂 TpTextField，用主題的 `inputDecorationTheme`），輸入後標籤浮到文字上方；場景只拍到空欄位狀態，空欄位時標籤在框內看起來像 placeholder，是 Material 浮動標籤的標準行為，沒有改，加一個 widget test 守住（輸入後標籤仍在、在文字上方）。**標題下約 100pt 空白成立**：`showAppFormSheet` 的內容 `ListView`／`SingleChildScrollView`＋`SafeArea` 又吃了一次狀態列的上方 inset（標題列已在狀態列下方），改在 `showAppFormSheet` 對內容 `MediaQuery.removePadding(removeTop: true)`，所有表單 sheet 一併修正。重拍 15 個受影響場景淺深各一，逐張看過 | `adaptive_sheet_test`「內容貼著標題列」、`note_edit_sheet_test` 標籤守門 | 空白：紅燈（標題下到第一個欄位 59pt）→ 綠燈；標籤：特性測試，一開始就綠（證明該項不成立） |
 | A18 | `note-edit-sheet`、`favorites-filter-sheet`（compact 的 `showAppFormSheet`） | VoiceOver | sheet 背景遮罩是一個全螢幕、可點擊、沒有語意名稱的節點（`labeledTapTargetGuideline` 回報 `Rect 0,0 → 393×852`），VoiceOver 會停在無名元素上；來源是 compact sheet 的套件遮罩，沒有定位到程式碼 | 為遮罩提供名稱（如「關閉」），或排除遮罩的語意、只留「取消」為關閉入口 | 工具量測 |
 | A19 | `developer-app-delete-confirm`（編輯 OAuth 應用頁） | D、版面 | 場景裡編輯頁捲到底，「停用應用程式」鈕仍有一半在螢幕外（按鈕中心 y=894、螢幕高 874）。可能是 sheet 高度超出螢幕的版面問題，也可能是場景視窗的假象 | **先在真機確認**；若屬實，讓內容區底部留出可見空間（safe area 與 sheet 高度） | 看圖加量測，待真機 |
 | A20 | `sync-conflict-sheet`、`sync-conflict-sheet-many` | F、D12 | 逐筆選擇「用對方的／保留你的」後，已選項只靠按鈕填色深淺（實心對淡底）表示，沒有勾選記號或文字；色覺或對比不足時看不出選了哪一邊，且「套用」前沒有總結 | 已選項加勾選圖示或改用分段控制；或在卡片標出「已選：你的」 | 看圖 |

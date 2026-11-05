@@ -268,6 +268,13 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     ref.listen(shareControllerProvider(widget.tripId), (prev, next) {
       final link = next.lastCreated;
       if (link != null && link != prev?.lastCreated && _scroll.hasClients) {
+        if (MediaQuery.disableAnimationsOf(context)) {
+          // 結果卡這一幀才插入清單頂端，等版面完成再跳，否則會被新內容的高度修正推離頂端。
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scroll.hasClients) _scroll.jumpTo(0);
+          });
+          return;
+        }
         unawaited(
           _scroll.animateTo(
             0,
