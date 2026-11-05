@@ -2560,9 +2560,9 @@ void main() {
 
     testWidgets('失敗重試被 owner 擋下：只告知，不再重試', (tester) async {
       _useTallViewport(tester);
-      when(consent.fetch).thenAnswer(
-        (_) async => aiConsentFixture(AiDataConsentStatus.valid),
-      );
+      when(
+        consent.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
       stubGenerate([
         const ApiError(status: 500, code: 'X', message: 'boom'),
         ownerGate,
