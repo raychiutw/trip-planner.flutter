@@ -55,6 +55,11 @@ class _StubAuth extends AuthNotifier {
       const UserInfo(id: 'u1', email: 'a@b.c', emailVerified: true);
 }
 
+class _SignedOutAuth extends AuthNotifier {
+  @override
+  Future<UserInfo?> build() async => null;
+}
+
 class _Harness extends ConsumerWidget {
   const _Harness({required this.run});
 
@@ -83,13 +88,16 @@ void main() {
     WidgetTester tester, {
     String? keptMessage,
     bool Function()? isCurrent,
+    bool signedIn = true,
   }) async {
     calls = 0;
     outcome = null;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authStateProvider.overrideWith(_StubAuth.new),
+          authStateProvider.overrideWith(
+            signedIn ? _StubAuth.new : _SignedOutAuth.new,
+          ),
           aiDataConsentRepositoryProvider.overrideWithValue(repo),
         ],
         child: MaterialApp(
@@ -127,6 +135,19 @@ void main() {
   });
 
   group('旗標關閉或讀不到狀態：行為與沒有這個功能時完全相同', () {
+    testWidgets('未登入：完全不介入，不讀同意狀態、不跳 sheet，直接執行一次', (tester) async {
+      await pumpFlow(tester, signedIn: false);
+      await tapGo(tester);
+
+      verifyNever(repo.fetch);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      expect(calls, 1);
+      expect(outcome, isTrue);
+    });
+
     testWidgets('enforced=false：不跳 sheet、直接執行一次', (tester) async {
       when(repo.fetch).thenAnswer(
         (_) async => _consent(AiDataConsentStatus.none, enforced: false),
