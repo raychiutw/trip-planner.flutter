@@ -71,9 +71,22 @@ void main() {
       ),
       findsOneWidget,
     );
+    // 輔助技術：「已選」整列是一個節點，label 就是文字，勾選圖示是裝飾不另念。
+    final chosenNode = tester.getSemantics(chosen);
+    expect(chosenNode.label, '已選：對方的');
+    expect(
+      find.descendant(
+        of: chosen,
+        matching: find.byWidgetPredicate(
+          (w) => w is ExcludeSemantics && w.excluding,
+        ),
+      ),
+      findsWidgets,
+    );
     await tester.tap(ours);
     await tester.pump();
     expect(find.text('已選：你的'), findsOneWidget);
+    expect(tester.getSemantics(chosen).label, '已選：你的');
     expect(find.text('已選：對方的'), findsNothing);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();

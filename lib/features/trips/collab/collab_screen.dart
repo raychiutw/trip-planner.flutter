@@ -257,6 +257,8 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     );
   }
 
+  static bool _isBlank(TextEditingValue value) => value.text.trim().isEmpty;
+
   Widget _addRow(CollabState state) {
     return AbsorbPointer(
       key: const ValueKey('collab-invite-form'),
@@ -285,7 +287,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
             // Email 有沒有內容決定說明與「新增」，只重建這兩處，不重建整個畫面。
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: _email,
-              builder: (_, value, _) => value.text.trim().isEmpty
+              builder: (_, value, _) => _isBlank(value)
                   ? const TpFieldHint(
                       '請先輸入 Email，才能新增成員。',
                       textKey: ValueKey('collab-email-hint'),
@@ -312,7 +314,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                   valueListenable: _email,
                   builder: (_, value, child) => FilledButton(
                     key: const ValueKey('collab-add'),
-                    onPressed: state.adding || value.text.trim().isEmpty
+                    onPressed: state.adding || _isBlank(value)
                         ? null
                         : () => _invite(state),
                     child: child,

@@ -216,11 +216,12 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   }
 
   Future<void> _showConflict(TripEntryConflict conflict) {
-    final lead = conflict.time == null ? '該時段' : conflict.time!;
+    // 時間字串與後面的中文之間才需要空格；「該時段」本身是中文，不加。
+    final lead = conflict.time == null ? '該時段' : '${conflict.time} ';
     return showAppAlert(
       context,
       title: '時段衝突',
-      message: '$lead 已有「${conflict.title}」，請改選其他時間。',
+      message: '$lead已有「${conflict.title}」，請改選其他時間。',
       actionLabel: '知道了',
     );
   }

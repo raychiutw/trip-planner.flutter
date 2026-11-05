@@ -151,8 +151,9 @@ void main() {
         ),
       );
       expect(day.bottom, lessThanOrEqualTo(popup.bottom - bottomSafeArea));
-      // 月曆實際分到的高度要不小於它自己需要的高度（由 render 的 intrinsic 高度問出，
-      // 不是讀實作端寫的數字）；被固定高度擠壓時實際高度會比需要的小。
+      // 月曆分到的高度要不小於它需要的高度。「需要」由 CalendarDatePicker 自己的
+      // render 回答（intrinsic），不是實作端寫的數字；這是唯一擋得住「彈出層固定高度」
+      // 退化的斷言（還原成固定 410pt 時為 362 < 388 轉紅，下面兩條位置斷言則不會）。
       final picker = tester.renderObject<RenderBox>(
         find.byType(CalendarDatePicker),
       );

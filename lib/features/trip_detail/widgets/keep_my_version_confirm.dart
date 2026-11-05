@@ -7,7 +7,7 @@ import '../../../app/adaptive.dart';
 
 /// 協作者也改了同一處時，問使用者是否以自己的版本覆蓋。
 ///
-/// [what] 是協作者改動的對象（「相同欄位」「交通設定」），是三處唯一差異的地方。
+/// [what] 是協作者改動的對象（具體欄位名稱，與橫幅點名的同一份來源；交通是「交通設定」），是三處唯一差異的地方。
 Future<bool> confirmKeepMyVersion(
   BuildContext context, {
   required String what,

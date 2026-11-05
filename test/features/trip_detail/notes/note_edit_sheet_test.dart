@@ -538,7 +538,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
     await tester.pumpAndSettle();
-    expect(find.text('協作者也修改了相同欄位。\n繼續會以你的版本覆蓋對方的版本。'), findsOneWidget);
+    expect(find.text('協作者也修改了名稱。\n繼續會以你的版本覆蓋對方的版本。'), findsOneWidget);
     await tester.tap(find.text('繼續編輯'));
     await tester.pumpAndSettle();
     expect(find.text('我的草稿'), findsOneWidget);
@@ -555,7 +555,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
     await tester.pumpAndSettle();
     expect(find.text('保留你的版本？'), findsOneWidget);
-    expect(find.text('協作者也修改了相同欄位。\n繼續會以你的版本覆蓋對方的版本。'), findsOneWidget);
+    expect(find.text('協作者也修改了名稱。\n繼續會以你的版本覆蓋對方的版本。'), findsOneWidget);
     await tester.tap(find.text('保留我的版本'));
     await tester.pumpAndSettle();
     verify(
@@ -619,11 +619,13 @@ void main() {
     expect(find.text('無法載入最新版本。你的草稿已保留，請重試。'), findsOneWidget);
     expect(find.text('我的草稿'), findsOneWidget);
     expect(
-      tester
-          .widget<Semantics>(find.byKey(const ValueKey('note-edit-error')))
-          .properties
-          .liveRegion,
-      isTrue,
+      find.descendant(
+        of: find.byKey(const ValueKey('note-edit-error')),
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.liveRegion == true,
+        ),
+      ),
+      findsOneWidget,
     );
 
     await tester.tap(find.text('重試'));

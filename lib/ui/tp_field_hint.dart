@@ -17,7 +17,7 @@ class TpFieldHint extends StatelessWidget {
   final Color? color;
 
   /// 欄位文字的水平內縮（OutlineInputBorder 的 contentPadding 是 16；量過截圖，12 會比欄位內文偏左）。
-  static const _inset = 16.0;
+  static const _inset = TpSpacing.s4;
 
   @override
   Widget build(BuildContext context) {

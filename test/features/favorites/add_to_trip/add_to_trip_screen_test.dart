@@ -1446,6 +1446,36 @@ void main() {
     expect(find.text('10:00-11:00 已有「午餐」，請改選其他時間。'), findsOneWidget);
   });
 
+  testWidgets('favorite mode：409 沒帶時段 → 說明用「該時段」，中文詞間不留空格', (tester) async {
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'CONFLICT',
+        message: 'CONFLICT',
+        payload: {
+          'conflictWith': {'entryId': 5, 'title': '午餐', 'dayNum': 1},
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('該時段已有「午餐」，請改選其他時間。'), findsOneWidget);
+  });
+
   testWidgets('結束早於開始的驗證訊息是 liveRegion', (tester) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(

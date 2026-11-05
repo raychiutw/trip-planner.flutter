@@ -9,6 +9,7 @@ import '../../../models/entry.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_chip.dart';
+import '../../../ui/tp_inline_banner.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
 import 'keep_my_version_confirm.dart';
@@ -334,35 +335,15 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
                 const SizedBox(height: TpSpacing.s4),
               ],
               if (_errorMessage != null) ...[
-                Semantics(
+                TpInlineBanner(
                   key: const ValueKey('travel-edit-error'),
-                  liveRegion: true,
-                  child: Container(
-                    padding: const EdgeInsets.all(TpSpacing.s3),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(TpSpacing.s3),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: theme.colorScheme.onErrorContainer,
-                          ),
-                        ),
-                        if (_waitingForFresh)
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: TextButton(
-                              onPressed: _refreshAfterConflict,
-                              child: const Text('重試'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                  message: _errorMessage!,
+                  action: _waitingForFresh
+                      ? TextButton(
+                          onPressed: _refreshAfterConflict,
+                          child: const Text('重試'),
+                        )
+                      : null,
                 ),
                 const SizedBox(height: TpSpacing.s3),
               ],

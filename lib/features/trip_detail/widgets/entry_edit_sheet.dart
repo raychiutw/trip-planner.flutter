@@ -13,6 +13,7 @@ import '../../../app/app_feedback.dart';
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_inline_banner.dart';
 import '../../../ui/tp_picker_field.dart';
 import '../../../ui/tp_compact_time_field.dart';
 import '../entry_mutations.dart';
@@ -411,7 +412,10 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   Future<bool> _save() async {
     if (_hasRemoteConflict) {
-      final overwrite = await confirmKeepMyVersion(context, what: '相同欄位');
+      final overwrite = await confirmKeepMyVersion(
+        context,
+        what: _conflictFieldLabels(),
+      );
       if (!mounted || !overwrite) return false;
       _conflicts = const {};
     }
@@ -626,28 +630,15 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             ],
             const SizedBox(height: TpSpacing.s3),
             if (refreshError != null) ...[
-              Container(
+              TpInlineBanner(
                 key: const ValueKey('entry-edit-refresh-error'),
-                padding: const EdgeInsets.all(TpSpacing.s3),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(TpSpacing.s3),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      entryDeleted
-                          ? '此停留點已被刪除，無法再儲存；你的草稿仍保留。'
-                          : '無法載入最新版本；你的草稿仍保留。',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onErrorContainer,
-                      ),
-                    ),
-                    if (!entryDeleted) ...[
-                      const SizedBox(height: TpSpacing.s2),
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
+                message: entryDeleted
+                    ? '此停留點已被刪除，無法再儲存；你的草稿仍保留。'
+                    : '無法載入最新版本；你的草稿仍保留。',
+                action: entryDeleted
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s2),
                         child: TextButton.icon(
                           key: const ValueKey('entry-edit-stale-retry'),
                           onPressed: _retryAfterStale,
@@ -655,9 +646,6 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                           label: const Text('重試載入'),
                         ),
                       ),
-                    ],
-                  ],
-                ),
               ),
               const SizedBox(height: TpSpacing.s3),
             ] else if (_waitingForFresh) ...[
@@ -670,23 +658,10 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               const SizedBox(height: TpSpacing.s3),
             ],
             if (_hasRemoteConflict) ...[
-              // 與筆記、交通 sheet 的頂部紅底橫幅同款；指出是哪些欄位，不必等按儲存才知道。
-              Semantics(
+              TpInlineBanner(
                 key: const ValueKey('entry-edit-conflict-banner'),
-                liveRegion: true,
-                child: Container(
-                  padding: const EdgeInsets.all(TpSpacing.s3),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(TpSpacing.s3),
-                  ),
-                  child: Text(
+                message:
                     '協作者也修改了${_conflictFieldLabels()}。你的修改已保留；再次儲存前請確認是否覆蓋對方的版本。',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: TpSpacing.s3),
             ],
