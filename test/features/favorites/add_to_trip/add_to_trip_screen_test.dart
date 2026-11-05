@@ -1442,6 +1442,8 @@ void main() {
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
+    // A21：時段併入句首，不用全形括號（括號單獨起行、末行孤字）。
+    expect(find.text('10:00-11:00 已有「午餐」，請改選其他時間。'), findsOneWidget);
   });
 
   testWidgets('結束早於開始的驗證訊息是 liveRegion', (tester) async {

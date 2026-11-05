@@ -11,6 +11,7 @@ import '../../../models/note_section.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_chip.dart';
 import '../trip_providers.dart';
+import '../widgets/keep_my_version_confirm.dart';
 import 'note_field_spec.dart';
 
 /// 以 modal bottom sheet 開啟筆記新增/編輯表單。
@@ -215,14 +216,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               freshRow.fields[key] != _baseFields[key] &&
               freshRow.fields[key] != fields[key],
         )) {
-      final overwrite = await showAppDestructiveConfirm(
-        context,
-        source: TpDestructiveConfirmSource.direct,
-        title: '保留你的修改？',
-        message: '協作者也修改了相同欄位。繼續會以你的草稿覆蓋那些欄位。',
-        confirmLabel: '保留我的修改',
-        cancelLabel: '繼續編輯',
-      );
+      final overwrite = await confirmKeepMyVersion(context, what: '相同欄位');
       if (!mounted || !overwrite) return false;
     }
     setState(() {

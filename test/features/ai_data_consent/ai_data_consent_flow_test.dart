@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoAlertDialog;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -402,6 +403,10 @@ void main() {
         find.byKey(const ValueKey('ai-data-consent-accept')),
         findsNothing,
       );
+      // A27：純告知用 alert，只留一個關閉動作（不再是帶「取消」「知道了」雙鈕的 sheet）。
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      expect(find.text('知道了'), findsOneWidget);
+      expect(find.text('取消'), findsNothing);
       expect(calls, 1);
       expect(outcome, isNull);
       verifyNever(() => repo.accept(any()));

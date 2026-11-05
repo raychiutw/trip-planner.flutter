@@ -11,6 +11,7 @@ import '../../../theme/tokens.dart';
 import '../../../ui/tp_chip.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
+import 'keep_my_version_confirm.dart';
 
 /// 開啟交通編輯 bottom sheet。
 Future<void> showTravelEditSheet(
@@ -239,14 +240,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     if (_needsConflictConfirmation) {
       setState(() => _submitting = true);
       _syncFormState();
-      final overwrite = await showAppDestructiveConfirm(
-        context,
-        source: TpDestructiveConfirmSource.direct,
-        title: '保留你的版本？',
-        message: '協作者也更新了交通設定。繼續會以你目前的交通方式與分鐘數覆蓋對方版本。',
-        confirmLabel: '保留我的版本',
-        cancelLabel: '繼續編輯',
-      );
+      final overwrite = await confirmKeepMyVersion(context, what: '交通設定');
       if (!mounted) return false;
       setState(() => _submitting = false);
       _syncFormState();

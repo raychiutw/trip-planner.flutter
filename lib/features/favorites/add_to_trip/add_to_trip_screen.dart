@@ -216,11 +216,11 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   }
 
   Future<void> _showConflict(TripEntryConflict conflict) {
-    final timeLabel = conflict.time == null ? '' : '（${conflict.time}）';
+    final lead = conflict.time == null ? '該時段' : conflict.time!;
     return showAppAlert(
       context,
       title: '時段衝突',
-      message: '該時段已有「${conflict.title}」$timeLabel。請改選其他時間後再試。',
+      message: '$lead 已有「${conflict.title}」，請改選其他時間。',
       actionLabel: '知道了',
     );
   }

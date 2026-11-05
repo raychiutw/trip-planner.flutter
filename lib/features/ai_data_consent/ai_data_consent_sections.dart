@@ -16,7 +16,7 @@ class AiDataConsentStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = switch (status) {
       AiDataConsentStatus.stale => '說明已更新：請重新確認後才能繼續使用 AI。你仍可使用不需要 AI 的功能。',
-      AiDataConsentStatus.withdrawn => '你先前已撤回同意。要再使用 AI 助理，請重新同意。',
+      AiDataConsentStatus.withdrawn => '你先前已撤回同意。\n要再使用 AI 助理，請重新同意。',
       _ => null,
     };
     if (text == null) return const SizedBox.shrink();

@@ -14,6 +14,9 @@ void main() {
   testWidgets('表單 sheet 內容貼著標題列，不再疊一份狀態列的上方留白', (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
+    // 狀態列上方 inset：177 實體像素 / 3 = 59pt。若內容又疊一次這個 inset，標題列與
+    // 第一個欄位的間距會 >= 59；沒疊則為 0（ListView 沒有自己的 padding）。
+    const statusBarInset = 177 / 3;
     tester.view.padding = const FakeViewPadding(top: 177);
     tester.view.viewPadding = const FakeViewPadding(top: 177);
     addTearDown(tester.view.reset);
@@ -42,7 +45,7 @@ void main() {
 
     final header = tester.getRect(find.byType(TpSheetHeader));
     final first = tester.getRect(find.text('第一個欄位'));
-    expect(first.top - header.bottom, lessThan(40));
+    expect(first.top - header.bottom, lessThan(statusBarInset));
   });
 
   testWidgets('表單 Escape 與語意取消都先確認未儲存草稿', (tester) async {

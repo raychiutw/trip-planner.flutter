@@ -17,6 +17,7 @@ import '../../../ui/tp_picker_field.dart';
 import '../../../ui/tp_compact_time_field.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
+import 'keep_my_version_confirm.dart';
 import 'entry_field_merge.dart';
 import '../../../models/display_format.dart';
 
@@ -184,6 +185,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   }
 
   bool get _hasRemoteConflict => _conflicts.isNotEmpty;
+
+  String _conflictFieldLabels() =>
+      const {'description': '行程備註', 'startTime': '開始時間', 'endTime': '結束時間'}
+          .entries
+          .where((e) => _conflicts.contains(e.key))
+          .map((e) => e.value)
+          .join('、');
 
   /// 表單目前的三個可編輯欄位(與 [entryFieldsOf] 同一套正規化)。
   EntryFields get _oursFromForm => {
@@ -403,14 +411,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   Future<bool> _save() async {
     if (_hasRemoteConflict) {
-      final overwrite = await showAppDestructiveConfirm(
-        context,
-        source: TpDestructiveConfirmSource.direct,
-        title: '保留你的版本？',
-        message: '協作者也修改了相同欄位。繼續會以你目前的內容覆蓋對方版本。',
-        confirmLabel: '保留我的版本',
-        cancelLabel: '繼續編輯',
-      );
+      final overwrite = await confirmKeepMyVersion(context, what: '相同欄位');
       if (!mounted || !overwrite) return false;
       _conflicts = const {};
     }
@@ -665,6 +666,27 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                 onPressed: _retryAfterStale,
                 icon: const Icon(CupertinoIcons.refresh),
                 label: const Text('重新載入新版'),
+              ),
+              const SizedBox(height: TpSpacing.s3),
+            ],
+            if (_hasRemoteConflict) ...[
+              // 與筆記、交通 sheet 的頂部紅底橫幅同款；指出是哪些欄位，不必等按儲存才知道。
+              Semantics(
+                key: const ValueKey('entry-edit-conflict-banner'),
+                liveRegion: true,
+                child: Container(
+                  padding: const EdgeInsets.all(TpSpacing.s3),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(TpSpacing.s3),
+                  ),
+                  child: Text(
+                    '協作者也修改了${_conflictFieldLabels()}。你的修改已保留；再次儲存前請確認是否覆蓋對方的版本。',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: TpSpacing.s3),
             ],

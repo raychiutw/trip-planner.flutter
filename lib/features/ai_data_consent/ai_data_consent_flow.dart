@@ -51,7 +51,7 @@ Future<T?> runWithAiDataConsent<T extends Object>(
   }
 
   Future<T?> tellOwnerMissing() async {
-    await showAiOwnerConsentMissingSheet(
+    await showAiOwnerConsentMissingAlert(
       context,
       inputKept: keptMessage != null,
     );

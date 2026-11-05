@@ -1,4 +1,5 @@
 import '../../helpers/semantics_flags.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,6 +58,23 @@ void main() {
     final ours = find.byKey(const ValueKey('conflict-keep-ours-c1'));
     expect(tester.isSelectedOf(theirs), isTrue);
     expect(tester.isSelectedOf(ours), isFalse);
+    // A20：已選項要有文字與勾選記號，不能只靠按鈕填色。
+    final chosen = find.byKey(const ValueKey('conflict-chosen-c1'));
+    expect(
+      find.descendant(of: chosen, matching: find.text('已選：對方的')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: chosen,
+        matching: find.byIcon(CupertinoIcons.checkmark_circle_fill),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(ours);
+    await tester.pump();
+    expect(find.text('已選：你的'), findsOneWidget);
+    expect(find.text('已選：對方的'), findsNothing);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 

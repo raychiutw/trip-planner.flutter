@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,6 +56,14 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('ai-data-settings-consent')),
+      findsNothing,
+    );
+    // A25：撤回是動作列（跳確認框），不是導航，不能畫「往下一層」的 chevron。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('ai-data-settings-withdraw')),
+        matching: find.byIcon(CupertinoIcons.chevron_forward),
+      ),
       findsNothing,
     );
   });
@@ -138,6 +147,14 @@ void main() {
       expect(
         find.byKey(const ValueKey('ai-data-settings-withdraw')),
         findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('ai-data-settings-consent')),
+          matching: find.byIcon(CupertinoIcons.chevron_forward),
+        ),
+        findsNothing,
+        reason: '開 sheet 的動作列不畫 chevron',
       );
       await tester.tap(find.byKey(const ValueKey('ai-data-settings-consent')));
       await tester.pumpAndSettle();

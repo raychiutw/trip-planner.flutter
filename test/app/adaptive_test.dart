@@ -133,26 +133,40 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      // CalendarDatePicker 內部宣告了月曆需要的高度（6 週最多）；實際分到的高度
-      // 比它小就是被擠壓或裁掉，最後一週會被下緣吃掉。
-      final body = find
-          .descendant(
-            of: find.byType(CalendarDatePicker),
-            matching: find.byType(SizedBox),
-          )
-          .first;
-      expect(
-        tester.getSize(body).height,
-        greaterThanOrEqualTo(tester.widget<SizedBox>(body).height!),
+      // 彈出層（Material）下緣在螢幕底；最後一週的日期不能落進底部安全區，
+      // 也不能超出月曆自己的範圍（被固定高度擠壓時會）。
+      const bottomSafeArea = 102 / 3;
+      final popup = tester.getRect(
+        find
+            .ancestor(
+              of: find.byType(CalendarDatePicker),
+              matching: find.byType(Material),
+            )
+            .first,
       );
-      // 最後一週的日期也要在彈出層可見範圍內（螢幕高減底部安全區 34pt）。
       final day = tester.getRect(
         find.descendant(
           of: find.byType(CalendarDatePicker),
           matching: find.text('$lastDay'),
         ),
       );
-      expect(day.bottom, lessThanOrEqualTo(874 - 34));
+      expect(day.bottom, lessThanOrEqualTo(popup.bottom - bottomSafeArea));
+      // 月曆實際分到的高度要不小於它自己需要的高度（由 render 的 intrinsic 高度問出，
+      // 不是讀實作端寫的數字）；被固定高度擠壓時實際高度會比需要的小。
+      final picker = tester.renderObject<RenderBox>(
+        find.byType(CalendarDatePicker),
+      );
+      expect(
+        picker.size.height,
+        greaterThanOrEqualTo(picker.getMaxIntrinsicHeight(picker.size.width)),
+      );
+      // 月曆分到的高度要裝得下自己的日期格；被固定高度擠壓時日期格會超出月曆範圍。
+      expect(
+        day.bottom,
+        lessThanOrEqualTo(
+          tester.getRect(find.byType(CalendarDatePicker)).bottom,
+        ),
+      );
     });
   }
 

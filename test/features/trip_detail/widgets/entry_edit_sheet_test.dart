@@ -779,6 +779,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
     expect(find.text('保留你的版本？'), findsOneWidget);
+    expect(
+      find.text('協作者也修改了相同欄位。\n繼續會以你的版本覆蓋對方的版本。'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('保留我的版本'));
     await tester.pumpAndSettle();
 
@@ -1375,6 +1379,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // A23：衝突狀態要有常駐橫幅指出是哪些欄位，不能等按儲存才知道。
+    final banner = find.byKey(const ValueKey('entry-edit-conflict-banner'));
+    expect(banner, findsOneWidget);
+    expect(
+      find.descendant(of: banner, matching: find.textContaining('開始時間、結束時間')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
