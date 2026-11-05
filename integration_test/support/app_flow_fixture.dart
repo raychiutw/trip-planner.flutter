@@ -11,6 +11,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/auth_repository.dart';
+import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/map_repository.dart';
@@ -422,6 +423,10 @@ class AppFlowFixture {
   final AppVersion? fixedAppVersion;
   final ThemeMode? initialThemeMode;
 
+  /// 跨流程驗證要用真的 ApiClient 與快取（離線佇列、衝突）時才設；預設沿用 [apiClient] 替身。
+  ApiClient? realApiClient;
+  CacheStore? realCacheStore;
+
   Future<void> dispose() async {
     await favoritesStream.close();
     await pendingCountStream.close();
@@ -447,7 +452,9 @@ class AppFlowFixture {
     return ProviderScope(
       overrides: [
         ...authOverrides,
-        apiClientProvider.overrideWithValue(apiClient),
+        apiClientProvider.overrideWithValue(realApiClient ?? apiClient),
+        if (realCacheStore != null)
+          cacheStoreProvider.overrideWithValue(realCacheStore!),
         authRepositoryProvider.overrideWithValue(auth),
         tripRepositoryProvider.overrideWithValue(trips),
         collabRepositoryProvider.overrideWithValue(collab),

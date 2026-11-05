@@ -937,6 +937,69 @@ void main() {
     expect(router.state.uri.path, '/trips/copied-trip');
   });
 
+  testWidgets('公開分享登入複製後，在複製出的行程列印並保留登入身分（#387 流程4）', (tester) async {
+    final auth = _MockAuthRepository();
+    final printActions = _RecordingPrintActions();
+    var signedIn = false;
+    when(
+      auth.currentUser,
+    ).thenAnswer((_) async => signedIn ? _loggedInUser : null);
+    final container = _buildContainer(
+      currentUser: null,
+      authRepository: auth,
+      resolveAuthFromRepository: true,
+      extraOverrides: fakeBrowserLoginOverrides(onLogin: () => signedIn = true),
+      printActions: printActions,
+    );
+    addTearDown(container.dispose);
+    final repository = container.read(accountRepositoryProvider);
+    when(
+      () => repository.clonePublicTripShare('public-token'),
+    ).thenAnswer((_) async => 'copied-trip');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/s/public-token');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('login-browser-button')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/s/public-token');
+
+    // 登入後回到同一個公開分享頁，列印仍可用，且不會因此離開分享頁。
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(printActions.printed, hasLength(1));
+    expect(printActions.printed.single.displayTitle, 'public-trip');
+    expect(router.state.uri.path, '/s/public-token');
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+    verify(() => repository.clonePublicTripShare('public-token')).called(1);
+    expect(router.state.uri.path, '/trips/copied-trip');
+
+    // 複製出的行程：從功能選單進列印頁並列印，不再被導去登入。
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-print')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripPrintScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('trip-print-do')));
+    await tester.pumpAndSettle();
+    expect(printActions.printed, hasLength(2));
+    expect(printActions.printed.last.displayTitle, 'print-trip');
+  });
+
   testWidgets('未登入可進入邀請確認頁 /invite?token', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
