@@ -555,10 +555,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
     await tester.pumpAndSettle();
     expect(find.text('保留你的版本？'), findsOneWidget);
-    expect(
-      find.text('協作者也修改了相同欄位。\n繼續會以你的版本覆蓋對方的版本。'),
-      findsOneWidget,
-    );
+    expect(find.text('協作者也修改了相同欄位。\n繼續會以你的版本覆蓋對方的版本。'), findsOneWidget);
     await tester.tap(find.text('保留我的版本'));
     await tester.pumpAndSettle();
     verify(
