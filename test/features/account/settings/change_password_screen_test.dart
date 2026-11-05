@@ -97,6 +97,15 @@ void main() {
     );
   });
 
+  testWidgets('說明字不被截成一行（HIG 截圖發現：後半句被省略號吃掉）', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final decoration = inner(tester, next).decoration!;
+    expect(decoration.helperMaxLines, greaterThanOrEqualTo(3));
+    expect(decoration.helperText, contains('這台維持登入'));
+  });
+
   testWidgets('顯示／隱藏切換新密碼', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

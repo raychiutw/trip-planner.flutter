@@ -206,7 +206,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       decoration: InputDecoration(
                         labelText: '新密碼',
                         helperText:
-                            '至少 $_minPasswordLength 字元。變更後其他裝置會登出,這台維持登入。',
+                            '至少 $_minPasswordLength 字元。變更後其他裝置會登出，這台維持登入。',
+                        helperMaxLines: 3,
                         border: InputBorder.none,
                         errorText: _nextError,
                         suffixIcon: IconButton(
