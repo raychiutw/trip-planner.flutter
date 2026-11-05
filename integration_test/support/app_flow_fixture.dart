@@ -15,6 +15,7 @@ import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
+import 'package:tripline/api/ai_data_consent_repository.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
@@ -57,6 +58,13 @@ class MockTripRepository extends Mock implements TripRepository {}
 class MockCollabRepository extends Mock implements CollabRepository {}
 
 class MockRequestsRepository extends Mock implements RequestsRepository {}
+
+/// 預設讀不到狀態＝AI 資料同意旗標關閉，流程與沒有這個功能時相同。
+class _UnenforcedConsentRepository extends Mock
+    implements AiDataConsentRepository {
+  @override
+  Future<Never?> fetch() async => null;
+}
 
 class MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
@@ -444,6 +452,9 @@ class AppFlowFixture {
         tripRepositoryProvider.overrideWithValue(trips),
         collabRepositoryProvider.overrideWithValue(collab),
         requestsRepositoryProvider.overrideWithValue(requests),
+        aiDataConsentRepositoryProvider.overrideWithValue(
+          _UnenforcedConsentRepository(),
+        ),
         favoritesRepositoryProvider.overrideWithValue(favorites),
         favoritesProvider.overrideWith((ref) => favoritesStream.stream),
         offlinePendingCountProvider.overrideWith(

@@ -1,6 +1,6 @@
 # HIG 比對後的修改清單（#531）
 
-日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（136 個場景全看；原為 125，後續各輪補到 136）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
+日期：2026-11-04。來源：[App 逐張檢查報告](2026-11-04-hig-screenshot-review-app.md)（142 個場景全看；原為 125，後續各輪補到 142）與 web 逐張檢查報告（trip-planner repo 的 `docs/qa/2026-11-04-hig-web-screenshot-review.md`，27 個場景桌機與手機寬全看）。
 
 這份清單只列「要改什麼」，每項都帶位置、建議改法與怎麼驗證。清單寫成時還沒動程式碼，之後已處理的項目標 ✅（A1～A7、A9、A11、A14、S1～S3、T2 等）、查過不改的標 ⚪；排序是我的建議，開票與否由你決定。
 
@@ -71,6 +71,9 @@
 | A22 | `entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm` | G2、G3 | 三處「保留你的版本？」覆寫確認措辭不一致：筆記的標題與破壞性鈕是「保留你的修改？」「保留我的修改」，停留點與交通是「保留你的版本？」「保留我的版本」；說明主體也各寫各的（「你目前的內容」「你的草稿」「你目前的交通方式與分鐘數」「那些欄位」）。結構相同（取消「繼續編輯」在左、紅字破壞性鈕在右），只有用字不同 | 三處統一標題與按鈕用字（建議沿用「保留你的版本？」「保留我的版本」），說明只在「覆蓋什麼」處差異化；改前確認 web 版用語 | 看圖＋原始碼比對 |
 | A23 | `entry-edit-sheet-remote-conflict` | F、G2 | 停留點編輯 sheet 進入遠端衝突狀態後，**畫面上沒有任何提示哪個欄位與協作者衝突**（只有欄位外框，備註欄顯示使用者的草稿，對方的備註不可見），使用者要按「儲存」才在確認框得知；筆記與交通 sheet 則至少有頂部紅底說明橫幅（「已載入最新版本…」）。 | 衝突欄位旁加提示列（例如「協作者也改了這個欄位」），或沿用筆記與交通的橫幅；取證時注意：這是靜止狀態，不含 snackbar | 看圖＋原始碼 |
 | A24 | `travel-edit-overwrite-confirm` | G2 | 確認框說明三行，末行剩孤字「本。」（與 A21 同型，低嚴重度） | 縮短說明或調整斷句 | 看圖 |
+| A25 | `account-ai-data-settings`、`account-ai-data-settings-stale` | F、D | 「AI 與資料」頁底的「撤回同意」「查看說明並同意」是動作列（前者跳確認框、後者開 sheet），卻用 `TpSettingsRow` 的預設右箭頭，暗示會推進下一頁 | 動作列不顯示 chevron（`trailing` 傳空），或改成置中的按鈕列；改前確認其他動作列（登出等）的做法 | 看圖 |
+| A26 | `trip-health-ai-data-consent-sheet`（同一橫幅也出現在聊天同意 sheet 的已撤回狀態） | G | 已撤回橫幅文字折行後末行剩孤字「意。」（與 A21、A24 同型，低嚴重度；文案與 web 相同） | 縮短或調整斷句，web 同步 | 看圖 |
+| A27 | `chat-ai-data-owner-missing-sheet` | D12、版面 | 旅伴被 owner 擋下的 sheet 標題列同時有「取消」與「知道了」兩個等效動作；內容只佔 sheet 上方約四分之一，下方整片空白 | 這類純告知用 alert 或縮小 sheet 高度，只留一個關閉動作；與 web 的「owner-missing」sheet 一併決定 | 看圖 |
 
 **與專案決策有張力，需要你決定要不要改規則，不建議直接改程式：** `account-home`、`account-home-security` 的生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。這些都是已知的專案決定。
 
@@ -153,7 +156,7 @@ web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告
 
 ## 清單覆蓋率
 
-App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 135 個畫面**；畫面清單裡標「部分」的彈出層（編輯行程與分享的日期選擇器、`showAppConfirm` 在通知設定與帳號查看說明等、`showAppNotice` 在其餘畫面、`showAppAlert` 的其餘呼叫端）沒有取證，不能因為本報告而視為通過；各場景用測試替身造狀態的限制見[缺口文件](2026-11-04-hig-verification-gaps.md)第 1 節。
+App 路由與彈出層對照見[畫面清單](../research/2026-11-04-hig-app-screen-inventory.md)。**本報告只涵蓋「有 mock 場景」的 142 個畫面**；畫面清單裡標「部分」的彈出層（編輯行程與分享的日期選擇器、`showAppConfirm` 在通知設定與帳號查看說明等、`showAppNotice` 在其餘畫面、`showAppAlert` 的其餘呼叫端）沒有取證，不能因為本報告而視為通過；各場景用測試替身造狀態的限制見[缺口文件](2026-11-04-hig-verification-gaps.md)第 1 節。
 
 ## 四、看過但判定沒問題的（避免重複討論）
 

@@ -61,6 +61,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | 個人資料 | 已有場景 | `account-settings-profile` |
 | 通知 | 已有場景 | `account-settings-notifications` `ax-account-notifications-2x` |
 | 變更密碼 | 已有場景 | `account-change-password` |
+| AI 與資料（帳號設定，#390） | 已有場景 | `account-ai-data-settings` `account-ai-data-settings-stale` `account-ai-data-withdraw-confirm` |
 
 ### 啟動時的全螢幕狀態
 
@@ -84,7 +85,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppContentSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppScreenSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
-| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 已有場景（九處呼叫端都有） | `note-edit-sheet` `favorites-filter-sheet` `chat-ai-consent-sheet` `explore-custom-region-sheet` `poi-info-edit-sheet` `travel-edit-sheet` `share-edit-sheet` `entry-edit-sheet` `sync-conflict-sheet` `sync-conflict-sheet-many`（衝突解決 sheet 已有場景）`entry-edit-sheet-remote-conflict`（停留點遠端衝突狀態） |
+| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 已有場景（九處呼叫端都有） | `note-edit-sheet` `favorites-filter-sheet` `chat-ai-consent-sheet` `chat-ai-data-consent-sheet` `chat-ai-data-owner-missing-sheet` `trip-health-ai-data-consent-sheet` `explore-custom-region-sheet` `poi-info-edit-sheet` `travel-edit-sheet` `share-edit-sheet` `entry-edit-sheet` `sync-conflict-sheet` `sync-conflict-sheet-many`（衝突解決 sheet 已有場景）`entry-edit-sheet-remote-conflict`（停留點遠端衝突狀態） |
 | `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | 部分 | `favorites-removed-notice`（只覆蓋收藏移除成功；其餘畫面的通知仍無場景） |
 | `confirmAndRunIrreversibleAction` | 協作、分享 | 部分 | `share-revoke-confirm` `collab-remove-member-confirm` `collab-revoke-invite-confirm`（重新產生、刪除分享連結同一支元件，未各拍一張） |
 | `confirmAndDelete` | 停留點 POI、時間軸、筆記 | 已有場景 | `timeline-delete-entry-confirm` `note-delete-confirm` `entry-alternate-remove-confirm` |
