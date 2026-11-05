@@ -78,18 +78,18 @@
 
 | # | 場景 | 檢查表 | 問題 | 建議修改 | 強度 |
 |---|---|---|---|---|---|
-| W1 ✅ 已處理 web#1580（PR 未合併） | `account-sessions`、`account-connected-apps`、`developer-apps` | 版面 | 頁面上方小標被固定頁首壓住而被裁切或重疊，桌機與手機都有 | 頁面內容區加上頁首高度的 `scroll-margin`／padding-top | 看圖 |
-| W2 ✅ 已處理 web#1580（PR 未合併） | `trip-detail`（桌機） | E1 | 地圖面板錯誤態的「重試」是未套樣式的原生灰色按鈕 | 改用專案按鈕元件 | 看圖 |
-| W3 ✅ 已處理 web#1580（PR 未合併） | `trip-detail`（手機） | 版面 | 移動方式膠囊超出右緣被截斷 | 允許換行或改成可橫向捲動並露出邊緣提示 | 看圖 |
-| W4 ✅ 已處理 web#1580（PR 未合併） | `explore`（手機） | — | 篩選膠囊「Sight 1」與卡片類別「SIGHT」是未在地化的英文原值 | 類別 key 對照到中文標籤 | 看圖 |
-| W5 ✅ 已處理 web#1580（PR 未合併） | `trips-new`（手機） | B | 日期欄位「選擇日期」字級明顯大於同頁其他 placeholder | 與其他欄位的 placeholder 字級對齊 | 看圖 |
-| W6 ✅ 已處理 web#1580（PR 未合併） | `trip-detail` | WCAG 2.5.3 | 起訖時間 chip 的 `aria-label="編輯起訖時間"` 蓋掉可見時間文字（`EntryTimeChip.tsx:140`，9 個節點） | 讓 accessible name 以可見文字開頭，如「09:00–12:00，編輯起訖時間」 | axe 加程式碼 |
-| W7 ✅ 已處理 web#1580（PR 未合併） | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
-| W8 ✅ 已處理 web#1580（PR 未合併） | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
-| W9 | `trips-list-error` | G6、G7 | 行程清單載入失敗只有一行字，沒有重試（`TripsListPage` 錯誤態沒有任何重試動作） | 補「重試」，行為與 App 的錯誤態一致 | 看圖加程式碼 |
-| W10 | `signup-check-email`、`invite` | B7 | 以「320px、html 字級 200%」近似量測有橫向捲動（scrollWidth 354、366 對 320），原因未定位；近似量法，是否構成 1.4.10 違規待驗證 | 先定位再修，並用瀏覽器縮放驗證 | 量測（未定位） |
+| W1 ✅ 已處理 web#1580（已合併） | `account-sessions`、`account-connected-apps`、`developer-apps` | 版面 | 頁面上方小標被固定頁首壓住而被裁切或重疊，桌機與手機都有 | 頁面內容區加上頁首高度的 `scroll-margin`／padding-top | 看圖 |
+| W2 ✅ 已處理 web#1580（已合併） | `trip-detail`（桌機） | E1 | 地圖面板錯誤態的「重試」是未套樣式的原生灰色按鈕 | 改用專案按鈕元件 | 看圖 |
+| W3 ✅ 已處理 web#1580（已合併） | `trip-detail`（手機） | 版面 | 移動方式膠囊超出右緣被截斷 | 允許換行或改成可橫向捲動並露出邊緣提示 | 看圖 |
+| W4 ✅ 已處理 web#1580（已合併） | `explore`（手機） | — | 篩選膠囊「Sight 1」與卡片類別「SIGHT」是未在地化的英文原值 | 類別 key 對照到中文標籤 | 看圖 |
+| W5 ✅ 已處理 web#1580（已合併） | `trips-new`（手機） | B | 日期欄位「選擇日期」字級明顯大於同頁其他 placeholder | 與其他欄位的 placeholder 字級對齊 | 看圖 |
+| W6 ✅ 已處理 web#1580（已合併） | `trip-detail` | WCAG 2.5.3 | 起訖時間 chip 的 `aria-label="編輯起訖時間"` 蓋掉可見時間文字（`EntryTimeChip.tsx:140`，9 個節點） | 讓 accessible name 以可見文字開頭，如「09:00–12:00，編輯起訖時間」 | axe 加程式碼 |
+| W7 ✅ 已處理 web#1580（已合併） | `trips-new` | WCAG 2.5.3、ARIA | 日期欄的 `aria-label` 與可見文字不一致；`aria-required` 加在不允許的角色上 | 先讀 `TripDatePicker`，把 `required` 改用該角色允許的方式表達 | axe（元件內部未讀） |
+| W8 ✅ 已處理 web#1580（已合併） | `trip-print` | C5 | 分區數量標籤 `#8a7a68`、11px，4.14:1（`tripPrintStyles.ts:66`） | 調深該色至 4.5:1 以上 | axe 加程式碼 |
+| W9 ✅ 已處理 web#1582（已合併） | `trips-list-error` | G6、G7 | 行程清單載入失敗只有一行字，沒有重試（`TripsListPage` 錯誤態沒有任何重試動作） | 補「重試」，行為與 App 的錯誤態一致 | 看圖加程式碼 |
+| W10 ✅ 已處理 web#1582（已合併） | `signup-check-email`、`invite` | B7 | 以「320px、html 字級 200%」近似量測有橫向捲動（scrollWidth 354、366 對 320），原因未定位；近似量法，是否構成 1.4.10 違規待驗證 | 先定位再修，並用瀏覽器縮放驗證 | 量測（未定位） |
 
-W1～W8 已由 web PR #1580 處理（W9、W10 未動）；該 PR 尚未合併，合併後再確認。
+W1～W8 已由 web PR #1580 處理，W9、W10 已由 web PR #1582 處理，三者都已合併。W10 的成因是不可斷字串（長 email、邀請內文）撐出容器，修在元件（`overflow-wrap: anywhere`），用 320px 加 200% 字級重現並驗證；那仍是近似量法，沒有另外驗真實瀏覽器縮放。
 
 web 補掃（axe、320px 重排、200% 文字、鍵盤焦點）詳見 web 報告「補掃」一節：重排與放大沒有橫向捲動；`explore` 搜尋欄的焦點樣式待目視確認；`landing` 的 200% 文字檢查沒有生效。
 
