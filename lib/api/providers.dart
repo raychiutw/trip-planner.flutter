@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/oauth_tokens.dart';
 import '../models/user.dart';
 import 'account_repository.dart';
+import 'ai_data_consent_repository.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
@@ -43,6 +44,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final accountRepositoryProvider = Provider<AccountRepository>(
   (ref) => AccountRepository(client: ref.watch(apiClientProvider)),
+);
+
+final aiDataConsentRepositoryProvider = Provider<AiDataConsentRepository>(
+  (ref) => AiDataConsentRepository(client: ref.watch(apiClientProvider)),
 );
 
 final tripRepositoryProvider = Provider<TripRepository>(

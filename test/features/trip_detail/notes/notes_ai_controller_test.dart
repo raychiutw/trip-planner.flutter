@@ -11,6 +11,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
 import 'package:tripline/features/trip_detail/notes/notes_ai_controller.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
+import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip_request.dart';
@@ -987,4 +988,29 @@ void main() {
       verify(() => repo.fetchNotesAiState('t')).called(1);
     });
   }
+
+  test('缺 AI 資料同意被擋：回到閒置、不算失敗，並把型別化例外交給呼叫端', () async {
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 't'),
+    ).thenThrow(
+      const AiConsentRequiredException(
+        party: AiConsentParty.submitter,
+        requiredVersion: 'ai-data-v1',
+      ),
+    );
+    final c = makeContainer();
+    final ctrl = c.read(notesAiControllerProvider('t').notifier);
+    c.listen(notesAiControllerProvider('t'), (_, _) {});
+    await _flush();
+
+    await expectLater(
+      ctrl.generate(NoteGenerationType.tips),
+      throwsA(isA<AiConsentRequiredException>()),
+    );
+
+    final state = job(c, NoteGenerationType.tips);
+    expect(state.phase, NotesAiPhase.idle);
+    expect(state.failureMessage, isNull);
+    expect(state.isBusy, isFalse);
+  });
 }

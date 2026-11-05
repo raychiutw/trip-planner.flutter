@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/account_repository.dart';
+import 'package:tripline/api/ai_data_consent_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart' show AccountDeletionPreview;
 import 'package:tripline/api/poi_repository.dart';
@@ -35,6 +36,7 @@ import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/day.dart' show TripDay;
@@ -65,6 +67,62 @@ class MockShareRepository extends Mock implements ShareRepository {}
 
 class MockPoiRepository extends Mock implements PoiRepository {}
 
+class MockAiDataConsentRepository extends Mock
+    implements AiDataConsentRepository {}
+
+/// 取證用的 AI 資料同意狀態；文字形狀對照 api `ai-data-v1`，占位符換成明顯的待填字樣
+/// （正式文案由 server 提供，App 不寫死，這裡只是 fixture）。
+AiDataConsent higConsent(
+  AiDataConsentStatus status, {
+  bool enforced = true,
+}) => AiDataConsent(
+  status: status,
+  currentVersion: 'ai-data-v1',
+  acceptedVersion: status == AiDataConsentStatus.valid ? 'ai-data-v1' : null,
+  acceptedAt: status == AiDataConsentStatus.valid
+      ? '2026-10-01T02:03:04.000Z'
+      : null,
+  enforced: enforced,
+  text: const AiDataConsentText(
+    version: 'ai-data-v1',
+    title: '讓 AI 協助安排你的行程？',
+    intro:
+        'Tripline 的 AI 助理可以依你的要求，幫你查詢景點、調整行程順序、新增或修改行程內容。要做到這些，我們需要把部分資料交給 AI 處理。請先看清楚下面的內容，再決定要不要同意。',
+    sections: [
+      AiDataConsentSection(
+        heading: '我們會交給 AI 的資料',
+        items: [
+          '送出要求的人在聊天中輸入的文字，以及送出者的顯示名稱（不含 email）。',
+          '被要求處理的那一個行程的內容：天數與日期、景點與店家名稱、備註、預約文字、交通方式與時間。',
+          '不會交給 AI：密碼、登入憑證、帳號 email、其他行程。',
+        ],
+      ),
+      AiDataConsentSection(
+        heading: '用途',
+        items: ['只用來完成這一次提出的行程要求（查詢、新增、修改、重新排序）。'],
+      ),
+      AiDataConsentSection(
+        heading: '處理方',
+        items: ['Anthropic（Claude）。資料的保存期間與是否用於模型訓練，依處理方條款，詳見連結：（待填）'],
+      ),
+      AiDataConsentSection(
+        heading: '你的選擇',
+        items: [
+          '同意：你之後送出的 AI 要求會交給 AI 處理。',
+          '不同意：不影響任何不需要 AI 的功能，仍可手動編輯行程、與旅伴共同編輯。',
+          '隨時撤回：到「帳號設定 → AI 與資料」。',
+        ],
+      ),
+    ],
+    withdrawal: [
+      '撤回後，新的 AI 要求會立即被拒絕。',
+      '排隊中、尚未開始的要求會被終結。',
+      '已經開始的工作不保證能停止。',
+      '已經交給 AI 處理的資料無法收回。',
+    ],
+  ),
+);
+
 const higUser = UserInfo(
   id: 'u-1',
   email: 'ray@example.com',
@@ -74,12 +132,15 @@ const higUser = UserInfo(
 
 /// 一個情境用的全部 fake（每個情境、每種明暗都重建，避免狀態外洩）。
 class HigFakes {
-  HigFakes._(this.fixture, this.account, this.share, this.poi);
+  HigFakes._(this.fixture, this.account, this.share, this.poi, this.consent);
 
   final AppFlowFixture fixture;
   final MockAccountRepository account;
   final MockShareRepository share;
   final MockPoiRepository poi;
+
+  /// AI 資料同意；預設讀不到狀態＝不強制（旗標關閉），不影響其他場景。
+  final MockAiDataConsentRepository consent;
 
   /// 預設 offline 假訊號；情境可改成 false 觸發「目前離線」橫幅。
   Stream<bool> network = const Stream<bool>.empty();
@@ -262,7 +323,9 @@ class HigFakes {
     when(
       () => fixture.trips.fetchPublicTripShare(any()),
     ).thenAnswer((_) async => higPublicShare);
-    return HigFakes._(fixture, account, share, poi);
+    final consent = MockAiDataConsentRepository();
+    when(consent.fetch).thenAnswer((_) async => null);
+    return HigFakes._(fixture, account, share, poi, consent);
   }
 
   /// 與 `AppFlowFixture.app` 相同的 override 鏈，再補 account／share／poi 與網路訊號。
@@ -303,6 +366,7 @@ class HigFakes {
         accountRepositoryProvider.overrideWithValue(account),
         shareRepositoryProvider.overrideWithValue(share),
         poiRepositoryProvider.overrideWithValue(poi),
+        aiDataConsentRepositoryProvider.overrideWithValue(consent),
       ],
       child: const TriplineApp(),
     );
@@ -1250,6 +1314,39 @@ List<HigScene> higScenes() => [
     location: '/trips?account=notifications',
   ),
   HigScene(
+    'account-ai-data-settings',
+    '#390',
+    location: '/trips?account=home',
+    stub: (f) => when(
+      f.consent.fetch,
+    ).thenAnswer((_) async => higConsent(AiDataConsentStatus.valid)),
+    act: (tester, f) async => _tapKey(tester, 'settings-ai-data'),
+    proof: () => find.byKey(const ValueKey('ai-data-settings-withdraw')),
+  ),
+  HigScene(
+    'account-ai-data-settings-stale',
+    '#390',
+    location: '/trips?account=home',
+    stub: (f) => when(
+      f.consent.fetch,
+    ).thenAnswer((_) async => higConsent(AiDataConsentStatus.stale)),
+    act: (tester, f) async => _tapKey(tester, 'settings-ai-data'),
+    proof: () => find.byKey(const ValueKey('ai-data-settings-consent')),
+  ),
+  HigScene(
+    'account-ai-data-withdraw-confirm',
+    '#390',
+    location: '/trips?account=home',
+    stub: (f) => when(
+      f.consent.fetch,
+    ).thenAnswer((_) async => higConsent(AiDataConsentStatus.valid)),
+    act: (tester, f) async {
+      await _tapKey(tester, 'settings-ai-data');
+      await _tapKey(tester, 'ai-data-settings-withdraw');
+    },
+    proof: () => find.byType(CupertinoAlertDialog),
+  ),
+  HigScene(
     'account-delete-dialog',
     '#425',
     location: '/trips?account=home',
@@ -1897,6 +1994,76 @@ List<HigScene> higScenes() => [
       await _tapKey(tester, 'chat-send');
     },
     proof: () => find.byKey(const ValueKey('ai-consent-title')),
+  ),
+
+  HigScene(
+    'chat-ai-data-consent-sheet',
+    '#390',
+    location: '/chat',
+    stub: (f) => when(
+      f.consent.fetch,
+    ).thenAnswer((_) async => higConsent(AiDataConsentStatus.none)),
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('chat-input')),
+        '幫我排 Day 1',
+      );
+      await tester.pump();
+      await _tapKey(tester, 'chat-send');
+    },
+    proof: () => find.byKey(const ValueKey('ai-data-consent-accept')),
+  ),
+  HigScene(
+    'chat-ai-data-owner-missing-sheet',
+    '#390',
+    location: '/chat',
+    stub: (f) {
+      when(
+        f.consent.fetch,
+      ).thenAnswer((_) async => higConsent(AiDataConsentStatus.valid));
+      when(
+        () => f.requests.sendRequest(
+          tripId: any(named: 'tripId'),
+          message: any(named: 'message'),
+        ),
+      ).thenThrow(
+        const AiConsentRequiredException(
+          party: AiConsentParty.owner,
+          requiredVersion: 'ai-data-v1',
+        ),
+      );
+    },
+    act: (tester, f) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('chat-input')),
+        '幫我排 Day 1',
+      );
+      await tester.pump();
+      await _tapKey(tester, 'chat-send');
+    },
+    proof: () => find.byKey(const ValueKey('ai-data-consent-owner-missing')),
+  ),
+  HigScene(
+    'trip-health-ai-data-consent-sheet',
+    '#390',
+    location: '/trips/okinawa/health',
+    stub: (f) {
+      _poiHealthOk(f);
+      when(
+        () => f.fixture.trips.fetchHealthReport(any()),
+      ).thenAnswer((_) async => null);
+      when(
+        f.consent.fetch,
+      ).thenAnswer((_) async => higConsent(AiDataConsentStatus.withdrawn));
+    },
+    act: (tester, f) async {
+      await tester.tap(find.byKey(const ValueKey('trip-health-start-button')));
+      // 啟動中按鈕有永不停止的 spinner，不能 pumpAndSettle。
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    },
+    proof: () => find.byKey(const ValueKey('ai-data-consent-accept')),
   ),
 
   // ── 邀請 ──

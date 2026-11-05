@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../models/ai_data_consent.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_chip.dart';
@@ -23,6 +24,7 @@ import '../../ui/tp_state_view.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
+import '../ai_consent/ai_data_consent_flow.dart';
 import '../requests/request_lifecycle.dart';
 import 'ai_consent_sheet.dart';
 import 'chat_controller.dart';
@@ -419,35 +421,55 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     final text = rawText.trim();
     if (text.isEmpty || _sendInProgress) return;
     _sendInProgress = true;
+    final tripId = widget.tripId;
     try {
-      if (_aiAuthorized == null) {
-        await _aiAuthorizationLoad;
-        if (!mounted) return;
-      }
-
-      if (_aiAuthorized != true) {
-        final authorized = await showAiConsentSheet(
-          context,
-          message: text,
-          onAuthorize: () => ref.read(authRepositoryProvider).authorizeAi(),
-        );
-        if (!mounted) return;
-        if (!authorized) return;
-        _aiAuthorized = true;
-      }
-
-      if (clearComposer) _input.clear();
-      HapticFeedback.lightImpact();
-      unawaited(
-        ref.read(chatControllerProvider(widget.tripId).notifier).send(text),
+      // 資料同意先於操作授權（隱私同意是前提）；被 server 擋下時就地同意並接續。
+      await runWithAiDataConsent<bool>(
+        context,
+        ref,
+        keptMessage: text,
+        isCurrent: () => mounted && widget.tripId == tripId,
+        action: () => _authorizeAndSend(text, clearComposer: clearComposer),
       );
-      // 捲到底(reverse list 底部 = offset 0)。
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) _scroll.jumpTo(0);
-      });
     } finally {
       _sendInProgress = false;
     }
+  }
+
+  /// 操作授權（既有）→ 送出。被資料同意閘門擋下時把輸入放回輸入框，交給同意流程重試。
+  Future<bool?> _authorizeAndSend(
+    String text, {
+    required bool clearComposer,
+  }) async {
+    if (_aiAuthorized == null) {
+      await _aiAuthorizationLoad;
+      if (!mounted) return null;
+    }
+
+    if (_aiAuthorized != true) {
+      final authorized = await showAiConsentSheet(
+        context,
+        message: text,
+        onAuthorize: () => ref.read(authRepositoryProvider).authorizeAi(),
+      );
+      if (!mounted) return null;
+      if (!authorized) return null;
+      _aiAuthorized = true;
+    }
+
+    if (clearComposer) _input.clear();
+    HapticFeedback.lightImpact();
+    try {
+      await ref.read(chatControllerProvider(widget.tripId).notifier).send(text);
+    } on AiConsentRequiredException {
+      if (clearComposer && mounted) _input.text = text;
+      rethrow;
+    }
+    // 捲到底(reverse list 底部 = offset 0)。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    });
+    return true;
   }
 
   @override

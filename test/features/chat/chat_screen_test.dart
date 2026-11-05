@@ -1,4 +1,6 @@
+import '../../helpers/ai_data_consent_fixtures.dart';
 import '../../helpers/semantics_flags.dart';
+import 'package:tripline/models/ai_data_consent.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
@@ -92,8 +94,10 @@ void main() {
   late StreamController<TripRequestEvent> requestEvents;
   late _MockTripRepo tripRepo;
   late _MockAuthRepo authRepo;
+  late MockAiDataConsentRepo consentRepo;
 
   setUp(() {
+    consentRepo = unenforcedConsentRepo();
     reqRepo = _MockRequestsRepo();
     requestEvents = StreamController<TripRequestEvent>.broadcast();
     addTearDown(requestEvents.close);
@@ -143,6 +147,7 @@ void main() {
         requestsRepositoryProvider.overrideWithValue(reqRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
         authRepositoryProvider.overrideWithValue(authRepo),
+        aiDataConsentRepositoryProvider.overrideWithValue(consentRepo),
         authStateProvider.overrideWith(() => _StubAuth(currentUser)),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
       ],
@@ -2250,6 +2255,208 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('輸入訊息或語音指令'), findsOneWidget);
+    });
+  });
+
+  group('AI 資料同意', () {
+    void stubSend(String text, int id) {
+      when(
+        () => reqRepo.sendRequest(
+          tripId: any(named: 'tripId'),
+          message: any(named: 'message'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            _req(id: id, message: text, status: RequestStatus.processing),
+      );
+      when(() => reqRepo.fetchRequest(id)).thenAnswer(
+        (_) async => _req(
+          id: id,
+          message: text,
+          status: RequestStatus.completed,
+          reply: '完成',
+        ),
+      );
+    }
+
+    Future<void> typeAndSend(WidgetTester tester, String text) async {
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('chat-input')), text);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('chat-send')));
+      await tester.pumpAndSettle();
+    }
+
+    String inputText(WidgetTester tester) => tester
+        .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+        .controller!
+        .text;
+
+    void verifyNoSend() => verifyNever(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    );
+
+    testWidgets('旗標關閉（enforced=false）：不跳資料同意，行為與現在完全相同', (tester) async {
+      when(consentRepo.fetch).thenAnswer(
+        (_) async =>
+            aiConsentFixture(AiDataConsentStatus.none, enforced: false),
+      );
+      stubSend('排晚餐', 8);
+      await typeAndSend(tester, '排晚餐');
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      verify(
+        () => reqRepo.sendRequest(tripId: 'okinawa', message: '排晚餐'),
+      ).called(1);
+      verifyNever(() => consentRepo.accept(any()));
+    });
+
+    for (final status in [
+      AiDataConsentStatus.none,
+      AiDataConsentStatus.stale,
+      AiDataConsentStatus.withdrawn,
+    ]) {
+      testWidgets('$status：先跳資料同意，同意前不發 AI request，輸入保留', (tester) async {
+        when(
+          consentRepo.fetch,
+        ).thenAnswer((_) async => aiConsentFixture(status));
+        await typeAndSend(tester, '排晚餐');
+
+        expect(
+          find.byKey(const ValueKey('ai-data-consent-accept')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('ai-data-consent-kept')),
+          findsOneWidget,
+        );
+        verifyNoSend();
+        expect(inputText(tester), '排晚餐');
+      });
+    }
+
+    testWidgets('取消：不送、輸入保留、不呼叫 accept', (tester) async {
+      when(
+        consentRepo.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.none));
+      await typeAndSend(tester, '排晚餐');
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-cancel')));
+      await tester.pumpAndSettle();
+
+      verifyNoSend();
+      verifyNever(() => consentRepo.accept(any()));
+      expect(inputText(tester), '排晚餐');
+    });
+
+    testWidgets('同意 → 接續送出原訊息恰好一次並清空輸入', (tester) async {
+      when(
+        consentRepo.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.none));
+      when(
+        () => consentRepo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      stubSend('排晚餐', 8);
+      await typeAndSend(tester, '排晚餐');
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => reqRepo.sendRequest(tripId: 'okinawa', message: '排晚餐'),
+      ).called(1);
+      expect(inputText(tester), isEmpty);
+    });
+
+    testWidgets('資料同意先於 AI 操作授權：同意後才輪到操作授權，仍未送出', (tester) async {
+      when(authRepo.fetchAiAuthorization).thenAnswer((_) async => false);
+      when(
+        consentRepo.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.none));
+      when(
+        () => consentRepo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      await typeAndSend(tester, '排晚餐');
+      expect(find.byKey(const ValueKey('ai-consent-authorize')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ai-consent-authorize')),
+        findsOneWidget,
+      );
+      verifyNoSend();
+    });
+
+    testWidgets('本地不知道、server 403 送出者缺同意：就地同意後只重送一次，且不留錯誤橫幅', (tester) async {
+      var reads = 0;
+      when(consentRepo.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? aiConsentFixture(AiDataConsentStatus.valid, enforced: false)
+            : aiConsentFixture(AiDataConsentStatus.none),
+      );
+      when(
+        () => consentRepo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      var attempt = 0;
+      when(
+        () => reqRepo.sendRequest(
+          tripId: any(named: 'tripId'),
+          message: any(named: 'message'),
+        ),
+      ).thenAnswer((_) async {
+        if (attempt++ == 0) throw submitterGate;
+        return _req(id: 8, message: '排晚餐', status: RequestStatus.processing);
+      });
+      when(() => reqRepo.fetchRequest(8)).thenAnswer(
+        (_) async => _req(
+          id: 8,
+          message: '排晚餐',
+          status: RequestStatus.completed,
+          reply: '完成',
+        ),
+      );
+      await typeAndSend(tester, '排晚餐');
+      expect(inputText(tester), '排晚餐', reason: '被擋時輸入要還在');
+      expect(find.text('沒有權限傳訊息'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => reqRepo.sendRequest(tripId: 'okinawa', message: '排晚餐'),
+      ).called(2);
+      expect(inputText(tester), isEmpty);
+    });
+
+    testWidgets('旅伴被 owner 擋下：清楚訊息、輸入保留、沒有排隊中的泡泡', (tester) async {
+      when(
+        consentRepo.fetch,
+      ).thenAnswer((_) async => aiConsentFixture(AiDataConsentStatus.valid));
+      when(
+        () => reqRepo.sendRequest(
+          tripId: any(named: 'tripId'),
+          message: any(named: 'message'),
+        ),
+      ).thenThrow(ownerGate);
+      await typeAndSend(tester, '排晚餐');
+
+      expect(find.textContaining('行程擁有者尚未同意 AI 資料處理'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      expect(inputText(tester), '排晚餐');
+      expect(find.text('沒有權限傳訊息'), findsNothing);
+      verify(
+        () => reqRepo.sendRequest(tripId: 'okinawa', message: '排晚餐'),
+      ).called(1);
     });
   });
 }

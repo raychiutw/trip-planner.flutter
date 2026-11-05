@@ -64,6 +64,9 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'travel-edit-sheet': {'Drag handle 36x4'},
   'explore-custom-region-sheet': {'Drag handle 36x4'},
   'chat-ai-consent-sheet': {'Drag handle 36x4'},
+  'chat-ai-data-consent-sheet': {'Drag handle 36x4'},
+  'chat-ai-data-owner-missing-sheet': {'Drag handle 36x4'},
+  'trip-health-ai-data-consent-sheet': {'Drag handle 36x4'},
   // 「匿名分享」勾選框 40x40，與分享頁建立表單同一個元件（'share-manage'）。
   'share-edit-sheet': {'(無標籤) 40x40', 'Drag handle 36x4'},
   'favorites-removed-notice': {'搜尋收藏 361x36'},
@@ -77,6 +80,7 @@ const _knownTapTargetViolations = <String, Set<String>>{
 const _scenesWithDialog = {
   'account-logout-confirm',
   'account-connected-app-revoke-confirm',
+  'account-ai-data-withdraw-confirm',
   'account-delete-dialog',
   'chat-voice-consent',
   'invite-wrong-account-pending',
