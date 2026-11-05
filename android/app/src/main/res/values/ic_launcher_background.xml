@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 與 iOS Default 底色同一個品牌 tint（GLOSSARY「tint」） -->
+    <color name="ic_launcher_background">#FF8A6038</color>
+</resources>

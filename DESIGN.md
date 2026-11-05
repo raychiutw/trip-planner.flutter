@@ -386,12 +386,14 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：不預先裁圓角，由系統套用遮罩。
 - **Tripline 決策**：主圖保留足夠安全邊距，確保 20pt 小尺寸仍可辨識。
 - **Tripline 決策**：iOS 沿用 `Assets.xcassets/AppIcon.appiconset` 的 Single Size 格式，提供 Default／Dark／Tinted 三個 1024×1024 主檔，各尺寸由 Xcode 產生。
-- **Tripline 決策**：Android 沿用既有 `mipmap-*/ic_launcher.png`，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
+- **Tripline 決策**：Android 8 以上用 adaptive icon（`mipmap-anydpi-v26/ic_launcher.xml`）：底層是單色 `@color/ic_launcher_background`（`#8A6038`）、前景為透明底的奶油白圖形、`monochrome` 供 Android 13 主題圖示；圖形縮放置中並落在安全區（66dp／108dp 的圓）內。傳統 `mipmap-*/ic_launcher.png` 保留給舊版 Android，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
 - 所有 PNG 必須是正方形、正確像素尺寸且**不含 alpha**。
 
 木棕 `#8A6038` 就是 GLOSSARY.md 定義的淺色 tint（品牌柔褐，全產品單一值）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。Dark 變體的圖形色沿用同一個值，不另用深色 tint `#D0A576`；Tinted 變體是給系統上色的灰階稿，不含品牌色。
 
-換色用 `tool/recolor_app_icon.swift`（macOS 內建 swift）：`bg` 換 Default 底色、`glyph` 換 Dark 圖形色，抗鋸齒邊緣會一併重混；Android 五種密度由 Default 主檔以 `sips -z <px> <px>` 縮放（48／72／96／144／192）。守門測試是 `test/docs/app_icon_brand_tint_test.dart`。web 圖示以同一份 iOS 主檔為準。
+換色用 `tool/recolor_app_icon.swift`（macOS 內建 swift）：`bg` 換 Default 底色、`glyph` 換 Dark 圖形色，抗鋸齒邊緣會一併重混；Android 五種密度由 Default 主檔以 `sips -z <px> <px>` 縮放（48／72／96／144／192）。守門測試是 `test/docs/app_icon_brand_tint_test.dart`。
+
+Android adaptive 的前景與 monochrome 圖層用 `tool/gen_android_adaptive_icon.swift` 由 iOS Default 主檔重產（同一套混合比例反推，混合比例當 alpha；各密度 108／162／216／324／432px 的 PNG，放 `mipmap-*dpi/ic_launcher_foreground.png`、`ic_launcher_monochrome.png`）。選 PNG 而非 vector drawable，是因為圖形的唯一來源是點陣主檔、沒有向量原稿，手描向量會讓兩平台的構圖漂移。`tool/preview_android_adaptive_icon.swift` 輸出圓形／圓角方形遮罩預覽（`docs/qa/android-adaptive-icon-preview.png`），那是靜態模擬遮罩，不是啟動器實拍。守門測試是 `test/docs/android_adaptive_icon_test.dart`（底層色、三個圖層資源、安全區）。web 圖示以同一份 iOS 主檔為準。
 
 ## 17. Motion 與 haptics
 
