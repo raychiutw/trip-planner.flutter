@@ -384,6 +384,68 @@ void main() {
       verifyNever(() => repo.accept(any()));
     });
 
+    testWidgets('同意後重送，版本又被更新而再被擋：重新讀取並再詢問一次，接續成功', (tester) async {
+      var reads = 0;
+      when(repo.fetch).thenAnswer((_) async {
+        final n = reads++;
+        if (n == 0) return _consent(AiDataConsentStatus.valid, enforced: false);
+        return n == 1
+            ? _consent(AiDataConsentStatus.none)
+            : _consent(AiDataConsentStatus.stale, version: 'ai-data-v2');
+      });
+      when(() => repo.accept(any())).thenAnswer(
+        (inv) async => _consent(
+          AiDataConsentStatus.valid,
+          version: inv.positionalArguments.first as String,
+        ),
+      );
+      var gates = 2;
+      thrower = () => gates-- > 0 ? _submitterGate : null;
+      await pumpFlow(tester);
+      await tapGo(tester);
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+        reason: '第二次被擋要重新彈 sheet，不是直接顯示無法確認',
+      );
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.accept('ai-data-v2')).called(1);
+      expect(calls, 3);
+      expect(outcome, isTrue);
+      expect(find.text(kAiConsentUnavailableMessage), findsNothing);
+    });
+
+    testWidgets('一直被擋：再詢問有上限，用完顯示無法確認、不無限迴圈', (tester) async {
+      var reads = 0;
+      when(repo.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? _consent(AiDataConsentStatus.valid, enforced: false)
+            : _consent(AiDataConsentStatus.none),
+      );
+      when(
+        () => repo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      thrower = () => _submitterGate;
+      await pumpFlow(tester);
+      await tapGo(tester);
+      for (var i = 0; i <= kAiConsentMaxReprompts; i++) {
+        await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+        await tester.pumpAndSettle();
+      }
+
+      verify(
+        () => repo.accept('ai-data-v1'),
+      ).called(kAiConsentMaxReprompts + 1);
+      expect(calls, kAiConsentMaxReprompts + 2);
+      expect(outcome, isNull);
+      expect(find.text(kAiConsentUnavailableMessage), findsOneWidget);
+    });
+
     testWidgets('重讀不到說明文字：不猜、不繞過閘門，顯示無法確認', (tester) async {
       when(repo.fetch).thenAnswer((_) async => null);
       thrower = () => _submitterGate;

@@ -16,6 +16,12 @@ import 'ai_data_consent_sheet.dart';
 /// 讀不到說明文字、無法確認同意狀態時的錯誤訊息。
 const kAiConsentUnavailableMessage = '暫時無法確認 AI 資料同意，請稍後再試。';
 
+/// 同意後重送仍被 403 擋下（說明在使用者看 sheet 期間又升版）時，最多再詢問幾次。
+///
+/// 升版是低頻事件，一次重問就足以涵蓋競態；超過仍被擋代表狀態不一致或後端異常，
+/// 再問只會讓使用者陷入同意迴圈，改顯示「無法確認」。
+const kAiConsentMaxReprompts = 1;
+
 /// 執行 [action]（必須用 `translateAiConsentGate` 包過 mutation，被擋時丟
 /// [AiConsentRequiredException]）。回傳 null = 使用者取消、owner 未同意、或同意後
 /// [isCurrent] 已為 false（換行程／離頁），此時動作沒有（再）執行。
@@ -61,10 +67,9 @@ Future<T?> runWithAiDataConsent<T extends Object>(
     return null;
   }
 
-  try {
-    return await action();
-  } on AiConsentRequiredException catch (gate) {
+  Future<T?> afterGate(AiConsentRequiredException gate, int reprompts) async {
     if (gate.party == AiConsentParty.owner) return tellOwnerMissing();
+    if (reprompts > kAiConsentMaxReprompts) return unavailable();
     final fresh = await notifier.refresh();
     if (!context.mounted || !current()) return null;
     if (fresh == null) return unavailable();
@@ -73,9 +78,13 @@ Future<T?> runWithAiDataConsent<T extends Object>(
       return await action();
     } on AiConsentRequiredException catch (again) {
       if (!context.mounted) return null;
-      return again.party == AiConsentParty.owner
-          ? tellOwnerMissing()
-          : unavailable();
+      return afterGate(again, reprompts + 1);
     }
+  }
+
+  try {
+    return await action();
+  } on AiConsentRequiredException catch (gate) {
+    return afterGate(gate, 0);
   }
 }

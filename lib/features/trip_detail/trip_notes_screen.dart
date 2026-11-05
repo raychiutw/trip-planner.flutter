@@ -155,7 +155,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
                       message: '這次生成超過 10 分鐘沒有完成，已經停止。可以再試一次。',
                       onRetry: () {
                         controller.dismiss(type);
-                        unawaited(controller.generate(type));
+                        _generateWithConsent(type);
                       },
                       onDismiss: () => controller.dismiss(type),
                     ),
@@ -174,7 +174,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
                           ai.of(type).failureMessage ?? notesAiFallbackMessage,
                       onRetry: () {
                         controller.dismiss(type);
-                        unawaited(controller.generate(type));
+                        _generateWithConsent(type);
                       },
                       onDismiss: () => controller.dismiss(type),
                     ),
@@ -216,6 +216,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       ],
     );
   }
+
+  void _generateWithConsent(NoteGenerationType type) =>
+      generateNotesWithConsent(context, ref, tripId: widget.tripId, type: type);
 
   /// 停止等待 —— 走 controller;伺服器沒確認時誠實提示。
   Future<void> _stopWaitingFor(NoteGenerationType type) async {
@@ -299,6 +302,25 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     });
   }
 }
+
+/// 筆記 AI 生成的唯一入口（首次與逾時／失敗重試共用）。
+///
+/// 資料同意先於 AI mutation；取消、owner 未同意時不生成，也不當成失敗。
+void generateNotesWithConsent(
+  BuildContext context,
+  WidgetRef ref, {
+  required String tripId,
+  required NoteGenerationType type,
+}) => unawaited(
+  runWithAiDataConsent<bool>(
+    context,
+    ref,
+    action: () async {
+      await ref.read(notesAiControllerProvider(tripId).notifier).generate(type);
+      return true;
+    },
+  ),
+);
 
 /// 單一筆記 row 的資料：id/version（OCC）、editFields（編輯預填）、display（唯讀卡片）。
 class _NoteRowData {
@@ -823,19 +845,8 @@ class _NotesSection extends ConsumerWidget {
       for (final type in section.generationTypes)
         type: ai.of(type).exclusionCount,
     };
-    // 資料同意先於 AI mutation；取消、owner 未同意時不生成，也不當成失敗。
-    void onGenerateNotes(NoteGenerationType type) => unawaited(
-      runWithAiDataConsent<bool>(
-        context,
-        ref,
-        action: () async {
-          await ref
-              .read(notesAiControllerProvider(tripId).notifier)
-              .generate(type);
-          return true;
-        },
-      ),
-    );
+    void onGenerateNotes(NoteGenerationType type) =>
+        generateNotesWithConsent(context, ref, tripId: tripId, type: type);
     return Card(
       key: ValueKey('notes-section-${section.name}'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
