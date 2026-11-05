@@ -30,11 +30,15 @@ import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/poi_favorite.dart';
+import 'package:tripline/models/entry.dart' show TimelineEntry;
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/trip_audit.dart';
+import 'package:tripline/models/trip_health.dart';
+import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/trip_share.dart';
@@ -502,6 +506,31 @@ Future<void> _scrollDown(WidgetTester tester, [double dy = -600]) async {
   await higSettle(tester);
 }
 
+void _entryDetailOk(HigFakes f) =>
+    when(
+      () => f.fixture.trips.watchEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer(
+      // 編輯表單只採用比種子（version 0）新的詳情，所以版本要大於 0。
+      (_) => Stream.value(
+        const TimelineEntry(
+          id: 11,
+          sortOrder: 0,
+          version: 1,
+          startTime: '10:00',
+          endTime: '11:00',
+          title: '那霸機場',
+        ),
+      ),
+    );
+
+void _poiHealthOk(HigFakes f) =>
+    when(() => f.fixture.trips.fetchPoiHealth(any())).thenAnswer(
+      (_) async => const TripPoiHealthReport(version: 1, closed: 0, missing: 0),
+    );
+
 Future<void> _submitResetPassword(WidgetTester tester, HigFakes f) async {
   await tester.enterText(
     find.byKey(const ValueKey('reset-password-field')),
@@ -835,6 +864,169 @@ List<HigScene> higScenes() => [
       await _scrollDown(tester, -1200);
       await _tapKey(tester, 'settings-delete-account');
     },
+  ),
+
+  // ── #536：協作、健檢、稽核、停留點路由 ──
+  HigScene(
+    'collab',
+    '#536',
+    location: '/collab/okinawa',
+    proof: () => find.byKey(const ValueKey('collab-content')),
+  ),
+  HigScene(
+    'collab-load-failed',
+    '#536',
+    location: '/collab/okinawa',
+    stub: (f) => when(
+      () => f.fixture.collab.fetchMembers(any()),
+    ).thenAnswer((_) async => throw _failure),
+    proof: () => find.byKey(const ValueKey('collab-page-error')),
+  ),
+  HigScene(
+    'trip-health-not-run',
+    '#536',
+    location: '/trips/okinawa/health',
+    stub: (f) {
+      _poiHealthOk(f);
+      when(
+        () => f.fixture.trips.fetchHealthReport(any()),
+      ).thenAnswer((_) async => null);
+    },
+    proof: () => find.byKey(const ValueKey('trip-health-content')),
+  ),
+  HigScene(
+    'trip-health-findings',
+    '#536',
+    location: '/trips/okinawa/health',
+    stub: (f) {
+      _poiHealthOk(f);
+      when(() => f.fixture.trips.fetchHealthReport(any())).thenAnswer(
+        (_) async => const TripHealthReport(
+          tripId: 'okinawa',
+          userId: 'u-1',
+          status: TripHealthStatus.completed,
+          createdAt: '2026-10-10T00:00:00Z',
+          completedAt: '2026-10-10T00:01:00Z',
+          findings: [
+            TripHealthFinding(
+              severity: TripHealthSeverity.high,
+              title: '第一天行程過滿',
+              description: '10:00 到 21:00 之間沒有休息時間。',
+              suggestion: '把其中一個景點移到第二天。',
+            ),
+            TripHealthFinding(
+              severity: TripHealthSeverity.low,
+              title: '午餐尚未安排',
+              description: '第二天沒有用餐停留點。',
+            ),
+          ],
+        ),
+      );
+    },
+    proof: () => find.text('第一天行程過滿'),
+  ),
+  HigScene(
+    'trip-health-load-failed',
+    '#536',
+    location: '/trips/okinawa/health',
+    stub: (f) {
+      _poiHealthOk(f);
+      when(() => f.fixture.trips.fetchHealthReport(any())).thenThrow(_failure);
+    },
+    proof: () => find.byKey(const ValueKey('trip-health-load-error')),
+  ),
+  HigScene(
+    'trip-audit',
+    '#536',
+    location: '/trips/okinawa/audit',
+    stub: (f) =>
+        when(
+          () => f.fixture.trips.fetchAuditLog(
+            any(),
+            limit: any(named: 'limit'),
+            requestId: any(named: 'requestId'),
+          ),
+        ).thenAnswer(
+          (_) async => const [
+            TripAuditRow(
+              id: 1,
+              tripId: 'okinawa',
+              tableName: 'trip_entries',
+              action: TripAuditAction.update,
+              createdAt: '2026-10-10T00:00:00Z',
+              recordId: 11,
+              changedBy: 'ray@example.com',
+            ),
+            TripAuditRow(
+              id: 2,
+              tripId: 'okinawa',
+              tableName: 'trip_entries',
+              action: TripAuditAction.insert,
+              createdAt: '2026-10-09T00:00:00Z',
+              recordId: 12,
+              changedBy: 'ray@example.com',
+            ),
+          ],
+        ),
+    proof: () => find.byKey(const ValueKey('trip-audit-row-1')),
+  ),
+  HigScene(
+    'trip-audit-empty',
+    '#536',
+    location: '/trips/okinawa/audit',
+    stub: (f) => when(
+      () => f.fixture.trips.fetchAuditLog(
+        any(),
+        limit: any(named: 'limit'),
+        requestId: any(named: 'requestId'),
+      ),
+    ).thenAnswer((_) async => const <TripAuditRow>[]),
+    proof: () => find.byKey(const ValueKey('trip-audit-empty')),
+  ),
+  HigScene(
+    'trip-audit-load-failed',
+    '#536',
+    location: '/trips/okinawa/audit',
+    stub: (f) => when(
+      () => f.fixture.trips.fetchAuditLog(
+        any(),
+        limit: any(named: 'limit'),
+        requestId: any(named: 'requestId'),
+      ),
+    ).thenThrow(_failure),
+    proof: () => find.byKey(const ValueKey('trip-audit-error')),
+  ),
+  HigScene(
+    'entry-add',
+    '#536',
+    location: '/trips/okinawa/entries/new?day=1',
+    proof: () => find.text('新增停留點'),
+  ),
+  HigScene(
+    'entry-edit',
+    '#536',
+    location: '/trips/okinawa/entries/11/edit',
+    stub: _entryDetailOk,
+    proof: () => find.text('管理地點'),
+  ),
+  HigScene(
+    'entry-copy',
+    '#536',
+    location: '/trips/okinawa/entries/11/copy',
+    proof: () => find.byKey(const ValueKey('entry-action-submit')),
+  ),
+  HigScene(
+    'entry-move',
+    '#536',
+    location: '/trips/okinawa/entries/11/move',
+    proof: () => find.byKey(const ValueKey('entry-action-submit')),
+  ),
+  HigScene(
+    'entry-pois',
+    '#536',
+    location: '/trips/okinawa/entries/11/pois',
+    stub: _entryDetailOk,
+    proof: () => find.text('正選地點'),
   ),
 
   // ── #535：全域地圖、加入行程、確認對話框 ──

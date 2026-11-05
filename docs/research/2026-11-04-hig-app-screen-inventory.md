@@ -22,7 +22,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `/auth/verify-email` | VerifyEmailScreen | 已有場景 | `auth-verify-email` `auth-verify-email-success` `auth-verify-email-incomplete` |
 | `/new-trip` | CreateTripScreen | 已有場景 | `trip-create` `ax-trip-create-2x` |
 | `/edit-trip/:tripId` | EditTripScreen | 已有場景 | `trip-edit` `trip-edit-load-failed` |
-| `/collab/:tripId` | CollabScreen | **缺口** | 無 |
+| `/collab/:tripId` | CollabScreen | 已有場景 | `collab` `collab-load-failed` |
 | `/share-trip/:tripId` | ShareScreen | 已有場景 | `share-manage` `share-custom-expiry-missing` `share-created-card` `share-create-failed` `share-list-load-failed` `ax-share-manage-2x` |
 | `/oauth/consent` | InvalidLinkScreen（固定提示文字） | 已有場景 | `oauth-consent-invalid` |
 | `/invite` | InviteScreen | 已有場景 | `invite-signed-in` `invite-wrong-account` `invite-wrong-account-pending` `invite-load-failed` `invite-logged-out` `ax-invite-2x` |
@@ -33,13 +33,13 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `map` | 行程地圖（TripMap） | 已有場景 | `trip-map` `trip-map-route-failed` `ax-trip-map-2x` |
 | `notes` | TripNotesScreen | 已有場景 | `trip-notes` `ax-trip-notes-2x` |
 | `print` | TripPrintScreen | 已有場景 | `trip-print` `ax-trip-print-2x` |
-| `health` | TripHealthScreen | **缺口** | 無 |
-| `audit` | TripAuditScreen | **缺口** | 無 |
-| `entries/new` | EntryAddRouteScreen | **缺口** | 無（表單本體是 `showAppFormSheet`，見彈出層） |
-| `entries/:eid/edit` | EntryEditRouteScreen | **缺口** | 無 |
-| `entries/:eid/copy` | EntryActionRouteScreen | **缺口** | 無 |
-| `entries/:eid/move` | EntryActionRouteScreen | **缺口** | 無 |
-| `entries/:eid/pois` | EntryPoiScreen | **缺口** | 無 |
+| `health` | TripHealthScreen | 已有場景 | `trip-health-not-run` `trip-health-findings` `trip-health-load-failed` |
+| `audit` | TripAuditScreen | 已有場景 | `trip-audit` `trip-audit-empty` `trip-audit-load-failed` |
+| `entries/new` | EntryAddRouteScreen | 已有場景 | `entry-add` |
+| `entries/:eid/edit` | EntryEditRouteScreen | 已有場景 | `entry-edit` |
+| `entries/:eid/copy` | EntryActionRouteScreen | 已有場景 | `entry-copy` |
+| `entries/:eid/move` | EntryActionRouteScreen | 已有場景 | `entry-move` |
+| `entries/:eid/pois` | EntryPoiScreen | 已有場景 | `entry-pois` |
 | `/map` | GlobalMapScreen | 已有場景 | `global-map` `global-map-empty` `global-map-load-failed` |
 | `/favorites` | FavoritesScreen | 已有場景 | `favorites` `favorites-load-failed` `ax-favorites-2x` |
 | `explore` | ExploreScreen | 已有場景 | `explore` `explore-empty-results` `explore-search-failed` `ax-explore-2x` |
@@ -93,7 +93,7 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 
 ## 三、缺口摘要
 
-- 路由缺口 7 個，另有 1 個部分（#534、#535 補了 7 個）：`/collab/:tripId`、`health`、`audit`、`entries/*`（4 個）；`:favoriteId/add-to-trip` 只有無效 ID 狀態；加上變更密碼（PR #530）。
+- 路由缺口 0 個，另有 1 個部分（#534～#536 補了 15 個）：`:favoriteId/add-to-trip` 只有無效 ID 狀態（正常載入狀態沒有場景）；另加上變更密碼（PR #530，尚未進 master）。
 - 彈出層缺口：幾乎全部。目前只有帳號刪除、登出確認、解除連結確認、刪除行程確認、聊天語音同意取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。
