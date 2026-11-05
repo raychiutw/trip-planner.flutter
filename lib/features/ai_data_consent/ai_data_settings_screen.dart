@@ -19,6 +19,7 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_settings_group.dart';
 import 'ai_data_consent_controller.dart';
+import 'ai_data_consent_sections.dart';
 import 'ai_data_consent_sheet.dart';
 
 String aiDataConsentHeadline(AiDataConsentStatus status) => switch (status) {
