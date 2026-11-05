@@ -23,6 +23,7 @@ import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_state_view.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
@@ -1227,6 +1228,42 @@ void main() {
     await tester.pump();
 
     expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsOneWidget);
+  });
+
+  testWidgets('route loader：錯誤態除了原因還有圖示與「返回」，按下會回到上一頁', (tester) async {
+    // 從啟動頁 push 進錯誤態，才有「上一頁」可回。
+    await tester.pumpWidget(
+      buildScoped(
+        Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AddToTripRouteScreen(
+                    uri: Uri.parse('/favorites/add-to-trip'),
+                  ),
+                ),
+              ),
+              child: const Text('launcher'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('launcher'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsOneWidget);
+    // 重用專案的錯誤態元件：有圖示、原因與下一步動作。
+    final state = tester.widget<TpStateView>(find.byType(TpStateView));
+    expect(state.kind, TpStateKind.error);
+    final back = find.text('返回');
+    expect(back, findsOneWidget, reason: '錯誤態要有下一步動作，不是只有一行字');
+
+    await tester.tap(back);
+    await tester.pumpAndSettle();
+    expect(find.text('launcher'), findsOneWidget);
+    expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsNothing);
   });
 
   testWidgets('favorite mode：選 trip/day(預設)→ 送出呼叫 addFavoriteToTrip', (

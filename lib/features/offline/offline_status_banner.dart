@@ -102,9 +102,10 @@ class _Bar extends StatelessWidget {
                   liveRegion: true,
                   child: Text(
                     text,
+                    // 狀態橫幅一律 footnote 13（與聊天橫幅一致，也是改字階前的大小）。
                     style: Theme.of(
                       context,
-                    ).textTheme.bodyMedium?.copyWith(color: foreground),
+                    ).textTheme.bodySmall?.copyWith(color: foreground),
                   ),
                 ),
               ),

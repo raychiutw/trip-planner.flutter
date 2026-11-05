@@ -1,4 +1,5 @@
 /// 編輯行程狀態機:一次性 fetchTrip 帶入初值 → 使用者改 → diff-only PUT。
+/// 即時儲存:畫面在失焦、按「完成」或切換類操作當下呼叫 [save]／[flush];打字不送。
 /// destinations 載入自 GET(無 country)→ 不重算 countries(避免誤判)。
 library;
 
@@ -34,6 +35,7 @@ class EditTripState {
     this.daysMutating = false,
     this.error,
     this.saved = false,
+    this.titleBlank = false,
   });
 
   final bool loading;
@@ -60,6 +62,9 @@ class EditTripState {
   /// 目前欄位已與 baseline 一致，不是允許關閉的提交憑證。
   final bool saved;
 
+  /// 標題欄位目前是空白:不送出,畫面就地提示。放在 state 裡才會觸發重建。
+  final bool titleBlank;
+
   EditTripState copyWith({
     bool? loading,
     bool? loadFailed,
@@ -69,6 +74,7 @@ class EditTripState {
     bool? shifting,
     bool? daysMutating,
     Object? error = _sentinel,
+    bool? titleBlank,
   }) {
     return EditTripState(
       loading: loading ?? this.loading,
@@ -87,6 +93,7 @@ class EditTripState {
       daysMutating: daysMutating ?? this.daysMutating,
       error: error == _sentinel ? this.error : error as String?,
       saved: saved,
+      titleBlank: titleBlank ?? this.titleBlank,
     );
   }
 
@@ -110,6 +117,7 @@ class EditTripState {
       shifting: shifting,
       daysMutating: daysMutating,
       error: error,
+      titleBlank: titleBlank,
     );
   }
 
@@ -152,12 +160,25 @@ class _TripMetadata {
     [for (final destination in other.destinations) destination.name],
   );
 
+  // 空白標題永遠不送,所以不算變更;baseline 保留上次成功的標題。
   bool equivalent(_TripMetadata other) =>
-      title == other.title &&
+      (title.trim().isEmpty || title == other.title) &&
       description == other.description &&
       lang == other.lang &&
       published == other.published &&
       sameDestinations(other);
+}
+
+/// 即時儲存的欄位;[label] 用在「有變更尚未送出」攔截文字。
+enum EditField {
+  title('標題'),
+  destinations('目的地'),
+  description('描述'),
+  lang('語言'),
+  published('發布狀態');
+
+  const EditField(this.label);
+  final String label;
 }
 
 enum DayDeletionResolution {
@@ -249,7 +270,19 @@ class EditTripController extends Notifier<EditTripState> {
     }
   }
 
-  void setTitle(String v) => _session?.edit(_session!.draft.copyWith(title: v));
+  void setTitle(String v) {
+    state = state.copyWith(titleBlank: v.trim().isEmpty);
+    _session?.edit(_session!.draft.copyWith(title: v));
+  }
+
+  /// 標題欄位還原成上次成功儲存的值(按「完成」時用)。
+  void restoreTitle() {
+    final s = _session;
+    if (s == null) return;
+    state = state.copyWith(titleBlank: false);
+    s.edit(s.draft.copyWith(title: s.baseline.title));
+  }
+
   void setDescription(String v) =>
       _session?.edit(_session!.draft.copyWith(description: v));
   void setLang(String v) => _session?.edit(_session!.draft.copyWith(lang: v));
@@ -274,6 +307,21 @@ class EditTripController extends Notifier<EditTripState> {
   /// 需明確儲存的欄位是否仍有變更，不含已生效的 Day 操作。
   bool get hasChanges => _session?.dirty ?? false;
 
+  /// 目前與 baseline 不同、還沒送出成功的欄位(空白標題不算)。
+  Set<EditField> get unsentFields {
+    final s = _session;
+    if (s == null) return const {};
+    final d = s.draft;
+    final b = s.baseline;
+    return {
+      if (d.title.trim().isNotEmpty && d.title != b.title) EditField.title,
+      if (!d.sameDestinations(b)) EditField.destinations,
+      if (d.description != b.description) EditField.description,
+      if (d.lang != b.lang) EditField.lang,
+      if (d.published != b.published) EditField.published,
+    };
+  }
+
   /// 欄位提交失敗的持續性訊息，與 Day 操作錯誤分開呈現。
   String? get saveError => _session?.error;
 
@@ -281,8 +329,10 @@ class EditTripController extends Notifier<EditTripState> {
   Future<DraftAccepted<_TripMetadata, void>> _writeMetadata(
     DraftSnapshot<_TripMetadata> snapshot,
   ) async {
-    final draft = snapshot.draft;
     final baseline = snapshot.baseline;
+    final draft = snapshot.draft.title.trim().isEmpty
+        ? snapshot.draft.copyWith(title: baseline.title)
+        : snapshot.draft;
     await _repo.updateTrip(
       tripId,
       title: draft.title != baseline.title ? draft.title : null,
@@ -306,6 +356,31 @@ class EditTripController extends Notifier<EditTripState> {
 
   /// 無變更不送空 body；提交中的再次操作交由 session 擋下。
   Future<DraftSaved<void>?> save() async => _session?.submit();
+
+  /// flush 最多重送幾輪:送出期間使用者又改了欄位會再髒,超過就放棄回報未完成。
+  static const _flushMaxRounds = 5;
+
+  /// 按「完成」:等進行中的送出結束,再把剩下的變更送完。true=全部已生效,
+  /// false=有欄位送出失敗(輸入仍保留,錯誤由 [saveError] 提供)。
+  Future<bool> flush() async {
+    final s = _session;
+    if (s == null) return true;
+    for (var i = 0; i < _flushMaxRounds; i++) {
+      if (s.submitting) {
+        final idle = Completer<void>();
+        void listener() {
+          if (!s.submitting && !idle.isCompleted) idle.complete();
+        }
+
+        s.addListener(listener);
+        await idle.future;
+        s.removeListener(listener);
+      }
+      if (!s.dirty) return true;
+      if (await s.submit() == null) return false;
+    }
+    return !s.dirty;
+  }
 
   /// 關閉當下重新檢查，較新的輸入不能被舊成功結果帶離畫面。
   bool canFinish(DraftSaved<void> saved) => _session?.canFinish(saved) ?? false;

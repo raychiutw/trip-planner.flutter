@@ -906,6 +906,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
         _selectorGap,
       ),
       child: TpHorizontalSelector<int>(
+        semanticLabel: '行程日期',
         key: const ValueKey('trip-timeline-view-day-selector'),
         value: _activeDayNum,
         options: [

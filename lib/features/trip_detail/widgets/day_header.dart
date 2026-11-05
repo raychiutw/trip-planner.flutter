@@ -101,7 +101,9 @@ class DayHeader extends StatelessWidget {
           Text(day.displayTitle, style: theme.textTheme.headlineSmall),
         Text(
           summary,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          // 「N 個停留點」是標題下的 metadata：HIG 的次要資訊用 Footnote 13（標題 20 → 計數 13，
+          // 層級要拉得開），所以不用 bodyMedium（15）。
+          style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w400,
             color: theme.colorScheme.onSurfaceVariant,
             fontFeatures: const [FontFeature.tabularFigures()],

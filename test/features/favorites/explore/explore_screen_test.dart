@@ -53,6 +53,22 @@ void main() {
     child: MaterialApp(theme: AppTheme.light(), home: const ExploreScreen()),
   );
 
+  testWidgets('探索頁每個可點擊節點都有語意標籤（VoiceOver，#544 A11）', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(buildApp());
+    await tester.enterText(
+      find.byKey(const ValueKey('explore-search-field')),
+      '東京',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    // 只能有一個節點叫「搜尋地點」，否則 VoiceOver 會把同一個欄位念兩次。
+    expect(find.bySemanticsLabel('搜尋地點'), findsOneWidget);
+    handle.dispose();
+  });
+
   testWidgets('AX 字級分類 chip 列高度跟著字級放大,文字不被裁切', (tester) async {
     tester.view.physicalSize = const Size(390, 1600);
     tester.view.devicePixelRatio = 1;

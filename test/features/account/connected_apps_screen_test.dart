@@ -76,6 +76,42 @@ void main() {
     expect(find.textContaining('2026/7/8'), findsOneWidget);
   });
 
+  testWidgets('深色 sheet 內 scope 標籤要有自己的膠囊底，不與卡片同色（#544 A6）', (tester) async {
+    // 帳號 sheet 的子樹會把 surface 三階上移一階（AppTheme.elevated）；Chip 的底色
+    // 若取自建主題時的 chipTheme，就會和卡片（上移後的 surfaceContainerLow）同色而隱形。
+    final base = AppTheme.dark();
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (retryCount, error) => null,
+        overrides: [
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
+          authRepositoryProvider.overrideWithValue(mockAuthRepository),
+        ],
+        child: MaterialApp(
+          theme: base.copyWith(
+            colorScheme: AppTheme.elevated(base.colorScheme),
+          ),
+          home: const ConnectedAppsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final cardColor = AppTheme.elevated(base.colorScheme).surfaceContainerLow;
+    final chip = tester.widget<Chip>(find.byType(Chip).first);
+    expect(
+      chip.backgroundColor,
+      isNotNull,
+      reason: '不能退回 chipTheme（它不會跟著 sheet 的 elevated 配色走）',
+    );
+    expect(chip.backgroundColor, isNot(cardColor));
+    // 明確是目前（elevated）主題的 surfaceContainerHigh，不是任意一個非 null 的色。
+    expect(
+      chip.backgroundColor,
+      AppTheme.elevated(base.colorScheme).surfaceContainerHigh,
+    );
+  });
+
   testWidgets('顯示 AI owner 授權卡，成功後刷新清單', (tester) async {
     await pumpScreen(tester);
 

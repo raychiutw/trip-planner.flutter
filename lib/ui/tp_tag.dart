@@ -37,7 +37,10 @@ class TpTag extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: theme.textTheme.labelLarge?.copyWith(
+          // 標籤（唯讀的狀態、數量、面向）是 chip 等級的小元件，維持 15pt 半粗體，
+          // 不跟著按鈕的 17pt：它常與列內文字並排，比正文大會搶層級。
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
             color: emphasized ? scheme.onPrimaryContainer : scheme.onSurface,
           ),
         ),

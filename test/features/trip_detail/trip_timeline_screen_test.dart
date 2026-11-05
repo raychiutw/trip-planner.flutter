@@ -896,11 +896,11 @@ void main() {
       find.byKey(const ValueKey('app-large-screen-sheet')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('tp-app-bar-cancel')), findsOneWidget);
-    expect(find.byKey(const ValueKey('edit-save')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-cancel')), findsNothing);
+    expect(find.byKey(const ValueKey('edit-done')), findsOneWidget);
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+    await tester.tap(find.byKey(const ValueKey('edit-done')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsNothing);
   });

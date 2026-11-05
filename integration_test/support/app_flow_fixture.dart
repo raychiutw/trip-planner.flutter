@@ -580,9 +580,9 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-action-edit-info')));
   await tester.pumpAndSettle();
-  expect(find.byKey(const ValueKey('edit-save')), findsOneWidget);
+  expect(find.byKey(const ValueKey('edit-done')), findsOneWidget);
   await captureState('form');
-  await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+  await tester.tap(find.byKey(const ValueKey('edit-done')));
   await tester.pumpAndSettle();
 
   // 行程與地圖之間改由 root tab 進出（兩顆重複的 bar button 已移除）。

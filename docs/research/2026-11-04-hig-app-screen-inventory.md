@@ -21,24 +21,24 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `/auth/password/reset` | ResetPasswordScreen | 已有場景 | `auth-reset-password` `auth-reset-password-success` `auth-reset-password-expired` |
 | `/auth/verify-email` | VerifyEmailScreen | 已有場景 | `auth-verify-email` `auth-verify-email-success` `auth-verify-email-incomplete` |
 | `/new-trip` | CreateTripScreen | 已有場景 | `trip-create` `ax-trip-create-2x` |
-| `/edit-trip/:tripId` | EditTripScreen | 已有場景 | `trip-edit` `trip-edit-load-failed` |
-| `/collab/:tripId` | CollabScreen | 已有場景 | `collab` `collab-load-failed` |
-| `/share-trip/:tripId` | ShareScreen | 已有場景 | `share-manage` `share-custom-expiry-missing` `share-created-card` `share-create-failed` `share-list-load-failed` `ax-share-manage-2x` |
+| `/edit-trip/:tripId` | EditTripScreen | 已有場景 | `trip-edit` `trip-edit-save-failed` `trip-edit-finish-blocked-confirm` `trip-edit-load-failed` |
+| `/collab/:tripId` | CollabScreen | 已有場景 | `collab` `collab-load-failed` `collab-remove-member-confirm` `collab-revoke-invite-confirm` |
+| `/share-trip/:tripId` | ShareScreen | 已有場景 | `share-manage` `share-custom-expiry-missing` `share-created-card` `share-create-failed` `share-list-load-failed` `share-revoke-confirm` `ax-share-manage-2x` |
 | `/oauth/consent` | InvalidLinkScreen（固定提示文字） | 已有場景 | `oauth-consent-invalid` |
 | `/invite` | InviteScreen | 已有場景 | `invite-signed-in` `invite-wrong-account` `invite-wrong-account-pending` `invite-load-failed` `invite-logged-out` `ax-invite-2x` |
 | `/s/:token` | PublicShareScreen | 已有場景 | `public-share` `public-share-signed-in` `ax-public-share-2x` |
 | `/chat` | ChatScreen | 已有場景 | `chat` `ax-chat-2x` |
 | `/trips` | TripsListScreen | 已有場景 | `trips-list` `trips-list-load-failed` `trips-list-empty` `offline-banner-network` `offline-banner-pending` `ax-trips-list-2x` `ax-trips-list-3x` |
-| `:tripId` | TripTimelineScreen | 已有場景 | `trip-timeline` `ax-trip-timeline-2x` |
+| `:tripId` | TripTimelineScreen | 已有場景 | `trip-timeline` `timeline-delete-entry-confirm` `ax-trip-timeline-2x` |
 | `map` | 行程地圖（TripMap） | 已有場景 | `trip-map` `trip-map-route-failed` `ax-trip-map-2x` |
 | `notes` | TripNotesScreen | 已有場景 | `trip-notes` `ax-trip-notes-2x` |
 | `print` | TripPrintScreen | 已有場景 | `trip-print` `ax-trip-print-2x` |
 | `health` | TripHealthScreen | 已有場景 | `trip-health-not-run` `trip-health-findings` `trip-health-load-failed` |
 | `audit` | TripAuditScreen | 已有場景 | `trip-audit` `trip-audit-empty` `trip-audit-load-failed` |
-| `entries/new` | EntryAddRouteScreen | 已有場景 | `entry-add` |
-| `entries/:eid/edit` | EntryEditRouteScreen | 已有場景 | `entry-edit` |
-| `entries/:eid/copy` | EntryActionRouteScreen | 已有場景 | `entry-copy` |
-| `entries/:eid/move` | EntryActionRouteScreen | 已有場景 | `entry-move` |
+| `/trips/:tripId/entries/new`（shell 外整頁 modal） | EntryAddRouteScreen | 已有場景 | `entry-add` |
+| `/trips/:tripId/entries/:eid/edit`（shell 外整頁 modal） | EntryEditRouteScreen | 已有場景 | `entry-edit` |
+| `/trips/:tripId/entries/:eid/copy`（shell 外整頁 modal） | EntryActionRouteScreen | 已有場景 | `entry-copy` |
+| `/trips/:tripId/entries/:eid/move`（shell 外整頁 modal） | EntryActionRouteScreen | 已有場景 | `entry-move` |
 | `entries/:eid/pois` | EntryPoiScreen | 已有場景 | `entry-pois` |
 | `/map` | GlobalMapScreen | 已有場景 | `global-map` `global-map-empty` `global-map-load-failed` |
 | `/favorites` | FavoritesScreen | 已有場景 | `favorites` `favorites-load-failed` `ax-favorites-2x` |
@@ -75,25 +75,25 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 
 | helper | 呼叫畫面 | 狀態 | 場景 |
 |---|---|---|---|
-| `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | **缺口** | 無 |
-| `showAppTimePicker` | 筆記編輯 | **缺口** | 無 |
-| `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音） |
-| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm`（只覆蓋三處；從選單觸發的是 action sheet，不是 alert） |
-| `showAppAlert` | 加入行程、帳號 | **缺口** | 無 |
+| `showAppDatePicker` | 建立／編輯行程、分享、筆記編輯 | 部分 | `create-trip-date-picker` `note-edit-date-picker`（建立行程與筆記；編輯行程、分享仍無場景） |
+| `showAppTimePicker` | 筆記編輯 | 已有場景 | `note-edit-time-picker` |
+| `showAppConfirm` | 聊天、帳號、通知設定、停留點異動 | 部分 | `chat-voice-consent`（只覆蓋聊天語音同意；聊天「無法使用語音輸入」、帳號「需要重新驗證才能刪除」、通知設定「允許通知」、停留點備選「設為正選？」四處仍無場景） |
+| `showAppDestructiveConfirm` | 登出、收藏、筆記、行程、停留點、開發者 App、已連結 App、登入裝置 | 部分 | `account-logout-confirm` `account-connected-app-revoke-confirm` `trip-delete-confirm` `share-revoke-confirm` `collab-remove-member-confirm` `timeline-delete-entry-confirm` `account-session-revoke-confirm` `developer-app-delete-confirm` `trip-edit-delete-day-confirm`（編輯行程的刪除行程日；選單觸發的是 action sheet；詳情頁與編輯頁上的直接按鈕走 alert；停留點、筆記、交通的『保留你的版本？』覆寫確認已由 #559／#561 補 `entry-edit-overwrite-confirm` `note-edit-overwrite-confirm` `travel-edit-overwrite-confirm`） `favorites-remove-confirm`（收藏移除，direct 來源，確認走 alert）`trip-edit-finish-blocked-confirm`（編輯行程「有變更尚未送出」的完成攔截框，重試／放棄）（仍無場景：收藏多選的批次移除）|
+| `showAppAlert` | 加入行程、帳號 | 已有場景（兩處呼叫端都有） | `account-delete-preview-failed` `add-to-trip-time-conflict-alert`（帳號與加入行程時段衝突） |
 | `showAppActionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppSelectionSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppContentSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
 | `showAppScreenSheet` | 畫面沒有直接呼叫（只有 helper 之間互相使用） | 已排除（沒有使用） | 無 |
-| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | **缺口** | 無 |
-| `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | **缺口** | 無 |
-| `confirmAndRunIrreversibleAction` | 協作、分享 | **缺口** | 無 |
-| `confirmAndDelete` | 停留點 POI、時間軸、筆記 | **缺口** | 無 |
+| `showAppFormSheet` | 聊天 AI 同意、收藏、探索、停留點 POI、筆記編輯、交通編輯、衝突解決、分享、停留點編輯 | 已有場景（九處呼叫端都有） | `note-edit-sheet` `favorites-filter-sheet` `chat-ai-consent-sheet` `explore-custom-region-sheet` `poi-info-edit-sheet` `travel-edit-sheet` `share-edit-sheet` `entry-edit-sheet` `sync-conflict-sheet` `sync-conflict-sheet-many`（衝突解決 sheet 已有場景）`entry-edit-sheet-remote-conflict`（停留點遠端衝突狀態） |
+| `showAppNotice` | 幾乎所有可操作的畫面（Snackbar／提示） | 部分 | `favorites-removed-notice`（只覆蓋收藏移除成功；其餘畫面的通知仍無場景） |
+| `confirmAndRunIrreversibleAction` | 協作、分享 | 部分 | `share-revoke-confirm` `collab-remove-member-confirm` `collab-revoke-invite-confirm`（重新產生、刪除分享連結同一支元件，未各拍一張） |
+| `confirmAndDelete` | 停留點 POI、時間軸、筆記 | 已有場景 | `timeline-delete-entry-confirm` `note-delete-confirm` `entry-alternate-remove-confirm` |
 | `showCupertinoDialog`（直接呼叫，帳號畫面） | 刪除帳號確認 | 已有場景 | `account-delete-dialog` |
-| `showCupertinoDialog`（直接呼叫，生物辨識登入列） | 開啟生物辨識確認 | **缺口** | 無 |
+| `showCupertinoDialog`（直接呼叫，生物辨識登入列） | 關閉生物辨識確認 | 已有場景 | `account-biometric-disable-confirm`（原清單寫成「開啟」確認；程式碼只有「關閉並登出」這一個確認，已更正） |
 
 ## 三、缺口摘要
 
 - 路由缺口 0 個，另有 1 個部分（#534～#536 補了 15 個）：`:favoriteId/add-to-trip` 只有無效 ID 狀態（正常載入狀態沒有場景）；另加上變更密碼（PR #530，尚未進 master）。
-- 彈出層缺口：幾乎全部。目前只有帳號刪除、登出確認、解除連結確認、刪除行程確認、聊天語音同意取得場景（App 鎖開啟提示是全螢幕狀態，不算彈出層）。這是補場景時優先度最高的一塊，因為 HIG 對 alert、action sheet、picker 的規定集中在這裡。
+- 彈出層：#531 補了 23 個，#558～#561 再補 8 個（衝突解決 sheet 兩個、加入行程時段衝突 alert、刪除行程日確認〔原稱編輯行程放棄確認〕、三處『保留你的版本？』覆寫確認、停留點遠端衝突狀態），另有編輯行程的完成攔截框 1 個，共 32 個。`showAppFormSheet`、`showAppAlert` 的呼叫端已全數有場景。仍標「部分」的是 spec #557 範圍外的呼叫端：日期選擇器（編輯行程、分享）、`showAppConfirm` 四處、`showAppDestructiveConfirm` 一處（收藏批次移除；編輯行程的完成攔截框已有 `trip-edit-finish-blocked-confirm`）、`confirmAndRunIrreversibleAction`（重新產生、刪除分享連結）、`showAppNotice`（其餘畫面）。這些場景用測試替身造狀態的限制見缺口文件第 1 節。App 鎖開啟提示是全螢幕狀態，不算彈出層。
 - 已排除的 4 個 helper 沒有呼叫端；若之後有人開始使用，守門測試會逼著更新這份清單。
 - 後續取證票補場景時，把狀態從「**缺口**」改成「已有場景」並填上場景名稱，守門測試會檢查場景名稱真的存在。

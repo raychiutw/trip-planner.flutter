@@ -206,6 +206,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
@@ -267,6 +268,7 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
       );
+      await tester.pump(); // 勾選後建立鈕才啟用
       await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
       await tester.pump();
       router.go('/auth/password/reset?token=new-token');
@@ -345,6 +347,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pump();
@@ -509,6 +512,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     final submit = find.byKey(const ValueKey('signup-submit-button'));
     await tester.tap(submit);
     await tester.tap(submit);
@@ -555,6 +559,37 @@ void main() {
     expect(textField().obscureText, isFalse);
   });
 
+  testWidgets('未勾同意時建立鈕停用並顯示說明，勾選後啟用（HIG F5，與 web 對齊）', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+    final submit = find.byKey(const ValueKey('signup-submit-button'));
+    VoidCallback? onPressed() =>
+        tester.widget<TpToolbarTextButton>(submit).onPressed;
+
+    // 空表單、未勾同意：不可按，並說明為什麼
+    expect(onPressed(), isNull);
+    expect(find.byKey(const ValueKey('signup-consent-hint')), findsOneWidget);
+
+    // 只填欄位、仍未勾同意：還是不可按
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.pump();
+    expect(onPressed(), isNull);
+
+    // 勾選後啟用、說明消失
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
+    await tester.pump();
+    expect(onPressed(), isNotNull);
+    expect(find.byKey(const ValueKey('signup-consent-hint')), findsNothing);
+  });
+
   testWidgets('未同意個資條款不呼叫建立帳號', (tester) async {
     await pumpAuthRoutes(tester, initialLocation: '/signup');
 
@@ -566,10 +601,14 @@ void main() {
       find.byKey(const ValueKey('signup-password-field')),
       'password123',
     );
-    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    // 建立鈕停用，點了也不會送出；說明文字取代原本送出後才出現的錯誤。
+    await tester.tap(
+      find.byKey(const ValueKey('signup-submit-button')),
+      warnIfMissed: false,
+    );
     await tester.pump();
 
-    expect(find.text('請先閱讀並同意個資條款'), findsOneWidget);
+    expect(find.byKey(const ValueKey('signup-consent-hint')), findsOneWidget);
     verifyNever(
       () => mockAuthRepository.signup(
         email: any(named: 'email'),
@@ -609,6 +648,7 @@ void main() {
       const ValueKey('signup-privacy-consent-checkbox'),
     );
     await tester.tap(consent);
+    await tester.pump(); // 勾選後建立鈕才啟用
     tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
@@ -686,6 +726,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -722,6 +763,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -759,6 +801,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -799,6 +842,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    await tester.pump(); // 勾選後建立鈕才啟用
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 

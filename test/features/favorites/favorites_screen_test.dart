@@ -200,6 +200,26 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('收藏每一列的可點擊節點都有語意標籤，讀得出地點名稱（VoiceOver，#544 A11）', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      // 名稱只能有一個節點，避免 VoiceOver 把同一列念兩次。
+      expect(find.bySemanticsLabel(RegExp('暖暮拉麵')), findsOneWidget);
+      handle.dispose();
+    });
+
     testWidgets('渲染收藏清單 N 卡', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

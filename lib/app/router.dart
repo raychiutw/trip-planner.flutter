@@ -156,6 +156,56 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             PublicShareScreen(token: state.pathParameters['token']!),
       ),
+      // 停留點新增/編輯/複製/移動:shell 外整頁 modal(沒有分頁列),網址不變。
+      GoRoute(
+        path: '/trips/:tripId/entries/new',
+        pageBuilder: (context, state) => _modalPage(
+          EntryAddRouteScreen(
+            tripId: state.pathParameters['tripId']!,
+            initialDayNum: int.tryParse(state.uri.queryParameters['day'] ?? ''),
+            initialMode: _entryAddModeFromQuery(
+              state.uri.queryParameters['mode'],
+            ),
+            initialRegion: state.uri.queryParameters['region'],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/trips/:tripId/entries/:eid/edit',
+        pageBuilder: (context, state) => _modalPage(
+          _entryRoute(
+            state,
+            (tripId, entryId) =>
+                EntryEditRouteScreen(tripId: tripId, entryId: entryId),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/trips/:tripId/entries/:eid/copy',
+        pageBuilder: (context, state) => _modalPage(
+          _entryRoute(
+            state,
+            (tripId, entryId) => EntryActionRouteScreen(
+              tripId: tripId,
+              entryId: entryId,
+              action: EntryRouteAction.copy,
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/trips/:tripId/entries/:eid/move',
+        pageBuilder: (context, state) => _modalPage(
+          _entryRoute(
+            state,
+            (tripId, entryId) => EntryActionRouteScreen(
+              tripId: tripId,
+              entryId: entryId,
+              action: EntryRouteAction.move,
+            ),
+          ),
+        ),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
@@ -221,51 +271,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         path: 'audit',
                         builder: (context, state) => TripAuditScreen(
                           tripId: state.pathParameters['tripId']!,
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'entries/new',
-                        builder: (context, state) => EntryAddRouteScreen(
-                          tripId: state.pathParameters['tripId']!,
-                          initialDayNum: int.tryParse(
-                            state.uri.queryParameters['day'] ?? '',
-                          ),
-                          initialMode: _entryAddModeFromQuery(
-                            state.uri.queryParameters['mode'],
-                          ),
-                          initialRegion: state.uri.queryParameters['region'],
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'entries/:eid/edit',
-                        builder: (context, state) => _entryRoute(
-                          state,
-                          (tripId, entryId) => EntryEditRouteScreen(
-                            tripId: tripId,
-                            entryId: entryId,
-                          ),
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'entries/:eid/copy',
-                        builder: (context, state) => _entryRoute(
-                          state,
-                          (tripId, entryId) => EntryActionRouteScreen(
-                            tripId: tripId,
-                            entryId: entryId,
-                            action: EntryRouteAction.copy,
-                          ),
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'entries/:eid/move',
-                        builder: (context, state) => _entryRoute(
-                          state,
-                          (tripId, entryId) => EntryActionRouteScreen(
-                            tripId: tripId,
-                            entryId: entryId,
-                            action: EntryRouteAction.move,
-                          ),
                         ),
                       ),
                       GoRoute(
@@ -345,6 +350,10 @@ EntryAddMode _entryAddModeFromQuery(
   }
   return fallback;
 }
+
+/// shell 外整頁 modal 的轉場(自下滑入),與新增/編輯行程一致。
+Page<void> _modalPage(Widget child) =>
+    MaterialPage<void>(fullscreenDialog: true, child: child);
 
 /// 所有停留點操作共用的外部 ID 解析；無效值不進入資料畫面。
 Widget _entryRoute(

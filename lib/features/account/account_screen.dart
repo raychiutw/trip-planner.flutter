@@ -406,7 +406,11 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
           onPressed: _canSubmit && !_submitting ? _delete : null,
           child: _submitting
               ? const CupertinoActivityIndicator()
-              : const Text('永久刪除'),
+              : Text(
+                  '永久刪除',
+                  // 停用態維持 Cupertino 的灰（依 WCAG 不要求對比），啟用才畫紅。
+                  style: _canSubmit ? tpDestructiveActionStyle(context) : null,
+                ),
         ),
       ],
     );

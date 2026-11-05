@@ -2102,6 +2102,28 @@ void main() {
     expect(saved, isTrue);
   });
 
+  testWidgets('modal instant 只有右側「完成」，沒有取消也沒有關閉鈕', (tester) async {
+    var done = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.modalInstant,
+            title: const Text('編輯行程'),
+            primaryActionLabel: '完成',
+            onPrimaryAction: () => done = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('取消'), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-leading')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
+    await tester.tap(find.text('完成'));
+    expect(done, isTrue);
+  });
+
   testWidgets('modal form keeps the complete Cancel label at large text', (
     tester,
   ) async {

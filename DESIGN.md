@@ -326,6 +326,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **HIG 必須**：背景、surface、文字、separator、disabled 與語意狀態使用 dynamic system colors，不維護暖白／暖褐完整自訂 palette。
 - **Tripline 決策**：保留一個可適應 Light、Dark 與 Increased Contrast 的暖褐 app tint，只用於選取、link 與主要動作。
+- **Tripline 決策**：tint 全產品單一值（淺色 `#8A6038`、深色 `#D0A576`），不拆成文字棕與填色棕。系統開啟 Increased Contrast 時，淺色 tint 前景改用較深的 `#6F4C2C`（對中性選取底 6.09:1），深色不變；一般狀態外觀不變（#550）。
+- **已知例外（#550）**：預設狀態下，root tab bar「選中」標籤（11pt）對中性灰選取底（`#E5E5EA`）為 4.39:1，比小字 4.5:1 差 0.11。決定不為它改品牌色或另造文字專用棕，理由：單一 tint 是產品決策（與 Apple 一致）、差距小，且開啟 Increased Contrast 即達標。對話框內品牌色動作按鈕（「稍後再說」「開啟」「切換帳號」等，約 4.0～4.4:1）同屬此例外。回歸測試把 4.39:1 釘住（`test/theme/app_theme_test.dart`），數字變動要有意識地改。
+- **Tripline 決策**：確認框（alert）的破壞性動作用 Tripline 破壞性紅（淺 `#D70015`、深 `#FF6961`），不用 Cupertino 預設的 systemRed（淺色對白底約 3.0～3.4:1）。`CupertinoDialogAction.isDestructiveAction` 在 alert 上的色來自套件、不吃 Theme，所以以動作文字的 style 覆寫（`tpDestructiveActionStyle`），保留 `isDestructiveAction` 語意；action sheet 本來就用 error 色。停用態的破壞性按鈕維持灰（WCAG 不要求）（#551）。
 - **Tripline 決策**：淺色次要文字（`secondaryLabel`）不採 iOS 系統值（#3C3C43 @60%，對白底 3.44:1、對 #F2F2F7 3.29:1），改為 @75%，在白、secondary、tertiary 三層底色上都達 WCAG AA 4.5:1；深色維持系統值。由 `app_theme_test` 守門。destructive 紅字（對白底 3.55:1）維持系統值，未調整。
 - **HIG 必須**：destructive、warning、success 使用系統語意色，不套品牌 tint。
 - **Tripline 決策**：地圖 Day marker／route 可使用資料編碼色，但必須搭配編號或線型。
@@ -360,6 +363,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：POI 卡、表單、聊天訊息與設定 row 隨文字增高，不以固定高度裁切。
 - **Tripline 決策**：時間、數量與日期需要對齊時可使用 tabular figures。（[Typography](https://developer.apple.com/design/human-interface-guidelines/typography) 全頁沒有 tabular figures 的敘述，且本條本身是「可」；原標「HIG 必須」，已改標。）
 - **Tripline 決策**：不使用 Large Title。
+- **Tripline 決策（字階，#544 A14）**：字階對照 Apple 預設（Large）字階——`displaySmall` 28（Title1）、`headlineMedium` 22（Title2）、`headlineSmall` 20（Title3）、`titleLarge`／`titleMedium`／`bodyLarge`／`labelLarge` 17（Headline、Body、按鈕）、`bodyMedium` 15（Subheadline）、`bodySmall`／`titleSmall` 13（Footnote）、`labelMedium` 12（Caption1）、`labelSmall` 11（Caption2，螢幕文字下限）。原本整組小一級（正文 15／13／12），與檢查表 B1「正文預設 17pt」不符。
+- **Tripline 決策（刻意維持較小字級的元件）**：分兩種理由。① **幾何依舊字級校準**：chip、`TpTag` 與分段控制（15pt 半粗體；17pt 時分段控制五個選項放不下一列會退成直排）、狀態橫幅（聊天與離線，13pt；橫幅區塊不限高也不可捲動，AX5 下本來就會比螢幕高，改回 15 只會更早發生，限高加捲動另案處理）、地圖底部 POI 卡與 Google POI 卡（accessory 高度固定，Google 卡扣掉 44 的開啟鈕只剩 44，兩行 17pt 剛好 44 沒有餘裕，維持 15pt）、選單快捷動作的短文字（三格並排，13pt）。② **層級選擇（跟 HIG 一致，不是遷就測試）**：設定列的副標與值用 Subheadline 15（標題 Body 17，要拉開層級）、Day 標頭下的「N 個停留點」用 Footnote 13（標題 20）。沒明寫字級的 `Text` 會吃 `Material` 預設的 `bodyMedium`（現為 15），新增 chrome 時要明寫。
 - **Tripline 決策（縮字例外）**：起訖時間（停留點卡與逐日標頭的 `09:30 - 11:00`，半形冒號與等寬數字；原 D1 定版的全形冒號因字距過寬於 0.33.0 改回半形）維持單行，AX 字級撐破卡片寬度時才以 `FittedBox.scaleDown` 等比縮小。這是全 App 唯一允許的縮字處；其餘一律換行、重排或增高，不得縮字。
 
 ### 16.4 Icons 與 touch target
@@ -374,8 +379,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 | 外觀 | 背景 | 圖形 |
 |---|---|---|
-| Default | 木棕 `#A97A4A` | 奶油白 `#FFFBF5` |
-| Dark | 棕黑 `#1A140F` | 木棕 `#A97A4A` |
+| Default | 木棕 `#8A6038` | 奶油白 `#FFFBF5` |
+| Dark | 棕黑 `#1A140F` | 木棕 `#8A6038` |
 | Tinted | 等亮度灰 `#818181` | 白色（供系統著色） |
 
 - **Tripline 決策**：不預先裁圓角，由系統套用遮罩。
@@ -384,7 +389,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：Android 沿用既有 `mipmap-*/ic_launcher.png`，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
 - 所有 PNG 必須是正方形、正確像素尺寸且**不含 alpha**。
 
-木棕 `#A97A4A` 就是 GLOSSARY.md 定義的 tint（品牌柔褐）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。
+木棕 `#8A6038` 就是 GLOSSARY.md 定義的淺色 tint（品牌柔褐，全產品單一值）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。Dark 變體的圖形色沿用同一個值，不另用深色 tint `#D0A576`；Tinted 變體是給系統上色的灰階稿，不含品牌色。
+
+換色用 `tool/recolor_app_icon.swift`（macOS 內建 swift）：`bg` 換 Default 底色、`glyph` 換 Dark 圖形色，抗鋸齒邊緣會一併重混；Android 五種密度由 Default 主檔以 `sips -z <px> <px>` 縮放（48／72／96／144／192）。守門測試是 `test/docs/app_icon_brand_tint_test.dart`。web 圖示以同一份 iOS 主檔為準。
 
 ## 17. Motion 與 haptics
 
