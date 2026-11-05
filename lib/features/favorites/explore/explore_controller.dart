@@ -4,6 +4,8 @@ library;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../api/api_client.dart' show isOfflineError;
+import '../../../app/error_message.dart';
 import '../../../api/favorites_repository.dart';
 import '../../../api/poi_repository.dart';
 import '../../../api/providers.dart';
@@ -118,6 +120,8 @@ class ExploreState {
 //（find-or-create 命中既有 POI 時 type 不重算）→ 用名稱單一來源避免取消收藏失效。
 String _savedKey(PoiSearchResult poi) => poi.name.trim();
 
+const _searchFailed = '搜尋失敗,請稍後再試';
+
 class ExploreController extends Notifier<ExploreState> {
   int _requestSeq = 0;
   CancelToken? _cancelToken;
@@ -179,14 +183,14 @@ class ExploreController extends Notifier<ExploreState> {
       state = state.copyWith(
         searching: false,
         hasSearched: true,
-        errorMessage: '搜尋失敗,請稍後再試',
+        errorMessage: isOfflineError(e) ? '目前無法連線，請檢查網路後再試' : _searchFailed,
       );
-    } on Exception {
+    } on Exception catch (e) {
       if (seq != _requestSeq) return;
       state = state.copyWith(
         searching: false,
         hasSearched: true,
-        errorMessage: '搜尋失敗,請稍後再試',
+        errorMessage: userFacingApiError(e, fallback: _searchFailed),
       );
     }
   }

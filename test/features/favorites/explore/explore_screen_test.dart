@@ -1,11 +1,13 @@
 import 'dart:ui' show Tristate;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/ui/tp_chip.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart';
@@ -568,6 +570,45 @@ void main() {
     expect(find.text('搜尋失敗,請稍後再試'), findsNothing);
     expect(find.text('沒有找到「東京」的結果。換個關鍵字試試?'), findsOneWidget);
   });
+
+  for (final c in <(String, Object, String)>[
+    (
+      '斷線',
+      DioException(
+        requestOptions: RequestOptions(path: '/poi-search'),
+        type: DioExceptionType.connectionError,
+      ),
+      '目前無法連線，請檢查網路後再試',
+    ),
+    (
+      '被限流',
+      const ApiError(status: 429, code: 'RATE_LIMITED', message: 'HTTP 429'),
+      '操作太頻繁，請稍後再試',
+    ),
+    (
+      '伺服器錯誤',
+      const ApiError(status: 503, code: 'HTTP_503', message: 'HTTP 503'),
+      '伺服器暫時無法處理，請稍後再試',
+    ),
+  ]) {
+    testWidgets('搜尋失敗依原因說明：${c.$1}', (tester) async {
+      when(
+        () => poi.searchPois(
+          q: any(named: 'q'),
+          limit: any(named: 'limit'),
+          region: any(named: 'region'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenThrow(c.$2);
+
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 10));
+
+      expect(find.text(c.$3), findsOneWidget);
+      expect(find.text('重試'), findsOneWidget);
+    });
+  }
 
   testWidgets('進頁自動搜尋預設地區時,搜尋框同步回填關鍵字', (tester) async {
     await tester.pumpWidget(buildApp());

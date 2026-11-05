@@ -65,9 +65,11 @@ Future<DateTime?> showAppDatePicker(
       color: Theme.of(sheetContext).colorScheme.surface,
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 410,
+        // 高度不寫死：CalendarDatePicker 自己宣告 6 週的高度，固定 410 會把它擠壓、
+        // 最後一週被下緣裁掉（A16）。文字放大時內容超出螢幕就改成可捲動。
+        child: SingleChildScrollView(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
@@ -85,13 +87,11 @@ Future<DateTime?> showAppDatePicker(
                   ],
                 ),
               ),
-              Expanded(
-                child: CalendarDatePicker(
-                  initialDate: initialDate,
-                  firstDate: firstDate,
-                  lastDate: lastDate,
-                  onDateChanged: (value) => selected = value,
-                ),
+              CalendarDatePicker(
+                initialDate: initialDate,
+                firstDate: firstDate,
+                lastDate: lastDate,
+                onDateChanged: (value) => selected = value,
               ),
             ],
           ),
@@ -1059,7 +1059,15 @@ Future<bool?> showAppFormSheet(
               Expanded(child: child!),
             ],
           ),
-          child: builder(sheetContext),
+          // 標題列已在狀態列下方；內容再吃一次上方 inset 會在標題下留一塊空白（A17）。
+          // Builder 讓它在自己的 context 上讀 MediaQuery，系統設定變動時才會跟著重建。
+          child: Builder(
+            builder: (innerContext) => MediaQuery.removePadding(
+              context: innerContext,
+              removeTop: true,
+              child: builder(sheetContext),
+            ),
+          ),
         ),
       );
     },

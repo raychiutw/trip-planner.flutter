@@ -97,6 +97,65 @@ void main() {
     expect(await result, DateTime(2026, 4, 25));
   });
 
+  // A16：彈出層高度固定時，最後一週會被下緣裁掉。2026/11 是 5 週，2026/8 是 6 週。
+  // 用正式主題、zh_TW 與 iPhone 的底部安全區（34pt）重現場景條件。
+  for (final (month, lastDay) in [(11, 30), (8, 31)]) {
+    testWidgets('日期選擇器 2026/$month 的最後一週完整落在彈出層內', (tester) async {
+      tester.view.physicalSize = const Size(1206, 2622);
+      tester.view.devicePixelRatio = 3;
+      tester.view.padding = const FakeViewPadding(bottom: 102);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 102);
+      addTearDown(tester.view.reset);
+      const locale = Locale('zh', 'TW');
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: locale,
+          supportedLocales: const [locale],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => unawaited(
+                  showAppDatePicker(
+                    context,
+                    initialDate: DateTime(2026, month, 15),
+                    firstDate: DateTime(2026, 1, 1),
+                    lastDate: DateTime(2026, 12, 31),
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // CalendarDatePicker 內部宣告了月曆需要的高度（6 週最多）；實際分到的高度
+      // 比它小就是被擠壓或裁掉，最後一週會被下緣吃掉。
+      final body = find
+          .descendant(
+            of: find.byType(CalendarDatePicker),
+            matching: find.byType(SizedBox),
+          )
+          .first;
+      expect(
+        tester.getSize(body).height,
+        greaterThanOrEqualTo(tester.widget<SizedBox>(body).height!),
+      );
+      // 最後一週的日期也要在彈出層可見範圍內（螢幕高減底部安全區 34pt）。
+      final day = tester.getRect(
+        find.descendant(
+          of: find.byType(CalendarDatePicker),
+          matching: find.text('$lastDay'),
+        ),
+      );
+      expect(day.bottom, lessThanOrEqualTo(874 - 34));
+    });
+  }
+
   testWidgets('Android 日期也使用同一個 calendar sheet', (tester) async {
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {

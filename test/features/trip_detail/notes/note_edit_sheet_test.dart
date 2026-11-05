@@ -64,6 +64,27 @@ void main() {
     registerFallbackValue(<String, dynamic>{});
   });
 
+  testWidgets('A17：輸入內容後欄位名稱仍以浮動標籤常駐（不是 placeholder）', (tester) async {
+    await _open(tester, _MockTripRepository(), section: NoteSection.flights);
+    final field = find.byKey(const ValueKey('note-field-flight_no'));
+    expect(
+      tester.widget<TextField>(field).decoration?.hintText,
+      isNull,
+      reason: '欄位名稱走 labelText，不是輸入後會消失的 hint',
+    );
+
+    final labelAbove = find.descendant(of: field, matching: find.text('航班編號'));
+    await tester.enterText(field, 'BR123');
+    await tester.pumpAndSettle();
+
+    expect(labelAbove, findsOneWidget);
+    // 標籤浮到輸入文字上方，而不是被蓋掉。
+    expect(
+      tester.getRect(labelAbove).bottom,
+      lessThanOrEqualTo(tester.getRect(find.text('BR123')).top),
+    );
+  });
+
   group('欄位輸入屬性（keyboard／AutoFill／換行鍵）', () {
     TextField fieldOf(WidgetTester tester, String key) =>
         tester.widget<TextField>(find.byKey(ValueKey('note-field-$key')));
