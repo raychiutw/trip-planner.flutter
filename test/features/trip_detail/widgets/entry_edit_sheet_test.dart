@@ -779,6 +779,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
     expect(find.text('保留你的版本？'), findsOneWidget);
+    expect(find.text('協作者也修改了行程備註。\n繼續會以你的版本覆蓋對方的版本。'), findsOneWidget);
     await tester.tap(find.text('保留我的版本'));
     await tester.pumpAndSettle();
 
@@ -1376,6 +1377,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // A23：衝突狀態要有常駐橫幅指出是哪些欄位，不能等按儲存才知道。
+    final banner = find.byKey(const ValueKey('entry-edit-conflict-banner'));
+    expect(banner, findsOneWidget);
+    expect(
+      find.descendant(of: banner, matching: find.textContaining('開始時間、結束時間')),
+      findsOneWidget,
+    );
+
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
     expect(find.text('保留你的版本？'), findsOneWidget);
@@ -1393,5 +1402,49 @@ void main() {
         endTime: any(named: 'endTime'),
       ),
     );
+  });
+
+  testWidgets('衝突欄位改回與對方一致後，衝突橫幅消失', (tester) async {
+    final repo = _MockTripRepository();
+    final entries = StreamController<TimelineEntry>.broadcast();
+    addTearDown(entries.close);
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      entryStream: entries.stream,
+    );
+    entries.add(_entry);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-desc')),
+      '我的備註',
+    );
+    entries.add(
+      const TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        startTime: '09:00',
+        endTime: '10:00',
+        title: '首里城',
+        description: '協作者的備註',
+        version: 3,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final banner = find.byKey(const ValueKey('entry-edit-conflict-banner'));
+    expect(banner, findsOneWidget);
+    expect(
+      find.descendant(of: banner, matching: find.textContaining('行程備註')),
+      findsOneWidget,
+    );
+
+    // 改成與對方（目前的 base）一致＝不再衝突。
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-desc')),
+      '協作者的備註',
+    );
+    await tester.pumpAndSettle();
+    expect(banner, findsNothing);
   });
 }

@@ -1876,7 +1876,7 @@ List<HigScene> higScenes() => [
     proof: () => find.text('編輯停留點'),
   ),
   // 「保留你的版本？」三處確認：停留點靠即時推送，筆記與交通靠 409 後重新載入（見各 stub 的註解）。
-  // 確認框標題在三處（筆記是「保留你的修改？」）幾乎相同，所以 act 內另外斷言背景 sheet 的專屬文字。
+  // 確認框標題與按鈕在三處完全相同（共用 confirmKeepMyVersion），所以 act 內另外斷言背景 sheet 的專屬文字。
   HigScene(
     'entry-edit-sheet-remote-conflict',
     '#559',
@@ -1915,8 +1915,7 @@ List<HigScene> higScenes() => [
       await _tapKey(tester, 'note-edit-submit');
       expect(find.text('我的草稿'), findsWidgets, reason: '背景要是筆記編輯 sheet 且保留草稿');
     },
-    // 筆記的確認標題是「保留你的修改？」，與停留點、交通的「保留你的版本？」不同。
-    proof: () => find.text('保留我的修改'),
+    proof: () => find.text('保留我的版本'),
   ),
   HigScene(
     'travel-edit-overwrite-confirm',
@@ -1943,7 +1942,7 @@ List<HigScene> higScenes() => [
       await _tapKey(tester, 'travel-submit');
       expect(find.text('交通方式'), findsWidgets, reason: '背景要是交通編輯 sheet');
     },
-    proof: () => find.text('協作者也更新了交通設定。繼續會以你目前的交通方式與分鐘數覆蓋對方版本。'),
+    proof: () => find.textContaining('協作者也修改了交通設定'),
   ),
   HigScene(
     'travel-edit-sheet',

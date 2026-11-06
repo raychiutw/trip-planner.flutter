@@ -12,6 +12,7 @@ import '../../app/app_feedback.dart';
 import '../../models/ai_data_consent.dart';
 import 'ai_data_consent_controller.dart';
 import 'ai_data_consent_sheet.dart';
+import 'ai_owner_consent_missing_alert.dart';
 
 /// 讀不到說明文字、無法確認同意狀態時的錯誤訊息。
 const kAiConsentUnavailableMessage = '暫時無法確認 AI 資料同意，請稍後再試。';
@@ -51,7 +52,7 @@ Future<T?> runWithAiDataConsent<T extends Object>(
   }
 
   Future<T?> tellOwnerMissing() async {
-    await showAiOwnerConsentMissingSheet(
+    await showAiOwnerConsentMissingAlert(
       context,
       inputKept: keptMessage != null,
     );

@@ -13,6 +13,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/trips/collab/collab_screen.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_field_hint.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockCollabRepo extends Mock implements CollabRepository {}
@@ -237,6 +238,25 @@ void main() {
     await tester.pump();
     expect(addButton().onPressed, isNotNull);
     expect(find.byKey(const ValueKey('collab-email-hint')), findsNothing);
+  });
+
+  testWidgets('未填說明字用共用的 TpFieldHint，與欄位內文左緣對齊（同註冊頁）', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final hint = find.byKey(const ValueKey('collab-email-hint'));
+    expect(
+      find.ancestor(of: hint, matching: find.byType(TpFieldHint)),
+      findsOneWidget,
+    );
+    // 說明字的左緣要與欄位內文（EditableText）對齊；差 2pt 以內是外框線寬。
+    final fieldText = tester.getTopLeft(
+      find.descendant(
+        of: find.byKey(const ValueKey('collab-email')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(tester.getTopLeft(hint).dx, closeTo(fieldText.dx, 2));
   });
 
   testWidgets('新增成員 → 輸入 email + 點新增 → invite', (tester) async {

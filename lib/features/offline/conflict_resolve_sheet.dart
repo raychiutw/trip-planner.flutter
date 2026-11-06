@@ -1,6 +1,7 @@
 /// 衝突解決表單：先逐筆選擇保留版本，再一次套用。
 library;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -175,6 +176,7 @@ class _ConflictCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final conflict = this.conflict;
+    final chosenLabel = choice == _ConflictChoice.ours ? '已選：你的' : '已選：對方的';
     return TpGroupedSurface(
       key: ValueKey('conflict-card-${conflict.id}'),
       children: [
@@ -215,6 +217,33 @@ class _ConflictCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: TpSpacing.s3),
+              ],
+              // 已選項只靠按鈕填色看不出來（色覺、對比不足），另以勾選記號加文字標示。
+              if (choice != null) ...[
+                // 整列一個語意節點（label 即文字），勾選圖示是裝飾、不另念。
+                Semantics(
+                  key: ValueKey('conflict-chosen-${conflict.id}'),
+                  container: true,
+                  label: chosenLabel,
+                  child: ExcludeSemantics(
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.checkmark_circle_fill,
+                          size: 16,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: TpSpacing.s1),
+                        Text(
+                          chosenLabel,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: colorScheme.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s2),
               ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,

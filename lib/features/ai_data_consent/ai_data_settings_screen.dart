@@ -203,12 +203,15 @@ class _Body extends StatelessWidget {
                 key: const ValueKey('ai-data-settings-withdraw'),
                 title: '撤回同意',
                 destructive: true,
+                // 動作列（跳確認框／開 sheet）不是導航，不畫「往下一層」的 chevron。
+                trailing: const SizedBox.shrink(),
                 onTap: busy ? null : onWithdraw,
               )
             else
               TpSettingsRow(
                 key: const ValueKey('ai-data-settings-consent'),
                 title: '查看說明並同意',
+                trailing: const SizedBox.shrink(),
                 onTap: busy ? null : onConsent,
               ),
           ],

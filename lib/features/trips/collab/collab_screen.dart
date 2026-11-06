@@ -13,6 +13,7 @@ import '../../../app/irreversible_action.dart';
 import '../../../models/trip_member.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_chip.dart';
+import '../../../ui/tp_field_hint.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'collab_controller.dart';
@@ -40,13 +41,6 @@ class CollabScreen extends ConsumerStatefulWidget {
 class _CollabScreenState extends ConsumerState<CollabScreen> {
   final _email = TextEditingController();
   String _role = 'member';
-
-  @override
-  void initState() {
-    super.initState();
-    // Email 有沒有內容決定「新增」可不可按，輸入時要重建。
-    _email.addListener(() => setState(() {}));
-  }
 
   @override
   void dispose() {
@@ -263,6 +257,8 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     );
   }
 
+  static bool _isBlank(TextEditingValue value) => value.text.trim().isEmpty;
+
   Widget _addRow(CollabState state) {
     return AbsorbPointer(
       key: const ValueKey('collab-invite-form'),
@@ -288,17 +284,16 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 isDense: true,
               ),
             ),
-            if (_email.text.trim().isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: TpSpacing.s1),
-                child: Text(
-                  '請先輸入 Email，才能新增成員。',
-                  key: const ValueKey('collab-email-hint'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
+            // Email 有沒有內容決定說明與「新增」，只重建這兩處，不重建整個畫面。
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _email,
+              builder: (_, value, _) => _isBlank(value)
+                  ? const TpFieldHint(
+                      '請先輸入 Email，才能新增成員。',
+                      textKey: ValueKey('collab-email-hint'),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             const SizedBox(height: TpSpacing.s2),
             Wrap(
               spacing: TpSpacing.s2,
@@ -315,11 +310,15 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                   selected: _role == 'viewer',
                   onPressed: () => setState(() => _role = 'viewer'),
                 ),
-                FilledButton(
-                  key: const ValueKey('collab-add'),
-                  onPressed: state.adding || _email.text.trim().isEmpty
-                      ? null
-                      : () => _invite(state),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _email,
+                  builder: (_, value, child) => FilledButton(
+                    key: const ValueKey('collab-add'),
+                    onPressed: state.adding || _isBlank(value)
+                        ? null
+                        : () => _invite(state),
+                    child: child,
+                  ),
                   child: state.adding
                       ? Semantics(
                           key: const ValueKey('collab-invite-progress'),

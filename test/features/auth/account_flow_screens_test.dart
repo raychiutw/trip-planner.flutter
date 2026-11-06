@@ -116,6 +116,21 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('未勾同意的提示字左緣與欄位內文對齊（同共編頁的驗證方式）', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    final fieldText = tester.getTopLeft(
+      find.descendant(
+        of: find.byKey(const ValueKey('signup-email-field')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('signup-consent-hint'))).dx,
+      closeTo(fieldText.dx, 2),
+    );
+  });
+
   testWidgets('註冊欄位提供同組姓名、Email 與新密碼 AutoFill 語意', (tester) async {
     await pumpAuthRoutes(tester, initialLocation: '/signup');
 

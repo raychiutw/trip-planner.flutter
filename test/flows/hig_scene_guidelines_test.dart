@@ -65,7 +65,6 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'explore-custom-region-sheet': {'Drag handle 36x4'},
   'chat-ai-consent-sheet': {'Drag handle 36x4'},
   'chat-ai-data-consent-sheet': {'Drag handle 36x4'},
-  'chat-ai-data-owner-missing-sheet': {'Drag handle 36x4'},
   'trip-health-ai-data-consent-sheet': {'Drag handle 36x4'},
   // 「匿名分享」勾選框 40x40，與分享頁建立表單同一個元件（'share-manage'）。
   'share-edit-sheet': {'(無標籤) 40x40', 'Drag handle 36x4'},
@@ -99,6 +98,8 @@ const _scenesWithDialog = {
   'entry-edit-overwrite-confirm',
   'note-edit-overwrite-confirm',
   'travel-edit-overwrite-confirm',
+  // 純告知改成 alert（A27），不再是 sheet。
+  'chat-ai-data-owner-missing-sheet',
 };
 
 /// 走語意樹，回傳所有「可點擊但最短邊小於 [_minTapTarget] pt」的元素。

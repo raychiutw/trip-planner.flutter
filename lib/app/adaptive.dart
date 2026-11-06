@@ -1060,7 +1060,9 @@ Future<bool?> showAppFormSheet(
             ],
           ),
           // 標題列已在狀態列下方；內容再吃一次上方 inset 會在標題下留一塊空白（A17）。
-          // Builder 讓它在自己的 context 上讀 MediaQuery，系統設定變動時才會跟著重建。
+          // Builder 讓 removePadding 在自己的 context 上讀 MediaQuery。MediaQuery 一變動
+          // （含鍵盤動畫每一幀）都會重新呼叫呼叫端的 builder，所以 builder 只能回傳
+          // `(_) => SomeForm(...)` 這種無狀態包裝，不可在裡面建立有狀態物件（controller 等）。
           child: Builder(
             builder: (innerContext) => MediaQuery.removePadding(
               context: innerContext,

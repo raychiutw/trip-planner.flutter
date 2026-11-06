@@ -42,7 +42,8 @@ void main() {
 
     final header = tester.getRect(find.byType(TpSheetHeader));
     final first = tester.getRect(find.text('第一個欄位'));
-    expect(first.top - header.bottom, lessThan(40));
+    // ListView 沒有自己的 padding：內容貼著標題列＝間距 0；若又疊一次 59pt 狀態列 inset 就不是 0。
+    expect(first.top - header.bottom, closeTo(0, 0.5));
   });
 
   testWidgets('表單 Escape 與語意取消都先確認未儲存草稿', (tester) async {

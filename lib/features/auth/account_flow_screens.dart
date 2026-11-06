@@ -14,6 +14,7 @@ import '../../app/error_message.dart';
 import '../../app/external_links.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_field_hint.dart';
 
 /// Email/password signup page, including optional invitation token handoff.
 class SignupScreen extends ConsumerStatefulWidget {
@@ -255,30 +256,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       ),
                     ),
                     if (!_privacyConsent)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 12),
-                        child: Text(
-                          '請先同意個資條款，才能建立帳號。',
-                          key: const ValueKey('signup-consent-hint'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
+                      const TpFieldHint(
+                        '請先同意個資條款，才能建立帳號。',
+                        textKey: ValueKey('signup-consent-hint'),
                       ),
                     if (field.errorText != null || _privacyConsentError != null)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 12),
-                        child: Text(
-                          field.errorText ?? _privacyConsentError!,
-                          key: const ValueKey('signup-privacy-consent-error'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                        ),
+                      TpFieldHint(
+                        field.errorText ?? _privacyConsentError!,
+                        textKey: const ValueKey('signup-privacy-consent-error'),
+                        color: Theme.of(context).colorScheme.error,
                       ),
                   ],
                 ),

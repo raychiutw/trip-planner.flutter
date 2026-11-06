@@ -10,7 +10,9 @@ import '../../../app/adaptive.dart';
 import '../../../models/note_section.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_chip.dart';
+import '../../../ui/tp_inline_banner.dart';
 import '../trip_providers.dart';
+import '../widgets/keep_my_version_confirm.dart';
 import 'note_field_spec.dart';
 
 /// 以 modal bottom sheet 開啟筆記新增/編輯表單。
@@ -215,13 +217,16 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               freshRow.fields[key] != _baseFields[key] &&
               freshRow.fields[key] != fields[key],
         )) {
-      final overwrite = await showAppDestructiveConfirm(
+      final conflictLabels = [
+        for (final spec in _specs)
+          if (changedFields.containsKey(spec.key) &&
+              freshRow.fields[spec.key] != _baseFields[spec.key] &&
+              freshRow.fields[spec.key] != fields[spec.key])
+            spec.label,
+      ].join('、');
+      final overwrite = await confirmKeepMyVersion(
         context,
-        source: TpDestructiveConfirmSource.direct,
-        title: '保留你的修改？',
-        message: '協作者也修改了相同欄位。繼續會以你的草稿覆蓋那些欄位。',
-        confirmLabel: '保留我的修改',
-        cancelLabel: '繼續編輯',
+        what: conflictLabels,
       );
       if (!mounted || !overwrite) return false;
     }
@@ -335,55 +340,10 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
                 const SizedBox(height: TpSpacing.s4),
               ],
               if (_errorMessage != null) ...[
-                Semantics(
+                TpInlineBanner(
                   key: const ValueKey('note-edit-error'),
-                  liveRegion: true,
-                  child: Container(
-                    padding: const EdgeInsets.all(TpSpacing.s3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(TpSpacing.s3),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onErrorContainer,
-                          ),
-                        ),
-                        if (_deletedRow)
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _saveAsNew = true;
-                                  _needsRefresh = false;
-                                  _deletedRow = false;
-                                  _errorMessage = '草稿可另存為新筆記。按「儲存」後會建立新的一筆。';
-                                });
-                                _syncFormState();
-                              },
-                              child: const Text('另存為新筆記'),
-                            ),
-                          )
-                        else if (_needsRefresh)
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: TextButton(
-                              onPressed: () => _refreshAfterConflict(
-                                ref.read(tripRepositoryProvider),
-                              ),
-                              child: const Text('重試'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                  message: _errorMessage!,
+                  action: _noteBannerAction(),
                 ),
                 const SizedBox(height: TpSpacing.s3),
               ],
@@ -406,6 +366,31 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         ),
       ),
     );
+  }
+
+  Widget? _noteBannerAction() {
+    if (_deletedRow) {
+      return TextButton(
+        onPressed: () {
+          setState(() {
+            _saveAsNew = true;
+            _needsRefresh = false;
+            _deletedRow = false;
+            _errorMessage = '草稿可另存為新筆記。按「儲存」後會建立新的一筆。';
+          });
+          _syncFormState();
+        },
+        child: const Text('另存為新筆記'),
+      );
+    }
+    if (_needsRefresh) {
+      return TextButton(
+        onPressed: () =>
+            _refreshAfterConflict(ref.read(tripRepositoryProvider)),
+        child: const Text('重試'),
+      );
+    }
+    return null;
   }
 
   Widget _field(NoteFieldSpec spec) {

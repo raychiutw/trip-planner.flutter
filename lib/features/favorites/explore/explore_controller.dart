@@ -5,10 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_client.dart' show isOfflineError;
-import '../../../app/error_message.dart';
 import '../../../api/favorites_repository.dart';
 import '../../../api/poi_repository.dart';
 import '../../../api/providers.dart';
+import '../../../app/error_message.dart';
 import '../../../models/poi_favorite.dart';
 import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
