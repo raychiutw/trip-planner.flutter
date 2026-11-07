@@ -49,6 +49,16 @@ void main() {
     );
   });
 
+  test('傳統 mipmap 五密度的 ic_launcher.png 都存在', () {
+    for (final d in _densities.keys) {
+      expect(
+        File('$_res/mipmap-$d/ic_launcher.png').existsSync(),
+        isTrue,
+        reason: 'ic_launcher.png $d',
+      );
+    }
+  });
+
   testWidgets('前景與 monochrome 五密度存在、透明底、圖形在 66dp 安全區內', (tester) async {
     await tester.runAsync(() async {
       for (final layer in [
