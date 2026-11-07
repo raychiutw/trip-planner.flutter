@@ -57,7 +57,7 @@ class TpChip extends StatelessWidget {
                 : scheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
+              color: selected ? scheme.tintFill : scheme.outlineVariant,
             ),
           ),
           child: Padding(

@@ -1759,7 +1759,7 @@ void main() {
     final decoration = focusedCard.decoration! as BoxDecoration;
     final border = decoration.border! as Border;
 
-    expect(border.top.color, AppTheme.light().colorScheme.primary);
+    expect(border.top.color, AppTheme.light().colorScheme.tintFill);
     expect(border.top.width, 2);
   });
 

@@ -1858,7 +1858,7 @@ void main() {
     const resting = <WidgetState>{};
     expect(
       primary.style?.backgroundColor?.resolve(resting),
-      scheme.primary,
+      scheme.tintFill,
       reason: '著色在底色',
     );
     expect(

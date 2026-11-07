@@ -1058,10 +1058,10 @@ class _ComposerState extends ConsumerState<_Composer> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: widget.sending
-                            ? scheme.primary.withValues(
+                            ? scheme.tintFill.withValues(
                                 alpha: TpDisabled.controlOpacity,
                               )
-                            : scheme.primary,
+                            : scheme.tintFill,
                       ),
                       child: SizedBox.square(
                         dimension: 32,

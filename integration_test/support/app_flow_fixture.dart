@@ -49,6 +49,7 @@ import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -1396,13 +1397,13 @@ class _InjectedAccessibility {
 }
 
 /// 等同 lib/main.dart 的 `_triplineGlassTheme`：光暈主色換成品牌 tint，
-/// 以 AppTheme 的 `colorScheme.primary` 取同一個 token。
+/// 以 AppTheme 的 `colorScheme.tintFill` 取同一個 token。
 GlassThemeData productionEquivalentGlassTheme() => GlassThemeData(
   light: GlassThemeVariant.light.copyWith(
-    glowColors: GlassGlowColors(primary: AppTheme.light().colorScheme.primary),
+    glowColors: GlassGlowColors(primary: AppTheme.light().colorScheme.tintFill),
   ),
   dark: GlassThemeVariant.dark.copyWith(
-    glowColors: GlassGlowColors(primary: AppTheme.dark().colorScheme.primary),
+    glowColors: GlassGlowColors(primary: AppTheme.dark().colorScheme.tintFill),
   ),
 );
 

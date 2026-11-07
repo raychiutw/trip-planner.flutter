@@ -956,7 +956,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     // 白底圓形 chip + 日別色外圈／數字；聚焦點改 adaptive app tint 填底並放大。
     final style = tripMapMarkerStyle(
       dayColor: pin.color,
-      focusColor: Theme.of(context).colorScheme.primary,
+      focusColor: Theme.of(context).colorScheme.tintFill,
       isFocused: pin.entry.id == _activeEntryId,
     );
     return TripMapMarker(

@@ -1644,11 +1644,13 @@ class _EntryDropTarget extends StatelessWidget {
           decoration: BoxDecoration(
             color: candidates.isEmpty
                 ? Colors.transparent
-                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+                : Theme.of(
+                    context,
+                  ).colorScheme.tintFill.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(8),
             border: candidates.isEmpty
                 ? null
-                : Border.all(color: Theme.of(context).colorScheme.primary),
+                : Border.all(color: Theme.of(context).colorScheme.tintFill),
           ),
           alignment: Alignment.center,
           child: candidates.isNotEmpty

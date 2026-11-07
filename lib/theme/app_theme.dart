@@ -11,10 +11,8 @@ abstract final class AppTheme {
   static ThemeData light({bool highContrast = false}) {
     final colorScheme = ColorScheme(
       brightness: Brightness.light,
-      // 提高對比時前景改用較深的 tint（#550）；單一 tint，深色本來就夠亮不變。
-      primary: highContrast
-          ? TpSystemColorsLight.tintDeep
-          : TpSystemColorsLight.tint,
+      // primary 是前景（文字、圖示）用的深棕；底色與邊線改取 tintFill。
+      primary: TpSystemColorsLight.tintDeep,
       onPrimary: const Color(0xFFFFFFFF),
       primaryContainer: TpSystemColorsLight.tintBackground,
       onPrimaryContainer: TpSystemColorsLight.tintDeep,
@@ -151,7 +149,7 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.primary,
+          backgroundColor: colorScheme.tintFill,
           foregroundColor: colorScheme.onPrimary,
           minimumSize: buttonMinSize,
           padding: buttonPadding,
@@ -208,7 +206,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+          borderSide: BorderSide(color: colorScheme.tintFill, width: 1.5),
         ),
         border: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),

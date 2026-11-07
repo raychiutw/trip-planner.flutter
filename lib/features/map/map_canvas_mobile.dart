@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart'
     as nav;
 
+import '../../theme/tokens.dart';
 import 'map_adapter.dart';
 import 'map_style.dart';
 import 'trip_map_cluster_projector.dart';
@@ -179,7 +180,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
             color: item.members.first.color,
             style: tripMapMarkerStyle(
               dayColor: item.members.first.color,
-              focusColor: Theme.of(context).colorScheme.primary,
+              focusColor: Theme.of(context).colorScheme.tintFill,
               isFocused: false,
             ),
             title: '${item.members.length} 個停留點',

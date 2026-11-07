@@ -58,7 +58,7 @@ class PoiFavoriteCard extends StatelessWidget {
               : BorderRadius.circular(TpRadius.lg),
           border: Border.all(
             color: !grouped && selected
-                ? theme.colorScheme.primary
+                ? theme.colorScheme.tintFill
                 : Colors.transparent,
             width: selected ? 2 : 1,
           ),
