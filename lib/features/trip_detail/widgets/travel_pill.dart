@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
 import '../../../models/segment.dart';
+import '../../../ui/tp_transit_icon.dart';
 
 /// 站間移動 pill：中性描邊、Tripline accent icon + 分鐘數（tabular）。
 class TravelPill extends StatelessWidget {
@@ -34,10 +35,7 @@ class TravelPill extends StatelessWidget {
       case 'bus':
         return Icons.directions_bus;
       case 'train':
-      case 'metro':
-      case 'hsr':
         return Icons.train;
-      case 'monorail':
       case 'tram':
         return Icons.tram;
       case 'flight':
@@ -53,6 +51,14 @@ class TravelPill extends StatelessWidget {
         return Icons.route;
     }
   }
+
+  /// 單軌、地鐵、高鐵有專屬圖示；其餘回 null 走 [iconForType]。
+  static TpTransitGlyph? glyphForType(String type) => switch (type) {
+    'monorail' => TpTransitGlyph.monorail,
+    'metro' => TpTransitGlyph.metro,
+    'hsr' => TpTransitGlyph.hsr,
+    _ => null,
+  };
 
   /// 距離公尺 → 顯示字串：>=1000m 整數 km；<1000m 顯示 M m。
   static String _formatDistance(int distanceM) {
@@ -145,11 +151,14 @@ class TravelPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            iconForType(submode ?? mode ?? ''),
-            size: 17,
-            color: colorScheme.primary,
-          ),
+          if (glyphForType(submode ?? mode ?? '') case final glyph?)
+            TpTransitIcon(glyph: glyph, size: 17, color: colorScheme.primary)
+          else
+            Icon(
+              iconForType(submode ?? mode ?? ''),
+              size: 17,
+              color: colorScheme.primary,
+            ),
           const SizedBox(width: 4),
           Flexible(
             child: Text(

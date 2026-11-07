@@ -5,6 +5,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_transit_icon.dart';
 
 Future<void> pumpPill(
   WidgetTester tester,
@@ -120,7 +121,29 @@ void main() {
         const Travel(type: 'transit', submode: 'hsr', min: 90),
       );
       expect(find.text('高鐵 · 90 分鐘'), findsOneWidget);
+      expect(find.byIcon(Icons.train), findsNothing);
+      expect(
+        tester.widget<TpTransitIcon>(find.byType(TpTransitIcon)).glyph,
+        TpTransitGlyph.hsr,
+      );
+    });
+
+    testWidgets('單軌、地鐵、高鐵各用不同專屬圖示，火車維持 Icons.train', (tester) async {
+      final glyphs = <TpTransitGlyph>{};
+      for (final sub in ['monorail', 'metro', 'hsr']) {
+        await pumpPill(tester, Travel(type: 'transit', submode: sub, min: 5));
+        glyphs.add(
+          tester.widget<TpTransitIcon>(find.byType(TpTransitIcon)).glyph,
+        );
+        expect(find.byIcon(Icons.train), findsNothing);
+      }
+      expect(glyphs, TpTransitGlyph.values.toSet());
+      await pumpPill(
+        tester,
+        const Travel(type: 'transit', submode: 'train', min: 5),
+      );
       expect(find.byIcon(Icons.train), findsOneWidget);
+      expect(find.byType(TpTransitIcon), findsNothing);
     });
 
     testWidgets('sameplace 顯示中性「不需計算路程」marker', (tester) async {
