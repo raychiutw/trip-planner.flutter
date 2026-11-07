@@ -1134,6 +1134,60 @@ void main() {
       expect(find.text('detail:imported-trip'), findsOneWidget);
     });
 
+    Future<MockTripRepository> pumpImportWith(
+      WidgetTester tester,
+      TripImportFile file,
+    ) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(
+        () => mockTripRepository.importTripJson(any()),
+      ).thenAnswer((_) async => 'imported-trip');
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              _FakeTripImportFilePicker(file),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pumpAndSettle();
+      return mockTripRepository;
+    }
+
+    testWidgets('匯入大小上限以字元數計：中文檔位元組超過但字元數未超 → 放行', (tester) async {
+      final content = '{"schemaVersion":1,"pad":"${'中' * 200000}"}';
+      final repo = await pumpImportWith(
+        tester,
+        // length 為位元組數（UTF-8 約 600KB > 512KB），字元數仍在上限內
+        TripImportFile(name: 'zh.json', length: 600000, content: content),
+      );
+
+      verify(() => repo.importTripJson(content)).called(1);
+    });
+
+    testWidgets('匯入大小上限以字元數計：字元數超過 → 拒絕且不送出', (tester) async {
+      final content = '{"schemaVersion":1,"pad":"${'a' * (512 * 1024)}"}';
+      final repo = await pumpImportWith(
+        tester,
+        // length 刻意給小值，證明判斷依據是字元數而非 file.length
+        TripImportFile(name: 'big.json', length: 10, content: content),
+      );
+
+      expect(find.text('檔案過大（上限 512KB）'), findsOneWidget);
+      verifyNever(() => repo.importTripJson(any()));
+    });
+
     testWidgets('長按 → 匯出 JSON → 寫入 export 檔名與內容', (tester) async {
       await _useWideSurface(tester);
       final mockTripRepository = MockTripRepository();

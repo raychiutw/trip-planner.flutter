@@ -25,7 +25,7 @@ import '../../ui/swipe_to_delete.dart';
 import 'current_trip_provider.dart';
 import 'trip_card.dart';
 
-const int _maxTripImportBytes = 512 * 1024;
+const int _maxTripImportChars = 512 * 1024;
 
 /// 匯入 JSON 檔案選擇器；widget test 以 provider override 注入假檔案。
 final tripImportFilePickerProvider = Provider<TripImportFilePicker>(
@@ -481,7 +481,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     try {
       final file = await ref.read(tripImportFilePickerProvider).pick();
       if (!mounted || file == null) return;
-      if (file.length > _maxTripImportBytes) {
+      // 後端以 text.length（UTF-16 字元數）判斷，這裡同單位；file.length 是位元組，中文檔會被誤擋（#1601）
+      if (file.content.length > _maxTripImportChars) {
         _showImportError('檔案過大（上限 512KB）');
         return;
       }
