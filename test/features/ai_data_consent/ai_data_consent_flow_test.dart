@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoAlertDialog;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -410,6 +411,43 @@ void main() {
       expect(calls, 1);
       expect(outcome, isNull);
       verifyNever(() => repo.accept(any()));
+    });
+
+    testWidgets('旅伴被 owner 擋下：「複製這句話」把通知文字交給系統分享選單', (tester) async {
+      final shared = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('dev.fluttercommunity.plus/share'),
+            (call) async {
+              shared.add((call.arguments as Map)['text'] as String);
+              return 'dev.fluttercommunity.plus/share/success';
+            },
+          );
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('dev.fluttercommunity.plus/share'),
+              null,
+            ),
+      );
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      thrower = () => _ownerGate;
+      await pumpFlow(tester, keptMessage: '幫我排第二天');
+      await tapGo(tester);
+
+      const notice = '我想用 Tripline 的 AI 排行程，請到 帳號設定 → AI 與資料 同意一下，謝謝！';
+      expect(find.text(notice), findsOneWidget);
+      expect(find.bySemanticsLabel('複製這句話'), findsOneWidget);
+      await tester.tap(find.text('複製這句話'));
+      await tester.pumpAndSettle();
+      expect(shared, [notice]);
+
+      // 「知道了」仍可關閉。
+      await tester.tap(find.text('知道了'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
     });
 
     testWidgets('同意後重送，版本又被更新而再被擋：重新讀取並再詢問一次，接續成功', (tester) async {
