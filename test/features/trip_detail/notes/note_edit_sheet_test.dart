@@ -224,7 +224,7 @@ void main() {
         find.byKey(ValueKey('note-field-$requiredKey')),
         '我的草稿',
       );
-      for (final message in ['儲存失敗，請稍後再試', '已載入最新版本。你的草稿已保留，請再次儲存。']) {
+      for (final message in ['儲存失敗，請稍後再試', '已載入最新版本。你的修改已保留，請再次儲存。']) {
         await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
         await tester.pumpAndSettle();
         final banner = find.byKey(const ValueKey('note-edit-error'));
@@ -616,7 +616,7 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
     await tester.pumpAndSettle();
-    expect(find.text('無法載入最新版本。你的草稿已保留，請重試。'), findsOneWidget);
+    expect(find.text('無法載入最新版本。你的修改已保留，請重試。'), findsOneWidget);
     expect(find.text('我的草稿'), findsOneWidget);
     expect(
       find.descendant(
@@ -674,7 +674,7 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
     await tester.pumpAndSettle();
-    expect(find.text('這筆筆記已被刪除。你的草稿仍在表單中。'), findsOneWidget);
+    expect(find.text('這筆筆記已被刪除。你的修改仍在表單中。'), findsOneWidget);
     expect(find.text('我的草稿'), findsOneWidget);
     await tester.tap(find.text('另存為新筆記'));
     await tester.pumpAndSettle();

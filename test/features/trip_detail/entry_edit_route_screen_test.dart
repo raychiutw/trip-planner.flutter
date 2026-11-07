@@ -587,7 +587,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('此停留點已被刪除，無法再儲存；你的草稿仍保留。'), findsOneWidget);
+    expect(find.text('此停留點已被刪除，無法再儲存；你的修改仍保留。'), findsOneWidget);
     final saveButton = tester.widget<TextButton>(
       find.descendant(
         of: find.byKey(const ValueKey('entry-edit-submit')),

@@ -480,6 +480,8 @@ class _LogoutRow extends StatelessWidget {
           title: '登出',
           leading: const Icon(CupertinoIcons.square_arrow_right),
           destructive: true,
+          // 動作列（跳確認框）不是導航，不畫向右 chevron（A25 同型）。
+          trailing: const SizedBox.shrink(),
           onTap: onTap,
         ),
       ],
