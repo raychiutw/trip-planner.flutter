@@ -33,6 +33,13 @@ The Patrol bundle contains two independent evidence suites:
 - `app_owned_flow_test.dart` runs Welcome／Login, four root tabs, trips, itinerary and Day fallback, notes, map/itinerary switching, Tripline and external POIs, Account 與本機 appearance 三選一（確認立即套用後可切回跟隨系統）, chat draft retention, favorites branch restoration, forms, destructive confirmation, offline state, error, and recovery against deterministic repository fixtures. It never calls production services.
 - `native_map_smoke_test.dart` checks real native map creation, dispose／recreate lifecycle, zoom 13 before and after remount, overlays, theme switching, location permission, pan／pinch／rotate／double-tap gestures, and native POI callbacks. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI fails unless a Google native POI produces the platform callback.
 
+`oauth_callback_test.dart`（#584，僅 Android）用真的 `OAuthLoginService` 與 `WebAuthLauncher`，
+只把 token endpoint 換成本機 stub，再以 Patrol `openUrl` 送
+`https://<callbackHost>/oauth/callback?code=…&state=…`，三情境：前景收到、`pressHome` 後收到、
+沒有進行中登入時收到（行程被殺後的等價冷狀態：不崩、不登入、無殘留 token；測試與 App 同行程，
+無法真的殺掉再送，真正的 process death 仍需手測）。**不涵蓋 App Link 擁有權**（assetlinks.json
+與網域）：測試環境的 intent 不經系統驗證，擁有權仍需一次真機手測。iOS 的 `openUrl` 能力另開票追蹤。
+
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
 `app_owned_flow_test.dart` 另含第二個 Patrol test「app-owned visual evidence walks
