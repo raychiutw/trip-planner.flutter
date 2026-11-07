@@ -428,6 +428,10 @@ class AppFlowFixture {
   /// 整合測試用它把假登入換回真的 `OAuthLoginService` + 真啟動器。
   final List<dynamic> extraOverrides = [];
 
+  /// true 時不裝假登入的三個 provider，由 [extraOverrides] 自備真的（riverpod 不允許
+  /// 同一 container 重複 override 同一 provider）。
+  bool realOAuth = false;
+
   /// 跨流程驗證要用真的 ApiClient 與快取（離線佇列、衝突）時才設；預設沿用 [apiClient] 替身。
   ApiClient? realApiClient;
   CacheStore? realCacheStore;
@@ -439,6 +443,7 @@ class AppFlowFixture {
 
   /// 認證相關 overrides：瀏覽器登入換成假的，憑證只活在記憶體。
   List<dynamic> get authOverrides {
+    if (realOAuth) return const [];
     final store = InMemoryOAuthTokenStore();
     if (session.signedIn) store.write(_fixtureTokens());
     return [

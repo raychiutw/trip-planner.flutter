@@ -4,6 +4,8 @@
 // 再以 intent（Patrol openUrl）送 https://<callbackHost>/oauth/callback?code&state。
 // 涵蓋 link 路由到 App、背景恢復；**不涵蓋** App Link 擁有權（assetlinks 與網域），
 // 那要一次真機手測。
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -41,6 +43,7 @@ class _RecordingRepository extends OAuthRepository {
 
 class _Harness {
   _Harness(this.fixture) {
+    fixture.realOAuth = true;
     final dio = Dio();
     DioAdapter(dio: dio).onPost('/oauth/token', (server) {
       tokenCalls++;
@@ -96,8 +99,14 @@ Future<void> _expectTripsList(PatrolIntegrationTester $) async {
   fail('callback 後未進到行程列表');
 }
 
+// #592：iOS 上 openUrl 只會開 Safari、不會進 App（授權 callback 由
+// ASWebAuthenticationSession 在 session 內攔截），這三情境在 iOS 不成立，見 docs/mobile-e2e.md。
+final _iosSkip = Platform.isIOS;
+
 void main() {
-  patrolTest('oauth callback in foreground completes login', ($) async {
+  patrolTest('oauth callback in foreground completes login', skip: _iosSkip, (
+    $,
+  ) async {
     final h = await _launch($);
     final state = await _startLogin($, h);
 
@@ -108,7 +117,9 @@ void main() {
     expect(await h.store.read(), isNotNull);
   });
 
-  patrolTest('oauth callback after pressHome completes login', ($) async {
+  patrolTest('oauth callback after pressHome completes login', skip: _iosSkip, (
+    $,
+  ) async {
     final h = await _launch($);
     final state = await _startLogin($, h);
 
@@ -124,16 +135,20 @@ void main() {
   // 行程被殺後的等價狀態：沒有進行中的登入（記憶體裡沒有 state／verifier）就收到
   // callback。注意：測試行程與 App 同行程，無法真的殺掉再送，這裡只驗「冷狀態收到
   // callback 不崩、不登入、不落 token」；真正的 process death 仍需手測。
-  patrolTest('oauth callback with no live login stays signed out', ($) async {
-    final h = await _launch($);
+  patrolTest(
+    'oauth callback with no live login stays signed out',
+    skip: _iosSkip,
+    ($) async {
+      final h = await _launch($);
 
-    await $.platform.mobile.openUrl(h.callbackUrl(state: 'orphan-state'));
-    await $.tester.pump(const Duration(seconds: 3));
+      await $.platform.mobile.openUrl(h.callbackUrl(state: 'orphan-state'));
+      await $.tester.pump(const Duration(seconds: 3));
 
-    expect(find.byType(WelcomeScreen), findsOneWidget);
-    expect(find.byType(TripsListScreen), findsNothing);
-    expect(h.tokenCalls, 0);
-    expect(await h.store.read(), isNull);
-    expect($.tester.takeException(), isNull);
-  });
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(find.byType(TripsListScreen), findsNothing);
+      expect(h.tokenCalls, 0);
+      expect(await h.store.read(), isNull);
+      expect($.tester.takeException(), isNull);
+    },
+  );
 }
