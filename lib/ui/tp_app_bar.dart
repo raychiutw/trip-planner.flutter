@@ -66,7 +66,7 @@ class TpToolbarTextButton extends StatelessWidget {
         style: TextButton.styleFrom(
           minimumSize: const Size(TpSpacing.tapMin, TpSpacing.tapMin),
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          backgroundColor: prominent ? scheme.primary : null,
+          backgroundColor: prominent ? scheme.tintFill : null,
           foregroundColor: prominent ? scheme.onPrimary : null,
           disabledBackgroundColor: prominent
               ? scheme.onSurface.withValues(alpha: 0.12)

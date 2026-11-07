@@ -75,7 +75,7 @@ void main() {
       );
       expect(
         (fill.decoration as BoxDecoration).color,
-        theme.colorScheme.primary,
+        theme.colorScheme.tintFill,
       );
       final track = tester.widget<DecoratedBox>(
         find.byKey(const ValueKey('tp-progress-track')),
@@ -255,7 +255,7 @@ void main() {
       );
       final box = deco.decoration as BoxDecoration;
       expect(box.color, theme.colorScheme.primaryContainer);
-      expect((box.border as Border).top.color, theme.colorScheme.primary);
+      expect((box.border as Border).top.color, theme.colorScheme.tintFill);
       final node = tester.getSemantics(find.byType(TpChip));
       expect(node.flagsCollection.isSelected, Tristate.isTrue);
       expect(node.flagsCollection.isButton, isTrue);
@@ -621,7 +621,7 @@ void main() {
       final button = tester.widget<CupertinoButton>(
         find.byType(CupertinoButton),
       );
-      expect(button.color, theme.colorScheme.primary);
+      expect(button.color, theme.colorScheme.tintFill);
       await tester.tap(find.text('重試'));
       expect(taps, 1);
       expect(find.byType(FilledButton), findsNothing);

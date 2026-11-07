@@ -158,7 +158,7 @@ void main() {
         expect(
           Theme.of(context).colorScheme.primary,
           brightness == Brightness.light
-              ? TpSystemColorsLight.tint
+              ? TpSystemColorsLight.tintDeep
               : TpSystemColorsDark.tint,
         );
         expect(find.byKey(const ValueKey('welcome-login-top')), findsOneWidget);

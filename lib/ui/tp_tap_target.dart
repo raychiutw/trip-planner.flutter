@@ -89,7 +89,7 @@ class _TpTapTargetState extends State<TpTapTarget> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(widget.focusRadius),
                 border: _focusVisible
-                    ? Border.all(color: scheme.primary, width: 2)
+                    ? Border.all(color: scheme.tintFill, width: 2)
                     : null,
               ),
               child: widget.child,

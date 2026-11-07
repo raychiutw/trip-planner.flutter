@@ -298,7 +298,7 @@ class _EntryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isFocused
-              ? theme.colorScheme.primary
+              ? theme.colorScheme.tintFill
               : theme.colorScheme.outlineVariant,
           width: isFocused ? 2 : 1,
         ),

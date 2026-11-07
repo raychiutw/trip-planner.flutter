@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tokens.dart';
+
 /// 線性進度條。Cupertino 沒有 linear progress,HIG 的 progress indicator 也只定義
 /// 轉圈與帶值的 bar,所以這裡用 `colorScheme` 自繪(不新增套件)。
 ///
@@ -139,7 +141,7 @@ class _TpProgressBarState extends State<TpProgressBar>
 
   Widget _fill(ColorScheme scheme, BorderRadius radius) => DecoratedBox(
     key: const ValueKey('tp-progress-fill'),
-    decoration: BoxDecoration(color: scheme.primary, borderRadius: radius),
+    decoration: BoxDecoration(color: scheme.tintFill, borderRadius: radius),
     child: const SizedBox.expand(),
   );
 }

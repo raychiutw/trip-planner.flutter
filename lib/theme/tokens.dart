@@ -69,6 +69,15 @@ abstract final class TpSystemColorsDark {
   static const overlay = Color(0x99000000);
 }
 
+/// 品牌棕的「非文字」用途：底色、邊線、填色。
+///
+/// 淺色 `colorScheme.primary` 是前景文字／圖示用的深棕 tintDeep（對選中底 6.2:1）；
+/// 底色與邊線仍用較淺的 tint #8A6038。深色兩者同為 primary，不變。
+extension TpTintFill on ColorScheme {
+  Color get tintFill =>
+      brightness == Brightness.light ? TpSystemColorsLight.tint : primary;
+}
+
 /// 圓角 token；md 8 為卡片/按鈕主力。
 abstract final class TpRadius {
   static const xs = 4.0;

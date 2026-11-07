@@ -620,7 +620,7 @@ void main() {
     final box =
         tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
     expect(box.shape, BoxShape.circle);
-    expect(box.color, scheme.primary);
+    expect(box.color, scheme.tintFill);
     final icon = tester.widget<Icon>(
       find.descendant(of: surface, matching: find.byType(Icon)),
     );

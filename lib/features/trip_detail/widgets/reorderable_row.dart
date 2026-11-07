@@ -102,7 +102,9 @@ class TpInlineEditControlVisual extends StatelessWidget {
       width: TpSpacing.tapMin,
       height: TpSpacing.tapMin,
       decoration: BoxDecoration(
-        color: pressed ? primary.withValues(alpha: 0.12) : Colors.transparent,
+        color: pressed
+            ? Theme.of(context).colorScheme.tintFill.withValues(alpha: 0.12)
+            : Colors.transparent,
         borderRadius: const BorderRadius.all(Radius.circular(22)),
       ),
       child: Icon(icon, size: 20, color: primary),

@@ -85,7 +85,8 @@ void main() {
       final theme = AppTheme.light();
 
       expect(theme.useMaterial3, isTrue);
-      expect(theme.colorScheme.primary, TpSystemColorsLight.tint);
+      expect(theme.colorScheme.primary, TpSystemColorsLight.tintDeep);
+      expect(theme.colorScheme.tintFill, TpSystemColorsLight.tint);
       expect(theme.colorScheme.surface, TpSystemColorsLight.background);
       expect(
         theme.colorScheme.surfaceContainerLow,
@@ -190,35 +191,37 @@ void main() {
     });
   });
 
-  group('提高對比的單一 tint 變體（#550）', () {
+  group('前景棕與底色棕分工', () {
     // 分頁列選取膠囊底：中性灰 tertiary（#E5E5EA）。
     final capsule = TpSystemColorsLight.tertiary;
+    const clear = Color(0x00000000);
 
-    test('一般狀態 tint 不變（回歸）：淺 #8A6038、深 #D0A576', () {
-      expect(AppTheme.light().colorScheme.primary, const Color(0xFF8A6038));
+    test('一般狀態：淺色前景 #6F4C2C、底色 #8A6038；深色 #D0A576 不變', () {
+      expect(AppTheme.light().colorScheme.primary, const Color(0xFF6F4C2C));
+      expect(AppTheme.light().colorScheme.tintFill, const Color(0xFF8A6038));
       expect(AppTheme.dark().colorScheme.primary, const Color(0xFFD0A576));
+      expect(AppTheme.dark().colorScheme.tintFill, const Color(0xFFD0A576));
     });
 
-    test('一般狀態對選取底 4.39:1，是已知例外（不為它改品牌色）', () {
-      final ratio = wcagContrast(
-        AppTheme.light().colorScheme.primary,
-        const Color(0x00000000),
-        under: capsule,
-      );
-      // 只守「仍略低於 AA 4.5」這個已知狀態，不釘死小數，避免微調 tint 就誤報。
-      expect(ratio, inInclusiveRange(4.3, 4.49));
+    test('前景對選取底與一般底色都達 4.5:1（原 4.39:1 例外解除）', () {
+      final primary = AppTheme.light().colorScheme.primary;
+      for (final bg in [
+        capsule,
+        TpSystemColorsLight.background,
+        TpSystemColorsLight.secondary,
+      ]) {
+        expect(
+          wcagContrast(primary, clear, under: bg),
+          greaterThanOrEqualTo(6.0),
+        );
+      }
     });
 
-    test('提高對比：淺色 tint 前景改為 #6F4C2C，對選取底達 4.5:1', () {
-      final primary = AppTheme.light(highContrast: true).colorScheme.primary;
-      expect(primary, const Color(0xFF6F4C2C));
+    test('提高對比與一般狀態前景相同', () {
       expect(
-        wcagContrast(primary, const Color(0x00000000), under: capsule),
-        greaterThanOrEqualTo(4.5),
+        AppTheme.light(highContrast: true).colorScheme.primary,
+        AppTheme.light().colorScheme.primary,
       );
-    });
-
-    test('提高對比：深色 tint 不變', () {
       expect(
         AppTheme.dark(highContrast: true).colorScheme.primary,
         const Color(0xFFD0A576),

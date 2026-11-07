@@ -43,7 +43,7 @@ class TpFilledButton extends StatelessWidget {
 
   Widget _button(ColorScheme scheme) {
     return CupertinoButton(
-      color: tonal ? scheme.primaryContainer : scheme.primary,
+      color: tonal ? scheme.primaryContainer : scheme.tintFill,
       disabledColor: scheme.onSurface.withAlpha(TpDisabled.fillAlpha),
       minimumSize: const Size(0, TpSpacing.tapMin),
       padding: _padding,
