@@ -126,6 +126,21 @@ void main() {
       expect(setupGuide, contains('App Link 擁有權'));
     });
 
+    // #592：iOS 的 openUrl 在模擬器實測只會開 Safari，不會進 App；三情境不能搬到 iOS。
+    test(
+      'OAuth callback test is Android-only and iOS finding is documented',
+      () {
+        final iosJob = e2eWorkflow.substring(
+          e2eWorkflow.indexOf('ios_test_lab:'),
+        );
+        expect(iosJob, isNot(contains('oauth_callback_test.dart')));
+        expect(oauthCallback, contains('Platform.isIOS'));
+        expect(setupGuide, contains('#592'));
+        expect(setupGuide, contains('ASWebAuthenticationSession'));
+        expect(setupGuide, contains('Universal Link 擁有權'));
+      },
+    );
+
     test('scheduled Android matrix runs on Taipei weekdays', () {
       expect(
         e2eWorkflow,

@@ -38,7 +38,17 @@ The Patrol bundle contains two independent evidence suites:
 `https://<callbackHost>/oauth/callback?code=…&state=…`，三情境：前景收到、`pressHome` 後收到、
 沒有進行中登入時收到（行程被殺後的等價冷狀態：不崩、不登入、無殘留 token；測試與 App 同行程，
 無法真的殺掉再送，真正的 process death 仍需手測）。**不涵蓋 App Link 擁有權**（assetlinks.json
-與網域）：測試環境的 intent 不經系統驗證，擁有權仍需一次真機手測。iOS 的 `openUrl` 能力另開票追蹤。
+與網域）：測試環境的 intent 不經系統驗證，擁有權仍需一次真機手測。
+
+**iOS 不適用（#592，2026-11-08 本機 iPhone 17／iOS 27.0 模擬器實測）**：Patrol `openUrl` 在 iOS 可呼叫
+並成功，但 https 連結被送到 Safari（畫面左上出現「◂ Safari」返回鈕），App 仍停在 Welcome，登入
+沒有完成，測試於 `_expectTripsList` 等不到行程列表而卡住。原因是 iOS 的授權 callback 由
+`ASWebAuthenticationSession`（`FlutterWebAuth2` `callbackUrlScheme: 'https'`）在 session 內攔截，
+不是 App 的 `openURL`；從外部開同一個連結不會餵給進行中的 session，而 Universal Link 直達 App 還要
+`applinks` entitlement 加網域 AASA 驗證，模擬器上不可靠。所以 oauth_callback_test 在 iOS 以 `skip` 略過，
+不放進 `ios_test_lab`。要覆蓋 iOS 需另寫以 XCUITest 操作 session 內頁面的測試（要有能 302 回
+callback 的授權頁，另票）。**Universal Link 擁有權（AASA 與網域）仍需一次真機手測。**
+
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
