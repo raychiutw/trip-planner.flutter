@@ -424,6 +424,10 @@ class AppFlowFixture {
   final AppVersion? fixedAppVersion;
   final ThemeMode? initialThemeMode;
 
+  /// 附加在 [authOverrides] 之後的 overrides（後者蓋前者）；#584 的 callback
+  /// 整合測試用它把假登入換回真的 `OAuthLoginService` + 真啟動器。
+  final List<dynamic> extraOverrides = [];
+
   /// 跨流程驗證要用真的 ApiClient 與快取（離線佇列、衝突）時才設；預設沿用 [apiClient] 替身。
   ApiClient? realApiClient;
   CacheStore? realCacheStore;
@@ -453,6 +457,7 @@ class AppFlowFixture {
     return ProviderScope(
       overrides: [
         ...authOverrides,
+        ...extraOverrides,
         apiClientProvider.overrideWithValue(realApiClient ?? apiClient),
         if (realCacheStore != null)
           cacheStoreProvider.overrideWithValue(realCacheStore!),
