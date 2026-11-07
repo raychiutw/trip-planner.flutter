@@ -296,7 +296,10 @@ void main() {
 
       final challenge = await authRepository.startDeleteReauth();
       expect(challenge.challengeId, 'ch_1');
-      expect(challenge.authorizeUrl.queryParameters['purpose'], 'account-delete');
+      expect(
+        challenge.authorizeUrl.queryParameters['purpose'],
+        'account-delete',
+      );
       expect(await authRepository.fetchDeleteReauthStatus('ch_1'), 'verified');
       await authRepository.cancelDeleteReauth('ch_1');
     });
