@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../app/error_message.dart';
 import '../../api/auth_repository.dart';
+import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
@@ -20,6 +21,7 @@ import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_settings_group.dart';
 import 'account_sessions_screen.dart';
+import 'delete_reauth_dialog.dart';
 import '../ai_data_consent/ai_data_consent_controller.dart';
 import '../ai_data_consent/ai_data_settings_screen.dart';
 import 'connected_apps_screen.dart';
@@ -114,28 +116,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       final preview = await repository.fetchAccountDeletionPreview();
       if (!mounted) return;
       setState(() => _loadingAccountDeletion = false);
-      if (!preview.hasPassword) {
-        final viewHelp = await showAppConfirm(
-          context,
-          title: '需要重新驗證才能刪除',
-          message:
-              '此帳號沒有可在 App 內重新驗證的密碼。目前無法在 App 內安全地重新驗證，'
-              '因此不會送出刪除要求。你可以查看安全刪除方式，使用註冊信箱提出申請。',
-          confirmLabel: '查看安全刪除方式',
-        );
-        if (viewHelp) unawaited(openAccountDeletionHelp());
-        return;
-      }
-      final deleted = await showCupertinoDialog<bool>(
-        context: context,
-        builder: (context) => _DeleteAccountDialog(
-          preview: preview,
-          onDelete: (confirmation) => repository.deleteAccount(
-            hasPassword: preview.hasPassword,
-            confirmation: confirmation,
-          ),
-        ),
-      );
+      // 有密碼一律走密碼確認（含同時有 Google 身分的帳號）；無密碼才走 Google 重新驗證。
+      final deleted = !preview.hasPassword && preview.reauthProvider == 'google'
+          ? await showCupertinoDialog<bool>(
+              context: context,
+              builder: (_) => DeleteReauthDialog(
+                preview: preview,
+                repository: repository,
+                launcher: ref.read(authorizationLauncherProvider),
+              ),
+            )
+          : await _confirmPasswordOrBlock(preview, repository);
       if (deleted != true || !mounted) return;
       final router = GoRouter.maybeOf(context);
       await ref.read(authStateProvider.notifier).accountDeleted();
@@ -154,6 +145,32 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     } finally {
       if (mounted) setState(() => _loadingAccountDeletion = false);
     }
+  }
+
+  /// 有密碼：密碼確認對話框；沒有任何可用重新驗證方式：不送刪除，轉安全刪除說明。
+  Future<bool?> _confirmPasswordOrBlock(
+    AccountDeletionPreview preview,
+    AuthRepository repository,
+  ) async {
+    if (!preview.hasPassword) {
+      final viewHelp = await showAppConfirm(
+        context,
+        title: '需要重新驗證才能刪除',
+        message:
+            '此帳號沒有可在 App 內重新驗證的密碼。目前無法在 App 內安全地重新驗證，'
+            '因此不會送出刪除要求。你可以查看安全刪除方式，使用註冊信箱提出申請。',
+        confirmLabel: '查看安全刪除方式',
+      );
+      if (viewHelp) unawaited(openAccountDeletionHelp());
+      return null;
+    }
+    return showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => _DeleteAccountDialog(
+        preview: preview,
+        onDelete: (password) => repository.deleteAccount(password: password),
+      ),
+    );
   }
 }
 

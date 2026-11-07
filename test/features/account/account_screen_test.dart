@@ -514,10 +514,7 @@ void main() {
       ),
     );
     when(
-      () => mockAuthRepository.deleteAccount(
-        hasPassword: any(named: 'hasPassword'),
-        confirmation: any(named: 'confirmation'),
-      ),
+      () => mockAuthRepository.deleteAccount(password: any(named: 'password')),
     ).thenThrow(
       const ApiError(
         status: 401,
@@ -569,10 +566,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(
-      () => mockAuthRepository.deleteAccount(
-        hasPassword: true,
-        confirmation: 'wrong-password',
-      ),
+      () => mockAuthRepository.deleteAccount(password: 'wrong-password'),
     ).called(1);
     expect(find.text('密碼不正確，請重新輸入'), findsOneWidget);
     final errorText = tester.widget<Text>(find.text('密碼不正確，請重新輸入'));
@@ -630,10 +624,7 @@ void main() {
       ),
     );
     when(
-      () => mockAuthRepository.deleteAccount(
-        hasPassword: any(named: 'hasPassword'),
-        confirmation: any(named: 'confirmation'),
-      ),
+      () => mockAuthRepository.deleteAccount(password: any(named: 'password')),
     ).thenAnswer((_) async {});
     await pumpAccountScreen(tester);
 
@@ -651,10 +642,7 @@ void main() {
       findsNothing,
     );
     verifyNever(
-      () => mockAuthRepository.deleteAccount(
-        hasPassword: any(named: 'hasPassword'),
-        confirmation: any(named: 'confirmation'),
-      ),
+      () => mockAuthRepository.deleteAccount(password: any(named: 'password')),
     );
   });
 

@@ -50,20 +50,36 @@ class SignupResult {
   }
 }
 
+/// POST /account/delete-reauth 的回應：開 [authorizeUrl] 讓使用者以 Google 重新驗證。
+class DeleteReauthChallenge {
+  const DeleteReauthChallenge({
+    required this.challengeId,
+    required this.authorizeUrl,
+  });
+
+  final String challengeId;
+  final Uri authorizeUrl;
+}
+
 class AccountDeletionPreview {
   const AccountDeletionPreview({
     required this.hasPassword,
     required this.tripsOwned,
     required this.collaboratorsAffected,
+    this.reauthProvider,
   });
 
   final bool hasPassword;
+
+  /// 無密碼帳號可用的重新驗證 provider（目前只有 `google`）；null = 沒有可用方式，必須阻擋。
+  final String? reauthProvider;
   final int tripsOwned;
   final int collaboratorsAffected;
 
   factory AccountDeletionPreview.fromJson(Map<String, dynamic> json) =>
       AccountDeletionPreview(
         hasPassword: json['hasPassword'] as bool,
+        reauthProvider: json['reauthProvider'] as String?,
         tripsOwned: (json['tripsOwned'] as num).toInt(),
         collaboratorsAffected: (json['collaboratorsAffected'] as num).toInt(),
       );
@@ -110,16 +126,45 @@ class AuthRepository {
     return AccountDeletionPreview.fromJson(body as Map<String, dynamic>);
   }
 
-  /// DELETE /account：有密碼的帳號送 password，純 OAuth 帳號送 DELETE。
-  Future<void> deleteAccount({
-    required bool hasPassword,
-    required String confirmation,
-  }) async {
+  /// DELETE /account：有密碼帳號帶目前密碼確認。
+  Future<void> deleteAccount({required String password}) async {
+    await _client.delete('/account', body: {'password': password});
+  }
+
+  /// DELETE /account：無密碼帳號只能帶已 verified 的 challengeId（只帶 confirm 後端回 403）。
+  Future<void> deleteAccountWithReauth({required String challengeId}) async {
     await _client.delete(
       '/account',
-      body: hasPassword
-          ? {'password': confirmation}
-          : {'confirm': confirmation},
+      body: {'confirm': 'DELETE', 'challengeId': challengeId},
+    );
+  }
+
+  /// POST /account/delete-reauth：建立 Google 重新驗證 challenge（5 分鐘有效）。
+  Future<DeleteReauthChallenge> startDeleteReauth() async {
+    final body =
+        await _client.post('/account/delete-reauth') as Map<String, dynamic>;
+    return DeleteReauthChallenge(
+      challengeId: body['challengeId'] as String,
+      authorizeUrl: Uri.parse(body['authorizeUrl'] as String),
+    );
+  }
+
+  /// GET /account/delete-reauth?challenge_id=：伺服器端狀態（pending／started／verified／
+  /// failed／cancelled／used／expired）。callback 網址只是返回訊號，是否驗證成功以此為準。
+  Future<String> fetchDeleteReauthStatus(String challengeId) async {
+    final body = await _client.get(
+      '/account/delete-reauth',
+      query: {'challenge_id': challengeId},
+      policy: CacheReadPolicy.noStore,
+    );
+    return (body as Map<String, dynamic>)['status'] as String;
+  }
+
+  /// DELETE /account/delete-reauth?challenge_id=：取消 challenge。
+  Future<void> cancelDeleteReauth(String challengeId) async {
+    await _client.delete(
+      '/account/delete-reauth',
+      query: {'challenge_id': challengeId},
     );
   }
 
