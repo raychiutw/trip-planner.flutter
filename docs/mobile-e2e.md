@@ -49,6 +49,13 @@ The Patrol bundle contains two independent evidence suites:
 不放進 `ios_test_lab`。要覆蓋 iOS 需另寫以 XCUITest 操作 session 內頁面的測試（要有能 302 回
 callback 的授權頁，另票）。**Universal Link 擁有權（AASA 與網域）仍需一次真機手測。**
 
+**iOS 模擬器 e2e 結論（#595，2026-11-08）**：嘗試在模擬器用 localhost 假授權伺服器（302 到 https callback）驅動登入，
+按下登入後 `ASWebAuthenticationSession` 在啟動前就被拒（`CANCELED`），走不到授權頁。系統 log：
+App 與 callback 網域沒有 `webcredentials` 關聯（AASA 的 appID 含 Team ID `8Z6WVFJ574`，而模擬器 build 是 adhoc 簽章、
+`TeamIdentifier=not set`）。繞過需要測試專用網域、自簽 AASA、`simctl keychain` 加根憑證、:443 與測試專用 entitlements，
+測的是測試用設定而不是正式簽章，價值有限，**決議不做**；iOS 的 OAuth 往返只靠實機手測。
+另：同時有多個 session 跑 `patrol test` 時，`pkill -f 'patrol test'` 會互相殺掉，避免並行。
+
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
