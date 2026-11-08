@@ -45,15 +45,28 @@ class _Harness {
   _Harness(this.fixture) {
     fixture.realOAuth = true;
     final dio = Dio();
-    DioAdapter(dio: dio).onPost('/oauth/token', (server) {
-      tokenCalls++;
-      fixture.session.signedIn = true;
-      server.reply(200, {
+    // http_mock_adapter 的 onPost 回呼在「註冊」時就執行、不是請求到達時；計數與登入狀態
+    // 必須掛在 interceptor，否則 tokenCalls 一建立就是 1（三情境的計數斷言會假綠或假紅）。
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.path.endsWith('/oauth/token')) {
+            tokenCalls++;
+            fixture.session.signedIn = true;
+          }
+          handler.next(options);
+        },
+      ),
+    );
+    DioAdapter(dio: dio).onPost(
+      '/oauth/token',
+      (server) => server.reply(200, {
         'access_token': 'AT',
         'refresh_token': 'RT',
         'expires_in': 900,
-      });
-    }, data: Matchers.any);
+      }),
+      data: Matchers.any,
+    );
     repo = _RecordingRepository(dio);
     fixture.extraOverrides.addAll([
       oauthTokenStoreProvider.overrideWithValue(store),
