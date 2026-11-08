@@ -663,6 +663,21 @@ void main() {
     expect(find.byType(CupertinoAlertDialog), findsNothing);
   });
 
+  testWidgets('登出是動作列不是導航，不畫向右 chevron（A25 同型）', (tester) async {
+    await pumpAccountScreen(tester);
+
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('登出'),
+          matching: find.byType(TpSettingsRow),
+        ),
+        matching: find.byIcon(CupertinoIcons.chevron_forward),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('登出對話框按取消不呼叫 logout', (tester) async {
     await pumpAccountScreen(tester);
 

@@ -1038,7 +1038,7 @@ void main() {
       find.byKey(const ValueKey('entry-edit-refresh-error')),
       findsOneWidget,
     );
-    expect(find.text('無法載入最新版本；你的草稿仍保留。'), findsOneWidget);
+    expect(find.text('無法載入最新版本；你的修改仍保留。'), findsOneWidget);
     expect(find.widgetWithText(TextField, '重新載入失敗也不能消失的草稿'), findsOneWidget);
     expect(find.text('重試載入'), findsOneWidget);
   });
@@ -1115,7 +1115,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text('無法載入最新版本；你的草稿仍保留。'), findsOneWidget);
+    expect(find.text('無法載入最新版本；你的修改仍保留。'), findsOneWidget);
     expect(find.widgetWithText(TextField, '重試後仍保留的草稿'), findsOneWidget);
     expect(submittedVersions, [2]);
 
@@ -1204,7 +1204,7 @@ void main() {
       find.byKey(const ValueKey('entry-edit-refresh-error')),
       findsOneWidget,
     );
-    expect(find.text('此停留點已被刪除，無法再儲存；你的草稿仍保留。'), findsOneWidget);
+    expect(find.text('此停留點已被刪除，無法再儲存；你的修改仍保留。'), findsOneWidget);
     expect(find.text('重試載入'), findsNothing);
     expect(find.widgetWithText(TextField, '停留點刪除後仍可複製的草稿'), findsOneWidget);
     final submitButton = tester.widget<TextButton>(
@@ -1232,7 +1232,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('此停留點已被刪除，無法再儲存；你的草稿仍保留。'), findsOneWidget);
+    expect(find.text('此停留點已被刪除，無法再儲存；你的修改仍保留。'), findsOneWidget);
     final submitButton = tester.widget<TextButton>(
       find.descendant(
         of: find.byKey(const ValueKey('entry-edit-submit')),

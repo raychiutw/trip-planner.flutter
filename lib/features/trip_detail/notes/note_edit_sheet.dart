@@ -288,7 +288,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
     setState(() {
       _submitting = false;
       _needsRefresh = true;
-      _errorMessage = '筆記已被更新。你的草稿已保留，正在載入最新版本。';
+      _errorMessage = '筆記已被更新。你的修改已保留，正在載入最新版本。';
     });
     _syncFormState();
     try {
@@ -299,25 +299,25 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
       if (latest == null) {
         setState(() {
           _deletedRow = true;
-          _errorMessage = '這筆筆記已被刪除。你的草稿仍在表單中。';
+          _errorMessage = '這筆筆記已被刪除。你的修改仍在表單中。';
         });
         return;
       }
       if (latest.version <= (_failedVersion ?? -1)) {
-        setState(() => _errorMessage = '尚未取得最新版本。你的草稿已保留，請重試。');
+        setState(() => _errorMessage = '尚未取得最新版本。你的修改已保留，請重試。');
         return;
       }
       setState(() {
         _freshRow = latest;
         _deletedRow = false;
         _needsRefresh = false;
-        _errorMessage = '已載入最新版本。你的草稿已保留，請再次儲存。';
+        _errorMessage = '已載入最新版本。你的修改已保留，請再次儲存。';
       });
       _syncFormState();
       ref.invalidate(tripNotesProvider(widget.tripId));
     } on Exception {
       if (!mounted) return;
-      setState(() => _errorMessage = '無法載入最新版本。你的草稿已保留，請重試。');
+      setState(() => _errorMessage = '無法載入最新版本。你的修改已保留，請重試。');
     }
   }
 
@@ -376,7 +376,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
             _saveAsNew = true;
             _needsRefresh = false;
             _deletedRow = false;
-            _errorMessage = '草稿可另存為新筆記。按「儲存」後會建立新的一筆。';
+            _errorMessage = '你的修改可另存為新筆記。按「儲存」後會建立新的一筆。';
           });
           _syncFormState();
         },

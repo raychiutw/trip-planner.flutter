@@ -633,8 +633,8 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               TpInlineBanner(
                 key: const ValueKey('entry-edit-refresh-error'),
                 message: entryDeleted
-                    ? '此停留點已被刪除，無法再儲存；你的草稿仍保留。'
-                    : '無法載入最新版本；你的草稿仍保留。',
+                    ? '此停留點已被刪除，無法再儲存；你的修改仍保留。'
+                    : '無法載入最新版本；你的修改仍保留。',
                 action: entryDeleted
                     ? null
                     : Padding(
