@@ -67,13 +67,21 @@ android {
         // 切換網域時：./gradlew ... -PoauthCallbackHost=<host> -PoauthCallbackPath=<path>
         manifestPlaceholders["oauthCallbackHost"] =
             (project.findProperty("oauthCallbackHost") as String?)
-                ?: "mobile-callback.trip-planner-dby.pages.dev"
+                ?: "trip-planner-dby.pages.dev"
         // 分享連結（/s/<token>）的 App Link 網域，要與 TRIPLINE_API_ORIGIN 的主站一致。
         manifestPlaceholders["shareLinkHost"] =
             (project.findProperty("shareLinkHost") as String?)
                 ?: "trip-planner-dby.pages.dev"
         manifestPlaceholders["oauthCallbackPath"] =
             (project.findProperty("oauthCallbackPath") as String?)
+                ?: "/mobile/oauth/callback"
+        // 過渡期保留的舊 callback（已發佈的舊版 App 仍用它；api 同時接受新舊兩組 redirect）。
+        // 舊版 App 退場後連同 manifest 的第二個 intent-filter 一併移除。
+        manifestPlaceholders["oauthLegacyCallbackHost"] =
+            (project.findProperty("oauthLegacyCallbackHost") as String?)
+                ?: "mobile-callback.trip-planner-dby.pages.dev"
+        manifestPlaceholders["oauthLegacyCallbackPath"] =
+            (project.findProperty("oauthLegacyCallbackPath") as String?)
                 ?: "/oauth/callback"
         testInstrumentationRunner =
             if (standardIntegrationTest) {

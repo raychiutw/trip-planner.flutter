@@ -4,7 +4,7 @@
 ///   --dart-define=TRIPLINE_API_ORIGIN=...
 ///   --dart-define=TRIPLINE_OAUTH_CLIENT_ID=tripline-mobile
 ///   --dart-define=TRIPLINE_OAUTH_CALLBACK_HOST=...
-///   --dart-define=TRIPLINE_OAUTH_CALLBACK_PATH=/oauth/callback
+///   --dart-define=TRIPLINE_OAUTH_CALLBACK_PATH=/mobile/oauth/callback
 library;
 
 abstract final class OAuthConfig {
@@ -16,14 +16,16 @@ abstract final class OAuthConfig {
 
   /// 授權回跳(Universal Link／App Link)的網域；須與後端登記的 redirect URI 一致，
   /// 且該網域要承載 apple-app-site-association 與 assetlinks.json。
+  /// 預設是 web 主站（與 issuer 的新 api 主機不同）；UAT 路徑是 /mobile/uat/oauth/callback，
+  /// 以 --dart-define（Android 另加 -PoauthCallbackPath）切換。
   static const callbackHost = String.fromEnvironment(
     'TRIPLINE_OAUTH_CALLBACK_HOST',
-    defaultValue: 'mobile-callback.trip-planner-dby.pages.dev',
+    defaultValue: 'trip-planner-dby.pages.dev',
   );
 
   static const callbackPath = String.fromEnvironment(
     'TRIPLINE_OAUTH_CALLBACK_PATH',
-    defaultValue: '/oauth/callback',
+    defaultValue: '/mobile/oauth/callback',
   );
 
   static String get redirectUri => 'https://$callbackHost$callbackPath';
