@@ -230,7 +230,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(
   AuthNotifier.new,
 );
 
-/// 這個帳號有沒有 local 密碼（只用 Google 登入的帳號沒有，不該顯示「變更密碼」）。
+/// 這個帳號有沒有 local 密碼（沒有密碼的帳號不該顯示「變更密碼」）。
 ///
 /// 目前**借用** `GET /account`（帳號刪除預覽）回的 `hasPassword`，後端沒有專屬端點；
 /// 日後有的話只改這一處。取不到就當作沒有：呼叫端的入口列 loading／error 刻意不畫任何東西，

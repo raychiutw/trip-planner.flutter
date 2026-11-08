@@ -615,7 +615,7 @@ void main() {
     expect(find.textContaining('網路'), findsOneWidget);
   });
 
-  testWidgets('純 OAuth 帳號無 fresh-auth 契約時安全阻擋刪除', (tester) async {
+  testWidgets('沒有密碼的帳號：拒絕刪除，不送任何刪除要求', (tester) async {
     when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
       (_) async => const AccountDeletionPreview(
         hasPassword: false,
@@ -709,7 +709,7 @@ void main() {
       expect(tester.widget<TpSettingsRow>(find.byKey(rowKey)).onTap, isNotNull);
     });
 
-    testWidgets('只用 Google 登入、沒有密碼：不顯示', (tester) async {
+    testWidgets('沒有密碼：不顯示', (tester) async {
       when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
         (_) async => const AccountDeletionPreview(
           hasPassword: false,

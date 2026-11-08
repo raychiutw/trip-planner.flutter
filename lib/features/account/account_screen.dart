@@ -11,7 +11,6 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../app/error_message.dart';
 import '../../api/auth_repository.dart';
-import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
@@ -21,7 +20,6 @@ import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_settings_group.dart';
 import 'account_sessions_screen.dart';
-import 'delete_reauth_dialog.dart';
 import '../ai_data_consent/ai_data_consent_controller.dart';
 import '../ai_data_consent/ai_data_settings_screen.dart';
 import 'connected_apps_screen.dart';
@@ -116,17 +114,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       final preview = await repository.fetchAccountDeletionPreview();
       if (!mounted) return;
       setState(() => _loadingAccountDeletion = false);
-      // 有密碼一律走密碼確認（含同時有 Google 身分的帳號）；無密碼才走 Google 重新驗證。
-      final deleted = !preview.hasPassword && preview.reauthProvider == 'google'
-          ? await showCupertinoDialog<bool>(
-              context: context,
-              builder: (_) => DeleteReauthDialog(
-                preview: preview,
-                repository: repository,
-                launcher: ref.read(authorizationLauncherProvider),
-              ),
-            )
-          : await _confirmPasswordOrBlock(preview, repository);
+      final deleted = await _confirmPasswordOrBlock(preview, repository);
       if (deleted != true || !mounted) return;
       final router = GoRouter.maybeOf(context);
       await ref.read(authStateProvider.notifier).accountDeleted();
@@ -147,7 +135,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     }
   }
 
-  /// 有密碼：密碼確認對話框；沒有任何可用重新驗證方式：不送刪除，轉安全刪除說明。
+  /// 有密碼：密碼確認對話框；沒有密碼：不送刪除，轉安全刪除說明（現實中不存在，仍須擋住）。
   Future<bool?> _confirmPasswordOrBlock(
     AccountDeletionPreview preview,
     AuthRepository repository,

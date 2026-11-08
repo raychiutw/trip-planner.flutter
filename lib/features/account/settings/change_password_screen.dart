@@ -32,7 +32,7 @@ const _rateLimitedCode = 'CHANGE_PASSWORD_RATE_LIMITED';
 const _errorMessageByCode = {
   'CHANGE_PASSWORD_CURRENT_INVALID': '目前密碼不正確',
   _rateLimitedCode: '嘗試次數過多，請稍後再試',
-  'CHANGE_PASSWORD_NO_PASSWORD': '此帳號以 Google 登入，沒有設定密碼',
+  'CHANGE_PASSWORD_NO_PASSWORD': '此帳號沒有設定密碼',
 };
 
 /// 被限流且後端有給 Retry-After 時,告訴使用者要等多久(秒數 ≥ 60 換成分鐘,進位)。
