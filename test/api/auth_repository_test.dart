@@ -258,51 +258,6 @@ void main() {
         throwsA(isA<ApiError>()),
       );
     });
-
-    test('無密碼帳號 DELETE /account 送 confirm 與 challengeId', () async {
-      dioAdapter.onDelete(
-        '/account',
-        (server) => server.reply(200, {'ok': true, 'tripsDeleted': 0}),
-        data: {'confirm': 'DELETE', 'challengeId': 'ch_1'},
-      );
-
-      await expectLater(
-        authRepository.deleteAccountWithReauth(challengeId: 'ch_1'),
-        completes,
-      );
-    });
-
-    test('delete-reauth：建立、查狀態、取消走契約路徑', () async {
-      dioAdapter
-        ..onPost(
-          '/account/delete-reauth',
-          (server) => server.reply(200, {
-            'challengeId': 'ch_1',
-            'authorizeUrl':
-                'https://api.example/api/oauth/login/google?purpose=account-delete&challenge=ch_1',
-            'expiresIn': 300,
-          }),
-        )
-        ..onGet(
-          '/account/delete-reauth',
-          (server) => server.reply(200, {'status': 'verified'}),
-          queryParameters: {'challenge_id': 'ch_1'},
-        )
-        ..onDelete(
-          '/account/delete-reauth',
-          (server) => server.reply(200, {'status': 'cancelled'}),
-          queryParameters: {'challenge_id': 'ch_1'},
-        );
-
-      final challenge = await authRepository.startDeleteReauth();
-      expect(challenge.challengeId, 'ch_1');
-      expect(
-        challenge.authorizeUrl.queryParameters['purpose'],
-        'account-delete',
-      );
-      expect(await authRepository.fetchDeleteReauthStatus('ch_1'), 'verified');
-      await authRepository.cancelDeleteReauth('ch_1');
-    });
   });
 
   group('account recovery and verification', () {

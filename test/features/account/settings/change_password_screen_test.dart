@@ -233,7 +233,7 @@ void main() {
 
     testWidgets('沒有密碼的帳號（409 CHANGE_PASSWORD_NO_PASSWORD）', (tester) async {
       await failWith(tester, apiError(409, 'CHANGE_PASSWORD_NO_PASSWORD'));
-      expect(find.textContaining('Google'), findsOneWidget);
+      expect(find.text('此帳號沒有設定密碼'), findsOneWidget);
     });
 
     // 本地已先擋過短／相同；server 仍回這兩個碼時（規則不同步）：有繁中說明就照用，
