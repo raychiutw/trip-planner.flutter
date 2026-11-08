@@ -40,6 +40,15 @@ The Patrol bundle contains two independent evidence suites:
 無法真的殺掉再送，真正的 process death 仍需手測）。**不涵蓋 App Link 擁有權**（assetlinks.json
 與網域）：測試環境的 intent 不經系統驗證，擁有權仍需一次真機手測。
 
+**本機模擬器實測（2026-11-08，arm64 API 34 google_apis，三情境全綠）**：模擬器上 App Link 網域驗證
+狀態是 `1024`（未驗證），此時 `openUrl` 的 https intent 會被 Chrome 接走、不進 App，測試會卡住。
+每次重裝 APK 後驗證狀態都會重置，所以跑測試期間要持續核准
+（`adb shell pm set-app-links --package com.raychiu.tripline 2 all`，迴圈每 0.5 秒執行）。
+這是模擬器環境的前置，不是 App 的缺陷，也代表此測試**不證明**網域擁有權。
+Flutter 內建 JDK 為 25 時 Gradle 8.14 會失敗，需先 `flutter config --jdk-dir` 指到 JDK 17。
+token 呼叫次數由 interceptor 計數：`http_mock_adapter` 的 `onPost` 回呼在註冊時就執行，
+計數寫在裡面會讓 `tokenCalls` 一開始就是 1。
+
 **iOS 不適用（#592，2026-11-08 本機 iPhone 17／iOS 27.0 模擬器實測）**：Patrol `openUrl` 在 iOS 可呼叫
 並成功，但 https 連結被送到 Safari（畫面左上出現「◂ Safari」返回鈕），App 仍停在 Welcome，登入
 沒有完成，測試於 `_expectTripsList` 等不到行程列表而卡住。原因是 iOS 的授權 callback 由
