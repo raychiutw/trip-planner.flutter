@@ -40,7 +40,9 @@ void main() {
   });
 
   test('CI 工作流沒有把 callback 覆寫回舊主機或舊路徑', () {
-    for (final f in Directory('.github/workflows').listSync().whereType<File>()) {
+    for (final f in Directory(
+      '.github/workflows',
+    ).listSync().whereType<File>()) {
       final text = f.readAsStringSync();
       expect(text, isNot(contains('TRIPLINE_OAUTH_CALLBACK_HOST=$legacyHost')));
       expect(text, isNot(contains('oauthCallbackHost=$legacyHost')));
