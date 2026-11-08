@@ -532,4 +532,108 @@ void main() {
       expect(find.text(kAiConsentUnavailableMessage), findsOneWidget);
     });
   });
+
+  group('補強：409 重新同意、撤回後再被攔、非閘門錯誤', () {
+    ApiError mismatch409() => ApiError.fromResponse(409, {
+      'error': {
+        'code': 'AI_CONSENT_VERSION_MISMATCH',
+        'message': 'm',
+        'currentVersion': 'ai-data-v2',
+      },
+    });
+
+    testWidgets('409 後重新同意新版：帶新版本 POST，成功後才接續執行一次', (tester) async {
+      var reads = 0;
+      when(repo.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? _consent(AiDataConsentStatus.none)
+            : _consent(AiDataConsentStatus.stale, version: 'ai-data-v2'),
+      );
+      when(() => repo.accept('ai-data-v1')).thenThrow(mismatch409());
+      when(() => repo.accept('ai-data-v2')).thenAnswer(
+        (_) async => _consent(AiDataConsentStatus.valid, version: 'ai-data-v2'),
+      );
+      await pumpFlow(tester);
+      await tapGo(tester);
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+      expect(calls, 0, reason: '409 之後、重新同意之前不得執行');
+
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.accept('ai-data-v2')).called(1);
+      expect(calls, 1);
+      expect(outcome, isTrue);
+    });
+
+    testWidgets('409 後取消：不再 POST、不執行、sheet 關閉', (tester) async {
+      var reads = 0;
+      when(repo.fetch).thenAnswer(
+        (_) async => reads++ == 0
+            ? _consent(AiDataConsentStatus.none)
+            : _consent(AiDataConsentStatus.stale, version: 'ai-data-v2'),
+      );
+      when(() => repo.accept('ai-data-v1')).thenThrow(mismatch409());
+      await pumpFlow(tester);
+      await tapGo(tester);
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-accept')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('ai-data-consent-cancel')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.accept(any())).called(1);
+      expect(calls, 0);
+      expect(outcome, isNull);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('先同意、撤回後再次被攔：真的走 controller.withdraw，下一次動作要重新同意', (
+      tester,
+    ) async {
+      var status = AiDataConsentStatus.valid;
+      when(repo.fetch).thenAnswer((_) async => _consent(status));
+      when(repo.withdraw).thenAnswer((_) async {
+        status = AiDataConsentStatus.withdrawn;
+        return _consent(status);
+      });
+      await pumpFlow(tester);
+      await tapGo(tester);
+      expect(calls, 1, reason: '已同意：直通');
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byKey(const ValueKey('go'))),
+      );
+      await container.read(aiDataConsentProvider.notifier).withdraw();
+      await tapGo(tester);
+
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsOneWidget,
+      );
+      expect(calls, 1, reason: '撤回後同意前不得再執行');
+    });
+
+    testWidgets('非閘門錯誤（500）：原樣往外丟，不跳 sheet、不重送', (tester) async {
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      thrower = () => ApiError.fromResponse(500, null);
+      await pumpFlow(tester);
+      Object? caught;
+      await runZonedGuarded(() async {
+        await tapGo(tester);
+      }, (e, _) => caught = e);
+
+      expect(calls, 1);
+      expect(caught, isA<ApiError>());
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+    });
+  });
 }
