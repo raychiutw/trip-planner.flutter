@@ -33,6 +33,39 @@ The Patrol bundle contains two independent evidence suites:
 - `app_owned_flow_test.dart` runs Welcome／Login, four root tabs, trips, itinerary and Day fallback, notes, map/itinerary switching, Tripline and external POIs, Account 與本機 appearance 三選一（確認立即套用後可切回跟隨系統）, chat draft retention, favorites branch restoration, forms, destructive confirmation, offline state, error, and recovery against deterministic repository fixtures. It never calls production services.
 - `native_map_smoke_test.dart` checks real native map creation, dispose／recreate lifecycle, zoom 13 before and after remount, overlays, theme switching, location permission, pan／pinch／rotate／double-tap gestures, and native POI callbacks. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI fails unless a Google native POI produces the platform callback.
 
+`oauth_callback_test.dart`（#584，僅 Android）用真的 `OAuthLoginService` 與 `WebAuthLauncher`，
+只把 token endpoint 換成本機 stub，再以 Patrol `openUrl` 送
+`https://<callbackHost>/oauth/callback?code=…&state=…`，三情境：前景收到、`pressHome` 後收到、
+沒有進行中登入時收到（行程被殺後的等價冷狀態：不崩、不登入、無殘留 token；測試與 App 同行程，
+無法真的殺掉再送，真正的 process death 仍需手測）。**不涵蓋 App Link 擁有權**（assetlinks.json
+與網域）：測試環境的 intent 不經系統驗證，擁有權仍需一次真機手測。
+
+**本機模擬器實測（2026-11-08，arm64 API 34 google_apis，三情境全綠）**：模擬器上 App Link 網域驗證
+狀態是 `1024`（未驗證），此時 `openUrl` 的 https intent 會被 Chrome 接走、不進 App，測試會卡住。
+每次重裝 APK 後驗證狀態都會重置，所以跑測試期間要持續核准
+（`adb shell pm set-app-links --package com.raychiu.tripline 2 all`，迴圈每 0.5 秒執行）。
+這是模擬器環境的前置，不是 App 的缺陷，也代表此測試**不證明**網域擁有權。
+Flutter 內建 JDK 為 25 時 Gradle 8.14 會失敗，需先 `flutter config --jdk-dir` 指到 JDK 17。
+token 呼叫次數由 interceptor 計數：`http_mock_adapter` 的 `onPost` 回呼在註冊時就執行，
+計數寫在裡面會讓 `tokenCalls` 一開始就是 1。
+
+**iOS 不適用（#592，2026-11-08 本機 iPhone 17／iOS 27.0 模擬器實測）**：Patrol `openUrl` 在 iOS 可呼叫
+並成功，但 https 連結被送到 Safari（畫面左上出現「◂ Safari」返回鈕），App 仍停在 Welcome，登入
+沒有完成，測試於 `_expectTripsList` 等不到行程列表而卡住。原因是 iOS 的授權 callback 由
+`ASWebAuthenticationSession`（`FlutterWebAuth2` `callbackUrlScheme: 'https'`）在 session 內攔截，
+不是 App 的 `openURL`；從外部開同一個連結不會餵給進行中的 session，而 Universal Link 直達 App 還要
+`applinks` entitlement 加網域 AASA 驗證，模擬器上不可靠。所以 oauth_callback_test 在 iOS 以 `skip` 略過，
+不放進 `ios_test_lab`。要覆蓋 iOS 需另寫以 XCUITest 操作 session 內頁面的測試（要有能 302 回
+callback 的授權頁，另票）。**Universal Link 擁有權（AASA 與網域）仍需一次真機手測。**
+
+**iOS 模擬器 e2e 結論（#595，2026-11-08）**：嘗試在模擬器用 localhost 假授權伺服器（302 到 https callback）驅動登入，
+按下登入後 `ASWebAuthenticationSession` 在啟動前就被拒（`CANCELED`），走不到授權頁。系統 log：
+App 與 callback 網域沒有 `webcredentials` 關聯（AASA 的 appID 含 Team ID `8Z6WVFJ574`，而模擬器 build 是 adhoc 簽章、
+`TeamIdentifier=not set`）。繞過需要測試專用網域、自簽 AASA、`simctl keychain` 加根憑證、:443 與測試專用 entitlements，
+測的是測試用設定而不是正式簽章，價值有限，**決議不做**；iOS 的 OAuth 往返只靠實機手測。
+另：同時有多個 session 跑 `patrol test` 時，`pkill -f 'patrol test'` 會互相殺掉，避免並行。
+
+
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
 `app_owned_flow_test.dart` 另含第二個 Patrol test「app-owned visual evidence walks

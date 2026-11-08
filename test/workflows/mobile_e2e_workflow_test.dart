@@ -18,6 +18,12 @@ void main() {
   final appOwnedSmoke = File(
     'patrol_test/app_owned_flow_test.dart',
   ).readAsStringSync();
+  final oauthCallback = File(
+    'patrol_test/oauth_callback_test.dart',
+  ).readAsStringSync();
+  final androidManifest = File(
+    'android/app/src/main/AndroidManifest.xml',
+  ).readAsStringSync();
   final appFlowFixture = File(
     'integration_test/support/app_flow_fixture.dart',
   ).readAsStringSync();
@@ -95,6 +101,45 @@ void main() {
       );
       expect(standardIntegrationRunner, isNot(contains('PatrolJUnitRunner')));
     });
+
+    // #584：OS 層（link 路由、背景恢復、行程死亡）原本零覆蓋。
+    test('Android matrix covers OAuth callback in three scenarios', () {
+      final androidJob = e2eWorkflow.substring(
+        e2eWorkflow.indexOf('android_test_lab:'),
+        e2eWorkflow.indexOf('ios_test_lab:'),
+      );
+      expect(
+        androidJob,
+        contains('--target patrol_test/oauth_callback_test.dart'),
+      );
+      for (final name in [
+        'oauth callback in foreground completes login',
+        'oauth callback after pressHome completes login',
+        'oauth callback with no live login stays signed out',
+      ]) {
+        expect(oauthCallback, contains("'$name'"));
+      }
+      // 守門：callback intent-filter 必須在 manifest，且只認 https App Link。
+      expect(androidManifest, contains('flutter_web_auth_2.CallbackActivity'));
+      expect(androidManifest, contains(r'android:host="${oauthCallbackHost}"'));
+      expect(androidManifest, contains(r'android:path="${oauthCallbackPath}"'));
+      expect(setupGuide, contains('App Link 擁有權'));
+    });
+
+    // #592：iOS 的 openUrl 在模擬器實測只會開 Safari，不會進 App；三情境不能搬到 iOS。
+    test(
+      'OAuth callback test is Android-only and iOS finding is documented',
+      () {
+        final iosJob = e2eWorkflow.substring(
+          e2eWorkflow.indexOf('ios_test_lab:'),
+        );
+        expect(iosJob, isNot(contains('oauth_callback_test.dart')));
+        expect(oauthCallback, contains('Platform.isIOS'));
+        expect(setupGuide, contains('#592'));
+        expect(setupGuide, contains('ASWebAuthenticationSession'));
+        expect(setupGuide, contains('Universal Link 擁有權'));
+      },
+    );
 
     test('scheduled Android matrix runs on Taipei weekdays', () {
       expect(
