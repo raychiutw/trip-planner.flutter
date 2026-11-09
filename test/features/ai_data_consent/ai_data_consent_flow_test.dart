@@ -203,8 +203,9 @@ void main() {
     });
 
     testWidgets('已同意目前版本：直接執行', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       await pumpFlow(tester);
       await tapGo(tester);
 
@@ -218,8 +219,9 @@ void main() {
 
   group('旅伴免同意（本地不攔，由 owner 的同意把關）', () {
     testWidgets('旅伴（role=member）自己沒同意：不跳 sheet、直接執行一次', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
       await pumpFlow(tester, tripId: 'trip-1', role: 'member');
       await tapGo(tester);
 
@@ -233,8 +235,9 @@ void main() {
     });
 
     testWidgets('擁有者（role=owner）沒同意：照舊先跳 sheet、不執行', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
       await pumpFlow(tester, tripId: 'trip-1', role: 'owner');
       await tapGo(tester);
 
@@ -243,8 +246,9 @@ void main() {
     });
 
     testWidgets('旅伴被 owner 擋下（server 403）：仍顯示 owner 尚未同意、不重送', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
       thrower = () => _ownerGate;
       await pumpFlow(tester, tripId: 'trip-1', role: 'member');
       await tapGo(tester);
@@ -278,10 +282,12 @@ void main() {
     }
 
     testWidgets('同意 → 帶看到的版本 POST，成功後只接續執行一次', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
-      when(() => repo.accept('ai-data-v1'))
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        () => repo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       await pumpFlow(tester);
       await tapGo(tester);
 
@@ -295,8 +301,9 @@ void main() {
     });
 
     testWidgets('取消：不呼叫 accept、不執行動作', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
       await pumpFlow(tester);
       await tapGo(tester);
 
@@ -309,8 +316,9 @@ void main() {
     });
 
     testWidgets('儲存失敗：sheet 留著顯示錯誤、不假裝已同意；重試成功才接續', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
       var attempt = 0;
       when(() => repo.accept('ai-data-v1')).thenAnswer((_) async {
         if (attempt++ == 0) throw ApiError.fromResponse(500, null);
@@ -366,8 +374,9 @@ void main() {
     });
 
     testWidgets('有被攔下的輸入時提示「已保留」', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
       await pumpFlow(tester, keptMessage: '幫我排第二天');
       await tapGo(tester);
 
@@ -378,10 +387,12 @@ void main() {
     });
 
     testWidgets('同意期間行程已換掉（isCurrent=false）：不提交過時的 intent', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.none));
-      when(() => repo.accept(any()))
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      when(
+        () => repo.accept(any()),
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       await pumpFlow(tester);
       await tapGo(tester);
 
@@ -402,8 +413,9 @@ void main() {
             ? _consent(AiDataConsentStatus.valid, enforced: false)
             : _consent(AiDataConsentStatus.none),
       );
-      when(() => repo.accept('ai-data-v1'))
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        () => repo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       var first = true;
       thrower = () {
         if (!first) return null;
@@ -441,8 +453,9 @@ void main() {
     });
 
     testWidgets('旅伴被 owner 擋下：顯示 owner 尚未同意，沒有同意動作、不重送', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       thrower = () => _ownerGate;
       await pumpFlow(tester, keptMessage: '幫我排第二天');
       await tapGo(tester);
@@ -478,8 +491,9 @@ void main() {
               null,
             ),
       );
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       thrower = () => _ownerGate;
       await pumpFlow(tester, keptMessage: '幫我排第二天');
       await tapGo(tester);
@@ -540,8 +554,9 @@ void main() {
             ? _consent(AiDataConsentStatus.valid, enforced: false)
             : _consent(AiDataConsentStatus.none),
       );
-      when(() => repo.accept('ai-data-v1'))
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        () => repo.accept('ai-data-v1'),
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       thrower = () => _submitterGate;
       await pumpFlow(tester);
       await tapGo(tester);
@@ -664,8 +679,9 @@ void main() {
     });
 
     testWidgets('非閘門錯誤（500）：原樣往外丟，不跳 sheet、不重送', (tester) async {
-      when(repo.fetch)
-          .thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.valid));
       thrower = () => ApiError.fromResponse(500, null);
       await pumpFlow(tester);
       Object? caught;
