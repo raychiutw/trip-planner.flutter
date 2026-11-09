@@ -172,6 +172,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       final report = await runWithAiDataConsent<TripHealthReport>(
         context,
         ref,
+        tripId: tripId,
         isCurrent: () => _isCurrent(generation, tripId),
         action: () => ref.read(tripRepositoryProvider).startHealthCheck(tripId),
       );

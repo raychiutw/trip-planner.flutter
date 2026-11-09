@@ -11,6 +11,9 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/ai_data_consent/ai_data_consent_controller.dart';
 import 'package:tripline/features/ai_data_consent/ai_data_consent_flow.dart';
+import 'package:tripline/features/trips/trips_list_screen.dart'
+    show myTripsProvider;
+import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -68,7 +71,12 @@ class _Harness extends ConsumerWidget {
   final Future<void> Function(BuildContext context, WidgetRef ref) run;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(myTripsProvider); // 先載入行程清單，流程用 ref.read 取角色
+    return _body(context, ref);
+  }
+
+  Widget _body(BuildContext context, WidgetRef ref) => Scaffold(
     body: Center(
       child: TextButton(
         key: const ValueKey('go'),
@@ -91,6 +99,8 @@ void main() {
     String? keptMessage,
     bool Function()? isCurrent,
     bool signedIn = true,
+    String? tripId,
+    String? role,
   }) async {
     calls = 0;
     outcome = null;
@@ -101,6 +111,11 @@ void main() {
             signedIn ? _StubAuth.new : _SignedOutAuth.new,
           ),
           aiDataConsentRepositoryProvider.overrideWithValue(repo),
+          myTripsProvider.overrideWith(
+            (ref) => Stream.value([
+              TripSummary(tripId: 'trip-1', name: '沖繩', role: role),
+            ]),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -110,6 +125,7 @@ void main() {
                 context,
                 ref,
                 keptMessage: keptMessage,
+                tripId: tripId,
                 isCurrent: isCurrent ?? () => current,
                 action: () async {
                   calls++;
@@ -194,6 +210,51 @@ void main() {
       await tapGo(tester);
 
       expect(calls, 1);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+    });
+  });
+
+  group('旅伴免同意（本地不攔，由 owner 的同意把關）', () {
+    testWidgets('旅伴（role=member）自己沒同意：不跳 sheet、直接執行一次', (tester) async {
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      await pumpFlow(tester, tripId: 'trip-1', role: 'member');
+      await tapGo(tester);
+
+      expect(calls, 1);
+      expect(outcome, isTrue);
+      expect(
+        find.byKey(const ValueKey('ai-data-consent-accept')),
+        findsNothing,
+      );
+      verifyNever(() => repo.accept(any()));
+    });
+
+    testWidgets('擁有者（role=owner）沒同意：照舊先跳 sheet、不執行', (tester) async {
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      await pumpFlow(tester, tripId: 'trip-1', role: 'owner');
+      await tapGo(tester);
+
+      expect(calls, 0);
+      expect(find.text('使用 AI 助理前，請先了解'), findsOneWidget);
+    });
+
+    testWidgets('旅伴被 owner 擋下（server 403）：仍顯示 owner 尚未同意、不重送', (tester) async {
+      when(
+        repo.fetch,
+      ).thenAnswer((_) async => _consent(AiDataConsentStatus.none));
+      thrower = () => _ownerGate;
+      await pumpFlow(tester, tripId: 'trip-1', role: 'member');
+      await tapGo(tester);
+
+      expect(calls, 1);
+      expect(outcome, isNull);
       expect(
         find.byKey(const ValueKey('ai-data-consent-accept')),
         findsNothing,
