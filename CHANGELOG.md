@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 移除
+
+- 移除舊登入回跳網域 `mobile-callback.trip-planner-dby.pages.dev` 的支援（iOS associated domains、Android 第二個 App Link intent-filter 與 placeholder）；0.38.0 以前的舊版 App 登入會壞，owner 已接受，隨下一次發版生效。（trip-planner#1663）
+
 ## [0.38.1] - 2026-11-09
 
 ### 變更

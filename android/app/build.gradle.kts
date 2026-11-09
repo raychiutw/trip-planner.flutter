@@ -75,14 +75,6 @@ android {
         manifestPlaceholders["oauthCallbackPath"] =
             (project.findProperty("oauthCallbackPath") as String?)
                 ?: "/mobile/oauth/callback"
-        // 過渡期保留的舊 callback（已發佈的舊版 App 仍用它；api 同時接受新舊兩組 redirect）。
-        // 舊版 App 退場後連同 manifest 的第二個 intent-filter 一併移除。
-        manifestPlaceholders["oauthLegacyCallbackHost"] =
-            (project.findProperty("oauthLegacyCallbackHost") as String?)
-                ?: "mobile-callback.trip-planner-dby.pages.dev"
-        manifestPlaceholders["oauthLegacyCallbackPath"] =
-            (project.findProperty("oauthLegacyCallbackPath") as String?)
-                ?: "/oauth/callback"
         testInstrumentationRunner =
             if (standardIntegrationTest) {
                 "androidx.test.runner.AndroidJUnitRunner"
