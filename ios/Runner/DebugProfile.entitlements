@@ -4,6 +4,7 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>webcredentials:trip-planner-dby.pages.dev</string>
 		<string>webcredentials:mobile-callback.trip-planner-dby.pages.dev</string>
 		<string>applinks:mobile-callback.trip-planner-dby.pages.dev</string>
 		<string>applinks:trip-planner-dby.pages.dev</string>

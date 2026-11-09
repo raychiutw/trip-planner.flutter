@@ -46,4 +46,19 @@ void main() {
   test('build.gradle.kts 的預設 path 與 OAuthConfig 一致', () {
     expect(gradleDefault('oauthCallbackPath'), OAuthConfig.callbackPath);
   });
+
+  test('過渡期另有舊 callback 的 intent-filter（host/path 走 placeholder）', () {
+    expect(activity, contains('android:host="\${oauthLegacyCallbackHost}"'));
+    expect(activity, contains('android:path="\${oauthLegacyCallbackPath}"'));
+  });
+
+  test('預設 callback 是主站路徑，舊 callback 只在 legacy placeholder', () {
+    expect(gradleDefault('oauthCallbackHost'), 'trip-planner-dby.pages.dev');
+    expect(gradleDefault('oauthCallbackPath'), '/mobile/oauth/callback');
+    expect(
+      gradleDefault('oauthLegacyCallbackHost'),
+      'mobile-callback.trip-planner-dby.pages.dev',
+    );
+    expect(gradleDefault('oauthLegacyCallbackPath'), '/oauth/callback');
+  });
 }

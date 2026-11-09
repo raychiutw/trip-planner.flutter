@@ -35,10 +35,13 @@ The Patrol bundle contains two independent evidence suites:
 
 `oauth_callback_test.dart`（#584，僅 Android）用真的 `OAuthLoginService` 與 `WebAuthLauncher`，
 只把 token endpoint 換成本機 stub，再以 Patrol `openUrl` 送
-`https://<callbackHost>/oauth/callback?code=…&state=…`，三情境：前景收到、`pressHome` 後收到、
+`https://<callbackHost><callbackPath>?code=…&state=…`（預設是 web 主站 `trip-planner-dby.pages.dev` 的 `/mobile/oauth/callback`；UAT 是 `/mobile/uat/oauth/callback`），三情境：前景收到、`pressHome` 後收到、
 沒有進行中登入時收到（行程被殺後的等價冷狀態：不崩、不登入、無殘留 token；測試與 App 同行程，
 無法真的殺掉再送，真正的 process death 仍需手測）。**不涵蓋 App Link 擁有權**（assetlinks.json
 與網域）：測試環境的 intent 不經系統驗證，擁有權仍需一次真機手測。
+過渡期 iOS entitlements 與 Android manifest 仍保留舊 `mobile-callback` 網域（已發佈的舊版 App 還在用，
+api 同時接受新舊兩組 redirect），舊版退場後再移除；web 主站的 AASA／assetlinks 與 api 接受新 redirect
+都上線之前，這個預設不能發版。
 
 **本機模擬器實測（2026-11-08，arm64 API 34 google_apis，三情境全綠）**：模擬器上 App Link 網域驗證
 狀態是 `1024`（未驗證），此時 `openUrl` 的 https intent 會被 Chrome 接走、不進 App，測試會卡住。
