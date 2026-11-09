@@ -23,7 +23,7 @@ Future<bool> showAiDataConsentSheet(
           context,
           title: 'AI 資料同意',
           titleKey: const ValueKey('ai-data-consent-title'),
-          submitLabel: '同意並繼續',
+          submitLabel: '同意',
           submitKey: const ValueKey('ai-data-consent-accept'),
           cancelKey: const ValueKey('ai-data-consent-cancel'),
           controller: controller,
