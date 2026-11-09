@@ -2,18 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// grep 守門：舊 callback 主機只允許出現在「過渡期保留」的檔案；
-/// 其他原始碼、CI 工作流與現行文件都不得再把它當預設。
+/// grep 守門：舊 callback 主機已退役（trip-planner#1663），不得出現在任何程式、設定、CI 工作流與現行文件。
 /// 有日期的歷史紀錄（docs/adr、research、qa、verification）與 CHANGELOG 不改寫，不在掃描範圍。
 void main() {
   const legacyHost = 'mobile-callback.trip-planner-dby.pages.dev';
-  const allowed = {
-    'ios/Runner/Release.entitlements',
-    'ios/Runner/DebugProfile.entitlements',
-    'android/app/build.gradle.kts',
-  };
 
-  test('舊 callback 主機只出現在過渡期保留的檔案', () {
+  test('舊 callback 主機不得出現在任何程式、設定、現行文件', () {
     final hits = <String>[];
     for (final root in ['lib', 'ios', 'android', 'patrol_test', '.github']) {
       final dir = Directory(root);
@@ -28,13 +22,24 @@ void main() {
         } on FileSystemException {
           continue; // 二進位檔
         }
-        if (text.contains(legacyHost) && !allowed.contains(f.path)) {
+        if (text.contains(legacyHost)) {
           hits.add(f.path);
         }
       }
     }
-    for (final doc in ['README.md', 'CONTRIBUTING.md', 'docs/mobile-e2e.md']) {
-      if (File(doc).readAsStringSync().contains(legacyHost)) hits.add(doc);
+    for (final doc in [
+      'README.md',
+      'CONTRIBUTING.md',
+      'CLAUDE.md',
+      'CODING_STANDARDS.md',
+      'DESIGN.md',
+      'GLOSSARY.md',
+      'docs/mobile-e2e.md',
+    ]) {
+      if (File(doc).existsSync() &&
+          File(doc).readAsStringSync().contains(legacyHost)) {
+        hits.add(doc);
+      }
     }
     expect(hits, isEmpty);
   });

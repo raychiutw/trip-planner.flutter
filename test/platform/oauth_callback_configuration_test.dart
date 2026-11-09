@@ -7,7 +7,7 @@ import 'package:tripline/api/oauth/oauth_config.dart';
 /// callback 網域與 App 有 webcredentials 關聯；只有 applinks 時授權視窗一開
 /// 就被回報成取消（CANCELED／code 1），登入按下去什麼都沒發生。
 void main() {
-  // 過渡期（舊版 App 仍用舊 callback）保留的舊網域；api 同時接受新舊兩組 redirect。
+  // 舊 callback 網域已退役（trip-planner#1663），entitlements 不得再宣告。
   const legacyHost = 'mobile-callback.trip-planner-dby.pages.dev';
 
   test('預設 callback 是 web 主站路徑，不是舊 mobile-callback 主機', () {
@@ -34,9 +34,7 @@ void main() {
         text,
         contains('<string>applinks:${OAuthConfig.callbackHost}</string>'),
       );
-      // 過渡期舊網域先保留，等舊版 App 退場再移除。
-      expect(text, contains('<string>webcredentials:$legacyHost</string>'));
-      expect(text, contains('<string>applinks:$legacyHost</string>'));
+      expect(text, isNot(contains(legacyHost)));
     });
   }
 }
