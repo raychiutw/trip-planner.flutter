@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.38.1] - 2026-11-09
+
+### 變更
+
+- 登入回跳網址預設搬到 web 主站（`https://trip-planner-dby.pages.dev/mobile/oauth/callback`，UAT 為 `/mobile/uat/oauth/callback`）：iOS 補主站的 `webcredentials` 關聯，Android 新增承接舊回跳網址的 App Link，舊版 App 與新版並存期間各自都能登入。前置已上線：web 的 AASA 與 assetlinks（2026-11-09 驗證回 200、`application/json`）、api 接受新 redirect（migration 0104，2026-11-09 套用到正式庫）。（trip-planner#1482）
+
 ### 移除
 
 - 移除「以 Google 重新驗證後刪除帳號」流程與相關程式。production 的 48 個帳號全部有密碼、沒有任何 Google 身分，這條路徑對現有帳號是死路徑；帳號刪除維持輸入密碼確認，沒有密碼的帳號一律拒絕並導向安全刪除說明，不會送出刪除。後端 `reauthProvider` 欄位缺值或仍存在都能正常解析。（owner 決議，trip-planner#1643）
