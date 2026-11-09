@@ -322,6 +322,7 @@ void _generateNotesWithConsent(
   runWithAiDataConsent<bool>(
     context,
     ref,
+    tripId: tripId,
     action: () async {
       await ref.read(notesAiControllerProvider(tripId).notifier).generate(type);
       return true;

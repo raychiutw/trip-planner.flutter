@@ -428,6 +428,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         context,
         ref,
         keptMessage: text,
+        tripId: tripId,
         isCurrent: () => mounted && widget.tripId == tripId,
         action: () => _authorizeAndSend(text, clearComposer: clearComposer),
       );

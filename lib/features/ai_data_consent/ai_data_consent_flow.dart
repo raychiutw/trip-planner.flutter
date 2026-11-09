@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/app_feedback.dart';
 import '../../models/ai_data_consent.dart';
+import '../trips/trips_list_screen.dart' show myTripsProvider;
 import 'ai_data_consent_controller.dart';
 import 'ai_data_consent_sheet.dart';
 import 'ai_owner_consent_missing_alert.dart';
@@ -25,9 +26,22 @@ const kAiConsentUnavailableMessage = '暫時無法確認 AI 資料同意，請�
 /// 陷入同意迴圈，改顯示「無法確認」。
 const kAiConsentMaxReprompts = 1;
 
+/// 目前使用者是否是 [tripId] 的旅伴（角色不是 owner）。
+///
+/// 旅伴不需要自己同意（由行程擁有者的同意把關，見 ADR-0012），所以不該被本地同意 sheet 攔下。
+/// 行程清單還沒載入、找不到該行程時當作擁有者：維持原本的本地檢查，最終仍由 server 判定。
+bool _isCompanionOf(WidgetRef ref, String? tripId) {
+  if (tripId == null) return false;
+  final trips = ref.read(myTripsProvider).value;
+  final role = trips?.where((t) => t.tripId == tripId).firstOrNull?.role;
+  return role != null && role != 'owner';
+}
+
 /// 執行 [action]（必須用 `translateAiConsentGate` 包過 mutation，被擋時丟
 /// [AiConsentRequiredException]）。回傳 null = 使用者取消、owner 未同意、或同意後
 /// [isCurrent] 已為 false（換行程／離頁），此時動作沒有（再）執行。
+///
+/// [tripId] 是這次 AI 操作所屬的行程；使用者是該行程的旅伴時不做本地同意檢查（旅伴免同意）。
 ///
 /// [keptMessage] 有值代表使用者輸入已被保留，sheet 會提示同意後會自動接續。
 /// 重新讀不到說明文字時不猜（也不繞過閘門）：顯示「無法確認」錯誤並回 null，
@@ -37,6 +51,7 @@ Future<T?> runWithAiDataConsent<T extends Object>(
   WidgetRef ref, {
   required Future<T?> Function() action,
   String? keptMessage,
+  String? tripId,
   bool Function()? isCurrent,
 }) async {
   bool current() => isCurrent?.call() ?? true;
@@ -66,7 +81,11 @@ Future<T?> runWithAiDataConsent<T extends Object>(
 
   final known = await ref.read(aiDataConsentProvider.future);
   if (!context.mounted || !current()) return null;
-  if (known != null && known.needsConsent && !await askConsent(known)) {
+  final companion = _isCompanionOf(ref, tripId);
+  if (!companion &&
+      known != null &&
+      known.needsConsent &&
+      !await askConsent(known)) {
     return null;
   }
 
