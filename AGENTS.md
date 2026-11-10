@@ -38,7 +38,7 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 
 ## 專案性質
 
-本 repo 是 [trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的 iOS／Android Flutter 移植版。**後端不動**：共用 Cloudflare Pages Functions API（`https://trip-planner-dby.pages.dev/api`），此 repo 只是另一個 client。P0（唯讀畫面）、P1（收藏／停留點 CRUD／AI 聊天／共編）與 P2（分享匯入、設定、OAuth PKCE Bearer 認證、離線快取）皆已完成，現在是既有功能的維護與增修。
+本 repo 是 [trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的 iOS／Android Flutter 移植版。**後端不動**：共用同一套後端 API（預設新 api `https://trip-planner-api-production.lean-lean.workers.dev`；舊 Pages Functions 入口已退役），此 repo 只是另一個 client。P0（唯讀畫面）、P1（收藏／停留點 CRUD／AI 聊天／共編）與 P2（分享匯入、設定、OAuth PKCE Bearer 認證、離線快取）皆已完成，現在是既有功能的維護與增修。
 
 ## 強制開發流程
 
@@ -100,7 +100,7 @@ Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 li
 - `ApiClient` 統一帶 `Authorization`：token 綁定金鑰時是 `DPoP <token>` 加每請求重簽的 proof，否則 `Bearer <token>`（ADR-0015）；**不送 `Cookie`、不送 `Origin`**，不得繞過它用 raw Dio 呼叫 API。DPoP 金鑰每次登入產生、隨登入憑證刪除，硬體優先、退軟體；SSE 同樣帶標頭並處理 `event: reconnect`。
 - refresh 被後端拒絕（400／401）會清憑證，並經 `bearerTokenSource.signedOut` 讓 `authStateProvider` 回到未登入。
 - `currentUser()` 收到 401 時回傳 `null`，不 throw。登入後跳轉靠 router redirect；`LoginScreen` 本身不導航。
-- master 在新 api 切換前不可發版（新認證連不上舊入口）。
+- 預設 API origin 已是新 api；舊入口已退役，新認證連不上它，指向其他後端須同時換掉認證，不是只改 `TRIPLINE_API_ORIGIN`。
 
 ### ApiClient 行為規則
 

@@ -85,8 +85,8 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### origin 常數
 
-- `kTriplineOrigin` 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', defaultValue: 'https://trip-planner-dby.pages.dev')`（`lib/api/api_client.dart:21-24`）。不得改回字面常數，本機後端靠 `--dart-define` 覆寫。
-- origin 決定 base URL（`'$origin/api'`）；切換到新 api 時只改這個設定值。
+- `kTriplineOrigin` 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', defaultValue: <新 api 正式站>)`（`lib/api/api_client.dart` 的 `kTriplineOrigin`；網頁版網域是另一個常數 `kTriplineWebOrigin`，不可混用）。不得改回字面常數，本機後端靠 `--dart-define` 覆寫。
+- origin 決定 base URL（`'$origin/api'`）；換後端只改這個設定值（認證也要一併對應，見 CLAUDE.md「認證」）。
 - origin 必須是純 origin：不含 `/api` 路徑、無結尾斜線（有測試守：`test/api/api_client_test.dart:430`）。
 
 

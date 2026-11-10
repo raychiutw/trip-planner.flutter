@@ -16,15 +16,15 @@ PDF 測試會讀取真正的輸出檔案：macOS 使用 Xcode Command Line Tools
 
 ### 指向本機後端
 
-預設連正式站 `https://trip-planner-dby.pages.dev`。**連 prod 時破壞性操作(刪除等)會真的打到正式資料** —— 測破壞性流程一律先改指本機後端,或使用測試帳號。
+預設連新 api 正式站 `https://trip-planner-api-production.lean-lean.workers.dev`。**連 prod 時破壞性操作(刪除等)會真的打到正式資料** —— 測破壞性流程一律先改指本機後端,或使用測試帳號。
 
-用 `--dart-define` 覆寫 origin(值是 origin,**不含** `/api`;app 會自動補 `/api`,並用同一個 origin 當 CSRF `Origin` header):
+用 `--dart-define` 覆寫 origin(值是 origin,**不含** `/api`;app 會自動補 `/api`;App 不送 `Cookie`／`Origin`,認證走 Bearer／DPoP):
 
 ```bash
 flutter run --dart-define=TRIPLINE_API_ORIGIN=http://localhost:8787
 ```
 
-多個 define 可重複加旗標,或用 `--dart-define-from-file`。本機後端的 CSRF allowlist 必須允許你傳入的 origin。
+多個 define 可重複加旗標,或用 `--dart-define-from-file`。本機後端須能驗證 App 送出的 Bearer／DPoP 憑證。
 
 驗證覆寫真的生效:
 
