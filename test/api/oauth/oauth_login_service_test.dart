@@ -100,6 +100,21 @@ void main() {
     expect((await store.read())!.refreshToken, 'RT');
   });
 
+  test('瀏覽器登入換票時必須帶 redirect_uri（RFC 6749：授權請求帶了，換票就要帶）', () async {
+    await service.login();
+
+    final captured = verify(
+      () => repo.exchangeCode(
+        code: any(named: 'code'),
+        codeVerifier: any(named: 'codeVerifier'),
+        clientId: any(named: 'clientId'),
+        redirectUri: captureAny(named: 'redirectUri'),
+        proofKey: any(named: 'proofKey'),
+      ),
+    ).captured;
+    expect(captured.single, OAuthConfig.redirectUri);
+  });
+
   test('callback 的 state 對不上 → 拒絕，不換 token', () async {
     launcher.reply = (_) => {'code': 'CODE', 'state': 'forged'};
 
