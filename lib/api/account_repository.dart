@@ -5,11 +5,15 @@ library;
 import '../models/oauth.dart';
 import '../models/user.dart';
 import 'api_client.dart';
+import 'step_up.dart';
 
 class AccountRepository {
-  AccountRepository({required ApiClient client}) : _client = client;
+  AccountRepository({required ApiClient client, StepUpGate? stepUp})
+    : _client = client,
+      _stepUp = stepUp;
 
   final ApiClient _client;
+  final StepUpGate? _stepUp;
 
   /// PATCH /account/profile（displayName 傳 null 表示清除）。
   Future<UserInfo> updateProfile({String? displayName}) async {
@@ -22,6 +26,7 @@ class AccountRepository {
 
   /// POST /account/password，已登入的變更密碼（要帶目前密碼）。
   ///
+  /// 敏感操作：收到 `REAUTH_REQUIRED` 會先重新驗證再重試一次（見 `step_up.dart`）。
   /// 成功後後端會登出其他裝置、保留目前這台。目前密碼錯回 403
   /// `CHANGE_PASSWORD_CURRENT_INVALID`（刻意不是 401，所以不會被當成登入過期）；
   /// 其餘錯誤碼見 trip-planner-api 的 `CHANGE_PASSWORD_*`。錯誤一律丟 [ApiError]，由畫面依 code 分支。
@@ -29,9 +34,16 @@ class AccountRepository {
     required String currentPassword,
     required String newPassword,
   }) async {
-    await _client.post(
-      '/account/password',
-      body: {'current_password': currentPassword, 'new_password': newPassword},
+    await runStepUp(
+      _stepUp,
+      (headers) => _client.post(
+        '/account/password',
+        body: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+        headers: headers,
+      ),
     );
   }
 

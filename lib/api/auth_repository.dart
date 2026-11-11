@@ -5,6 +5,7 @@ library;
 import '../models/user.dart';
 import '../models/public_config.dart';
 import 'api_client.dart';
+import 'step_up.dart';
 import 'api_error.dart';
 import 'cache_read_policy.dart';
 
@@ -72,9 +73,12 @@ class AccountDeletionPreview {
 
 /// 對應 `/api/oauth/*` 認證 endpoints。
 class AuthRepository {
-  AuthRepository({required ApiClient client}) : _client = client;
+  AuthRepository({required ApiClient client, StepUpGate? stepUp})
+    : _client = client,
+      _stepUp = stepUp;
 
   final ApiClient _client;
+  final StepUpGate? _stepUp;
 
   /// GET /public-config → login/signup feature flags available pre-auth.
   Future<PublicConfig> fetchPublicConfig() async {
@@ -112,8 +116,17 @@ class AuthRepository {
   }
 
   /// DELETE /account：有密碼帳號帶目前密碼確認。
+  ///
+  /// 敏感操作：收到 `REAUTH_REQUIRED` 會先重新驗證再重試一次（見 `step_up.dart`）。
   Future<void> deleteAccount({required String password}) async {
-    await _client.delete('/account', body: {'password': password});
+    await runStepUp(
+      _stepUp,
+      (headers) => _client.delete(
+        '/account',
+        body: {'password': password},
+        headers: headers,
+      ),
+    );
   }
 
   /// POST /oauth/forgot-password；後端固定 generic response，避免帳號列舉。

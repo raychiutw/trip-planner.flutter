@@ -20,6 +20,7 @@ import '../models/trip_poi_health.dart';
 import 'ai_data_consent_repository.dart';
 import 'api_client.dart';
 import 'cache_read_policy.dart';
+import 'step_up.dart';
 import 'cache/offline_op.dart';
 
 /// 行程 JSON 匯出結果，`content` 可直接寫入 `fileName`。
@@ -62,9 +63,12 @@ class CustomEntryPoi {
 
 /// 對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。
 class TripRepository {
-  TripRepository({required ApiClient client}) : _client = client;
+  TripRepository({required ApiClient client, StepUpGate? stepUp})
+    : _client = client,
+      _stepUp = stepUp;
 
   final ApiClient _client;
+  final StepUpGate? _stepUp;
 
   /// 聚合 GET /notes 的 response 段名(pretrip/emergency 與 URL 段名不同)。
   String _notesSectionKey(NoteSection s) => switch (s) {
@@ -536,8 +540,13 @@ class TripRepository {
   );
 
   /// DELETE /trips/:id（限 owner/admin）。
-  Future<void> deleteTrip(String id) =>
-      _client.delete('/trips/${Uri.encodeComponent(id)}');
+  ///
+  /// 敏感操作：收到 `REAUTH_REQUIRED` 會先重新驗證再重試一次（見 `step_up.dart`）。
+  Future<void> deleteTrip(String id) => runStepUp(
+    _stepUp,
+    (headers) =>
+        _client.delete('/trips/${Uri.encodeComponent(id)}', headers: headers),
+  );
 
   /// POST /trips/import，送出 web 匯出的 raw JSON text 並回傳新 tripId。
   Future<String> importTripJson(String jsonText) async {

@@ -26,6 +26,7 @@ import 'app/provider_retry.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
 import 'app/shared_preferences_settings_store.dart';
+import 'app/step_up_dialog.dart';
 import 'features/account/account_sheet.dart';
 import 'features/account/settings/theme_mode_controller.dart';
 import 'features/offline/offline_sync.dart';
@@ -113,6 +114,7 @@ Future<void> main() async {
             authorizationLauncherProvider.overrideWithValue(
               const WebAuthLauncher(),
             ),
+            stepUpPrompterProvider.overrideWith(appStepUpPrompter),
             themeModeProvider.overrideWith(
               () => ThemeModeController(initialMode: initialThemeMode),
             ),

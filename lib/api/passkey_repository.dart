@@ -4,11 +4,15 @@ library;
 
 import '../models/passkey.dart';
 import 'api_client.dart';
+import 'step_up.dart';
 
 class PasskeyRepository {
-  PasskeyRepository({required ApiClient client}) : _client = client;
+  PasskeyRepository({required ApiClient client, StepUpGate? stepUp})
+    : _client = client,
+      _stepUp = stepUp;
 
   final ApiClient _client;
+  final StepUpGate? _stepUp;
 
   /// GET /account/passkeys，只含本人的，依建立時間舊到新。
   Future<List<Passkey>> list() async {
@@ -54,6 +58,13 @@ class PasskeyRepository {
   }
 
   /// DELETE /account/passkeys/:id，撤銷：不影響任何登入狀態，找不到回 404 `PASSKEY_NOT_FOUND`。
-  Future<void> revoke(String id) =>
-      _client.delete('/account/passkeys/${Uri.encodeComponent(id)}');
+  ///
+  /// 敏感操作：收到 `REAUTH_REQUIRED` 會先重新驗證再重試一次（見 `step_up.dart`）。
+  Future<void> revoke(String id) => runStepUp(
+    _stepUp,
+    (headers) => _client.delete(
+      '/account/passkeys/${Uri.encodeComponent(id)}',
+      headers: headers,
+    ),
+  );
 }

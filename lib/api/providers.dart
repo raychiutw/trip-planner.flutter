@@ -22,6 +22,7 @@ import 'requests_repository.dart';
 import 'reports_repository.dart';
 import 'settings_store.dart';
 import 'share_repository.dart';
+import 'step_up.dart';
 import 'trip_repository.dart';
 
 final settingsStoreProvider = Provider<SettingsStore>(
@@ -39,16 +40,46 @@ final apiClientProvider = Provider<ApiClient>(
   ),
 );
 
+/// 重新驗證證明（只放記憶體）；`AuthNotifier` 在登出、換帳號時清除。
+final stepUpProofStoreProvider = Provider<StepUpProofStore>(
+  (ref) => StepUpProofStore(),
+);
+
+/// 向使用者要重新驗證的 UI；app 於 `main()` override 成對話框版，預設一律視為取消。
+final stepUpPrompterProvider = Provider<StepUpPrompter>(
+  (ref) => const NoStepUpPrompter(),
+);
+
+final stepUpGateProvider = Provider<StepUpGate>(
+  (ref) => StepUpGate(
+    store: ref.watch(stepUpProofStoreProvider),
+    prompter: ref.watch(stepUpPrompterProvider),
+  ),
+);
+
+final stepUpRepositoryProvider = Provider<StepUpRepository>(
+  (ref) => StepUpRepository(client: ref.watch(apiClientProvider)),
+);
+
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(client: ref.watch(apiClientProvider)),
+  (ref) => AuthRepository(
+    client: ref.watch(apiClientProvider),
+    stepUp: ref.watch(stepUpGateProvider),
+  ),
 );
 
 final accountRepositoryProvider = Provider<AccountRepository>(
-  (ref) => AccountRepository(client: ref.watch(apiClientProvider)),
+  (ref) => AccountRepository(
+    client: ref.watch(apiClientProvider),
+    stepUp: ref.watch(stepUpGateProvider),
+  ),
 );
 
 final passkeyRepositoryProvider = Provider<PasskeyRepository>(
-  (ref) => PasskeyRepository(client: ref.watch(apiClientProvider)),
+  (ref) => PasskeyRepository(
+    client: ref.watch(apiClientProvider),
+    stepUp: ref.watch(stepUpGateProvider),
+  ),
 );
 
 final aiDataConsentRepositoryProvider = Provider<AiDataConsentRepository>(
@@ -56,7 +87,10 @@ final aiDataConsentRepositoryProvider = Provider<AiDataConsentRepository>(
 );
 
 final tripRepositoryProvider = Provider<TripRepository>(
-  (ref) => TripRepository(client: ref.watch(apiClientProvider)),
+  (ref) => TripRepository(
+    client: ref.watch(apiClientProvider),
+    stepUp: ref.watch(stepUpGateProvider),
+  ),
 );
 
 final requestsRepositoryProvider = Provider<RequestsRepository>(
@@ -76,7 +110,10 @@ final mapRepositoryProvider = Provider<MapRepository>(
 );
 
 final shareRepositoryProvider = Provider<ShareRepository>(
-  (ref) => ShareRepository(client: ref.watch(apiClientProvider)),
+  (ref) => ShareRepository(
+    client: ref.watch(apiClientProvider),
+    stepUp: ref.watch(stepUpGateProvider),
+  ),
 );
 
 /// 受保護的登入憑證還沒解鎖(使用者取消或沒通過生物辨識)。
@@ -101,6 +138,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<UserInfo?> build() async {
     // refresh 被後端拒絕、憑證已清掉 → 回到未登入(離線快取保留,同一帳號重新登入還用得到)。
     final sub = ref.watch(bearerTokenSourceProvider).signedOut.listen((_) {
+      ref.read(stepUpProofStoreProvider).clear();
       if (ref.mounted) state = const AsyncData(null);
     });
     ref.onDispose(sub.cancel);
@@ -163,6 +201,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   /// 用系統瀏覽器登入(PKCE)。使用者取消不算錯誤,維持未登入。
   Future<void> signInWithBrowser() async {
     state = const AsyncLoading();
+    ref.read(stepUpProofStoreProvider).clear();
     try {
       await ref.read(oauthLoginServiceProvider).login();
     } on OAuthLoginException catch (e, stack) {
@@ -220,6 +259,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> accountDeleted() => _clearLocalAuth();
 
   Future<void> _clearLocalAuth() async {
+    ref.read(stepUpProofStoreProvider).clear();
     try {
       await ref.read(bearerTokenSourceProvider).clear();
       // 清離線快取,避免帳號間資料外洩。
