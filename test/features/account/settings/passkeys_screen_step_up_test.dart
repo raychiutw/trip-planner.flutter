@@ -166,14 +166,17 @@ void main() {
     expect(deletes[0].headers.containsKey('X-Step-Up-Proof'), isFalse);
     expect(deletes[1].headers['X-Step-Up-Proof'], 'issued-proof');
     expect(find.text('已撤銷 passkey'), findsOneWidget);
-    // 密碼只出現在 reauth/password 那一個請求的 body。
-    final withPassword = [
+    // 密碼只出現在 reauth/password 那一個請求的 body：網址（含 query）與標頭都不能有。
+    const pw = 'my-current-pw';
+    for (var i = 0; i < server.requests.length; i++) {
+      expect(server.requests[i].uri.toString(), isNot(contains(pw)));
+      expect('${server.requests[i].headers}', isNot(contains(pw)));
+    }
+    final inBody = [
       for (var i = 0; i < server.requests.length; i++)
-        if (server.bodies[i].contains('my-current-pw') ||
-            '${server.requests[i].headers}'.contains('my-current-pw'))
-          server.requests[i].uri.path,
+        if (server.bodies[i].contains(pw)) server.requests[i].uri.path,
     ];
-    expect(withPassword, ['/api/account/reauth/password']);
+    expect(inBody, ['/api/account/reauth/password']);
   });
 
   testWidgets('passkey 路徑：簽署成功 → 帶證明重試 → 撤銷成功', (tester) async {

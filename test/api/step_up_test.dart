@@ -319,6 +319,8 @@ void main() {
       expect(proof.expiresIn, 300);
       expect(reauth.last.uri.path, '/api/account/reauth/password');
       expect(reauth.last.data, {'password': 's3cret-pw'});
+      expect(reauth.last.uri.query, isEmpty);
+      expect('${reauth.last.headers}', isNot(contains('s3cret-pw')));
     });
 
     test('passkey：POST /account/reauth/passkey 帶 credential', () async {
