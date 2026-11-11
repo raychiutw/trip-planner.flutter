@@ -29,6 +29,7 @@ import 'settings/biometric_login_row.dart';
 import 'settings/appearance_screen.dart';
 import 'settings/change_password_screen.dart';
 import 'settings/notifications_screen.dart';
+import 'settings/passkeys_screen.dart';
 import 'settings/profile_edit_screen.dart';
 import 'settings/theme_mode_controller.dart';
 
@@ -237,6 +238,12 @@ class _SettingsGroup extends ConsumerWidget {
           children: [
             const AppLockRow(),
             const BiometricLoginRow(),
+            TpSettingsRow(
+              key: const ValueKey('settings-passkeys'),
+              leading: const Icon(CupertinoIcons.lock_shield),
+              title: 'Passkey',
+              onTap: () => open(const PasskeysScreen()),
+            ),
             // 能力探測列（不是內容資料）：loading／error 刻意不畫，見 [accountHasPasswordProvider]。
             if (ref.watch(accountHasPasswordProvider) case AsyncData(
               value: true,
