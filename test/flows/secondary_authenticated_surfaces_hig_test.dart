@@ -40,6 +40,9 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
   'lib/features/account/settings/change_password_screen.dart': {
     'ChangePasswordScreen': _HeaderContract.modalForm,
   },
+  'lib/features/account/settings/passkeys_screen.dart': {
+    'PasskeysScreen': _HeaderContract.authenticatedDetail,
+  },
   'lib/features/account/settings/profile_edit_screen.dart': {
     'ProfileEditScreen': _HeaderContract.modalForm,
   },

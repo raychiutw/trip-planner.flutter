@@ -456,6 +456,7 @@ void main() {
     final appearanceRow = tester.widget<TpSettingsRow>(appearance);
     expect(appearanceRow.value, '跟隨系統');
     expect(appearanceRow.onTap, isNotNull);
+    expect(find.byKey(const ValueKey('settings-passkeys')), findsOneWidget);
     expect(find.byKey(const ValueKey('settings-sessions')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('settings-connected-apps')),
