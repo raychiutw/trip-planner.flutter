@@ -1,5 +1,7 @@
 /// 撤銷 passkey 遇到 api 強制重新驗證（REAUTH_REQUIRED）的整條流程：
 /// 真的 ApiClient＋StepUpGate＋對話框，只有 HTTP 與平台通道是假的。
+library;
+
 import 'dart:convert';
 import 'dart:typed_data';
 
