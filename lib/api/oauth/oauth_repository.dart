@@ -11,6 +11,10 @@ import '../dpop/dpop_clock.dart';
 import '../dpop/dpop_proof.dart';
 import '../dpop/proof_key.dart';
 
+/// 瀏覽器登入與 passkey 登入共用的 scope（兩條路徑簽出的 token 要等價）。
+const kOAuthLoginScope =
+    'openid profile email offline_access trips:read trips:write';
+
 class OAuthRepository {
   OAuthRepository({Dio? dio, String origin = kTriplineOrigin, DpopClock? clock})
     : _origin = origin,
@@ -33,7 +37,7 @@ class OAuthRepository {
     required String redirectUri,
     required String codeChallenge,
     required String state,
-    String scope = 'openid profile email offline_access trips:read trips:write',
+    String scope = kOAuthLoginScope,
   }) {
     return Uri.parse('$_origin/api/oauth/authorize').replace(
       queryParameters: {
@@ -48,17 +52,51 @@ class OAuthRepository {
     );
   }
 
+  /// POST /oauth/passkey/options（未登入）：取得一次性登入挑戰，原樣交給平台層。
+  Future<Map<String, dynamic>> passkeyOptions() async =>
+      await _postJson('/oauth/passkey/options', <String, dynamic>{})
+          as Map<String, dynamic>;
+
+  /// POST /oauth/passkey/login（未登入）：assertion 驗證通過回 authorization code，
+  /// 之後以 [exchangeCode]（不帶 redirect_uri）兌換。
+  Future<String> passkeyLogin({
+    required String clientId,
+    required Map<String, dynamic> credential,
+    required String codeChallenge,
+    String? dpopJkt,
+    String scope = kOAuthLoginScope,
+  }) async {
+    final body = await _postJson('/oauth/passkey/login', {
+      'client_id': clientId,
+      'credential': credential,
+      'code_challenge': codeChallenge,
+      'code_challenge_method': 'S256',
+      'scope': scope,
+      'dpop_jkt': ?dpopJkt,
+    });
+    return (body as Map<String, dynamic>)['code'] as String;
+  }
+
+  Future<dynamic> _postJson(String path, Map<String, dynamic> data) async {
+    final res = await _dio.post<dynamic>(path, data: data);
+    final status = res.statusCode ?? 0;
+    if (status < 200 || status >= 300) {
+      throw ApiError.fromResponse(status, res.data);
+    }
+    return res.data;
+  }
+
   /// authorization_code + PKCE code_verifier 換 token。
   Future<OAuthTokens> exchangeCode({
     required String code,
     required String codeVerifier,
     required String clientId,
-    required String redirectUri,
+    String? redirectUri,
     ProofKey? proofKey,
   }) => _token({
     'grant_type': 'authorization_code',
     'code': code,
-    'redirect_uri': redirectUri,
+    'redirect_uri': ?redirectUri,
     'client_id': clientId,
     'code_verifier': codeVerifier,
   }, proofKey);

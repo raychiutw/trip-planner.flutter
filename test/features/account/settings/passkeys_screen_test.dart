@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/passkey_repository.dart';
+import 'package:tripline/api/settings_store.dart';
+import 'package:tripline/app/passkey_login.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/app/passkey_platform.dart';
 import 'package:tripline/features/account/settings/passkeys_screen.dart';
@@ -29,13 +31,18 @@ void main() {
   );
   const options = <String, dynamic>{'challenge': 'ch'};
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    SettingsStore? settings,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         retry: (retryCount, error) => null,
         overrides: [
           passkeyRepositoryProvider.overrideWithValue(repo),
           passkeyPlatformProvider.overrideWithValue(platform),
+          if (settings != null)
+            settingsStoreProvider.overrideWithValue(settings),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -153,6 +160,23 @@ void main() {
     ).called(1);
     verify(() => repo.list()).called(2);
     expect(find.text('已新增 passkey'), findsOneWidget);
+  });
+
+  testWidgets('新增成功：記下本機提示旗標（登出後登入頁靠它顯示 passkey 入口）；取消不記', (tester) async {
+    final settings = InMemorySettingsStore();
+    platform.outcome = const PasskeyCancelled();
+    await pumpScreen(tester, settings: settings);
+    await tester.tap(find.byKey(const ValueKey('passkey-add')));
+    await tester.pumpAndSettle();
+    await submitName(tester, '新手機');
+    expect(await settings.read(kPasskeyLoginHintKey), isNull);
+
+    platform.outcome = const PasskeyCreated(fakeCredential);
+    await tester.tap(find.byKey(const ValueKey('passkey-add')));
+    await tester.pumpAndSettle();
+    await submitName(tester, '新手機');
+
+    expect(await settings.read(kPasskeyLoginHintKey), '1');
   });
 
   testWidgets('新增：名稱留空就用預設名稱，不送空字串', (tester) async {

@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:passkeys/authenticator.dart';
 import 'package:passkeys/types.dart';
 
+import 'passkey_assertion.dart';
+
 sealed class PasskeyCreateOutcome {
   const PasskeyCreateOutcome();
 }
@@ -40,6 +42,13 @@ class PasskeyCreateFailed extends PasskeyCreateOutcome {
 abstract interface class PasskeyPlatform {
   /// [options] 是 `register/options` 的回應原樣。不會丟例外，結果都在 [PasskeyCreateOutcome]。
   Future<PasskeyCreateOutcome> create(Map<String, dynamic> options);
+
+  /// 平台是否支援 passkey（登入頁入口的前提；查詢失敗一律當不支援）。
+  Future<bool> isSupported();
+
+  /// 登入用的 assertion。[options] 是 `oauth/passkey/options` 的回應原樣
+  /// （allowCredentials 為空 = 讓系統列出此網域的 passkey）。不會丟例外。
+  Future<PasskeyAssertion> authenticate(Map<String, dynamic> options);
 }
 
 class NativePasskeyPlatform implements PasskeyPlatform {
@@ -62,6 +71,36 @@ class NativePasskeyPlatform implements PasskeyPlatform {
     } on Exception {
       // 套件的 AuthenticatorException、PlatformException、選項格式錯誤一律視為失敗。
       return const PasskeyCreateFailed();
+    }
+  }
+
+  @override
+  Future<bool> isSupported() async {
+    try {
+      // 2.23.1 沒有替代 API（PasskeyAvailability 不存在），升版時再換。
+      // ignore: deprecated_member_use
+      return await _authenticator.canAuthenticate();
+    } on Exception {
+      return false; // 查詢失敗（含沒有平台通道）一律當不支援，入口就不顯示
+    }
+  }
+
+  @override
+  Future<PasskeyAssertion> authenticate(Map<String, dynamic> options) async {
+    try {
+      final response = await _authenticator.authenticate(
+        AuthenticateRequestType.fromJson(
+          options,
+          // 登入頁主動按下的流程：要出系統面板，不是只在有現成憑證時靜默回應。
+          preferImmediatelyAvailableCredentials: false,
+        ),
+      );
+      return PasskeyAsserted(response.toJson());
+    } on PasskeyAuthCancelledException {
+      return const PasskeyAssertCancelled();
+    } on Exception {
+      // 沒有 passkey、網域未關聯、裝置不支援、選項格式錯誤等一律視為失敗。
+      return const PasskeyAssertFailed();
     }
   }
 }

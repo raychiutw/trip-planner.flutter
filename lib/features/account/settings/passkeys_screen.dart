@@ -18,6 +18,7 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../app/error_message.dart';
 import '../../../app/irreversible_action.dart';
+import '../../../app/passkey_login.dart' show markPasskeyLoginHint;
 import '../../../app/passkey_platform.dart';
 import '../../../models/display_format.dart';
 import '../../../models/passkey.dart';
@@ -111,6 +112,8 @@ class _PasskeysScreenState extends ConsumerState<PasskeysScreen> {
           await repo.registerVerify(credential: credential, name: name);
           if (!mounted) return;
           ref.invalidate(passkeysProvider);
+          // 登出後登入頁靠這個旗標顯示 passkey 入口（見 passkey_login.dart）。
+          unawaited(markPasskeyLoginHint(ref.read(settingsStoreProvider)));
           showAppNotice(context, '已新增 passkey');
         case PasskeyCancelled():
           showAppNotice(context, '已取消新增 passkey');

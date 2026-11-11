@@ -161,10 +161,14 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 用系統瀏覽器登入(PKCE)。使用者取消不算錯誤,維持未登入。
-  Future<void> signInWithBrowser() async {
+  Future<void> signInWithBrowser() =>
+      signInWith(() => ref.read(oauthLoginServiceProvider).login());
+
+  /// 執行某種登入（瀏覽器、passkey……），成功後解析身分。取消維持未登入，失敗落到 AsyncError。
+  Future<void> signInWith(Future<void> Function() login) async {
     state = const AsyncLoading();
     try {
-      await ref.read(oauthLoginServiceProvider).login();
+      await login();
     } on OAuthLoginException catch (e, stack) {
       state = e.cancelled ? const AsyncData(null) : AsyncError(e, stack);
       return;

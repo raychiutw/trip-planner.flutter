@@ -5,6 +5,7 @@ library;
 
 import '../../models/oauth_tokens.dart';
 import '../dpop/proof_key_store.dart';
+import 'code_redemption.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
 import 'pkce.dart';
@@ -103,21 +104,15 @@ class OAuthLoginService {
     // 每次登入一把新金鑰（ADR-0015）；伺服器沒綁定就用不到，立刻刪掉。
     final keys = _proofKeys;
     final key = await keys?.create();
-    final OAuthTokens tokens;
-    try {
-      tokens = await _repo.exchangeCode(
-        code: code,
-        codeVerifier: verifier,
-        clientId: _clientId,
-        redirectUri: OAuthConfig.redirectUri,
-        proofKey: key,
-      );
-    } on Object {
-      await keys?.delete();
-      rethrow;
-    }
-    if (!tokens.isDpop) await keys?.delete();
-    await _source.adopt(tokens);
-    return tokens;
+    return redeemAuthorizationCode(
+      repository: _repo,
+      source: _source,
+      clientId: _clientId,
+      code: code,
+      codeVerifier: verifier,
+      redirectUri: OAuthConfig.redirectUri,
+      key: key,
+      proofKeys: keys,
+    );
   }
 }
