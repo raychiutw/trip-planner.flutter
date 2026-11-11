@@ -12,6 +12,7 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_lock.dart';
+import '../../app/passkey_login.dart';
 import '../../theme/tokens.dart';
 
 /// 登入畫面（/login，shell 外）。
@@ -39,6 +40,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref.read(authStateProvider.notifier).unlock();
   }
 
+  /// passkey（Face ID／Touch ID）登入；取消與失敗留在本頁，失敗訊息走同一個錯誤橫幅。
+  Future<void> _passkeyLogin() async {
+    if (ref.read(authStateProvider).isLoading) return;
+    setState(() => _attempted = true);
+    await ref
+        .read(authStateProvider.notifier)
+        .signInWith(() => ref.read(passkeyLoginServiceProvider).login());
+  }
+
   String _errorMessage(Object error) =>
       error is OAuthLoginException ? error.userMessage : 'Tripline 登入失敗，請稍後再試';
 
@@ -56,6 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isBusy = authState.isLoading;
     final locked = ref.watch(authLockedProvider);
     final biometricKind = ref.watch(appLockKindProvider).value;
+    final showPasskey = ref.watch(passkeyLoginEntryProvider).value == true;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
@@ -177,7 +188,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: TpSpacing.s3),
                   ],
-                  (locked
+                  if (showPasskey) ...[
+                    FilledButton.icon(
+                      key: const ValueKey('login-passkey-button'),
+                      onPressed: isBusy ? null : _passkeyLogin,
+                      icon: Icon(
+                        biometricKind == BiometricKind.faceId
+                            ? CupertinoIcons.person_crop_square
+                            : CupertinoIcons.lock_shield,
+                      ),
+                      label: Text('使用 ${biometricKind.lockLabel} 登入'),
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                  ],
+                  (locked || showPasskey
                       ? OutlinedButton(
                           key: const ValueKey('login-browser-button'),
                           onPressed: isBusy ? null : _browserLogin,
