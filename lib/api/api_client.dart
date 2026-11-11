@@ -183,23 +183,30 @@ class ApiClient {
     CancelToken? cancelToken,
   }) => _send('HEAD', path, query: query, cancelToken: cancelToken);
 
+  /// [headers] 只給呼叫端帶額外的請求標頭（目前只有重新驗證證明，見 `step_up.dart`）；
+  /// 認證標頭仍由 ApiClient 統一產生，同名時以認證標頭為準。
   Future<dynamic> post(
     String path, {
     Object? body,
     Map<String, dynamic>? query,
-  }) => _send('POST', path, body: body, query: query);
+    Map<String, String>? headers,
+  }) => _send('POST', path, body: body, query: query, extraHeaders: headers);
 
   Future<dynamic> put(String path, {Object? body}) =>
       _send('PUT', path, body: body);
 
-  Future<dynamic> patch(String path, {Object? body}) =>
-      _send('PATCH', path, body: body);
+  Future<dynamic> patch(
+    String path, {
+    Object? body,
+    Map<String, String>? headers,
+  }) => _send('PATCH', path, body: body, extraHeaders: headers);
 
   Future<dynamic> delete(
     String path, {
     Object? body,
     Map<String, dynamic>? query,
-  }) => _send('DELETE', path, body: body, query: query);
+    Map<String, String>? headers,
+  }) => _send('DELETE', path, body: body, query: query, extraHeaders: headers);
 
   /// SWR 讀取:先 emit 本機快取(stale),再抓網路;fresh 到達後套用尚未 flush 的
   /// 樂觀 patch(維持「快取 = server 真相 + pending patch」不變式)再 emit。
@@ -347,6 +354,7 @@ class ApiClient {
     bool isRetryAttempt = false,
     CacheReadPolicy policy = CacheReadPolicy.cached,
     bool evictMutationCache = true,
+    Map<String, String>? extraHeaders,
   }) async {
     final auth = await _authHeadersFor(method, path);
 
@@ -356,7 +364,10 @@ class ApiClient {
         path,
         queryParameters: query,
         data: body,
-        options: Options(method: method, headers: auth.headers),
+        options: Options(
+          method: method,
+          headers: {...?extraHeaders, ...auth.headers},
+        ),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -384,6 +395,7 @@ class ApiClient {
         isRetryAttempt: true,
         policy: policy,
         evictMutationCache: evictMutationCache,
+        extraHeaders: extraHeaders,
       );
     }
     final decision = await _retryDecision(
@@ -403,6 +415,7 @@ class ApiClient {
         isRetryAttempt: true,
         policy: policy,
         evictMutationCache: evictMutationCache,
+        extraHeaders: extraHeaders,
       );
     }
     // 不會再重送的失敗保留 Retry-After（註冊等 429 要告訴使用者等多久）。

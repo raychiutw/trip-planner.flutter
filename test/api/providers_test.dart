@@ -18,6 +18,7 @@ import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/reports_repository.dart';
+import 'package:tripline/api/step_up.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
@@ -327,6 +328,56 @@ void main() {
       );
 
       expect(c.read(authStateProvider).value, isNull);
+    });
+
+    group('重新驗證證明（只放記憶體）的清除時機', () {
+      const proof = StepUpProof(proof: 'p', expiresIn: 300);
+
+      Future<void> signedIn() async {
+        await store.write(_tokens(idToken: _idToken()));
+        await container.read(authStateProvider.future);
+        container.read(stepUpProofStoreProvider).save(proof);
+        expect(container.read(stepUpProofStoreProvider).valid, 'p');
+      }
+
+      test('logout 清掉證明', () async {
+        await signedIn();
+        await container.read(authStateProvider.notifier).logout();
+        expect(container.read(stepUpProofStoreProvider).valid, isNull);
+      });
+
+      test('帳號刪除後清掉證明', () async {
+        await signedIn();
+        await container.read(authStateProvider.notifier).accountDeleted();
+        expect(container.read(stepUpProofStoreProvider).valid, isNull);
+      });
+
+      test('重新登入（可能換帳號）清掉證明', () async {
+        await signedIn();
+        await container.read(authStateProvider.notifier).signInWithBrowser();
+        expect(container.read(stepUpProofStoreProvider).valid, isNull);
+      });
+
+      test('refresh 被後端拒絕、憑證來源通知 signedOut 時清掉證明', () async {
+        await signedIn();
+        when(
+          () => oauthRepo.refresh(
+            refreshToken: any(named: 'refreshToken'),
+            clientId: any(named: 'clientId'),
+            proofKey: any(named: 'proofKey'),
+          ),
+        ).thenThrow(
+          const ApiError(status: 400, code: 'invalid_grant', message: 'x'),
+        );
+
+        expect(
+          await container.read(bearerTokenSourceProvider).refresh(),
+          false,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(container.read(stepUpProofStoreProvider).valid, isNull);
+      });
     });
 
     test('帳號刪除後清除離線快取與憑證，state 設為未登入', () async {

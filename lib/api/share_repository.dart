@@ -3,11 +3,15 @@ library;
 
 import '../models/trip_share.dart';
 import 'api_client.dart';
+import 'step_up.dart';
 
 class ShareRepository {
-  ShareRepository({required ApiClient client}) : _client = client;
+  ShareRepository({required ApiClient client, StepUpGate? stepUp})
+    : _client = client,
+      _stepUp = stepUp;
 
   final ApiClient _client;
+  final StepUpGate? _stepUp;
 
   /// GET /trips/:id/shares → {shares:[...]}。
   Future<List<TripShare>> fetchShares(String tripId) async {
@@ -88,12 +92,25 @@ class ShareRepository {
   }
 
   /// PATCH /trips/:id/shares/:shareId {action:'revoke'}。
-  Future<void> revokeShare(String tripId, int shareId) => _client.patch(
-    '/trips/${Uri.encodeComponent(tripId)}/shares/$shareId',
-    body: {'action': 'revoke'},
+  ///
+  /// 敏感操作：收到 `REAUTH_REQUIRED` 會先重新驗證再重試一次（見 `step_up.dart`）。
+  Future<void> revokeShare(String tripId, int shareId) => runStepUp(
+    _stepUp,
+    (headers) => _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/shares/$shareId',
+      body: {'action': 'revoke'},
+      headers: headers,
+    ),
   );
 
   /// DELETE /trips/:id/shares/:shareId。
-  Future<void> deleteShare(String tripId, int shareId) =>
-      _client.delete('/trips/${Uri.encodeComponent(tripId)}/shares/$shareId');
+  ///
+  /// 敏感操作：同 [revokeShare]。
+  Future<void> deleteShare(String tripId, int shareId) => runStepUp(
+    _stepUp,
+    (headers) => _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/shares/$shareId',
+      headers: headers,
+    ),
+  );
 }
