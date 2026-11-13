@@ -1,6 +1,8 @@
 /// API 層 riverpod providers 與全域認證狀態。
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/oauth_tokens.dart';
@@ -74,6 +76,19 @@ final shareRepositoryProvider = Provider<ShareRepository>(
   (ref) => ShareRepository(client: ref.watch(apiClientProvider)),
 );
 
+const _keptAccountKey = 'bio_login_kept_account';
+
+/// 登出後保留的生物辨識登入所標示的帳號（顯示名稱或信箱，非機密，存偏好設定）；
+/// 沒有保留則為 null。
+final keptBiometricAccountProvider = FutureProvider<String?>((ref) async {
+  try {
+    final v = await ref.watch(settingsStoreProvider).read(_keptAccountKey);
+    return (v == null || v.isEmpty) ? null : v;
+  } catch (_) {
+    return null;
+  }
+});
+
 /// 受保護的登入憑證還沒解鎖(使用者取消或沒通過生物辨識)。
 /// 登入畫面據此多提供「解鎖」入口。
 final authLockedProvider = NotifierProvider<AuthLockedNotifier, bool>(
@@ -105,7 +120,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return user;
   }
 
-  Future<UserInfo?> _resolveUser() async {
+  /// [explicit]：使用者主動登入／解鎖。冷啟動（false）遇到「登出後保留」的標記
+  /// 視為已登出，不得讀憑證，否則受保護讀取會跳出驗證並悄悄把登出撤銷。
+  Future<UserInfo?> _resolveUser({bool explicit = false}) async {
+    if (!explicit && await _hasKeptAccount()) {
+      await ref.read(bearerTokenSourceProvider).seal();
+      return null;
+    }
     final OAuthTokens? tokens;
     try {
       tokens = await ref.read(oauthTokenStoreProvider).read();
@@ -115,6 +136,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       return null;
     }
     ref.read(authLockedProvider.notifier).set(false);
+    ref.read(bearerTokenSourceProvider).unseal();
     if (tokens == null) {
       await ref.read(bearerTokenSourceProvider).discardProofKey();
       return null;
@@ -148,6 +170,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     if (user == null) return;
     final cache = ref.read(cacheStoreProvider);
     final ownerId = '${user.id}|${user.email}';
+    unawaited(_setKeptAccount(null)); // 已登入就不再有「保留的登入」
     final prev = (await cache.readResponse(_cacheOwnerKey))?.data;
     if (prev != null && prev != ownerId) {
       await cache.clear();
@@ -166,7 +189,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     }
     ref.read(authLockedProvider.notifier).set(false);
     state = await AsyncValue.guard(() async {
-      final user = await _resolveUser();
+      final user = await _resolveUser(explicit: true);
       await _enforceCacheOwner(user);
       return user;
     });
@@ -176,7 +199,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> unlock() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final user = await _resolveUser();
+      final user = await _resolveUser(explicit: true);
       await _enforceCacheOwner(user);
       return user;
     });
@@ -191,9 +214,18 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return user;
   }
 
-  /// 登出:盡力撤銷 refresh token,再清本機憑證與離線資料。
-  Future<void> logout() async {
+  /// 登出。開啟生物辨識登入者（憑證受生物辨識保護）預設走「保留模式」：憑證與
+  /// DPoP 金鑰一起留在手機上、**不呼叫伺服器端撤銷**（否則保留的憑證已失效），
+  /// 登入頁改用生物辨識登入。[clear] 為 true 則一律撤銷並清掉（關閉生物辨識登入）。
+  Future<void> logout({bool clear = false}) async {
     final store = ref.read(oauthTokenStoreProvider);
+    final user = state.value;
+    if (!clear &&
+        user != null &&
+        store.protection == TokenProtection.biometric) {
+      await _keepForBiometricLogin(user);
+      return;
+    }
     try {
       final refresh = (await store.read())?.refreshToken;
       if (refresh != null) {
@@ -211,10 +243,39 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     await _clearLocalAuth();
   }
 
+  Future<void> _keepForBiometricLogin(UserInfo user) async {
+    try {
+      await _setKeptAccount(
+        user.displayName?.isNotEmpty == true ? user.displayName : user.email,
+      );
+      await ref.read(bearerTokenSourceProvider).seal();
+      await ref.read(cacheStoreProvider).clear();
+    } finally {
+      state = const AsyncData(null);
+    }
+  }
+
+  Future<bool> _hasKeptAccount() async {
+    try {
+      final v = await ref.read(settingsStoreProvider).read(_keptAccountKey);
+      return v != null && v.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _setKeptAccount(String? label) async {
+    try {
+      await ref.read(settingsStoreProvider).write(_keptAccountKey, label ?? '');
+    } catch (_) {}
+    if (ref.mounted) ref.invalidate(keptBiometricAccountProvider);
+  }
+
   /// 帳號已由後端刪除，只清本機認證與離線資料，不再呼叫撤銷 API。
   Future<void> accountDeleted() => _clearLocalAuth();
 
   Future<void> _clearLocalAuth() async {
+    unawaited(_setKeptAccount(null));
     try {
       await ref.read(bearerTokenSourceProvider).clear();
       // 清離線快取,避免帳號間資料外洩。

@@ -29,7 +29,7 @@ class _FakeAuthNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => _user;
 
   @override
-  Future<void> logout() async {
+  Future<void> logout({bool clear = false}) async {
     logoutCalls.add(null);
     state = const AsyncData(null);
   }

@@ -22,6 +22,8 @@ class _WriteFailStore implements OAuthTokenStore {
   @override
   Future<void> write(OAuthTokens tokens) async => throw Exception('disk full');
   @override
+  Future<void> lock() async {}
+  @override
   Future<void> clear() async {
     cleared = true;
     _tokens = null;

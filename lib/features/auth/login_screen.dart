@@ -54,8 +54,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : TpSystemColorsLight.success;
     final authState = ref.watch(authStateProvider);
     final isBusy = authState.isLoading;
-    final locked = ref.watch(authLockedProvider);
     final biometricKind = ref.watch(appLockKindProvider).value;
+    // 登出後保留的生物辨識登入：標示帳號；只有裝置密碼的手機不提供入口。
+    final keptAccount = ref.watch(keptBiometricAccountProvider).value;
+    final showKept =
+        keptAccount != null &&
+        biometricKind != null &&
+        biometricKind != BiometricKind.passcode;
+    final locked = ref.watch(authLockedProvider) && !showKept;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
@@ -164,6 +170,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: TpSpacing.s4),
                   ],
+                  if (showKept) ...[
+                    FilledButton.icon(
+                      key: const ValueKey('login-biometric-button'),
+                      onPressed: isBusy ? null : _unlock,
+                      icon: Icon(
+                        biometricKind == BiometricKind.faceId
+                            ? CupertinoIcons.person_crop_square
+                            : CupertinoIcons.lock_shield,
+                      ),
+                      label: Text('用 ${biometricKind.lockLabel} 登入'),
+                    ),
+                    const SizedBox(height: TpSpacing.s2),
+                    Text(
+                      keptAccount,
+                      key: const ValueKey('login-biometric-account'),
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                  ],
                   if (locked) ...[
                     FilledButton.icon(
                       key: const ValueKey('login-unlock-button'),
@@ -177,7 +205,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: TpSpacing.s3),
                   ],
-                  (locked
+                  ((locked || showKept)
                       ? OutlinedButton(
                           key: const ValueKey('login-browser-button'),
                           onPressed: isBusy ? null : _browserLogin,
