@@ -39,8 +39,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref.read(authStateProvider.notifier).unlock();
   }
 
-  String _errorMessage(Object error) =>
-      error is OAuthLoginException ? error.userMessage : 'Tripline 登入失敗，請稍後再試';
+  String _errorMessage(Object error) => switch (error) {
+    OAuthLoginException() => error.userMessage,
+    KeptCredentialInvalid() => error.userMessage,
+    _ => 'Tripline 登入失敗，請稍後再試',
+  };
 
   @override
   Widget build(BuildContext context) => _buildContent(context);
@@ -146,7 +149,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // 從首頁直接登入失敗時沒有按過本頁的按鈕，登入失敗的錯誤仍要顯示。
                   if (authState.hasError &&
                       (_attempted ||
-                          authState.error is OAuthLoginException)) ...[
+                          authState.error is OAuthLoginException ||
+                          authState.error is KeptCredentialInvalid)) ...[
                     Semantics(
                       key: const ValueKey('login-error-banner'),
                       container: true,
