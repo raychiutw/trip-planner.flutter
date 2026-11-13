@@ -15,6 +15,9 @@ import '../dpop/proof_key_store.dart';
 import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 
+/// 憑證被清掉的原因：伺服器拒絕 refresh，或 DPoP 金鑰已不存在（生物特徵變更）。
+enum InvalidReason { rejected, keyLost }
+
 class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   StoredBearerTokenSource({
     required OAuthTokenStore store,
@@ -96,8 +99,19 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
     }
   }
 
+  InvalidReason? _lastInvalid;
+
+  /// 立刻取一次 access token（必要時 refresh），回傳憑證是否因此被判失效並清掉；
+  /// 暫時性錯誤（網路）不算失效。解鎖保留的憑證後用它確認入口還有效。
+  Future<InvalidReason?> verify() async {
+    _lastInvalid = null;
+    await accessToken();
+    return _lastInvalid;
+  }
+
   /// refresh 被拒或金鑰遺失：憑證與金鑰一併清掉，並通知回到未登入。
-  Future<void> _invalidate() async {
+  Future<void> _invalidate(InvalidReason reason) async {
+    _lastInvalid = reason;
     await clear();
     _signedOut.add(null);
   }
@@ -150,7 +164,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
         return null; // 鎖屏等暫時讀不到：保留憑證，稍後再試，不能當成金鑰遺失
       }
       if (key == null) {
-        await _invalidate();
+        await _invalidate(InvalidReason.keyLost);
         return null;
       }
     }
@@ -166,7 +180,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       // 400/401 = refresh token 真的失效(撤銷/過期)→ 視為登出。
       // 回應回來前使用者可能已登出又重新登入：憑證已換人就別清掉新的。
       if ((e.status == 400 || e.status == 401) && await _stillHolds(rt)) {
-        await _invalidate();
+        await _invalidate(InvalidReason.rejected);
       }
       return null;
     } on Exception {

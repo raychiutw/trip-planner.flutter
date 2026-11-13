@@ -112,6 +112,21 @@ void main() {
         tokenTypeHint: any(named: 'tokenTypeHint'),
       ),
     ).thenAnswer((_) async {});
+    // 解鎖後會立刻 refresh 確認憑證還有效。
+    when(
+      () => oauthRepo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+        proofKey: any(named: 'proofKey'),
+      ),
+    ).thenAnswer(
+      (_) async => OAuthTokens(
+        accessToken: 'AT2',
+        refreshToken: 'RT2',
+        tokenType: 'DPoP',
+        expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+      ),
+    );
     authRepo = _MockAuthRepo();
     when(() => authRepo.currentUser()).thenAnswer((_) async => _user);
     bio = FakeBiometricAuthenticator(kind: kind);

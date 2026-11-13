@@ -39,8 +39,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref.read(authStateProvider.notifier).unlock();
   }
 
-  String _errorMessage(Object error) =>
-      error is OAuthLoginException ? error.userMessage : 'Tripline 登入失敗，請稍後再試';
+  String _errorMessage(Object error) => switch (error) {
+    OAuthLoginException() => error.userMessage,
+    KeptCredentialInvalid() => error.userMessage,
+    _ => 'Tripline 登入失敗，請稍後再試',
+  };
 
   @override
   Widget build(BuildContext context) => _buildContent(context);

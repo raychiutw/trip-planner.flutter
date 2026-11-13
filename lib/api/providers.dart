@@ -19,6 +19,7 @@ import 'oauth/oauth_config.dart';
 import 'oauth/oauth_login_service.dart';
 import 'oauth/oauth_token_store.dart';
 import 'oauth/oauth_providers.dart';
+import 'oauth/stored_bearer_token_source.dart' show InvalidReason;
 import 'requests_repository.dart';
 import 'reports_repository.dart';
 import 'settings_store.dart';
@@ -102,6 +103,16 @@ class AuthLockedNotifier extends Notifier<bool> {
   void set(bool locked) => state = locked;
 }
 
+/// 保留的生物辨識登入憑證已失效，已清掉；登入頁顯示 [userMessage]。
+class KeptCredentialInvalid implements Exception {
+  const KeptCredentialInvalid(this.reason);
+  final InvalidReason reason;
+
+  String get userMessage => reason == InvalidReason.rejected
+      ? '登入已失效，請用瀏覽器重新登入'
+      : '生物辨識資料已變更，登入憑證已失效，請用瀏覽器重新登入';
+}
+
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
   // 上次快取擁有者標記(存 cacheStore;隨 clear 一起清、登入後重建)。
@@ -170,7 +181,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     if (user == null) return;
     final cache = ref.read(cacheStoreProvider);
     final ownerId = '${user.id}|${user.email}';
-    unawaited(_setKeptAccount(null)); // 已登入就不再有「保留的登入」
+    await _setKeptAccount(null); // 已登入就不再有「保留的登入」
     final prev = (await cache.readResponse(_cacheOwnerKey))?.data;
     if (prev != null && prev != ownerId) {
       await cache.clear();
@@ -195,11 +206,24 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     });
   }
 
-  /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)。
+  /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)。保留的憑證若已失效
+  /// （伺服器撤銷、生物特徵變更）會清掉並以 [KeptCredentialInvalid] 引導重新登入。
   Future<void> unlock() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      final kept = await _hasKeptAccount();
       final user = await _resolveUser(explicit: true);
+      if (kept) {
+        final src = ref.read(bearerTokenSourceProvider);
+        // 讀不到憑證又不是還沒解鎖：儲存層已因生物特徵變更把它清掉。
+        final reason = user == null
+            ? (ref.read(authLockedProvider) ? null : InvalidReason.keyLost)
+            : await src.verify();
+        if (reason != null) {
+          await _setKeptAccount(null);
+          throw KeptCredentialInvalid(reason);
+        }
+      }
       await _enforceCacheOwner(user);
       return user;
     });
