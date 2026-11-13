@@ -164,6 +164,25 @@ void main() {
     expect(await keys.load(), isNotNull);
   });
 
+  // 伺服器暫時故障（5xx）不是「憑證失效」：不能清憑證、金鑰，也不能顯示失效訊息，
+  // 否則伺服器一抖動，使用者就被迫重新用瀏覽器登入。
+  for (final status in [500, 502, 503]) {
+    testWidgets('refresh 回 $status（伺服器暫時故障）：不判失效，憑證與金鑰保留、照常登入', (
+      tester,
+    ) async {
+      final c = await pumpKept(tester);
+      tokenEndpointRejects(status);
+
+      await tester.tap(find.byKey(_entry));
+      await tester.pumpAndSettle();
+
+      expect(find.text('登入已失效，請用瀏覽器重新登入'), findsNothing);
+      expect(c.read(authStateProvider).value?.email, 'a@example.com');
+      expect(await store.read(), isNotNull, reason: '憑證不得被清掉');
+      expect(await keys.load(), isNotNull, reason: '金鑰不得被清掉');
+    });
+  }
+
   testWidgets('金鑰因生物特徵變更而遺失：清掉並說明原因', (tester) async {
     final c = await pumpKept(tester);
     await keys.delete(); // 硬體金鑰失效 → load() 回 null
