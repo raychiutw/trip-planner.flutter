@@ -220,7 +220,6 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
             ? (ref.read(authLockedProvider) ? null : InvalidReason.keyLost)
             : await src.verify();
         if (reason != null) {
-          await src.clear();
           await _setKeptAccount(null);
           throw KeptCredentialInvalid(reason);
         }
