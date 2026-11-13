@@ -6,7 +6,7 @@ status: accepted
 
 取代 [ADR-0016](0016-passkey-webauthn-shared-by-api.md)。ADR-0016 要由 api 新增 passkey 憑證儲存，讓 web 與 App 共用；owner 決定不在後端存 passkey，生物辨識只做在 App 端。需求見 trip-planner spec #1683。
 
-ADR-0016 的決定從未合併進 main、沒有部署，`passkey_credentials` 的 migration 也從未在任何環境套用，所以沒有 production 需要還原。
+ADR-0016 的實作從未合併進 main、沒有部署，`passkey_credentials` 的 migration 也從未在任何環境套用，所以沒有 production 需要還原。
 
 ## Decision
 
