@@ -26,6 +26,7 @@ import 'connected_apps_screen.dart';
 import 'developer_apps_screen.dart';
 import 'settings/app_lock_row.dart';
 import 'settings/biometric_login_row.dart';
+import 'settings/forget_this_phone_row.dart';
 import 'settings/appearance_screen.dart';
 import 'settings/change_password_screen.dart';
 import 'settings/notifications_screen.dart';
@@ -237,6 +238,7 @@ class _SettingsGroup extends ConsumerWidget {
           children: [
             const AppLockRow(),
             const BiometricLoginRow(),
+            const ForgetThisPhoneRow(),
             // 能力探測列（不是內容資料）：loading／error 刻意不畫，見 [accountHasPasswordProvider]。
             if (ref.watch(accountHasPasswordProvider) case AsyncData(
               value: true,

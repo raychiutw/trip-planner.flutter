@@ -243,6 +243,29 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     await _clearLocalAuth();
   }
 
+  /// 忘記這支手機：先嘗試伺服器端撤銷，不論成敗都清掉本機憑證、DPoP 金鑰與保留標記。
+  /// 回傳 false 代表撤銷沒成功（離線或錯誤），呼叫端要提示使用者到網頁版確認。
+  Future<bool> forgetThisPhone() async {
+    var revoked = true;
+    try {
+      final refresh =
+          (await ref.read(oauthTokenStoreProvider).read())?.refreshToken;
+      if (refresh != null) {
+        await ref
+            .read(oauthRepositoryProvider)
+            .revokeToken(
+              token: refresh,
+              clientId: OAuthConfig.clientId,
+              tokenTypeHint: 'refresh_token',
+            );
+      }
+    } catch (_) {
+      revoked = false;
+    }
+    await _clearLocalAuth();
+    return revoked;
+  }
+
   Future<void> _keepForBiometricLogin(UserInfo user) async {
     try {
       await _setKeptAccount(
