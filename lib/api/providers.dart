@@ -77,18 +77,17 @@ final shareRepositoryProvider = Provider<ShareRepository>(
   (ref) => ShareRepository(client: ref.watch(apiClientProvider)),
 );
 
-const _keptAccountKey = 'bio_login_kept_account';
-
-/// 登出後保留的生物辨識登入所標示的帳號（顯示名稱或信箱，非機密，存偏好設定）；
-/// 沒有保留則為 null。
-final keptBiometricAccountProvider = FutureProvider<String?>((ref) async {
+/// 讀「登出後保留」的帳號標示；標記與憑證同存於 [OAuthTokenStore]，讀不到視為沒有。
+Future<String?> _readKeptAccount(Ref ref) async {
   try {
-    final v = await ref.watch(settingsStoreProvider).read(_keptAccountKey);
-    return (v == null || v.isEmpty) ? null : v;
+    return await ref.read(oauthTokenStoreProvider).readKeptAccount();
   } catch (_) {
     return null;
   }
-});
+}
+
+/// 登出後保留的生物辨識登入所標示的帳號；沒有保留則為 null。
+final keptBiometricAccountProvider = FutureProvider<String?>(_readKeptAccount);
 
 /// 受保護的登入憑證還沒解鎖(使用者取消或沒通過生物辨識)。
 /// 登入畫面據此多提供「解鎖」入口。
@@ -134,7 +133,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   /// [explicit]：使用者主動登入／解鎖。冷啟動（false）遇到「登出後保留」的標記
   /// 視為已登出，不得讀憑證，否則受保護讀取會跳出驗證並悄悄把登出撤銷。
   Future<UserInfo?> _resolveUser({bool explicit = false}) async {
-    if (!explicit && await _hasKeptAccount()) {
+    if (!explicit && await _readKeptAccount(ref) != null) {
       await ref.read(bearerTokenSourceProvider).seal();
       return null;
     }
@@ -211,14 +210,23 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> unlock() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final kept = await _hasKeptAccount();
+      // 以使用者在登入頁看到的標記為準：儲存層因生物特徵變更清憑證時標記也跟著沒了。
+      final kept = await ref.read(keptBiometricAccountProvider.future) != null;
       final user = await _resolveUser(explicit: true);
       if (kept) {
         final src = ref.read(bearerTokenSourceProvider);
-        // 讀不到憑證又不是還沒解鎖：儲存層已因生物特徵變更把它清掉。
-        final reason = user == null
-            ? (ref.read(authLockedProvider) ? null : InvalidReason.keyLost)
-            : await src.verify();
+        final locked = ref.read(authLockedProvider);
+        // 讀不到使用者：憑證已被儲存層清掉才是金鑰遺失；憑證還在只是身分查不到
+        // （401／網路）則比照暫時性錯誤，不清憑證、重新封存。
+        final InvalidReason? reason;
+        if (user != null) {
+          reason = await src.verify();
+        } else if (locked || await _credentialsPresent()) {
+          reason = null;
+          await src.seal();
+        } else {
+          reason = InvalidReason.keyLost;
+        }
         if (reason != null) {
           await _setKeptAccount(null);
           throw KeptCredentialInvalid(reason);
@@ -227,6 +235,14 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await _enforceCacheOwner(user);
       return user;
     });
+  }
+
+  Future<bool> _credentialsPresent() async {
+    try {
+      return await ref.read(oauthTokenStoreProvider).read() != null;
+    } on TokenStoreLockedException {
+      return true;
+    }
   }
 
   /// PATCH /account/profile；畫面離開後仍由認證 owner 刷新帳號資料。
@@ -250,44 +266,33 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await _keepForBiometricLogin(user);
       return;
     }
-    try {
-      final refresh = (await store.read())?.refreshToken;
-      if (refresh != null) {
-        await ref
-            .read(oauthRepositoryProvider)
-            .revokeToken(
-              token: refresh,
-              clientId: OAuthConfig.clientId,
-              tokenTypeHint: 'refresh_token',
-            );
-      }
-    } catch (_) {
-      // 撤銷失敗不能擋住本機登出。
-    }
+    await _tryRevoke(); // 撤銷失敗不能擋住本機登出。
     await _clearLocalAuth();
   }
 
   /// 忘記這支手機：先嘗試伺服器端撤銷，不論成敗都清掉本機憑證、DPoP 金鑰與保留標記。
   /// 回傳 false 代表撤銷沒成功（離線或錯誤），呼叫端要提示使用者到網頁版確認。
   Future<bool> forgetThisPhone() async {
-    var revoked = true;
-    try {
-      final refresh =
-          (await ref.read(oauthTokenStoreProvider).read())?.refreshToken;
-      if (refresh != null) {
-        await ref
-            .read(oauthRepositoryProvider)
-            .revokeToken(
-              token: refresh,
-              clientId: OAuthConfig.clientId,
-              tokenTypeHint: 'refresh_token',
-            );
-      }
-    } catch (_) {
-      revoked = false;
-    }
+    final revoked = await _tryRevoke();
     await _clearLocalAuth();
     return revoked;
+  }
+
+  Future<bool> _tryRevoke() =>
+      _revokeRefreshToken().then((_) => true, onError: (_) => false);
+
+  /// 伺服器端撤銷目前的 refresh token（沒有憑證就什麼都不做）；失敗丟例外。
+  Future<void> _revokeRefreshToken() async {
+    final refresh =
+        (await ref.read(oauthTokenStoreProvider).read())?.refreshToken;
+    if (refresh == null) return;
+    await ref
+        .read(oauthRepositoryProvider)
+        .revokeToken(
+          token: refresh,
+          clientId: OAuthConfig.clientId,
+          tokenTypeHint: 'refresh_token',
+        );
   }
 
   Future<void> _keepForBiometricLogin(UserInfo user) async {
@@ -302,18 +307,9 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     }
   }
 
-  Future<bool> _hasKeptAccount() async {
-    try {
-      final v = await ref.read(settingsStoreProvider).read(_keptAccountKey);
-      return v != null && v.isNotEmpty;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<void> _setKeptAccount(String? label) async {
     try {
-      await ref.read(settingsStoreProvider).write(_keptAccountKey, label ?? '');
+      await ref.read(oauthTokenStoreProvider).writeKeptAccount(label);
     } catch (_) {}
     if (ref.mounted) ref.invalidate(keptBiometricAccountProvider);
   }
@@ -322,7 +318,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> accountDeleted() => _clearLocalAuth();
 
   Future<void> _clearLocalAuth() async {
-    unawaited(_setKeptAccount(null));
+    await _setKeptAccount(null);
     try {
       await ref.read(bearerTokenSourceProvider).clear();
       // 清離線快取,避免帳號間資料外洩。

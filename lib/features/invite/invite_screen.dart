@@ -111,10 +111,11 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       alwaysAsk: false,
       title: '切換帳號',
       confirmLabel: '切換帳號',
-      message: '切換帳號會先登出目前帳號，再前往登入。',
+      // 換人：撤銷並清除這支手機的登入，不保留給下一個人。
+      message: '切換帳號會先登出並清除這支手機上目前帳號的登入（含 Face ID 登入），再前往登入。',
     );
     if (!ok || !mounted) return;
-    await ref.read(authStateProvider.notifier).logout();
+    await ref.read(authStateProvider.notifier).logout(clear: true);
     if (!mounted) return;
     context.go(_loginLocation);
   }

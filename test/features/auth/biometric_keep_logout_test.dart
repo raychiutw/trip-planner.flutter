@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoDialogAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -226,7 +227,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(c1.read(authStateProvider).value?.email, 'ray@example.com');
-      expect(await settings.read('bio_login_kept_account'), anyOf(isNull, ''));
+      expect(await store.readKeptAccount(), isNull);
 
       final c2 = await coldStart(tester);
       expect(c2.read(authStateProvider).value?.email, 'ray@example.com');
@@ -243,7 +244,7 @@ void main() {
 
       expect(c1.read(authStateProvider).value, isNull);
       expect(find.byKey(_entry), findsOneWidget);
-      expect(await settings.read('bio_login_kept_account'), 'ray@example.com');
+      expect(await store.readKeptAccount(), 'ray@example.com');
       store.unlockSucceeds = true;
       expect(await store.read(), isNotNull);
       expect(await keys.load(), isNotNull);
@@ -298,9 +299,11 @@ void main() {
   });
 
   group('登出確認的說明文字', () {
+    bool? result;
     Future<void> openConfirm(
       WidgetTester tester, {
       required bool biometric,
+      bool alwaysAsk = true,
     }) async {
       await pumpSignedIn(
         tester,
@@ -308,7 +311,11 @@ void main() {
         home: Scaffold(
           body: Consumer(
             builder: (context, ref, _) => TextButton(
-              onPressed: () => confirmLogout(context, ref),
+              onPressed: () async => result = await confirmLogout(
+                context,
+                ref,
+                alwaysAsk: alwaysAsk,
+              ),
               child: const Text('open'),
             ),
           ),
@@ -327,11 +334,153 @@ void main() {
       );
     });
 
+    // 說明是誠實告知「會保留」，不能因為 alwaysAsk:false 又沒有待同步變更就略過對話框。
+    testWidgets('開啟者且 alwaysAsk:false、沒有待同步變更：仍顯示說明', (tester) async {
+      await openConfirm(tester, biometric: true, alwaysAsk: false);
+
+      expect(result, isNull, reason: '對話框還開著，尚未回傳');
+      expect(
+        find.textContaining('這支手機仍可用 Face ID 登入，要完全清除請選忘記這支手機'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('未開啟者且 alwaysAsk:false、沒有待同步變更：不打擾，直接放行', (tester) async {
+      await openConfirm(tester, biometric: false, alwaysAsk: false);
+
+      expect(result, isTrue);
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.textContaining('確定要登出嗎'), findsNothing);
+    });
+
     testWidgets('未開啟者：文字不變', (tester) async {
       await openConfirm(tester, biometric: false);
 
       expect(find.text('確定要登出嗎？'), findsOneWidget);
       expect(find.textContaining('忘記這支手機'), findsNothing);
+    });
+  });
+  group('保留模式的守門', () {
+    testWidgets('登出後呼叫 API 取 token 不會觸發受保護讀取或生物辨識；解鎖後恢復', (tester) async {
+      final c = await pumpSignedIn(tester, biometric: true);
+      final source = c.read(bearerTokenSourceProvider);
+      expect(await source.accessToken(), isNotNull, reason: '登入中正常取用');
+      await logout(tester, c);
+      final reads = store.reads;
+
+      expect(await source.accessToken(), isNull);
+      expect(await source.refresh(), isFalse);
+
+      expect(store.reads, reads, reason: '封存期間不得碰 store');
+
+      await tester.tap(find.byKey(_entry));
+      await tester.pumpAndSettle();
+      expect(await source.accessToken(), isNotNull, reason: '解鎖後恢復');
+    });
+
+    testWidgets('logout(clear: true)（切換帳號）：撤銷並清除憑證、金鑰與標記，不留給下一個人', (
+      tester,
+    ) async {
+      final c = await pumpSignedIn(tester, biometric: true);
+
+      await c.read(authStateProvider.notifier).logout(clear: true);
+      await tester.pumpAndSettle();
+
+      expect(await store.read(), isNull);
+      expect(await keys.load(), isNull);
+      expect(await store.readKeptAccount(), isNull);
+      verify(
+        () => oauthRepo.revokeToken(
+          token: 'RT',
+          clientId: OAuthConfig.clientId,
+          tokenTypeHint: 'refresh_token',
+        ),
+      ).called(1);
+      expect(find.byKey(_entry), findsNothing);
+    });
+  });
+
+  group('保留標記與憑證同生同滅', () {
+    testWidgets('偏好設定被清掉、憑證與標記仍在：冷啟動不會自動登入回去', (tester) async {
+      final c0 = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c0);
+      settings = InMemorySettingsStore(); // 模擬 iOS 重裝：偏好設定沒了、Keychain 還在
+
+      final c = await coldStart(tester);
+
+      expect(c.read(authStateProvider).value, isNull);
+      expect(store.reads, 0, reason: '不得讀憑證');
+      expect(find.byKey(_entry), findsOneWidget);
+    });
+
+    testWidgets('憑證被清掉：標記一起消失，登入頁沒有入口', (tester) async {
+      final c0 = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c0);
+      expect(find.byKey(_entry), findsOneWidget);
+
+      await store.clear();
+      final c = await coldStart(tester);
+
+      expect(c.read(authStateProvider).value, isNull);
+      expect(await store.readKeptAccount(), isNull);
+      expect(find.byKey(_entry), findsNothing);
+    });
+  });
+
+  group('登入頁的「忘記這支手機」', () {
+    const forget = ValueKey('login-forget-phone');
+
+    testWidgets('取消：憑證、金鑰、入口都在', (tester) async {
+      final c = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c);
+      expect(find.byKey(forget), findsOneWidget);
+
+      await tester.tap(find.byKey(forget));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+
+      expect(await store.read(), isNotNull);
+      expect(await keys.load(), isNotNull);
+      expect(find.byKey(_entry), findsOneWidget);
+      verifyNever(
+        () => oauthRepo.revokeToken(
+          token: any(named: 'token'),
+          clientId: any(named: 'clientId'),
+          tokenTypeHint: any(named: 'tokenTypeHint'),
+        ),
+      );
+    });
+
+    testWidgets('確認：撤銷、清憑證／金鑰／標記，入口與帳號標示消失', (tester) async {
+      final c = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c);
+
+      await tester.tap(find.byKey(forget));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CupertinoDialogAction, '忘記這支手機'));
+      await tester.pumpAndSettle();
+
+      expect(await store.read(), isNull);
+      expect(await keys.load(), isNull);
+      expect(await store.readKeptAccount(), isNull);
+      verify(
+        () => oauthRepo.revokeToken(
+          token: 'RT',
+          clientId: OAuthConfig.clientId,
+          tokenTypeHint: 'refresh_token',
+        ),
+      ).called(1);
+      expect(find.byKey(_entry), findsNothing);
+      expect(find.byKey(_account), findsNothing);
+      expect(find.byKey(forget), findsNothing);
+    });
+
+    testWidgets('沒有保留的登入：不顯示', (tester) async {
+      final c = await pumpSignedIn(tester, biometric: false);
+      await logout(tester, c);
+
+      expect(find.byKey(forget), findsNothing);
     });
   });
 }

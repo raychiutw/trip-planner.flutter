@@ -12,6 +12,7 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_lock.dart';
+import '../../app/forget_this_phone.dart';
 import '../../theme/tokens.dart';
 
 /// 登入畫面（/login，shell 外）。
@@ -192,6 +193,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       style: textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                    TextButton(
+                      key: const ValueKey('login-forget-phone'),
+                      onPressed: isBusy
+                          ? null
+                          : () => confirmAndForgetThisPhone(context, ref),
+                      child: const Text('忘記這支手機'),
                     ),
                     const SizedBox(height: TpSpacing.s3),
                   ],

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoDialogAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,10 +108,7 @@ void main() {
     return c;
   }
 
-  Finder inDialog(String t) => find.descendant(
-    of: find.byKey(const ValueKey('forget-phone-dialog')),
-    matching: find.textContaining(t),
-  );
+  Finder inDialog(String t) => find.textContaining(t);
 
   testWidgets('沒開生物辨識登入：不顯示這一列', (tester) async {
     await pump(tester, biometric: false);
@@ -121,7 +119,7 @@ void main() {
     final c = await pump(tester, biometric: true);
     await tester.tap(find.byKey(_row));
     await tester.pumpAndSettle();
-    expect(inDialog('賣掉或借出'), findsOneWidget);
+    expect(inDialog('賣掉或借出手機前使用：會清除'), findsOneWidget);
     expect(inDialog('其他裝置'), findsOneWidget);
     expect(inDialog('瀏覽器重新登入'), findsOneWidget);
 
@@ -136,17 +134,17 @@ void main() {
 
   testWidgets('確認：清憑證與金鑰與標記、呼叫撤銷、回登入頁且沒有 Face ID 入口', (tester) async {
     final c = await pump(tester, biometric: true);
-    await settings.write('bio_login_kept_account', 'ray@example.com');
+    await store.writeKeptAccount('ray@example.com');
     await tester.tap(find.byKey(_row));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('forget-phone-confirm')));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '忘記這支手機'));
     await tester.pumpAndSettle();
 
     expect(c.read(authStateProvider).value, isNull);
     expect(await store.read(), isNull);
     expect(await keys.load(), isNull);
-    expect(await settings.read('bio_login_kept_account'), anyOf(isNull, ''));
+    expect(await store.readKeptAccount(), isNull);
     verify(
       () => oauthRepo.revokeToken(
         token: 'RT',
@@ -164,7 +162,7 @@ void main() {
     await tester.tap(find.byKey(_row));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('forget-phone-confirm')));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '忘記這支手機'));
     await tester.pumpAndSettle();
 
     expect(c.read(authStateProvider).value, isNull);
