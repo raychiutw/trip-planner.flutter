@@ -24,7 +24,7 @@ class _FakeAuth extends AuthNotifier {
   void signIn() => state = const AsyncData(_user);
 
   @override
-  Future<void> logout() async {
+  Future<void> logout({bool clear = false}) async {
     logouts++;
     await ref.read(oauthTokenStoreProvider).clear();
     state = const AsyncData(null);
