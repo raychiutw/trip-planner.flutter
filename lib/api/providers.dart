@@ -120,7 +120,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return user;
   }
 
-  Future<UserInfo?> _resolveUser() async {
+  /// [explicit]：使用者主動登入／解鎖。冷啟動（false）遇到「登出後保留」的標記
+  /// 視為已登出，不得讀憑證，否則受保護讀取會跳出驗證並悄悄把登出撤銷。
+  Future<UserInfo?> _resolveUser({bool explicit = false}) async {
+    if (!explicit && await _hasKeptAccount()) {
+      await ref.read(bearerTokenSourceProvider).seal();
+      return null;
+    }
     final OAuthTokens? tokens;
     try {
       tokens = await ref.read(oauthTokenStoreProvider).read();
@@ -183,7 +189,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     }
     ref.read(authLockedProvider.notifier).set(false);
     state = await AsyncValue.guard(() async {
-      final user = await _resolveUser();
+      final user = await _resolveUser(explicit: true);
       await _enforceCacheOwner(user);
       return user;
     });
@@ -193,7 +199,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> unlock() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final user = await _resolveUser();
+      final user = await _resolveUser(explicit: true);
       await _enforceCacheOwner(user);
       return user;
     });
@@ -246,6 +252,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await ref.read(cacheStoreProvider).clear();
     } finally {
       state = const AsyncData(null);
+    }
+  }
+
+  Future<bool> _hasKeptAccount() async {
+    try {
+      final v = await ref.read(settingsStoreProvider).read(_keptAccountKey);
+      return v != null && v.isNotEmpty;
+    } catch (_) {
+      return false;
     }
   }
 

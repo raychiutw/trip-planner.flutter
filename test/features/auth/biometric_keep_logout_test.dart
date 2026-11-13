@@ -10,6 +10,7 @@ import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/logout_confirm.dart';
 import 'package:tripline/features/account/settings/biometric_login_row.dart';
@@ -19,6 +20,17 @@ import 'package:tripline/models/user.dart';
 
 import '../../helpers/fake_biometric.dart';
 import '../../helpers/fake_oauth.dart';
+
+/// 計算受保護讀取次數：冷啟動不該碰它。
+class _CountingStore extends InMemoryOAuthTokenStore {
+  int reads = 0;
+
+  @override
+  Future<OAuthTokens?> read() {
+    reads++;
+    return super.read();
+  }
+}
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
@@ -30,11 +42,47 @@ const _account = ValueKey('login-biometric-account');
 const _browser = ValueKey('login-browser-button');
 
 void main() {
-  late InMemoryOAuthTokenStore store;
+  late _CountingStore store;
+  late InMemorySettingsStore settings;
   late InMemoryProofKeyStore keys;
   late _MockOAuthRepo oauthRepo;
   late _MockAuthRepo authRepo;
   late FakeBiometricAuthenticator bio;
+
+  Widget app(Widget? home) => ProviderScope(
+    key: UniqueKey(),
+    overrides: [
+      oauthTokenStoreProvider.overrideWithValue(store),
+      proofKeyStoreProvider.overrideWithValue(keys),
+      oauthRepositoryProvider.overrideWithValue(oauthRepo),
+      authRepositoryProvider.overrideWithValue(authRepo),
+      biometricAuthenticatorProvider.overrideWithValue(bio),
+      settingsStoreProvider.overrideWithValue(settings),
+      ...fakeBrowserLoginOverrides(),
+    ],
+    child: MaterialApp.router(
+      routerConfig: GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (_, _) => home ?? const LoginScreen()),
+        ],
+      ),
+    ),
+  );
+
+  ProviderContainer containerOf(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+
+  /// 模擬重開 App：憑證、金鑰、偏好設定都留著，ProviderContainer 全新。
+  Future<ProviderContainer> coldStart(WidgetTester tester) async {
+    store.reads = 0;
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(app(null));
+    await tester.pumpAndSettle();
+    final c = containerOf(tester);
+    await c.read(authStateProvider.future);
+    await tester.pumpAndSettle();
+    return c;
+  }
 
   /// [biometric]：登入憑證是否受生物辨識保護（＝已開啟生物辨識登入）。
   Future<ProviderContainer> pumpSignedIn(
@@ -43,7 +91,8 @@ void main() {
     Widget? home,
     BiometricKind kind = BiometricKind.faceId,
   }) async {
-    store = InMemoryOAuthTokenStore();
+    store = _CountingStore();
+    settings = InMemorySettingsStore();
     await store.write(
       OAuthTokens(
         accessToken: 'AT',
@@ -66,32 +115,9 @@ void main() {
     authRepo = _MockAuthRepo();
     when(() => authRepo.currentUser()).thenAnswer((_) async => _user);
     bio = FakeBiometricAuthenticator(kind: kind);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          oauthTokenStoreProvider.overrideWithValue(store),
-          proofKeyStoreProvider.overrideWithValue(keys),
-          oauthRepositoryProvider.overrideWithValue(oauthRepo),
-          authRepositoryProvider.overrideWithValue(authRepo),
-          biometricAuthenticatorProvider.overrideWithValue(bio),
-          ...fakeBrowserLoginOverrides(),
-        ],
-        child: MaterialApp.router(
-          routerConfig: GoRouter(
-            routes: [
-              GoRoute(
-                path: '/',
-                builder: (_, _) => home ?? const LoginScreen(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    await tester.pumpWidget(app(home));
     await tester.pumpAndSettle();
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(MaterialApp)),
-    );
+    final container = containerOf(tester);
     expect((await container.read(authStateProvider.future)), isNotNull);
     return container;
   }
@@ -159,6 +185,61 @@ void main() {
 
       expect(find.byKey(_entry), findsNothing);
       expect(find.byKey(const ValueKey('login-unlock-button')), findsNothing);
+    });
+  });
+
+  group('登出後重開 App（冷啟動）', () {
+    testWidgets('視為已登出：不讀憑證、不跳驗證，登入頁仍有入口與帳號', (tester) async {
+      final c0 = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c0);
+
+      final c = await coldStart(tester);
+
+      expect(c.read(authStateProvider).value, isNull);
+      expect(store.reads, 0, reason: '冷啟動不得觸發受保護讀取');
+      expect(find.byKey(_entry), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(_account)).data, 'ray@example.com');
+      expect(await keys.load(), isNotNull);
+    });
+
+    testWidgets('按入口且通過：登入並清掉保留標記，再重開就照常自動登入', (tester) async {
+      final c0 = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c0);
+      final c1 = await coldStart(tester);
+
+      await tester.tap(find.byKey(_entry));
+      await tester.pumpAndSettle();
+
+      expect(c1.read(authStateProvider).value?.email, 'ray@example.com');
+      expect(await settings.read('bio_login_kept_account'), anyOf(isNull, ''));
+
+      final c2 = await coldStart(tester);
+      expect(c2.read(authStateProvider).value?.email, 'ray@example.com');
+    });
+
+    testWidgets('按入口但取消：仍在登入頁，標記與憑證都還在', (tester) async {
+      final c0 = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c0);
+      final c1 = await coldStart(tester);
+      store.unlockSucceeds = false;
+
+      await tester.tap(find.byKey(_entry));
+      await tester.pumpAndSettle();
+
+      expect(c1.read(authStateProvider).value, isNull);
+      expect(find.byKey(_entry), findsOneWidget);
+      expect(await settings.read('bio_login_kept_account'), 'ray@example.com');
+      store.unlockSucceeds = true;
+      expect(await store.read(), isNotNull);
+      expect(await keys.load(), isNotNull);
+    });
+
+    testWidgets('沒有保留標記：冷啟動照常自動登入', (tester) async {
+      await pumpSignedIn(tester, biometric: true);
+
+      final c = await coldStart(tester);
+
+      expect(c.read(authStateProvider).value?.email, 'ray@example.com');
     });
   });
 
