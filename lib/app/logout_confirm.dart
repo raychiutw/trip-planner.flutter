@@ -19,13 +19,15 @@ Future<bool> confirmLogout(
   String? message,
 }) async {
   // 開啟生物辨識登入者登出會保留憑證（#614），要誠實說明。
-  if (message == null && ref.read(biometricLoginProvider).enabled) {
+  final keeps = message == null && ref.read(biometricLoginProvider).enabled;
+  if (keeps) {
     final kind = await ref.read(appLockKindProvider.future);
     message = '這支手機仍可用 ${kind.lockLabel} 登入，要完全清除請選忘記這支手機。';
   }
   final pending = (await ref.read(cacheStoreProvider).readQueue()).length;
   if (!context.mounted) return false;
-  if (pending == 0 && !alwaysAsk) return true;
+  // 要說明保留就不能略過對話框，否則使用者看不到。
+  if (pending == 0 && !alwaysAsk && !keeps) return true;
   return showAppDestructiveConfirm(
     context,
     source: TpDestructiveConfirmSource.direct,

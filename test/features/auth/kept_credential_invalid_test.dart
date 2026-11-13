@@ -49,7 +49,6 @@ const _userA = UserInfo(id: 'a', email: 'a@example.com');
 const _userB = UserInfo(id: 'b', email: 'b@example.com');
 const _entry = ValueKey('login-biometric-button');
 const _browser = ValueKey('login-browser-button');
-const _kept = 'bio_login_kept_account';
 
 void main() {
   late InMemoryOAuthTokenStore store;
@@ -124,7 +123,7 @@ void main() {
   Future<void> expectCleared(ProviderContainer c) async {
     expect(await store.read(), isNull, reason: '憑證要清掉');
     expect(await keys.load(), isNull, reason: '金鑰要清掉');
-    expect(await settings.read(_kept), anyOf(isNull, ''), reason: '保留標記要清掉');
+    expect(await store.readKeptAccount(), isNull, reason: '保留標記要清掉');
     expect(c.read(authStateProvider).value, isNull);
   }
 
@@ -167,9 +166,7 @@ void main() {
   // 伺服器暫時故障（5xx）不是「憑證失效」：不能清憑證、金鑰，也不能顯示失效訊息，
   // 否則伺服器一抖動，使用者就被迫重新用瀏覽器登入。
   for (final status in [500, 502, 503]) {
-    testWidgets('refresh 回 $status（伺服器暫時故障）：不判失效，憑證與金鑰保留、照常登入', (
-      tester,
-    ) async {
+    testWidgets('refresh 回 $status（伺服器暫時故障）：不判失效，憑證與金鑰保留、照常登入', (tester) async {
       final c = await pumpKept(tester);
       tokenEndpointRejects(status);
 
@@ -207,6 +204,40 @@ void main() {
     expect(find.textContaining('生物辨識資料已變更'), findsOneWidget);
   });
 
+  // 憑證還在，只是 currentUser() 查不到身分（401 回 null 或網路錯誤）：不是生物特徵變更，
+  // 不得清憑證、金鑰與標記，也不得顯示「生物辨識資料已變更」。
+  testWidgets('憑證在但 currentUser() 回 null（401）：不判 keyLost，不清任何東西', (
+    tester,
+  ) async {
+    final c = await pumpKept(tester);
+    when(() => authRepo.currentUser()).thenAnswer((_) async => null);
+
+    await tester.tap(find.byKey(_entry));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('生物辨識資料已變更'), findsNothing);
+    expect(find.text('登入已失效，請用瀏覽器重新登入'), findsNothing);
+    expect(await store.readKeptAccount(), 'a@example.com');
+    expect(await store.read(), isNotNull);
+    expect(await keys.load(), isNotNull);
+    expect(c.read(authStateProvider).value, isNull);
+    expect(find.byKey(_entry), findsOneWidget);
+  });
+
+  testWidgets('憑證在但 currentUser() 網路錯誤：同樣不清任何東西', (tester) async {
+    await pumpKept(tester);
+    when(() => authRepo.currentUser()).thenThrow(Exception('offline'));
+
+    await tester.tap(find.byKey(_entry));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('生物辨識資料已變更'), findsNothing);
+    expect(await store.readKeptAccount(), 'a@example.com');
+    expect(await store.read(), isNotNull);
+    expect(await keys.load(), isNotNull);
+    expect(find.byKey(_entry), findsOneWidget);
+  });
+
   testWidgets('保留模式下改用瀏覽器登入成另一個帳號：舊憑證／金鑰／標記被覆蓋，不串帳號', (tester) async {
     final c = await pumpKept(tester);
     final oldKey = await keys.load();
@@ -218,7 +249,7 @@ void main() {
     expect(c.read(authStateProvider).value?.email, 'b@example.com');
     expect((await store.read())?.refreshToken, 'RT2');
     expect(await keys.load(), isNot(same(oldKey)));
-    expect(await settings.read(_kept), anyOf(isNull, ''));
+    expect(await store.readKeptAccount(), isNull);
     expect(c.read(keptBiometricAccountProvider).value, isNull);
   });
 

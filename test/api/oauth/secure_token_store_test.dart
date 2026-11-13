@@ -197,4 +197,44 @@ void main() {
       hasLength(1),
     );
   });
+
+  group('保留標記（登出後保留的帳號標示）', () {
+    test('寫入後讀得到，且用裝置密碼等級存（讀取不觸發生物辨識）', () async {
+      await store.writeKeptAccount('ray@example.com');
+
+      expect(await store.readKeptAccount(), 'ray@example.com');
+      expect(vault.writes.where((w) => w.$1 == 'tripline_oauth_kept_account'), [
+        ('tripline_oauth_kept_account', TokenProtection.passcode),
+      ]);
+    });
+
+    test('lock() 不動標記；clear() 與憑證同滅', () async {
+      await store.write(_tok());
+      await store.writeKeptAccount('ray@example.com');
+
+      await store.lock();
+      expect(await store.readKeptAccount(), 'ray@example.com');
+
+      await store.clear();
+      expect(await store.readKeptAccount(), isNull);
+      expect(vault.data, isEmpty);
+    });
+
+    test('寫 null 或空字串＝清掉', () async {
+      await store.writeKeptAccount('ray@example.com');
+      await store.writeKeptAccount(null);
+      expect(await store.readKeptAccount(), isNull);
+    });
+
+    test('生物特徵變更使 refresh token 失效時，儲存層清憑證也一併清掉標記', () async {
+      await store.write(_tok());
+      await store.setProtection(TokenProtection.biometric);
+      await store.writeKeptAccount('ray@example.com');
+      await store.lock();
+      vault.readError = PlatformException(code: 'KeyPermanentlyInvalidated');
+
+      expect(await store.read(), isNull);
+      expect(await store.readKeptAccount(), isNull);
+    });
+  });
 }

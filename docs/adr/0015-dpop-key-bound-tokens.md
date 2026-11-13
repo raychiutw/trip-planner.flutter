@@ -2,6 +2,8 @@
 status: accepted
 ---
 
+> 部分被 [ADR-0017](0017-biometric-login-stays-on-device.md) 取代（金鑰生命週期）。
+
 # 以 DPoP 把 token 綁定到 App 持有的金鑰
 
 新 api 把 access token 與 refresh token 綁定到 client 金鑰（DPoP，RFC 9449），並逐 client 強制（`DPOP_REQUIRED_CLIENTS`）。強制後沒帶 proof 的 token 請求回 400 `invalid_dpop_proof`，沒有這個決定 App 就登不進去。同時它讓 token 外洩（log、資料庫、網路）後無法被別人直接使用。本決定補充 ADR-0014，不取代它。
