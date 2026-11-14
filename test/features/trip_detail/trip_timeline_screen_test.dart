@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache_read_policy.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -24,6 +25,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/swipe_to_delete.dart';
@@ -61,6 +63,12 @@ class _TripSwitchHarness extends StatelessWidget {
     valueListenable: tripId,
     builder: (context, value, child) => TripTimelineScreen(tripId: value),
   );
+}
+
+class _FakeSignedInUser extends AuthNotifier {
+  @override
+  Future<UserInfo?> build() async =>
+      const UserInfo(id: 'me', email: 'me@example.com');
 }
 
 const _fakeTrip = Trip(id: _tripId, name: '沖繩自駕 2026', title: '沖繩自駕五日');
@@ -238,6 +246,7 @@ Future<void> _pumpTimeline(
   List<TripSummary>? trips,
   SelectedTripDay? initialSelectedDay,
   ValueListenable<bool>? branchActive,
+  bool signedIn = false,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$tripId',
@@ -335,6 +344,7 @@ Future<void> _pumpTimeline(
         if (trips != null)
           myTripsProvider.overrideWith((ref) => Stream.value(trips)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
+        if (signedIn) authStateProvider.overrideWith(_FakeSignedInUser.new),
         if (initialSelectedDay != null)
           selectedDayProvider.overrideWith(
             () => SeededSelectedDayController(initialSelectedDay),
@@ -3374,5 +3384,108 @@ void main() {
         noTravel: true,
       ),
     ).called(1);
+  });
+
+  group('行程詳情選單：歸檔', () {
+    TripSummary summary({String owner = 'me', String? archivedAt}) =>
+        TripSummary(
+          tripId: _tripId,
+          name: '沖繩自駕 2026',
+          title: '沖繩自駕五日',
+          ownerUserId: owner,
+          archivedAt: archivedAt,
+        );
+
+    testWidgets('擁有者：看到「歸檔行程」；旅伴看不到', (tester) async {
+      await _pumpTimeline(tester, trips: [summary()], signedIn: true);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trip-action-archive')), findsOneWidget);
+      expect(find.text('歸檔行程'), findsOneWidget);
+    });
+
+    testWidgets('擁有者且已歸檔：顯示「取消歸檔」', (tester) async {
+      await _pumpTimeline(
+        tester,
+        trips: [summary(archivedAt: '2026-11-01 08:00:00')],
+        signedIn: true,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+      await tester.pumpAndSettle();
+      expect(find.text('取消歸檔'), findsOneWidget);
+      expect(find.text('歸檔行程'), findsNothing);
+    });
+
+    testWidgets('旅伴：選單沒有歸檔動作', (tester) async {
+      await _pumpTimeline(
+        tester,
+        trips: [summary(owner: 'amy')],
+        signedIn: true,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trip-action-archive')), findsNothing);
+    });
+
+    testWidgets('清單資料還沒載入（無法確認身分）：不顯示歸檔', (tester) async {
+      await _pumpTimeline(tester, signedIn: true);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trip-action-archive')), findsNothing);
+    });
+
+    testWidgets('歸檔後詳情維持開啟：呼叫 PUT、顯示回饋，沒有跳走', (tester) async {
+      final repo = _sheetRepo();
+      when(
+        () => repo.archiveTrip(_tripId),
+      ).thenAnswer((_) async => '2026-11-01 08:00:00');
+      await _pumpTimeline(
+        tester,
+        repo: repo,
+        trips: [summary()],
+        signedIn: true,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-action-archive')));
+      await tester.pumpAndSettle();
+      expect(find.text('歸檔行程？'), findsOneWidget);
+      await tester.tap(find.widgetWithText(CupertinoDialogAction, '歸檔'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.archiveTrip(_tripId)).called(1);
+      expect(find.text('已歸檔「沖繩自駕五日」'), findsOneWidget);
+      expect(find.byType(TripTimelineScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
+      await tester.pumpAndSettle(const Duration(seconds: 4));
+    });
+
+    testWidgets('403：顯示只有擁有者能變更，詳情仍在', (tester) async {
+      final repo = _sheetRepo();
+      when(() => repo.archiveTrip(_tripId)).thenThrow(
+        const ApiError(status: 403, code: 'PERM_DENIED', message: 'x'),
+      );
+      await _pumpTimeline(
+        tester,
+        repo: repo,
+        trips: [summary()],
+        signedIn: true,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-action-archive')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CupertinoDialogAction, '歸檔'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('只有行程擁有者能變更歸檔狀態。'), findsOneWidget);
+      expect(find.byType(TripTimelineScreen), findsOneWidget);
+    });
   });
 }

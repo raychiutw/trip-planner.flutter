@@ -795,6 +795,80 @@ void main() {
     expect(rows.single.diff?['title'], {'old': 'A', 'new': 'B'});
   });
 
+  group('歸檔', () {
+    test('archiveTrip：PUT /trips/:id/archive 回傳 archivedAt', () async {
+      dioAdapter.onPut(
+        '/trips/old-trip/archive',
+        (server) => server.reply(200, {'archivedAt': '2026-11-01 08:00:00'}),
+      );
+
+      expect(
+        await tripRepository.archiveTrip('old-trip'),
+        '2026-11-01 08:00:00',
+      );
+      expect(recordedRequests.single.method, 'PUT');
+    });
+
+    test('unarchiveTrip：DELETE /trips/:id/archive 回傳 null', () async {
+      dioAdapter.onDelete(
+        '/trips/old-trip/archive',
+        (server) => server.reply(200, {'archivedAt': null}),
+      );
+
+      expect(await tripRepository.unarchiveTrip('old-trip'), isNull);
+      expect(recordedRequests.single.method, 'DELETE');
+    });
+
+    test('路徑參數會 encode', () async {
+      dioAdapter.onPut(
+        '/trips/a%2Fb/archive',
+        (server) => server.reply(200, {'archivedAt': 'x'}),
+      );
+
+      await tripRepository.archiveTrip('a/b');
+      expect(recordedRequests.single.path, '/trips/a%2Fb/archive');
+    });
+
+    test('403 丟 ApiError(status 403)', () async {
+      dioAdapter.onPut(
+        '/trips/t/archive',
+        (server) => server.reply(403, {
+          'error': {'code': 'PERM_DENIED', 'message': '僅行程擁有者可歸檔或取消歸檔'},
+        }),
+      );
+
+      await expectLater(
+        tripRepository.archiveTrip('t'),
+        throwsA(isA<ApiError>().having((e) => e.status, 'status', 403)),
+      );
+    });
+
+    test('離線：丟連線錯誤、不進離線佇列、也不假裝成功（線上限定）', () async {
+      final cache = InMemoryCacheStore();
+      final offlineDio = Dio(BaseOptions())
+        ..options.validateStatus = (_) => true;
+      DioAdapter(dio: offlineDio).onPut(
+        '/trips/t/archive',
+        (server) => server.throws(
+          0,
+          DioException(
+            requestOptions: RequestOptions(path: '/trips/t/archive'),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+      );
+      final repository = TripRepository(
+        client: ApiClient(dio: offlineDio, cacheStore: cache),
+      );
+
+      await expectLater(
+        repository.archiveTrip('t'),
+        throwsA(isA<DioException>()),
+      );
+      expect(await cache.readQueue(), isEmpty);
+    });
+  });
+
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
     dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));
 

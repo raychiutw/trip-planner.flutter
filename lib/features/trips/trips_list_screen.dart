@@ -23,6 +23,7 @@ import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_segmented_control.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'current_trip_provider.dart';
+import 'trip_archive.dart';
 import 'trip_card.dart';
 
 const int _maxTripImportChars = 512 * 1024;
@@ -138,6 +139,9 @@ enum TripFilter {
 
   /// 共編：ownerUserId != 當前 user。
   shared,
+
+  /// 已歸檔：archivedAt 不為 null（不分角色）。其他三個篩選只算未歸檔。
+  archived,
 }
 
 enum _TripsToolbarAction {
@@ -200,27 +204,34 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     super.dispose();
   }
 
-  /// 篩選分頁:全部 / 我的(ownerUserId == 當前 user)/ 共編(ownerUserId != 當前 user)。
+  /// 篩選分頁:全部 / 我的(ownerUserId == 當前 user)/ 共編(ownerUserId != 當前 user)
+  /// 皆只算未歸檔;已歸檔列出 archivedAt 非 null 的行程。
   /// currentUserId 為 null(未登入/載入中)時「我的/共編」皆回空,避免誤判。
   List<TripSummary> _filterByTab(
     List<TripSummary> trips,
     String? currentUserId,
   ) {
+    if (_filterTab == TripFilter.archived) {
+      return trips.where((t) => t.isArchived).toList();
+    }
+    final active = trips.where((t) => !t.isArchived);
     switch (_filterTab) {
       case TripFilter.all:
-        return trips;
+        return active.toList();
       case TripFilter.mine:
-        return trips
+        return active
             .where(
               (t) => t.ownerUserId != null && t.ownerUserId == currentUserId,
             )
             .toList();
       case TripFilter.shared:
-        return trips
+        return active
             .where(
               (t) => t.ownerUserId != null && t.ownerUserId != currentUserId,
             )
             .toList();
+      case TripFilter.archived:
+        throw StateError('Handled above');
     }
   }
 
@@ -373,6 +384,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                       TripFilter.all: '全部',
                       TripFilter.mine: '我的',
                       TripFilter.shared: '共編',
+                      TripFilter.archived: '已歸檔',
                     },
                     onChanged: (value) {
                       setState(() {
@@ -450,7 +462,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
           return [
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _buildNoResults(theme),
+              child: _filterTab == TripFilter.archived && _query.trim().isEmpty
+                  ? _buildNoArchived(theme)
+                  : _buildNoResults(theme),
             ),
           ];
         }
@@ -555,6 +569,23 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
+  Widget _buildNoArchived(ThemeData theme) {
+    return Center(
+      child: Semantics(
+        key: const ValueKey('trips-no-archived'),
+        container: true,
+        liveRegion: true,
+        child: Text(
+          '目前沒有已歸檔行程。歸檔行程會在這裡顯示。',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNoResults(ThemeData theme) {
     return Center(
       child: Semantics(
@@ -627,7 +658,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     onLongPress: isDeleting ? null : menuController.open,
                     moreMenu: isDeleting
                         ? null
-                        : _tripMenu(context, trip, menuController),
+                        : _tripMenu(
+                            context,
+                            trip,
+                            menuController,
+                            isOwner:
+                                currentUserId != null &&
+                                trip.ownerUserId == currentUserId,
+                          ),
                   ),
                   if (isDeleting)
                     Positioned.fill(
@@ -661,8 +699,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   Widget _tripMenu(
     BuildContext context,
     TripSummary trip,
-    TpMoreMenuController menuController,
-  ) {
+    TpMoreMenuController menuController, {
+    required bool isOwner,
+  }) {
     return TpMoreMenuButton<_TripListAction>(
       key: ValueKey('trip-card-more-${trip.tripId}'),
       controller: menuController,
@@ -697,6 +736,16 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             value: _TripListAction.exportJson,
             icon: CupertinoIcons.square_arrow_down,
           ),
+        // 歸檔只有擁有者能做；旅伴的選單不出現（不放無權限的動作）。
+        if (isOwner)
+          TpActionItem(
+            key: ValueKey('trip-menu-archive-${trip.tripId}'),
+            label: trip.isArchived ? '取消歸檔' : '歸檔行程',
+            value: _TripListAction.archive,
+            icon: trip.isArchived
+                ? CupertinoIcons.arrow_up_bin
+                : CupertinoIcons.archivebox,
+          ),
         TpActionItem(
           key: ValueKey('trip-menu-delete-${trip.tripId}'),
           label: '刪除行程',
@@ -725,6 +774,15 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         context.push('/trips/${Uri.encodeComponent(trip.tripId)}/health');
       case _TripListAction.exportJson:
         await _exportTripToJson(trip);
+      case _TripListAction.archive:
+        await confirmAndSetTripArchived(
+          context,
+          ref,
+          tripId: trip.tripId,
+          title: trip.displayTitle,
+          archived: trip.isArchived,
+          onChanged: () => ref.invalidate(myTripsProvider),
+        );
       case _TripListAction.delete:
         await _confirmAndDeleteTrip(
           context,
@@ -778,7 +836,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   }
 }
 
-enum _TripListAction { share, collab, health, exportJson, delete }
+enum _TripListAction { share, collab, health, exportJson, archive, delete }
 
 /// 空清單 hero 文案。
 class _EmptyHero extends StatelessWidget {
