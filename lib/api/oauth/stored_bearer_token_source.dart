@@ -15,6 +15,9 @@ import '../dpop/proof_key_store.dart';
 import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 
+/// 憑證被清掉的原因：伺服器拒絕 refresh，或 DPoP 金鑰已不存在（生物特徵變更）。
+enum InvalidReason { rejected, keyLost }
+
 class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   StoredBearerTokenSource({
     required OAuthTokenStore store,
@@ -36,6 +39,9 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   /// access token 只活在記憶體;store 只留 refresh token(ADR-0014)。
   OAuthTokens? _memory;
 
+  /// 登出但保留憑證之後:不碰 store，免得登出狀態下的 API 呼叫跳出生物辨識。
+  bool _sealed = false;
+
   final _signedOut = StreamController<void>.broadcast();
 
   /// refresh token 被後端拒絕(撤銷、過期、重放)而清掉憑證時通知,
@@ -44,9 +50,21 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
 
   /// 登入完成後交給來源:access token 進記憶體,其餘落地。
   Future<void> adopt(OAuthTokens tokens) async {
+    _sealed = false;
     _memory = tokens;
     await _store.write(tokens);
   }
+
+  /// 登出但保留憑證與 DPoP 金鑰（兩者必須一起留）：只丟掉記憶體中的 access token
+  /// 並封存，直到 [unseal]（生物辨識解鎖成功）或重新登入。
+  Future<void> seal() async {
+    _sealed = true;
+    _memory = null;
+    await _store.lock();
+  }
+
+  /// 受保護的憑證已讀出來：恢復正常取用。
+  void unseal() => _sealed = false;
 
   Future<bool> _stillHolds(String refreshToken) async {
     try {
@@ -72,6 +90,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
 
   /// 清掉本機登入憑證、記憶體中的 access token 與 DPoP 金鑰（登出、帳號刪除）。
   Future<void> clear() async {
+    _sealed = false;
     _memory = null;
     try {
       await _store.clear();
@@ -80,14 +99,26 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
     }
   }
 
+  InvalidReason? _lastInvalid;
+
+  /// 立刻取一次 access token（必要時 refresh），回傳憑證是否因此被判失效並清掉；
+  /// 暫時性錯誤（網路）不算失效。解鎖保留的憑證後用它確認入口還有效。
+  Future<InvalidReason?> verify() async {
+    _lastInvalid = null;
+    await accessToken();
+    return _lastInvalid;
+  }
+
   /// refresh 被拒或金鑰遺失：憑證與金鑰一併清掉，並通知回到未登入。
-  Future<void> _invalidate() async {
+  Future<void> _invalidate(InvalidReason reason) async {
+    _lastInvalid = reason;
     await clear();
     _signedOut.add(null);
   }
 
   @override
   Future<String?> accessToken() async {
+    if (_sealed) return null;
     final OAuthTokens? stored;
     try {
       stored = await _store.read();
@@ -113,6 +144,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       _inFlight ??= _doRefresh().whenComplete(() => _inFlight = null);
 
   Future<OAuthTokens?> _doRefresh() async {
+    if (_sealed) return null;
     final OAuthTokens? old;
     try {
       old = await _store.read();
@@ -132,7 +164,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
         return null; // 鎖屏等暫時讀不到：保留憑證，稍後再試，不能當成金鑰遺失
       }
       if (key == null) {
-        await _invalidate();
+        await _invalidate(InvalidReason.keyLost);
         return null;
       }
     }
@@ -148,7 +180,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       // 400/401 = refresh token 真的失效(撤銷/過期)→ 視為登出。
       // 回應回來前使用者可能已登出又重新登入：憑證已換人就別清掉新的。
       if ((e.status == 400 || e.status == 401) && await _stillHolds(rt)) {
-        await _invalidate();
+        await _invalidate(InvalidReason.rejected);
       }
       return null;
     } on Exception {
@@ -157,6 +189,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
     }
 
     // 登出（憑證已被清掉）發生在 refresh 進行中：不能把憑證寫回去讓它復活。
+    if (_sealed) return null;
     try {
       if (await _store.read() == null) return null;
     } on TokenStoreLockedException {

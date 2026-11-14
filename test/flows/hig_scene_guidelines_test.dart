@@ -38,9 +38,9 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'favorites': {'搜尋收藏 361x36'},
   'favorites-load-failed': {'搜尋收藏 361x36'},
   'account-developer-app-new': {'(無標籤) 40x40'},
-  // 設定頁多了「變更密碼」列後內容超出一屏，場景往下捲時頂端的個人資料列只露出 22pt，
-  // 語意樹的矩形被捲動區裁成 22（量測限制，列本身不小於 44pt；#529）。
-  'account-home-security': {'Ray 393x22'},
+  // 設定頁多了「變更密碼」列後內容超出一屏，場景往下捲時頂端的個人資料列只露出 21pt（新增「忘記這支手機」列後少 1pt），
+  // 語意樹的矩形被捲動區裁成 21（量測限制，列本身不小於 44pt；#529）。
+  'account-home-security': {'Ray 393x21'},
   'account-delete-dialog': {'目前密碼（重新驗證） 230x31'},
   'share-manage': {'(無標籤) 40x40'},
   'share-custom-expiry-missing': {'(無標籤) 40x40'},

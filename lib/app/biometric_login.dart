@@ -103,7 +103,7 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
           .read(biometricAuthenticatorProvider)
           .authenticate(reason: '驗證身分以關閉生物辨識登入');
       if (outcome != BiometricOutcome.success) return false;
-      await ref.read(authStateProvider.notifier).logout();
+      await ref.read(authStateProvider.notifier).logout(clear: true);
       return true;
     } finally {
       _inFlight = false;

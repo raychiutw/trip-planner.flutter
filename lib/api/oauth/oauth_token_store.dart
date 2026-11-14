@@ -36,6 +36,15 @@ abstract class OAuthTokenStore {
   /// 回 false 代表新等級存不進去（例如裝置沒設密碼），保護等級維持原樣。
   Future<bool> setProtection(TokenProtection protection);
   Future<void> clear();
+
+  /// 登出但保留憑證:丟掉記憶體中的明文,下一次 [read] 重新走受保護的讀取
+  /// (受生物辨識保護時會再跳出驗證)。不刪任何落地資料。
+  Future<void> lock();
+
+  /// 「登出後保留」的帳號標示（顯示名稱或信箱，非機密）；null = 沒有保留。
+  /// 與憑證放在同一個受保護儲存，[clear] 一併清掉，兩者同生同滅。
+  Future<String?> readKeptAccount();
+  Future<void> writeKeptAccount(String? label);
 }
 
 /// Keychain／Keystore 的最小介面(測試以假的替換)。
@@ -111,6 +120,7 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   static const _metaKey = 'tripline_oauth_tokens';
   static const _refreshKey = 'tripline_oauth_refresh';
+  static const _keptKey = 'tripline_oauth_kept_account';
 
   final SecretVault _vault;
   TokenProtection _protection = TokenProtection.passcode;
@@ -213,7 +223,25 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     _protection = TokenProtection.passcode;
     await _vault.delete(_metaKey);
     await _vault.delete(_refreshKey);
+    await _vault.delete(_keptKey);
   }
+
+  @override
+  Future<void> lock() async {
+    _cache = null;
+    _reading = null;
+  }
+
+  @override
+  Future<String?> readKeptAccount() async {
+    final v = await _vault.read(_keptKey, protection: TokenProtection.passcode);
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  @override
+  Future<void> writeKeptAccount(String? label) => label == null || label.isEmpty
+      ? _vault.delete(_keptKey)
+      : _vault.write(_keptKey, label, protection: TokenProtection.passcode);
 
   /// iOS errSecItemNotFound／Android KeyPermanentlyInvalidated 這類「項目已不可用」。
   static bool _isInvalidated(Object e) {
@@ -228,12 +256,27 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 class InMemoryOAuthTokenStore implements OAuthTokenStore {
   OAuthTokens? _tokens;
   TokenProtection _protection = TokenProtection.passcode;
+  String? _kept;
 
   @override
   TokenProtection get protection => _protection;
 
+  bool _locked = false;
+
+  /// 模擬 [lock] 之後的受保護讀取:true＝使用者通過生物辨識，false＝取消或失敗。
+  bool unlockSucceeds = true;
+
   @override
-  Future<OAuthTokens?> read() async => _tokens;
+  Future<OAuthTokens?> read() async {
+    if (_locked) {
+      if (!unlockSucceeds) throw const TokenStoreLockedException();
+      _locked = false;
+    }
+    return _tokens;
+  }
+
+  @override
+  Future<void> lock() async => _locked = true;
 
   @override
   Future<void> write(OAuthTokens tokens) async =>
@@ -248,6 +291,15 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   @override
   Future<void> clear() async {
     _tokens = null;
+    _kept = null;
+    _locked = false;
     _protection = TokenProtection.passcode;
   }
+
+  @override
+  Future<String?> readKeptAccount() async => _kept;
+
+  @override
+  Future<void> writeKeptAccount(String? label) async =>
+      _kept = (label == null || label.isEmpty) ? null : label;
 }

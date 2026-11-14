@@ -12,6 +12,7 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_lock.dart';
+import '../../app/forget_this_phone.dart';
 import '../../theme/tokens.dart';
 
 /// 登入畫面（/login，shell 外）。
@@ -39,8 +40,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref.read(authStateProvider.notifier).unlock();
   }
 
-  String _errorMessage(Object error) =>
-      error is OAuthLoginException ? error.userMessage : 'Tripline 登入失敗，請稍後再試';
+  String _errorMessage(Object error) => switch (error) {
+    OAuthLoginException() => error.userMessage,
+    KeptCredentialInvalid() => error.userMessage,
+    _ => 'Tripline 登入失敗，請稍後再試',
+  };
 
   @override
   Widget build(BuildContext context) => _buildContent(context);
@@ -54,8 +58,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : TpSystemColorsLight.success;
     final authState = ref.watch(authStateProvider);
     final isBusy = authState.isLoading;
-    final locked = ref.watch(authLockedProvider);
     final biometricKind = ref.watch(appLockKindProvider).value;
+    // 登出後保留的生物辨識登入：標示帳號；只有裝置密碼的手機不提供入口。
+    final keptAccount = ref.watch(keptBiometricAccountProvider).value;
+    final showKept =
+        keptAccount != null &&
+        biometricKind != null &&
+        biometricKind != BiometricKind.passcode;
+    final locked = ref.watch(authLockedProvider) && !showKept;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
@@ -164,6 +174,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: TpSpacing.s4),
                   ],
+                  if (showKept) ...[
+                    FilledButton.icon(
+                      key: const ValueKey('login-biometric-button'),
+                      onPressed: isBusy ? null : _unlock,
+                      icon: Icon(
+                        biometricKind == BiometricKind.faceId
+                            ? CupertinoIcons.person_crop_square
+                            : CupertinoIcons.lock_shield,
+                      ),
+                      label: Text('用 ${biometricKind.lockLabel} 登入'),
+                    ),
+                    const SizedBox(height: TpSpacing.s2),
+                    Text(
+                      keptAccount,
+                      key: const ValueKey('login-biometric-account'),
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    TextButton(
+                      key: const ValueKey('login-forget-phone'),
+                      onPressed: isBusy
+                          ? null
+                          : () => confirmAndForgetThisPhone(context, ref),
+                      child: const Text('忘記這支手機'),
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                  ],
                   if (locked) ...[
                     FilledButton.icon(
                       key: const ValueKey('login-unlock-button'),
@@ -177,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: TpSpacing.s3),
                   ],
-                  (locked
+                  ((locked || showKept)
                       ? OutlinedButton(
                           key: const ValueKey('login-browser-button'),
                           onPressed: isBusy ? null : _browserLogin,

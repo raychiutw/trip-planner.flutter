@@ -1,6 +1,8 @@
 ---
-status: accepted
+status: superseded by ADR-0017
 ---
+
+> **已被 [ADR-0017](0017-biometric-login-stays-on-device.md) 取代。**
 
 # 用 passkey（WebAuthn）做生物辨識登入，由 api 統一提供，web 與 App 共用
 

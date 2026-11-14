@@ -46,9 +46,9 @@ flutter run                                           # 連 prod API — 一律�
 認證只走 OAuth PKCE 與 Bearer(ADR-0014,取代 ADR-0005 的 cookie 路線):
 
 - 登入是系統瀏覽器授權(`OAuthLoginService`),以 https callback(Universal Link／App Link)回到 app;**App 內沒有密碼表單,也不保管密碼**。callback 網域、client id、API origin 都是 `--dart-define`／gradle 設定值,不得寫死
-- access token 只放記憶體(15 分鐘);refresh token 每次使用即輪替,落地在 Keychain／Keystore(`SecureOAuthTokenStore`),保護等級 `passcode`(預設)或 `biometric`(設定頁開啟)。裝置沒設密碼時不落地
+- access token 只放記憶體(15 分鐘);refresh token 每次使用即輪替,落地在 Keychain／Keystore(`SecureOAuthTokenStore`),保護等級 `passcode`(預設)或 `biometric`(設定頁開啟)。裝置沒設密碼時不落地。開啟生物辨識登入者登出時**保留**憑證與金鑰、不撤銷(ADR-0017);其餘情況登出都撤銷並清除
 - `ApiClient` 統一帶 `Authorization`(token 綁定金鑰時是 `DPoP` 加每請求重簽的 proof,否則 `Bearer`;ADR-0015);**不送 Cookie／Origin**。不要繞過它用 raw dio 打 API
-- DPoP 金鑰每次登入產生一把(硬體優先:iOS Secure Enclave／Android Keystore,沒有才退軟體金鑰),隨登入憑證一起刪除;介面是 `ProofKey`(`lib/api/dpop/`)。SSE 帶同樣的標頭並處理 `event: reconnect`
+- DPoP 金鑰每次登入產生一把(硬體優先:iOS Secure Enclave／Android Keystore,沒有才退軟體金鑰),與登入憑證同生同滅(一起保留、一起刪除:登出時只有開啟生物辨識登入者保留;忘記這支手機、關閉生物辨識登入、refresh 被拒、帳號刪除與其餘登出都刪除;ADR-0017);介面是 `ProofKey`(`lib/api/dpop/`)。SSE 帶同樣的標頭並處理 `event: reconnect`
 - refresh 被後端拒絕(400／401)會清憑證並由 `bearerTokenSource.signedOut` 通知 `authStateProvider` 回到未登入
 - `authStateProvider` 的身分優先取 id_token claims(驗過 `exp`／`aud`),否則落回 `currentUser()`(401 回 null 不 throw);登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
 - **API origin 預設是新 api**(`kTriplineOrigin`;網頁版網域 `kTriplineWebOrigin` 另外,分享連結、隱私頁用它)。新認證連不上已退役的舊入口(見 ADR-0014),若要指向其他後端須同時換掉認證,不是只改 `TRIPLINE_API_ORIGIN`
