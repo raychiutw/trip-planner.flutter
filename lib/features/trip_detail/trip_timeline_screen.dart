@@ -32,6 +32,7 @@ import '../trips/collab/collab_screen.dart';
 import '../trips/edit/edit_trip_screen.dart';
 import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
+import '../trips/trip_archive.dart';
 import 'selected_day_provider.dart';
 import 'trip_days_lookup.dart';
 import 'entry_mutations.dart';
@@ -56,6 +57,7 @@ enum _TripMoreAction {
   share,
   collab,
   health,
+  archive,
 }
 
 enum _EntryMoreAction { reorder, changePoi, edit, move, copy, delete }
@@ -135,7 +137,12 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     unawaited(showAppScreenSheet<void>(context, builder: (_) => screen));
   }
 
-  void _handleTripAction(_TripMoreAction action, String tripId) {
+  void _handleTripAction(
+    _TripMoreAction action,
+    String tripId, {
+    required String title,
+    required bool archived,
+  }) {
     switch (action) {
       case _TripMoreAction.editMode:
         setState(() => _editingTripId = tripId);
@@ -153,6 +160,18 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
         _openActionSheet(CollabScreen(tripId: tripId));
       case _TripMoreAction.health:
         _openActionSheet(TripHealthScreen(tripId: tripId));
+      case _TripMoreAction.archive:
+        // 詳情保持開啟：只刷新清單，不導航。
+        unawaited(
+          confirmAndSetTripArchived(
+            context,
+            ref,
+            tripId: tripId,
+            title: title,
+            archived: archived,
+            onChanged: () => ref.invalidate(myTripsProvider),
+          ),
+        );
     }
   }
 
@@ -192,6 +211,10 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     final currentTrip = trips
         .where((trip) => trip.tripId == tripId)
         .firstOrNull;
+    // 歸檔只有擁有者能做；清單還沒載入、無法確認身分時不顯示。
+    final currentUserId = ref.watch(authStateProvider).value?.id;
+    final canArchive =
+        currentUserId != null && currentTrip?.ownerUserId == currentUserId;
     final isEditing = _editingTripId == tripId;
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysIndexProvider(tripId));
@@ -267,8 +290,13 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
           else
             TpMoreMenuButton<_TripMoreAction>(
               key: const ValueKey('trip-actions-menu'),
-              onSelected: (action) => _handleTripAction(action, tripId),
-              items: const [
+              onSelected: (action) => _handleTripAction(
+                action,
+                tripId,
+                title: tripTitle,
+                archived: currentTrip?.isArchived ?? false,
+              ),
+              items: [
                 TpActionItem(
                   key: ValueKey('trip-edit-mode'),
                   value: _TripMoreAction.editMode,
@@ -318,6 +346,16 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   icon: CupertinoIcons.sparkles,
                   label: 'AI 健檢',
                 ),
+                if (canArchive)
+                  TpActionItem(
+                    key: const ValueKey('trip-action-archive'),
+                    value: _TripMoreAction.archive,
+                    icon: currentTrip!.isArchived
+                        ? CupertinoIcons.arrow_up_bin
+                        : CupertinoIcons.archivebox,
+                    label: currentTrip.isArchived ? '取消歸檔' : '歸檔行程',
+                    dividerBefore: true,
+                  ),
               ],
             ),
         ],

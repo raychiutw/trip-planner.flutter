@@ -16,6 +16,7 @@ class TripSummary {
     this.endDate,
     this.updatedAt,
     this.memberCount,
+    this.archivedAt,
   });
 
   final String tripId;
@@ -47,6 +48,11 @@ class TripSummary {
   /// 協作人數（後端回 int）。
   final int? memberCount;
 
+  /// 歸檔時間（owner 控制、全行程共用；null = 未歸檔）。歸檔只改清單分類，不動權限與內容。
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
+
   factory TripSummary.fromJson(Map<String, dynamic> json) {
     return TripSummary(
       tripId: json['tripId'] as String,
@@ -61,6 +67,7 @@ class TripSummary {
       endDate: json['endDate'] as String?,
       updatedAt: json['updatedAt'] as String?,
       memberCount: (json['memberCount'] as num?)?.toInt(),
+      archivedAt: json['archivedAt'] as String?,
     );
   }
 }

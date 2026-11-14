@@ -539,6 +539,20 @@ class TripRepository {
   Future<void> deleteTrip(String id) =>
       _client.delete('/trips/${Uri.encodeComponent(id)}');
 
+  /// PUT /trips/:id/archive（限 owner；已歸檔則維持原歸檔時間）→ `archivedAt`。
+  /// 線上限定，不進離線佇列：離線時丟連線錯誤，由呼叫端說明。
+  Future<String?> archiveTrip(String id) async => _archivedAt(
+    await _client.put('/trips/${Uri.encodeComponent(id)}/archive'),
+  );
+
+  /// DELETE /trips/:id/archive（限 owner）→ `archivedAt`（取消後為 null）。線上限定。
+  Future<String?> unarchiveTrip(String id) async => _archivedAt(
+    await _client.delete('/trips/${Uri.encodeComponent(id)}/archive'),
+  );
+
+  String? _archivedAt(dynamic body) =>
+      body is Map<String, dynamic> ? body['archivedAt'] as String? : null;
+
   /// POST /trips/import，送出 web 匯出的 raw JSON text 並回傳新 tripId。
   Future<String> importTripJson(String jsonText) async {
     final responseBody = await _client.post('/trips/import', body: jsonText);
