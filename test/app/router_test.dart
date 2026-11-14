@@ -17,6 +17,7 @@ import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
@@ -741,6 +742,46 @@ void main() {
       '/chat?tripId=trip-1',
     );
   });
+
+  // 回歸：保留模式登出後 router 把人導到 /welcome；歡迎頁的登入鈕若直接開瀏覽器，
+  // 登入頁的 Face ID 入口永遠到不了（0.40 實際發生）。
+  for (final key in ['welcome-login-top', 'welcome-login-hero']) {
+    testWidgets('Welcome 有保留的生物辨識登入（$key）：轉到有 Face ID 入口的登入畫面，不直接開瀏覽器', (
+      tester,
+    ) async {
+      final spy = _BrowserLoginSpyNotifier();
+      final container = _buildContainer(
+        currentUser: null,
+        authNotifier: () => spy,
+        extraOverrides: [
+          keptBiometricAccountProvider.overrideWith(
+            (ref) async => 'a@example.com',
+          ),
+          appLockKindProvider.overrideWith((ref) async => BiometricKind.faceId),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TriplineApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+
+      expect(spy.signInCount, 0, reason: '不得直接開瀏覽器');
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('login-biometric-button')),
+        findsOneWidget,
+      );
+    });
+  }
 
   testWidgets('Welcome 直接登入失敗：轉到登入畫面顯示錯誤，可重試', (tester) async {
     final container = _buildContainer(
