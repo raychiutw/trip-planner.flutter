@@ -72,6 +72,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // 直接開系統瀏覽器登入，不多繞一頁登入畫面；失敗才轉到登入畫面
           // 顯示錯誤並讓使用者重試。成功後由 redirect 帶回 redirect_after。
           onLogin: () async {
+            // 登出後保留了生物辨識登入：Face ID 入口在登入畫面，先到那裡，
+            // 不直接開瀏覽器（否則入口永遠到不了）。
+            final kept = await ref.read(keptBiometricAccountProvider.future);
+            if (!context.mounted) return;
+            if (kept != null) {
+              context.go(loginLocationFromWelcome(state.uri));
+              return;
+            }
             final signIn = ref
                 .read(authStateProvider.notifier)
                 .signInWithBrowser();
