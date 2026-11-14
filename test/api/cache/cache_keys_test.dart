@@ -69,6 +69,14 @@ void main() {
         containsAll(<String>['GET /trips/t/segments', 'GET /trips/t/days']),
       );
     });
+    test('歸檔／取消歸檔 → 失效行程清單（歸檔狀態在 /my-trips）', () {
+      for (final method in ['PUT', 'DELETE']) {
+        expect(
+          evictionPrefixesFor(method, '/trips/t/archive'),
+          containsAll(<String>['GET /my-trips', 'GET /trips/t']),
+        );
+      }
+    });
     test('trip 編輯/刪除 → trip + 清單', () {
       final p = evictionPrefixesFor('PUT', '/trips/t');
       expect(

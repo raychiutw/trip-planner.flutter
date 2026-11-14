@@ -3,6 +3,19 @@ import 'package:tripline/models/trip.dart';
 
 void main() {
   group('TripSummary.fromJson', () {
+    test('archivedAt：有值為已歸檔、缺漏或 null 為未歸檔', () {
+      TripSummary parse(Map<String, dynamic> extra) =>
+          TripSummary.fromJson({'tripId': 't', 'name': 'n', ...extra});
+
+      expect(parse({'archivedAt': '2026-11-01 08:00:00'}).isArchived, isTrue);
+      expect(parse({'archivedAt': null}).isArchived, isFalse);
+      expect(parse({}).isArchived, isFalse);
+      expect(
+        parse({'archivedAt': '2026-11-01 08:00:00'}).archivedAt,
+        '2026-11-01 08:00:00',
+      );
+    });
+
     test('解析完整欄位', () {
       final summary = TripSummary.fromJson({
         'tripId': 'okinawa-trip-2026-Ray',
