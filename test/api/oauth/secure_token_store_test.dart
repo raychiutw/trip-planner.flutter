@@ -43,8 +43,18 @@ class _FakeVault implements SecretVault {
   }
 
   @override
-  Future<void> delete(String key) async => data.remove(key);
+  Future<void> delete(String key, {TokenProtection? protection}) async =>
+      data.remove(key);
+
+  @override
+  bool get biometricUsesOwnNamespace => false;
 }
+
+/// refresh token 輪流用兩個槽位 key，測試只認前綴。
+bool _isRefreshKey(String k) => k.startsWith('tripline_oauth_refresh');
+
+String? _refreshOnDisk(_FakeVault v) =>
+    v.data.entries.singleWhere((e) => _isRefreshKey(e.key)).value;
 
 OAuthTokens _tok({String refresh = 'RT'}) => OAuthTokens(
   accessToken: 'SECRET_ACCESS',
@@ -66,14 +76,14 @@ void main() {
     await store.write(_tok());
 
     expect(vault.data.values.join(), isNot(contains('SECRET_ACCESS')));
-    expect(vault.data['tripline_oauth_refresh'], 'RT');
+    expect(_refreshOnDisk(vault), 'RT');
   });
 
   test('預設用裝置密碼等級保護 refresh token', () async {
     await store.write(_tok());
 
     expect(
-      vault.writes.where((w) => w.$1 == 'tripline_oauth_refresh').single.$2,
+      vault.writes.where((w) => _isRefreshKey(w.$1)).single.$2,
       TokenProtection.passcode,
     );
   });
@@ -94,7 +104,7 @@ void main() {
     await store.setProtection(TokenProtection.biometric);
 
     expect(
-      vault.writes.where((w) => w.$1 == 'tripline_oauth_refresh').last.$2,
+      vault.writes.where((w) => _isRefreshKey(w.$1)).last.$2,
       TokenProtection.biometric,
     );
     expect(store.protection, TokenProtection.biometric);
@@ -103,7 +113,7 @@ void main() {
     expect((await restarted.read())!.refreshToken, 'RT');
     expect(restarted.protection, TokenProtection.biometric);
     expect(
-      vault.reads.where((r) => r.$1 == 'tripline_oauth_refresh').last.$2,
+      vault.reads.where((r) => _isRefreshKey(r.$1)).last.$2,
       TokenProtection.biometric,
     );
   });
@@ -141,7 +151,7 @@ void main() {
 
     expect(vault.reads.length, readsAfterFirst);
     expect(jsonDecode(vault.data['tripline_oauth_tokens']!), isA<Map>());
-    expect(vault.data['tripline_oauth_refresh'], 'RT2');
+    expect(_refreshOnDisk(vault), 'RT2');
   });
 
   test('clear：全部刪除並回到預設保護等級', () async {
@@ -172,13 +182,13 @@ void main() {
   test('改保護等級前先刪掉舊項目（不同 access control 不能原地覆寫）', () async {
     await store.write(_tok());
     vault.data.remove('sentinel');
-    final before = vault.data['tripline_oauth_refresh'];
-    expect(before, 'RT');
+    final oldKey = vault.data.keys.singleWhere(_isRefreshKey);
 
     await store.setProtection(TokenProtection.biometric);
 
-    expect(vault.writes.last, (
-      'tripline_oauth_refresh',
+    expect(vault.data.containsKey(oldKey), isFalse); // 舊項目已刪
+    expect(vault.writes.where((w) => _isRefreshKey(w.$1)).last, (
+      vault.data.keys.singleWhere(_isRefreshKey),
       TokenProtection.biometric,
     ));
   });
@@ -192,10 +202,7 @@ void main() {
 
     await Future.wait([restarted.read(), restarted.read(), restarted.read()]);
 
-    expect(
-      vault.reads.where((r) => r.$1 == 'tripline_oauth_refresh'),
-      hasLength(1),
-    );
+    expect(vault.reads.where((r) => _isRefreshKey(r.$1)), hasLength(1));
   });
 
   group('保留標記（登出後保留的帳號標示）', () {

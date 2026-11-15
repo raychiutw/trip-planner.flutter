@@ -445,5 +445,8 @@ class MemoryVault implements SecretVault {
     required TokenProtection protection,
   }) async => data[key] = value;
   @override
-  Future<void> delete(String key) async => data.remove(key);
+  Future<void> delete(String key, {TokenProtection? protection}) async =>
+      data.remove(key);
+  @override
+  bool get biometricUsesOwnNamespace => false;
 }
