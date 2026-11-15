@@ -80,7 +80,7 @@ void main() {
             FakeBiometricAuthenticator(),
           ),
           settingsStoreProvider.overrideWithValue(settings),
-          ...fakeBrowserLoginOverrides(),
+          ...fakeBrowserLoginOverrides(stubBiometric: false),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(

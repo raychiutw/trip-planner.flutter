@@ -189,13 +189,20 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 用系統瀏覽器登入(PKCE)。使用者取消不算錯誤,維持未登入。
-  Future<void> signInWithBrowser() async {
+  /// 回傳 callback 是否帶 `biometric_intent=enable`（由呼叫端決定如何處理）。
+  Future<bool> signInWithBrowser({String? biometricHint}) async {
     state = const AsyncLoading();
+    var enableIntent = false;
     try {
-      await ref.read(oauthLoginServiceProvider).login();
+      await ref
+          .read(oauthLoginServiceProvider)
+          .login(
+            biometricHint: biometricHint,
+            onEnableIntent: () => enableIntent = true,
+          );
     } on OAuthLoginException catch (e, stack) {
       state = e.cancelled ? const AsyncData(null) : AsyncError(e, stack);
-      return;
+      return false;
     }
     ref.read(authLockedProvider.notifier).set(false);
     state = await AsyncValue.guard(() async {
@@ -203,6 +210,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await _enforceCacheOwner(user);
       return user;
     });
+    return enableIntent;
   }
 
   /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)。保留的憑證若已失效

@@ -74,8 +74,45 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
     super.dispose();
   }
 
+  /// 頂端的短暫提示條。
+  Widget _notice(BuildContext context, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + TpSpacing.s2,
+      left: TpSpacing.s4,
+      right: TpSpacing.s4,
+      child: Semantics(
+        liveRegion: true,
+        child: Material(
+          color: scheme.inverseSurface,
+          borderRadius: BorderRadius.circular(TpSpacing.s3),
+          child: Padding(
+            padding: const EdgeInsets.all(TpSpacing.s3),
+            child: Text(
+              text,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.onInverseSurface),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(biometricLoginProvider.select((s) => s.passcodeOnlyNotice), (
+      _,
+      shown,
+    ) {
+      if (!shown) return;
+      Timer(const Duration(seconds: 4), () {
+        if (mounted) {
+          ref.read(biometricLoginProvider.notifier).clearPasscodeOnlyNotice();
+        }
+      });
+    });
     final signedIn = ref.watch(authStateProvider).value != null;
     final lock = ref.watch(appLockProvider);
     final showLock = lock.locked && signedIn;
@@ -120,28 +157,10 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
             !showLock &&
             !lock.promptPending)
           const Positioned.fill(child: _BiometricLoginPrompt()),
+        if (ref.watch(biometricLoginProvider).passcodeOnlyNotice)
+          _notice(context, '這支手機沒有設定 Face ID／Touch ID，已用一般方式登入'),
         if (_showDisabledNotice)
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + TpSpacing.s2,
-            left: TpSpacing.s4,
-            right: TpSpacing.s4,
-            child: Semantics(
-              liveRegion: true,
-              child: Material(
-                color: scheme.inverseSurface,
-                borderRadius: BorderRadius.circular(TpSpacing.s3),
-                child: Padding(
-                  padding: const EdgeInsets.all(TpSpacing.s3),
-                  child: Text(
-                    '此裝置已沒有可用的生物辨識或裝置密碼，已關閉 App 鎖。',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: scheme.onInverseSurface,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _notice(context, '此裝置已沒有可用的生物辨識或裝置密碼，已關閉 App 鎖。'),
       ],
     );
   }

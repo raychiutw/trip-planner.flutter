@@ -69,6 +69,7 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
+import '../helpers/fake_biometric.dart';
 import '../helpers/fake_trip_map.dart';
 import '../helpers/fake_oauth.dart';
 
@@ -108,10 +109,11 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
   }
 
   @override
-  Future<void> signInWithBrowser() async {
+  Future<bool> signInWithBrowser({String? biometricHint}) async {
     signInCount++;
     final error = failWith;
     if (error != null) state = AsyncError(error, StackTrace.empty);
+    return false;
   }
 }
 
@@ -703,6 +705,12 @@ void main() {
     final container = _buildContainer(
       currentUser: null,
       authNotifier: () => spy,
+      extraOverrides: [
+        // 登入入口會先問生物辨識種類；真平台通道在 pump 內不會完成。
+        biometricAuthenticatorProvider.overrideWithValue(
+          FakeBiometricAuthenticator(kind: null),
+        ),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -771,6 +779,9 @@ void main() {
         currentUser: null,
         authNotifier: () => spy,
         extraOverrides: [
+          biometricAuthenticatorProvider.overrideWithValue(
+            FakeBiometricAuthenticator(kind: null),
+          ),
           keptBiometricAccountProvider.overrideWith(
             (ref) async => 'a@example.com',
           ),
@@ -850,6 +861,11 @@ void main() {
       currentUser: null,
       authNotifier: () =>
           _BrowserLoginSpyNotifier(failWith: OAuthLoginException('boom')),
+      extraOverrides: [
+        biometricAuthenticatorProvider.overrideWithValue(
+          FakeBiometricAuthenticator(kind: null),
+        ),
+      ],
     );
     addTearDown(container.dispose);
 

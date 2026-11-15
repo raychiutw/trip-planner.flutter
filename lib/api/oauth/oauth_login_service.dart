@@ -70,7 +70,12 @@ class OAuthLoginService {
   final String _clientId;
   final ProofKeyStore? _proofKeys;
 
-  Future<OAuthTokens> login() async {
+  /// [biometricHint]：授權網址帶給 web 的按鈕名稱提示（faceid／touchid／generic）。
+  /// [onEnableIntent]：登入完成後、callback 帶 `biometric_intent=enable` 時呼叫。
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     final verifier = generateCodeVerifier();
     final challenge = codeChallengeS256(verifier);
     final state = generateState();
@@ -80,6 +85,7 @@ class OAuthLoginService {
       redirectUri: OAuthConfig.redirectUri,
       codeChallenge: challenge,
       state: state,
+      biometricHint: biometricHint,
     );
 
     final callback = await _launcher.authorize(
@@ -118,6 +124,8 @@ class OAuthLoginService {
     }
     if (!tokens.isDpop) await keys?.delete();
     await _source.adopt(tokens);
+    // 旗標只是「請在手機上開啟」的請求，不含憑證；disable 屬另一張票，這裡忽略。
+    if (params['biometric_intent'] == 'enable') onEnableIntent?.call();
     return tokens;
   }
 }
