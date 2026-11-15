@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
+import 'package:tripline/api/oauth/oauth_protocol.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
@@ -71,9 +72,9 @@ void main() {
 
   group('授權網址的 biometric_hint', () {
     for (final (kind, hint) in [
-      (BiometricKind.faceId, 'faceid'),
-      (BiometricKind.touchId, 'touchid'),
-      (BiometricKind.biometric, 'generic'),
+      (BiometricKind.faceId, OAuthProtocol.hintFaceId),
+      (BiometricKind.touchId, OAuthProtocol.hintTouchId),
+      (BiometricKind.biometric, OAuthProtocol.hintGeneric),
       (BiometricKind.passcode, null),
       (null, null),
     ]) {

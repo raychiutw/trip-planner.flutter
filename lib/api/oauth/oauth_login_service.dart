@@ -6,6 +6,7 @@ library;
 import '../../models/oauth_tokens.dart';
 import '../dpop/proof_key_store.dart';
 import 'oauth_config.dart';
+import 'oauth_protocol.dart';
 import 'oauth_repository.dart';
 import 'pkce.dart';
 import 'stored_bearer_token_source.dart';
@@ -55,6 +56,14 @@ class UnavailableAuthorizationLauncher implements AuthorizationLauncher {
   }) async => throw OAuthLoginException('尚未設定授權啟動器');
 }
 
+/// 登入結果：憑證，加上 callback 是否要求在手機上開啟生物辨識登入。
+class OAuthLoginResult {
+  const OAuthLoginResult(this.tokens, {this.enableBiometric = false});
+
+  final OAuthTokens tokens;
+  final bool enableBiometric;
+}
+
 class OAuthLoginService {
   OAuthLoginService({
     required OAuthRepository repository,
@@ -74,12 +83,9 @@ class OAuthLoginService {
   final String _clientId;
   final ProofKeyStore? _proofKeys;
 
-  /// [biometricHint]：授權網址帶給 web 的按鈕名稱提示（faceid／touchid／generic）。
-  /// [onEnableIntent]：登入完成後、callback 帶 `biometric_intent=enable` 時呼叫。
-  Future<OAuthTokens> login({
-    String? biometricHint,
-    void Function()? onEnableIntent,
-  }) async {
+  /// [biometricHint]：授權網址帶給 web 的按鈕名稱提示（[OAuthProtocol] 的 hint 值）。
+  /// 結果的 [OAuthLoginResult.enableBiometric] 表示 callback 帶了開啟生物辨識登入的旗標。
+  Future<OAuthLoginResult> login({String? biometricHint}) async {
     final verifier = generateCodeVerifier();
     final challenge = codeChallengeS256(verifier);
     final state = generateState();
@@ -115,8 +121,12 @@ class OAuthLoginService {
     await _source.adopt(tokens);
     // 旗標只是「請在手機上開啟」的請求，不含憑證。一般登入只認 enable；disable 只會出現在
     // 設定頁的重新驗證（見 [reauthenticate]），登入收到時不處理。
-    if (params['biometric_intent'] == 'enable') onEnableIntent?.call();
-    return tokens;
+    return OAuthLoginResult(
+      tokens,
+      enableBiometric:
+          params[OAuthProtocol.biometricIntentParam] ==
+          OAuthProtocol.intentEnable,
+    );
   }
 
   /// 開系統瀏覽器等 callback；只認 state 相符的（防止別的網頁偽造回跳，CSRF），
@@ -141,7 +151,7 @@ class OAuthLoginService {
     }
     final error = params['error'];
     if (error != null) {
-      if (reauth && error == 'reauth_account_mismatch') {
+      if (reauth && error == OAuthProtocol.errorReauthAccountMismatch) {
         throw OAuthLoginException(
           '授權端判定重新驗證的帳號與目前帳號不同',
           userMessage: '登入的帳號與目前帳號不同',
@@ -150,7 +160,7 @@ class OAuthLoginService {
       }
       throw OAuthLoginException(
         '授權失敗:$error',
-        cancelled: reauth && error == 'access_denied',
+        cancelled: reauth && error == OAuthProtocol.errorAccessDenied,
       );
     }
     final code = params['code'];
@@ -188,7 +198,7 @@ class OAuthLoginService {
     );
     // api 只在批准者就是 expected_account 時才加 biometric_intent 旗標（不符會導回
     // error=reauth_account_mismatch），所以旗標與發起時的意圖一致即證明帳號相同；缺漏或不一致一律拒絕。
-    if (params['biometric_intent'] != intent) {
+    if (params[OAuthProtocol.biometricIntentParam] != intent) {
       throw OAuthLoginException('重新驗證的 callback 沒有帶預期的意圖');
     }
   }

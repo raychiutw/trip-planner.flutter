@@ -10,6 +10,7 @@ import '../api_error.dart';
 import '../dpop/dpop_clock.dart';
 import '../dpop/dpop_proof.dart';
 import '../dpop/proof_key.dart';
+import 'oauth_protocol.dart';
 
 class OAuthRepository {
   OAuthRepository({Dio? dio, String origin = kTriplineOrigin, DpopClock? clock})
@@ -47,12 +48,12 @@ class OAuthRepository {
         'state': state,
         'code_challenge': codeChallenge,
         'code_challenge_method': 'S256',
-        'biometric_hint': ?biometricHint,
+        OAuthProtocol.biometricHintParam: ?biometricHint,
         // 重新驗證：三者必須同時帶，api 才會要求使用者重新輸入密碼（api#91）。
         if (reauthIntent != null && expectedAccount != null) ...{
-          'prompt': 'login',
-          'biometric_intent': reauthIntent,
-          'expected_account': expectedAccount,
+          OAuthProtocol.promptParam: OAuthProtocol.promptLogin,
+          OAuthProtocol.biometricIntentParam: reauthIntent,
+          OAuthProtocol.expectedAccountParam: expectedAccount,
         },
       },
     );

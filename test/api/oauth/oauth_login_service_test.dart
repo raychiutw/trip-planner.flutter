@@ -5,6 +5,7 @@ import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
+import 'package:tripline/api/oauth/oauth_protocol.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 
 class _MockRepo extends Mock implements OAuthRepository {}
@@ -88,7 +89,7 @@ void main() {
   });
 
   test('用 https callback 的網域與路徑啟動授權，換到 token 後交給憑證來源', () async {
-    final tokens = await service.login();
+    final tokens = (await service.login()).tokens;
 
     expect(launcher.lastHost, OAuthConfig.callbackHost);
     expect(launcher.lastPath, OAuthConfig.callbackPath);
@@ -118,7 +119,7 @@ void main() {
 
   test('授權端回 error → 丟出登入例外，不換 token', () async {
     launcher.reply = (u) => {
-      'error': 'access_denied',
+      'error': OAuthProtocol.errorAccessDenied,
       'state': u.queryParameters['state']!,
     };
     await expectLater(service.login(), throwsA(isA<OAuthLoginException>()));
@@ -126,7 +127,7 @@ void main() {
 
   test('一般登入遇 access_denied → 仍是錯誤（cancelled 為 false），維持原行為', () async {
     launcher.reply = (u) => {
-      'error': 'access_denied',
+      'error': OAuthProtocol.errorAccessDenied,
       'state': u.queryParameters['state']!,
     };
     final error = await service.login().then<Object?>(
@@ -159,32 +160,43 @@ void main() {
         'state': u.queryParameters['state']!,
         ...extra,
       };
-      var enable = false;
-      await service.login(onEnableIntent: () => enable = true);
-      return enable;
+      return (await service.login()).enableBiometric;
     }
 
-    test('enable → 通知呼叫端，token 照常兌換並存下', () async {
-      expect(await loginWith({'biometric_intent': 'enable'}), isTrue);
+    test('enable → 回傳 enableBiometric，token 照常兌換並存下', () async {
+      expect(
+        await loginWith({
+          OAuthProtocol.biometricIntentParam: OAuthProtocol.intentEnable,
+        }),
+        isTrue,
+      );
       expect((await store.read())!.refreshToken, 'RT');
     });
 
     test('沒有旗標、disable、未知值 → 不通知、不報錯、登入照常', () async {
       expect(await loginWith({}), isFalse);
-      expect(await loginWith({'biometric_intent': 'disable'}), isFalse);
-      expect(await loginWith({'biometric_intent': 'x'}), isFalse);
+      expect(
+        await loginWith({
+          OAuthProtocol.biometricIntentParam: OAuthProtocol.intentDisable,
+        }),
+        isFalse,
+      );
+      expect(
+        await loginWith({OAuthProtocol.biometricIntentParam: 'x'}),
+        isFalse,
+      );
       expect((await store.read())!.refreshToken, 'RT');
     });
 
     test('biometricHint 傳給授權網址組裝', () async {
-      await service.login(biometricHint: 'touchid');
+      await service.login(biometricHint: OAuthProtocol.hintTouchId);
       verify(
         () => repo.buildAuthorizeUrl(
           clientId: any(named: 'clientId'),
           redirectUri: any(named: 'redirectUri'),
           codeChallenge: any(named: 'codeChallenge'),
           state: any(named: 'state'),
-          biometricHint: 'touchid',
+          biometricHint: OAuthProtocol.hintTouchId,
         ),
       ).called(1);
     });

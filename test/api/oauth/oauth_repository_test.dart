@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
+import 'package:tripline/api/oauth/oauth_protocol.dart';
 
 void main() {
   late Dio dio;
@@ -40,8 +41,16 @@ void main() {
       state: 's',
       biometricHint: hint,
     );
-    expect(build(hint: 'faceid').queryParameters['biometric_hint'], 'faceid');
-    expect(build().queryParameters.containsKey('biometric_hint'), isFalse);
+    expect(
+      build(
+        hint: OAuthProtocol.hintFaceId,
+      ).queryParameters[OAuthProtocol.biometricHintParam],
+      OAuthProtocol.hintFaceId,
+    );
+    expect(
+      build().queryParameters.containsKey(OAuthProtocol.biometricHintParam),
+      isFalse,
+    );
   });
 
   test('buildAuthorizeUrl：重新驗證帶 prompt=login、意圖與 expected_account；缺一不帶', () {
@@ -53,14 +62,27 @@ void main() {
       reauthIntent: intent,
       expectedAccount: account,
     );
-    final q = build(intent: 'disable', account: 'u_1').queryParameters;
-    expect(q['prompt'], 'login');
-    expect(q['biometric_intent'], 'disable');
-    expect(q['expected_account'], 'u_1');
-    for (final u in [build(), build(intent: 'enable'), build(account: 'u')]) {
-      expect(u.queryParameters.containsKey('prompt'), isFalse);
-      expect(u.queryParameters.containsKey('biometric_intent'), isFalse);
-      expect(u.queryParameters.containsKey('expected_account'), isFalse);
+    final q = build(
+      intent: OAuthProtocol.intentDisable,
+      account: 'u_1',
+    ).queryParameters;
+    expect(q[OAuthProtocol.promptParam], OAuthProtocol.promptLogin);
+    expect(q[OAuthProtocol.biometricIntentParam], OAuthProtocol.intentDisable);
+    expect(q[OAuthProtocol.expectedAccountParam], 'u_1');
+    for (final u in [
+      build(),
+      build(intent: OAuthProtocol.intentEnable),
+      build(account: 'u'),
+    ]) {
+      expect(u.queryParameters.containsKey(OAuthProtocol.promptParam), isFalse);
+      expect(
+        u.queryParameters.containsKey(OAuthProtocol.biometricIntentParam),
+        isFalse,
+      );
+      expect(
+        u.queryParameters.containsKey(OAuthProtocol.expectedAccountParam),
+        isFalse,
+      );
     }
   });
 

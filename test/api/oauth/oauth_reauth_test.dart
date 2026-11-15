@@ -5,6 +5,7 @@ import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
+import 'package:tripline/api/oauth/oauth_protocol.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 
 class _MockRepo extends Mock implements OAuthRepository {}
@@ -25,7 +26,7 @@ class _FakeLauncher implements AuthorizationLauncher {
         {
           'code': 'CODE',
           'state': authorizeUrl.queryParameters['state']!,
-          'biometric_intent': 'enable',
+          OAuthProtocol.biometricIntentParam: OAuthProtocol.intentEnable,
         };
     return Uri.https(callbackHost, callbackPath, params);
   }
@@ -105,16 +106,19 @@ void main() {
     ).thenAnswer((_) async {});
   });
 
-  Future<void> reauth({String intent = 'enable', String? hint}) =>
-      service.reauthenticate(
-        intent: intent,
-        expectedAccount: 'u1',
-        biometricHint: hint,
-      );
-
-  Future<Object?> reauthError({String intent = 'enable'}) => reauth(
+  Future<void> reauth({
+    String intent = OAuthProtocol.intentEnable,
+    String? hint,
+  }) => service.reauthenticate(
     intent: intent,
-  ).then<Object?>((_) => null, onError: (Object e) => e);
+    expectedAccount: 'u1',
+    biometricHint: hint,
+  );
+
+  Future<Object?> reauthError({String intent = OAuthProtocol.intentEnable}) =>
+      reauth(
+        intent: intent,
+      ).then<Object?>((_) => null, onError: (Object e) => e);
 
   void verifyNoExchangeOrRevoke() {
     verifyNever(
@@ -141,7 +145,7 @@ void main() {
 
   test('重新驗證遇 access_denied → 視為取消（cancelled 為 true）', () async {
     launcher.reply = (u) => {
-      'error': 'access_denied',
+      'error': OAuthProtocol.errorAccessDenied,
       'state': u.queryParameters['state']!,
     };
     final e = await reauthError();
@@ -153,9 +157,12 @@ void main() {
     launcher.reply = (u) => {
       'code': 'CODE',
       'state': u.queryParameters['state']!,
-      'biometric_intent': 'disable',
+      OAuthProtocol.biometricIntentParam: OAuthProtocol.intentDisable,
     };
-    await reauth(intent: 'disable', hint: 'faceid');
+    await reauth(
+      intent: OAuthProtocol.intentDisable,
+      hint: OAuthProtocol.hintFaceId,
+    );
 
     verify(
       () => repo.buildAuthorizeUrl(
@@ -163,8 +170,8 @@ void main() {
         redirectUri: any(named: 'redirectUri'),
         codeChallenge: any(named: 'codeChallenge'),
         state: any(named: 'state'),
-        biometricHint: 'faceid',
-        reauthIntent: 'disable',
+        biometricHint: OAuthProtocol.hintFaceId,
+        reauthIntent: OAuthProtocol.intentDisable,
         expectedAccount: 'u1',
       ),
     ).called(1);
@@ -174,23 +181,23 @@ void main() {
     launcher.reply = (u) => {
       'code': 'CODE',
       'state': u.queryParameters['state']!,
-      'biometric_intent': 'disable',
+      OAuthProtocol.biometricIntentParam: OAuthProtocol.intentDisable,
     };
     final oldKey = await keys.load();
 
-    await reauth(intent: 'disable');
+    await reauth(intent: OAuthProtocol.intentDisable);
 
     await expectCurrentLoginUntouched();
     expect(await keys.load(), same(oldKey), reason: '重新驗證不能換掉目前登入的金鑰');
     verifyNoExchangeOrRevoke();
   });
 
-  for (final flag in <String?>[null, 'disable', '']) {
+  for (final flag in <String?>[null, OAuthProtocol.intentDisable, '']) {
     test('callback 旗標為 ${flag ?? '缺漏'}、意圖 enable：拒絕，不兌換不撤銷', () async {
       launcher.reply = (u) => {
         'code': 'CODE',
         'state': u.queryParameters['state']!,
-        'biometric_intent': ?flag,
+        OAuthProtocol.biometricIntentParam: ?flag,
       };
 
       expect(await reauthError(), isA<OAuthLoginException>());
@@ -223,7 +230,7 @@ void main() {
   group('callback 帶 error=reauth_account_mismatch（api 判定帳號不符）', () {
     void replyMismatch({String? state}) {
       launcher.reply = (u) => {
-        'error': 'reauth_account_mismatch',
+        'error': OAuthProtocol.errorReauthAccountMismatch,
         'state': state ?? u.queryParameters['state']!,
       };
     }

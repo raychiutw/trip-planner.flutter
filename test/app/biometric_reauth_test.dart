@@ -7,6 +7,7 @@ import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
+import 'package:tripline/api/oauth/oauth_protocol.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
@@ -85,9 +86,9 @@ void main() {
       await ctl().reauthenticate(turnOn: true);
 
       expect(service.reauthCalls, 1);
-      expect(service.lastReauthIntent, 'enable');
+      expect(service.lastReauthIntent, OAuthProtocol.intentEnable);
       expect(service.lastExpectedAccount, 'u1');
-      expect(service.lastReauthHint, 'faceid');
+      expect(service.lastReauthHint, OAuthProtocol.hintFaceId);
       expect(bio.authenticateCalls, 1);
       expect(store.protection, TokenProtection.biometric);
       expect(st().enabled, isTrue);
@@ -132,7 +133,7 @@ void main() {
       await setUpWith(biometric: true);
       await ctl().reauthenticate(turnOn: false);
 
-      expect(service.lastReauthIntent, 'disable');
+      expect(service.lastReauthIntent, OAuthProtocol.intentDisable);
       expect(bio.authenticateCalls, 1);
       expect(container.read(authStateProvider).value, isNull);
       expect(await store.read(), isNull);
