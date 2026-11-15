@@ -892,19 +892,19 @@ List<HigScene> higScenes() => [
   const HigScene(
     'auth-login',
     '#420 #424',
-    location: '/login',
+    location: '/welcome',
     loggedIn: false,
   ),
   HigScene(
     'auth-login-error',
     '#420 #424',
-    location: '/login',
+    location: '/welcome',
     loggedIn: false,
     stub: (f) => f.fixture.session.loginError = OAuthLoginException(
       'boom',
       userMessage: 'Tripline 登入失敗，請稍後再試',
     ),
-    act: (tester, f) async => _tapKey(tester, 'login-browser-button'),
+    act: (tester, f) async => _tapKey(tester, 'welcome-login-hero'),
   ),
   const HigScene(
     'auth-signup',
@@ -2245,7 +2245,7 @@ List<HigScene> higScenes() => [
   const HigScene(
     'ax-login-2x',
     '#422',
-    location: '/login',
+    location: '/welcome',
     loggedIn: false,
     textScale: 2.0,
   ),
@@ -2312,9 +2312,9 @@ List<HigScene> higScenes() => [
     'app-lock-enable-prompt',
     '#462',
     loggedIn: false,
-    location: '/login',
+    location: '/welcome',
     stub: (f) => f.biometric = _OkBiometric(),
-    act: (tester, f) async => _tapKey(tester, 'login-browser-button'),
+    act: (tester, f) async => _tapKey(tester, 'welcome-login-hero'),
   ),
   HigScene(
     'account-home-security',

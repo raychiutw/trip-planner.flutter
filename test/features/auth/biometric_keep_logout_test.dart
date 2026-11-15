@@ -15,7 +15,7 @@ import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/logout_confirm.dart';
 import 'package:tripline/features/account/settings/biometric_login_row.dart';
-import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/auth/welcome_route.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
 
@@ -26,9 +26,23 @@ import '../../helpers/fake_oauth.dart';
 class _CountingStore extends InMemoryOAuthTokenStore {
   int reads = 0;
 
+  /// 封存（lock）之後第一次讀取才算一次系統驗證；解開後與正式 store 一樣走快取。
+  int prompts = 0;
+  bool _sealed = false;
+
+  @override
+  Future<void> lock() async {
+    _sealed = true;
+    await super.lock();
+  }
+
   @override
   Future<OAuthTokens?> read() {
     reads++;
+    if (_sealed) {
+      prompts++;
+      if (unlockSucceeds) _sealed = false;
+    }
     return super.read();
   }
 }
@@ -38,9 +52,18 @@ class _MockAuthRepo extends Mock implements AuthRepository {}
 class _MockOAuthRepo extends Mock implements OAuthRepository {}
 
 const _user = UserInfo(id: 'u1', email: 'ray@example.com');
-const _entry = ValueKey('login-biometric-button');
-const _account = ValueKey('login-biometric-account');
-const _browser = ValueKey('login-browser-button');
+const _hero = ValueKey('welcome-login-hero');
+// 有保留憑證時歡迎頁顯示的帳號標示（同時代表 Face ID 入口存在）。
+const _entry = ValueKey('welcome-kept-account');
+const _account = _entry;
+
+/// 解鎖成功時歡迎頁的進度畫面會一直留著（正式環境由 router 換頁），
+/// 測試直接掛 WelcomeRoute 沒有換頁，不能 pumpAndSettle（轉圈永不停）。
+Future<void> pumpAfterLogin(WidgetTester tester) async {
+  for (var i = 0; i < 20; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
 
 void main() {
   late _CountingStore store;
@@ -64,7 +87,7 @@ void main() {
     child: MaterialApp.router(
       routerConfig: GoRouter(
         routes: [
-          GoRoute(path: '/', builder: (_, _) => home ?? const LoginScreen()),
+          GoRoute(path: '/', builder: (_, _) => home ?? const WelcomeRoute()),
         ],
       ),
     ),
@@ -160,7 +183,6 @@ void main() {
         ),
       );
       expect(find.byKey(_entry), findsOneWidget);
-      expect(find.text('用 Face ID 登入'), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(_account)).data, 'ray@example.com');
     });
 
@@ -168,24 +190,35 @@ void main() {
       final c = await pumpSignedIn(tester, biometric: true);
       await logout(tester, c);
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
 
       expect(c.read(authStateProvider).value?.email, 'ray@example.com');
     });
 
-    testWidgets('取消：留在登入頁、憑證沒被登出，可改用瀏覽器登入', (tester) async {
+    testWidgets('解鎖只觸發一次受保護讀取（系統驗證一次）', (tester) async {
+      final c = await pumpSignedIn(tester, biometric: true);
+      await logout(tester, c);
+      store.prompts = 0;
+
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
+
+      expect(c.read(authStateProvider).value?.email, 'ray@example.com');
+      expect(store.prompts, 1);
+    });
+
+    testWidgets('取消：留在歡迎頁、憑證沒被登出，可再按一次', (tester) async {
       final c = await pumpSignedIn(tester, biometric: true);
       await logout(tester, c);
       store.unlockSucceeds = false;
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
 
       expect(c.read(authStateProvider).value, isNull);
       expect(find.byKey(_entry), findsOneWidget);
-      expect(find.byKey(_browser), findsOneWidget);
-      expect(find.text('改用瀏覽器登入'), findsOneWidget);
+      expect(find.byKey(_hero), findsOneWidget);
       store.unlockSucceeds = true;
       expect(await store.read(), isNotNull, reason: '取消不能清掉憑證');
       expect(await keys.load(), isNotNull);
@@ -200,7 +233,6 @@ void main() {
       await logout(tester, c);
 
       expect(find.byKey(_entry), findsNothing);
-      expect(find.byKey(const ValueKey('login-unlock-button')), findsNothing);
     });
   });
 
@@ -223,8 +255,8 @@ void main() {
       await logout(tester, c0);
       final c1 = await coldStart(tester);
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
 
       expect(c1.read(authStateProvider).value?.email, 'ray@example.com');
       expect(await store.readKeptAccount(), isNull);
@@ -239,8 +271,8 @@ void main() {
       final c1 = await coldStart(tester);
       store.unlockSucceeds = false;
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
 
       expect(c1.read(authStateProvider).value, isNull);
       expect(find.byKey(_entry), findsOneWidget);
@@ -373,8 +405,8 @@ void main() {
 
       expect(store.reads, reads, reason: '封存期間不得碰 store');
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
       expect(await source.accessToken(), isNotNull, reason: '解鎖後恢復');
     });
 
@@ -428,7 +460,7 @@ void main() {
   });
 
   group('登入頁的「忘記這支手機」', () {
-    const forget = ValueKey('login-forget-phone');
+    const forget = ValueKey('welcome-forget-phone');
 
     testWidgets('取消：憑證、金鑰、入口都在', (tester) async {
       final c = await pumpSignedIn(tester, biometric: true);

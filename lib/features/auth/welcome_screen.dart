@@ -1,14 +1,28 @@
 import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../../features/map/map_style.dart';
 import '../../theme/tokens.dart';
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key, required this.onLogin});
+  const WelcomeScreen({
+    super.key,
+    required this.onLogin,
+    this.emailVerified = false,
+    this.keptAccount,
+    this.onForgetPhone,
+  });
 
   final VoidCallback onLogin;
+
+  /// 從 Email 驗證連結回來（`verified=1`）：顯示「信箱已驗證」提示。
+  final bool emailVerified;
+
+  /// 登出後保留的生物辨識登入所標示的帳號（有才顯示帳號與「忘記這支手機」）。
+  final String? keptAccount;
+  final VoidCallback? onForgetPhone;
 
   @override
   Widget build(BuildContext context) => _buildContent(context);
@@ -59,7 +73,14 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
           ),
-          SliverToBoxAdapter(child: _Hero(onLogin: onLogin)),
+          SliverToBoxAdapter(
+            child: _Hero(
+              onLogin: onLogin,
+              emailVerified: emailVerified,
+              keptAccount: keptAccount,
+              onForgetPhone: onForgetPhone,
+            ),
+          ),
           const SliverToBoxAdapter(child: _Features()),
           SliverToBoxAdapter(child: _ClosingCallToAction(onLogin: onLogin)),
           const SliverToBoxAdapter(child: _Footer()),
@@ -70,9 +91,17 @@ class WelcomeScreen extends StatelessWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.onLogin});
+  const _Hero({
+    required this.onLogin,
+    required this.emailVerified,
+    required this.keptAccount,
+    required this.onForgetPhone,
+  });
 
   final VoidCallback onLogin;
+  final bool emailVerified;
+  final String? keptAccount;
+  final VoidCallback? onForgetPhone;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +111,12 @@ class _Hero extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 720;
-          final copy = _HeroCopy(onLogin: onLogin);
+          final copy = _HeroCopy(
+            onLogin: onLogin,
+            emailVerified: emailVerified,
+            keptAccount: keptAccount,
+            onForgetPhone: onForgetPhone,
+          );
           const art = _LandingArt(
             key: ValueKey('welcome-hero-art'),
             kind: _LandingArtKind.hero,
@@ -113,9 +147,17 @@ class _Hero extends StatelessWidget {
 }
 
 class _HeroCopy extends StatelessWidget {
-  const _HeroCopy({required this.onLogin});
+  const _HeroCopy({
+    required this.onLogin,
+    required this.emailVerified,
+    required this.keptAccount,
+    required this.onForgetPhone,
+  });
 
   final VoidCallback onLogin;
+  final bool emailVerified;
+  final String? keptAccount;
+  final VoidCallback? onForgetPhone;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +165,10 @@ class _HeroCopy extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (emailVerified) ...[
+          const _VerifiedBanner(),
+          const SizedBox(height: TpSpacing.s4),
+        ],
         Text(
           '旅遊行程規劃',
           style: theme.textTheme.labelSmall?.copyWith(
@@ -154,7 +200,69 @@ class _HeroCopy extends StatelessWidget {
           key: const ValueKey('welcome-login-hero'),
           onPressed: onLogin,
         ),
+        if (keptAccount case final account?) ...[
+          const SizedBox(height: TpSpacing.s2),
+          Text(
+            account,
+            key: const ValueKey('welcome-kept-account'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          TextButton(
+            key: const ValueKey('welcome-forget-phone'),
+            onPressed: onForgetPhone,
+            child: const Text('忘記這支手機'),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Email 驗證成功的提示（原登入頁的橫幅）。
+class _VerifiedBanner extends StatelessWidget {
+  const _VerifiedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final successColor = theme.brightness == Brightness.dark
+        ? TpSystemColorsDark.success
+        : TpSystemColorsLight.success;
+    return Semantics(
+      key: const ValueKey('welcome-verified-banner'),
+      container: true,
+      liveRegion: true,
+      label: '成功：信箱已驗證，請登入繼續。',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TpSpacing.s4,
+          vertical: TpSpacing.s3,
+        ),
+        decoration: BoxDecoration(
+          color: successColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(TpRadius.md),
+          border: MediaQuery.highContrastOf(context)
+              ? Border.all(color: theme.colorScheme.onSurface)
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(CupertinoIcons.check_mark_circled_solid, color: successColor),
+            const SizedBox(width: TpSpacing.s2),
+            Expanded(
+              child: Text(
+                '信箱已驗證，請登入繼續。',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

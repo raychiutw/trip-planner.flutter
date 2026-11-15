@@ -7,8 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
 import '../features/auth/account_flow_screens.dart';
-import '../features/auth/login_screen.dart';
-import '../features/auth/welcome_screen.dart';
+import '../features/auth/welcome_route.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
@@ -34,8 +33,6 @@ import '../features/trips/health/trip_health_screen.dart';
 import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
-import 'app_lock.dart';
-import 'biometric_login.dart';
 import 'auth_redirect_policy.dart';
 import 'legacy_aliases.dart';
 
@@ -66,39 +63,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
-      // 登入頁在 shell 外（無底部導航）
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // 登入流程只有歡迎頁；舊 /login 連結（驗證信、分享、邀請）轉到歡迎頁。
+      GoRoute(
+        path: '/login',
+        redirect: (context, state) => welcomeLocationFromLogin(state.uri),
+      ),
       GoRoute(
         path: '/welcome',
-        builder: (context, state) => WelcomeScreen(
-          // 直接開系統瀏覽器登入，不多繞一頁登入畫面；失敗才轉到登入畫面
-          // 顯示錯誤並讓使用者重試。成功後由 redirect 帶回 redirect_after。
-          onLogin: () async {
-            // 登出後保留了生物辨識登入：直接解鎖（跳 Face ID），成功由 redirect
-            // 進 App；取消或失敗才轉到登入畫面（那裡有 Face ID 與瀏覽器兩個入口）。
-            final kept = await ref.read(keptBiometricAccountProvider.future);
-            // 沒有保留憑證就不必查裝置種類（省一次平台呼叫）。
-            final kind = kept == null
-                ? null
-                : await ref.read(appLockKindProvider.future);
-            if (!context.mounted) return;
-            if (kind.hasBiometric) {
-              await ref.read(authStateProvider.notifier).unlock();
-              if (!context.mounted) return;
-              if (ref.read(authStateProvider).value == null) {
-                context.go(loginLocationFromWelcome(state.uri));
-              }
-              return;
-            }
-            final signIn = ref
-                .read(biometricLoginProvider.notifier)
-                .signInWithBrowser();
-            await signIn;
-            if (!context.mounted) return;
-            if (ref.read(authStateProvider).hasError) {
-              context.go(loginLocationFromWelcome(state.uri));
-            }
-          },
+        builder: (context, state) => WelcomeRoute(
+          emailVerified: state.uri.queryParameters['verified'] == '1',
         ),
       ),
       GoRoute(

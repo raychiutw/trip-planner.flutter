@@ -263,7 +263,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 已知既有債（不是許可）
 
-「不直接引用 `TpSystemColorsLight`／`TpSystemColorsDark`」這條目前有 3 處 feature 違反,都是取語意 success 色 —— `lib/features/auth/login_screen.dart:106-107`、`lib/features/auth/welcome_screen.dart:441-442`、`lib/features/invite/invite_screen.dart:639-640`。**新程式碼不得比照辦理**;審查看到既有的三處不算新違規。
+「不直接引用 `TpSystemColorsLight`／`TpSystemColorsDark`」這條目前有 3 處 feature 違反,都是取語意 success 色 —— `lib/features/auth/welcome_screen.dart`(兩處:功能卡、信箱已驗證提示,後者原在已移除的登入頁)、`lib/features/invite/invite_screen.dart`。**新程式碼不得比照辦理**;審查看到既有的三處不算新違規。
 
 ## UI 規範
 
