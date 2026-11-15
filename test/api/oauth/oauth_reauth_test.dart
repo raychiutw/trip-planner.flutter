@@ -320,10 +320,12 @@ void main() {
     test('一般登入收到同樣的 error：維持一般錯誤（不是取消、不是帳號不符）', () async {
       replyMismatch();
 
-      final e = await service.login().then<Object?>(
-        (_) => null,
-        onError: (Object e) => e,
-      ) as OAuthLoginException;
+      final e =
+          await service.login().then<Object?>(
+                (_) => null,
+                onError: (Object e) => e,
+              )
+              as OAuthLoginException;
 
       expect(e.accountMismatch, isFalse);
       expect(e.cancelled, isFalse);
