@@ -34,6 +34,7 @@ import '../features/trips/health/trip_health_screen.dart';
 import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
+import 'app_lock.dart';
 import 'auth_redirect_policy.dart';
 import 'legacy_aliases.dart';
 
@@ -72,12 +73,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // 直接開系統瀏覽器登入，不多繞一頁登入畫面；失敗才轉到登入畫面
           // 顯示錯誤並讓使用者重試。成功後由 redirect 帶回 redirect_after。
           onLogin: () async {
-            // 登出後保留了生物辨識登入：Face ID 入口在登入畫面，先到那裡，
-            // 不直接開瀏覽器（否則入口永遠到不了）。
+            // 登出後保留了生物辨識登入：直接解鎖（跳 Face ID），成功由 redirect
+            // 進 App；取消或失敗才轉到登入畫面（那裡有 Face ID 與瀏覽器兩個入口）。
             final kept = await ref.read(keptBiometricAccountProvider.future);
+            // 沒有保留憑證就不必查裝置種類（省一次平台呼叫）。
+            final kind = kept == null
+                ? null
+                : await ref.read(appLockKindProvider.future);
             if (!context.mounted) return;
-            if (kept != null) {
-              context.go(loginLocationFromWelcome(state.uri));
+            if (kind.hasBiometric) {
+              await ref.read(authStateProvider.notifier).unlock();
+              if (!context.mounted) return;
+              if (ref.read(authStateProvider).value == null) {
+                context.go(loginLocationFromWelcome(state.uri));
+              }
               return;
             }
             final signIn = ref
