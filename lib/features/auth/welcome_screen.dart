@@ -11,11 +11,15 @@ class WelcomeScreen extends StatelessWidget {
     super.key,
     required this.onLogin,
     this.emailVerified = false,
+    this.onSignup,
     this.keptAccount,
     this.onForgetPhone,
   });
 
   final VoidCallback onLogin;
+
+  /// 「建立帳號」入口（App 內 Email 註冊）；null 則不顯示。
+  final VoidCallback? onSignup;
 
   /// 從 Email 驗證連結回來（`verified=1`）：顯示「信箱已驗證」提示。
   final bool emailVerified;
@@ -77,6 +81,7 @@ class WelcomeScreen extends StatelessWidget {
             child: _Hero(
               onLogin: onLogin,
               emailVerified: emailVerified,
+              onSignup: onSignup,
               keptAccount: keptAccount,
               onForgetPhone: onForgetPhone,
             ),
@@ -94,12 +99,14 @@ class _Hero extends StatelessWidget {
   const _Hero({
     required this.onLogin,
     required this.emailVerified,
+    required this.onSignup,
     required this.keptAccount,
     required this.onForgetPhone,
   });
 
   final VoidCallback onLogin;
   final bool emailVerified;
+  final VoidCallback? onSignup;
   final String? keptAccount;
   final VoidCallback? onForgetPhone;
 
@@ -114,6 +121,7 @@ class _Hero extends StatelessWidget {
           final copy = _HeroCopy(
             onLogin: onLogin,
             emailVerified: emailVerified,
+            onSignup: onSignup,
             keptAccount: keptAccount,
             onForgetPhone: onForgetPhone,
           );
@@ -150,12 +158,14 @@ class _HeroCopy extends StatelessWidget {
   const _HeroCopy({
     required this.onLogin,
     required this.emailVerified,
+    required this.onSignup,
     required this.keptAccount,
     required this.onForgetPhone,
   });
 
   final VoidCallback onLogin;
   final bool emailVerified;
+  final VoidCallback? onSignup;
   final String? keptAccount;
   final VoidCallback? onForgetPhone;
 
@@ -200,6 +210,12 @@ class _HeroCopy extends StatelessWidget {
           key: const ValueKey('welcome-login-hero'),
           onPressed: onLogin,
         ),
+        if (onSignup != null)
+          TextButton(
+            key: const ValueKey('welcome-signup'),
+            onPressed: onSignup,
+            child: const Text('沒有帳號，建立帳號'),
+          ),
         if (keptAccount case final account?) ...[
           const SizedBox(height: TpSpacing.s2),
           Text(

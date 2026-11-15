@@ -3,14 +3,13 @@
 /// - 有保留憑證（登出後保留）或憑證被鎖，且裝置有生物辨識：登入鈕＝解鎖一次，
 ///   成功由 router redirect 進 App；取消留在原頁；憑證失效顯示訊息。
 /// - 其餘：開系統瀏覽器登入，失敗在本頁顯示錯誤。
-/// - 冷啟動憑證被鎖：自動嘗試解鎖一次（[welcomeAutoUnlockTriedProvider]）。
+/// - 冷啟動讀憑證時系統本身會跳一次驗證；取消就停在這裡，等使用者按登入鈕。
 library;
-
-import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/oauth/oauth_login_service.dart';
 import '../../api/providers.dart';
@@ -19,18 +18,6 @@ import '../../app/app_lock.dart';
 import '../../app/biometric_login.dart';
 import '../../app/forget_this_phone.dart';
 import 'welcome_screen.dart';
-
-/// 這次 App 啟動是否已自動解鎖過（只自動一次，之後都要使用者按登入鈕）。
-final welcomeAutoUnlockTriedProvider = NotifierProvider<_AutoUnlockFlag, bool>(
-  _AutoUnlockFlag.new,
-);
-
-class _AutoUnlockFlag extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  void markTried() => state = true;
-}
 
 class WelcomeRoute extends ConsumerStatefulWidget {
   const WelcomeRoute({super.key, this.emailVerified = false});
@@ -43,34 +30,7 @@ class WelcomeRoute extends ConsumerStatefulWidget {
 
 class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
   /// 登入／解鎖進行中（含成功後、router 換頁前）：以進度畫面蓋住歡迎頁內容。
-  /// 冷啟動憑證被鎖且尚未自動解鎖時，第一格就要蓋住，不先閃出歡迎頁。
-  late bool _busy;
-
-  @override
-  void initState() {
-    super.initState();
-    _busy =
-        ref.read(authLockedProvider) &&
-        !ref.read(welcomeAutoUnlockTriedProvider);
-    // 不能在 initState／build 期間改 provider，延後到 build 結束。
-    ref.listenManual(
-      authLockedProvider,
-      (_, locked) => WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _maybeAutoUnlock(locked),
-      ),
-      fireImmediately: true,
-    );
-  }
-
-  Future<void> _maybeAutoUnlock(bool locked) async {
-    if (!mounted || !locked || ref.read(welcomeAutoUnlockTriedProvider)) return;
-    ref.read(welcomeAutoUnlockTriedProvider.notifier).markTried();
-    await _guarded(() async {
-      if (!await _canUnlock()) return;
-      await _waitForRouteSettled();
-      if (mounted) await _unlock();
-    });
-  }
+  bool _busy = false;
 
   /// 執行登入／解鎖並維持進度畫面。成功（已登入）時不撤掉：router 會換頁，
   /// 提早撤掉會在轉址前多露出一格歡迎頁。取消、失敗、例外都要復原。
@@ -85,21 +45,6 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
         setState(() => _busy = false);
       }
     }
-  }
-
-  /// 頁面轉場結束才跳系統驗證：轉場中就解鎖成功會讓前後兩個 shell 同時存在。
-  Future<void> _waitForRouteSettled() async {
-    final animation = ModalRoute.of(context)?.animation;
-    if (animation == null || animation.isCompleted) return;
-    final done = Completer<void>();
-    void onStatus(AnimationStatus status) {
-      if (status != AnimationStatus.completed || done.isCompleted) return;
-      animation.removeStatusListener(onStatus);
-      done.complete();
-    }
-
-    animation.addStatusListener(onStatus);
-    await done.future;
   }
 
   /// 有保留憑證或憑證被鎖，而且裝置有生物辨識：登入鈕走解鎖。
@@ -152,6 +97,7 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
         Positioned.fill(
           child: WelcomeScreen(
             onLogin: _login,
+            onSignup: () => context.go('/signup'),
             emailVerified: widget.emailVerified,
             keptAccount: showKept ? kept : null,
             onForgetPhone: showKept

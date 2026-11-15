@@ -95,6 +95,9 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
   final OAuthLoginException? failWith;
   int signInCount = 0;
   int unlockCount = 0;
+
+  /// 非 null 時登入／解鎖會卡住直到完成（模擬進行中）。
+  Completer<void>? gate;
   // 非 null 時 unlock() 成功並登入為此使用者；null 表示取消（維持未登入）。
   UserInfo? unlockAs;
   Object? unlockError;
@@ -105,6 +108,7 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
   @override
   Future<void> unlock() async {
     unlockCount++;
+    await gate?.future;
     final error = unlockError;
     if (error != null) {
       state = AsyncError(error, StackTrace.empty);
@@ -116,6 +120,7 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
   @override
   Future<bool> signInWithBrowser({String? biometricHint}) async {
     signInCount++;
+    await gate?.future;
     final error = failWith;
     // 與正式的 signInWithBrowser 一致：取消回到未登入、不算錯誤。
     if (error != null) {
@@ -306,6 +311,11 @@ ProviderContainer _buildContainer({
   );
   return container;
 }
+
+// 歡迎頁介紹內容「露出」＝標題在樹上且沒有被登入進度畫面蓋住。
+bool welcomeExposed(WidgetTester tester) =>
+    find.byKey(const ValueKey('welcome-headline')).evaluate().isNotEmpty &&
+    find.byKey(const ValueKey('welcome-login-progress')).evaluate().isEmpty;
 
 void main() {
   testWidgets('舊路徑經 GoRouter 到達行程與停留點畫面', (tester) async {
@@ -870,6 +880,7 @@ void main() {
       expect(spy.unlockCount, 1);
       expect(spy.signInCount, 0);
       expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(welcomeExposed(tester), isTrue, reason: '取消後進度畫面要撤掉');
       expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
 
       await tester.tap(find.byKey(ValueKey(key)));
@@ -973,6 +984,71 @@ void main() {
     expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
   });
 
+  testWidgets('Welcome 的「建立帳號」入口導向 /signup', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('welcome-signup')));
+    await tester.pumpAndSettle();
+
+    expect(container.read(appRouterProvider).state.uri.path, '/signup');
+    expect(find.byType(SignupScreen), findsOneWidget);
+  });
+
+  for (final kept in [false, true]) {
+    testWidgets('登入進行中禁止重複觸發（${kept ? "解鎖" : "瀏覽器登入"}只啟動一次）', (tester) async {
+      final gate = Completer<void>();
+      final spy = _BrowserLoginSpyNotifier()..gate = gate;
+      final container = _buildContainer(
+        currentUser: null,
+        authNotifier: () => spy,
+        extraOverrides: [
+          biometricAuthenticatorProvider.overrideWithValue(
+            FakeBiometricAuthenticator(kind: null),
+          ),
+          if (kept) ...[
+            keptBiometricAccountProvider.overrideWith(
+              (ref) async => 'a@example.com',
+            ),
+            appLockKindProvider.overrideWith(
+              (ref) async => BiometricKind.faceId,
+            ),
+          ],
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TriplineApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // 進度畫面會蓋住按鈕，連點只能直接呼叫 onPressed（等同兩次點擊事件連發）。
+      final onLogin = tester
+          .widget<TextButton>(find.byKey(const ValueKey('welcome-login-top')))
+          .onPressed!;
+
+      onLogin();
+      onLogin();
+      await tester.pump();
+      onLogin();
+      await tester.pump(const Duration(milliseconds: 50));
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(kept ? spy.unlockCount : spy.signInCount, 1);
+      expect(kept ? spy.signInCount : spy.unlockCount, 0);
+    });
+  }
+
   group('/login 轉址到 /welcome', () {
     for (final entry in {
       '/login': '/welcome',
@@ -1031,11 +1107,6 @@ void main() {
       expect(find.text('信箱已驗證，請登入繼續。'), findsNothing);
     });
   });
-
-  // 歡迎頁介紹內容「露出」＝標題在樹上且沒有被登入進度畫面蓋住。
-  bool welcomeExposed(WidgetTester tester) =>
-      find.byKey(const ValueKey('welcome-headline')).evaluate().isNotEmpty &&
-      find.byKey(const ValueKey('welcome-login-progress')).evaluate().isEmpty;
 
   /// 逐格推進並確認每一格都沒有露出歡迎頁，回傳檢查過的格數。
   Future<int> pumpFramesNeverExposingWelcome(WidgetTester tester) async {
@@ -1221,27 +1292,8 @@ void main() {
 
     final lockScreen = find.byKey(const ValueKey('app-lock-screen'));
 
-    testWidgets('冷啟動自動解鎖成功：從第一個畫面到 /trips 每一格都不露出歡迎頁', (tester) async {
-      final r = await coldStart(tester, prompts: [false, true], settle: false);
-
-      await pumpFramesNeverExposingWelcome(tester);
-
-      expect(r.store.prompts, 2);
-      expect(find.byType(TripsListScreen), findsOneWidget);
-    });
-
-    testWidgets('冷啟動自動解鎖被取消：進度畫面消失，回到歡迎頁內容', (tester) async {
-      await coldStart(tester, prompts: [false, false]);
-
-      expect(welcomeExposed(tester), isTrue);
-    });
-
     testWidgets('憑證被鎖只是還沒解開，不是登出：App 鎖設定不被清掉，解鎖後也只驗一次', (tester) async {
-      final r = await coldStart(
-        tester,
-        prompts: [false, false, true],
-        appLock: true,
-      );
+      final r = await coldStart(tester, prompts: [false, true], appLock: true);
       expect(r.container.read(appLockProvider).enabled, isTrue);
 
       await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
@@ -1251,20 +1303,6 @@ void main() {
       expect(lockScreen, findsNothing);
       expect(r.container.read(appLockProvider).enabled, isTrue);
       expect(r.bio.authenticateCalls, 0);
-    });
-
-    testWidgets('自動解鎖只在這次啟動做一次：離開再回歡迎頁不會再自動跳', (tester) async {
-      final r = await coldStart(tester, prompts: [false, false, true]);
-      expect(r.store.prompts, 2);
-
-      final router = r.container.read(appRouterProvider);
-      router.go('/signup');
-      await tester.pumpAndSettle();
-      router.go('/welcome');
-      await tester.pumpAndSettle();
-
-      expect(find.byType(WelcomeScreen), findsOneWidget);
-      expect(r.store.prompts, 2);
     });
 
     testWidgets('兩套鎖都開、冷啟動憑證解鎖通過：不出現 App 鎖畫面，Face ID 總共一次', (tester) async {
@@ -1315,29 +1353,31 @@ void main() {
       expect(lockScreen, findsOneWidget);
     });
 
-    testWidgets('冷啟動憑證被鎖：自動解鎖一次，成功直接進 /trips，不經過任何登入按鈕', (tester) async {
-      final r = await coldStart(tester, prompts: [false, true], appLock: true);
-
-      expect(r.store.prompts, 2, reason: '啟動讀取一次（被取消）＋自動解鎖一次');
-      expect(r.container.read(appRouterProvider).state.uri.path, '/trips');
-      expect(find.byType(TripsListScreen), findsOneWidget);
-      expect(lockScreen, findsNothing, reason: '憑證解開後不再要求 App 鎖');
-      expect(r.bio.authenticateCalls, 0);
-      expect(r.browserLogins(), 0);
-    });
-
-    testWidgets('冷啟動自動解鎖被取消：停在歡迎頁、只自動一次；按登入鈕再解鎖一次', (tester) async {
-      final r = await coldStart(tester, prompts: [false, false, true]);
+    testWidgets('冷啟動 Face ID 被取消：停在歡迎頁，不會自動再跳第二次；按登入鈕才再解鎖', (tester) async {
+      final r = await coldStart(tester, prompts: [false, true]);
 
       expect(find.byType(WelcomeScreen), findsOneWidget);
-      expect(r.store.prompts, 2, reason: '自動解鎖只能一次');
+      expect(welcomeExposed(tester), isTrue, reason: '不蓋進度畫面，等使用者按');
+      expect(r.store.prompts, 1, reason: '只有啟動讀取的那一次');
+      expect(r.bio.authenticateCalls, 0);
       expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
       await tester.pumpAndSettle();
 
-      expect(r.store.prompts, 3);
+      expect(r.store.prompts, 2);
       expect(r.browserLogins(), 0, reason: '憑證被鎖時按登入是解鎖，不是開瀏覽器');
+      expect(find.byType(TripsListScreen), findsOneWidget);
+    });
+
+    testWidgets('解鎖成功：從按下到落在 /trips 每一格都不露出歡迎頁', (tester) async {
+      await coldStart(tester, prompts: [false, true]);
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pump();
+      expect(welcomeExposed(tester), isFalse);
+      await pumpFramesNeverExposingWelcome(tester);
+
       expect(find.byType(TripsListScreen), findsOneWidget);
     });
 
@@ -1400,7 +1440,7 @@ void main() {
     });
 
     testWidgets('解鎖成功後落點是 /trips（沒有 redirect_after）', (tester) async {
-      final r = await coldStart(tester, prompts: [false, false, true]);
+      final r = await coldStart(tester, prompts: [false, true]);
 
       await tester.tap(find.byKey(const ValueKey('welcome-login-top')));
       await tester.pumpAndSettle();
@@ -1409,7 +1449,7 @@ void main() {
     });
 
     testWidgets('解鎖成功後尊重站內 redirect_after', (tester) async {
-      final r = await coldStart(tester, prompts: [false, false, true]);
+      final r = await coldStart(tester, prompts: [false, true]);
       r.container.read(appRouterProvider).go('/map');
       await tester.pumpAndSettle();
       expect(find.byType(WelcomeScreen), findsOneWidget);
