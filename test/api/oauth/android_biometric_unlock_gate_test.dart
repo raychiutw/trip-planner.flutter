@@ -167,6 +167,14 @@ void main() {
     expect(s, isNotNull);
   });
 
+  test('biometric 項目寫入成功也算初始化過：下一次讀取要把關', () async {
+    final v = vaultFor(TargetPlatform.android);
+    await v.write('k', 'v', protection: TokenProtection.biometric);
+    expect(gateCalls, 0, reason: '寫入本身不把關');
+    await v.read('k', protection: TokenProtection.biometric);
+    expect(gateCalls, 1);
+  });
+
   test('biometric 項目刪除成功也算初始化過：下一次讀取要把關', () async {
     final v = vaultFor(TargetPlatform.android);
     await v.delete('k', protection: TokenProtection.biometric);
