@@ -55,7 +55,10 @@ class PromptVault implements SecretVault {
   }
 
   @override
-  Future<void> delete(String key) async {
+  bool get biometricUsesOwnNamespace => false;
+
+  @override
+  Future<void> delete(String key, {TokenProtection? protection}) async {
     data.remove(key);
     level.remove(key);
   }
@@ -290,7 +293,11 @@ class _FailingDeleteVault implements SecretVault {
     required TokenProtection protection,
   }) => _inner.write(key, value, protection: protection);
   @override
-  Future<void> delete(String key) async {
+  @override
+  bool get biometricUsesOwnNamespace => false;
+
+  @override
+  Future<void> delete(String key, {TokenProtection? protection}) async {
     if (failNextRefreshDelete && key.startsWith('tripline_oauth_refresh')) {
       // 第一個刪除（步驟 1，清目標槽位的殘留）放行；之後的（步驟 4）失敗。
       failNextRefreshDelete = false;

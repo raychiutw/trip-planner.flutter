@@ -10,6 +10,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../models/oauth_tokens.dart';
@@ -57,14 +59,26 @@ abstract interface class SecretVault {
     String value, {
     required TokenProtection protection,
   });
-  Future<void> delete(String key);
+
+  /// 刪除項目。[protection] 指出項目放在哪一種保護等級（Android 的 biometric 項目在
+  /// 獨立實例，刪除它會初始化該實例而可能跳驗證，所以不指定就只動 passcode 實例）；
+  /// iOS 維持原狀，兩種等級各刪一次（Keychain 刪除不需驗證）。
+  Future<void> delete(String key, {TokenProtection? protection});
+
+  /// biometric 項目是否放在獨立的儲存實例（Android）；iOS 為 false。
+  bool get biometricUsesOwnNamespace;
 }
 
 class FlutterSecureVault implements SecretVault {
-  FlutterSecureVault({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+  FlutterSecureVault({FlutterSecureStorage? storage, TargetPlatform? platform})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _platform = platform ?? defaultTargetPlatform;
 
   final FlutterSecureStorage _storage;
+  final TargetPlatform _platform;
+
+  @override
+  bool get biometricUsesOwnNamespace => _platform == TargetPlatform.android;
 
   static const _iosPasscode = IOSOptions(
     accessibility: KeychainAccessibility.passcode,
@@ -73,7 +87,11 @@ class FlutterSecureVault implements SecretVault {
     accessibility: KeychainAccessibility.passcode,
     accessControlFlags: [AccessControlFlag.biometryCurrentSet],
   );
+  // flutter_secure_storage 以 storageNamespace／sharedPreferencesName 為 key 快取 plugin
+  // 實例，cipher 以第一次呼叫的選項為準；不分開的話 biometric 設定會被 passcode 的第一次
+  // 呼叫蓋掉（Android 上「生物辨識登入」就沒有綁生物辨識）。
   static const _androidBiometric = AndroidOptions.biometric(
+    storageNamespace: 'biometric',
     enforceBiometrics: true,
     biometricType: AndroidBiometricType.strongBiometricOnly,
     biometricPromptTitle: '登入 Tripline',
@@ -107,8 +125,12 @@ class FlutterSecureVault implements SecretVault {
   );
 
   @override
-  Future<void> delete(String key) async {
-    for (final p in TokenProtection.values) {
+  Future<void> delete(String key, {TokenProtection? protection}) async {
+    // Android 的 biometric 實例一碰就會初始化（可能跳驗證），不指定就只動 passcode 實例。
+    final targets = biometricUsesOwnNamespace
+        ? [protection ?? TokenProtection.passcode]
+        : TokenProtection.values;
+    for (final p in targets) {
       await _storage.delete(key: key, iOptions: _ios(p), aOptions: _android(p));
     }
   }
@@ -132,6 +154,12 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   final SecretVault _vault;
   TokenProtection _protection = TokenProtection.passcode;
+
+  /// 磁碟上 refresh token 項目實際所在的保護等級（setProtection 期間與 [_protection] 不同）。
+  TokenProtection _storedProtection = TokenProtection.passcode;
+
+  /// meta 的 bio_ns 版本標記：Android 的 biometric 項目已放在獨立 namespace。
+  static const _bioNs = 1;
 
   /// 目前有效的 refresh token 槽位（讀到 meta 或寫入成功後更新）。
   _Slot _slot = _Slot.a;
@@ -169,7 +197,13 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
         ? TokenProtection.biometric
         : TokenProtection.passcode;
 
+    _storedProtection = _protection;
     _slot = meta['refresh_slot'] == 'b' ? _Slot.b : _Slot.a;
+    if (_protection == TokenProtection.biometric &&
+        _vault.biometricUsesOwnNamespace &&
+        meta['bio_ns'] != _bioNs) {
+      return _migrateToBiometricNamespace(meta);
+    }
 
     final String? refresh;
     try {
@@ -183,6 +217,58 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
       throw const TokenStoreLockedException();
     }
     if (refresh == null || refresh.isEmpty) return null;
+    return _cache = OAuthTokens.fromJson({...meta, 'refresh_token': refresh});
+  }
+
+  /// Android 舊版把 biometric 項目放在 passcode 實例（沒有真的綁生物辨識）：用 passcode
+  /// 選項讀出（不驗證）→ 以 biometric 選項寫進新 namespace 的另一個槽位（此時才第一次
+  /// 驗證）→ 更新 meta 標記 → 刪舊項目。任何一步失敗都不丟例外讓 app 當掉：
+  /// 取消驗證回鎖定（舊項目保留，下次再試），其餘退化成重新登入。
+  Future<OAuthTokens?> _migrateToBiometricNamespace(
+    Map<String, dynamic> meta,
+  ) async {
+    final oldKey = _slotKeys[_slot]!;
+    final String? refresh;
+    try {
+      refresh = await _vault.read(oldKey, protection: TokenProtection.passcode);
+    } on Exception {
+      await clear();
+      return null;
+    }
+    if (refresh == null || refresh.isEmpty) {
+      await clear();
+      return null;
+    }
+    final target = _slot == _Slot.a ? _Slot.b : _Slot.a;
+    try {
+      await _vault.write(
+        _slotKeys[target]!,
+        refresh,
+        protection: TokenProtection.biometric,
+      );
+    } on Exception catch (e) {
+      if (_isInvalidated(e)) {
+        await clear();
+        return null;
+      }
+      throw const TokenStoreLockedException(); // 取消或暫時失敗：舊項目還在
+    }
+    try {
+      await _vault.write(
+        _metaKey,
+        jsonEncode({...meta, 'refresh_slot': target.name, 'bio_ns': _bioNs}),
+        protection: TokenProtection.passcode,
+      );
+    } on Exception {
+      await clear();
+      return null;
+    }
+    _slot = target;
+    try {
+      await _vault.delete(oldKey, protection: TokenProtection.passcode);
+    } on Exception {
+      // 舊項目刪不掉：meta 已指向新槽位，下次輪替的清理會處理。
+    }
     return _cache = OAuthTokens.fromJson({...meta, 'refresh_token': refresh});
   }
 
@@ -205,9 +291,13 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     final meta = {...persisted.toJson()}..remove('refresh_token');
     meta['protection'] = _protection.name;
     meta['refresh_slot'] = target.name;
+    if (_protection == TokenProtection.biometric &&
+        _vault.biometricUsesOwnNamespace) {
+      meta['bio_ns'] = _bioNs;
+    }
     try {
       if (rotates) {
-        await _vault.delete(_slotKeys[target]!);
+        await _vault.delete(_slotKeys[target]!, protection: _protection);
         await _vault.write(
           _slotKeys[target]!,
           refresh,
@@ -222,14 +312,18 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     } on Exception {
       // 裝置沒設密碼等,存不進去:只留記憶體,下次開 app 重新登入。
       // 只收拾這次寫到一半的目標槽位，舊槽位與 meta 原封不動。
-      if (rotates) await _vault.delete(_slotKeys[target]!);
+      if (rotates) {
+        await _vault.delete(_slotKeys[target]!, protection: _protection);
+      }
       return false;
     }
     final old = _slot;
+    final oldProtection = _storedProtection;
     _slot = target;
+    _storedProtection = _protection;
     if (!rotates) return true;
     try {
-      await _vault.delete(_slotKeys[old]!);
+      await _vault.delete(_slotKeys[old]!, protection: oldProtection);
     } on Exception {
       // 舊槽位刪不掉：指標已指向新的，殘留的下次輪替會清。
     }
@@ -250,13 +344,42 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<void> clear() async {
+    // Android 的 biometric 實例一碰就可能跳驗證：只有確定用到它才清（含全新 store 靠 meta 判斷）。
+    final touchBiometric =
+        _vault.biometricUsesOwnNamespace &&
+        (_protection == TokenProtection.biometric ||
+            _storedProtection == TokenProtection.biometric ||
+            await _metaSaysBiometric());
     _cache = null;
     _protection = TokenProtection.passcode;
-    await _vault.delete(_metaKey);
+    _storedProtection = TokenProtection.passcode;
+    await _vault.delete(_metaKey, protection: TokenProtection.passcode);
     for (final key in _slotKeys.values) {
-      await _vault.delete(key);
+      await _vault.delete(key, protection: TokenProtection.passcode);
     }
-    await _vault.delete(_keptKey);
+    await _vault.delete(_keptKey, protection: TokenProtection.passcode);
+    if (!touchBiometric) return;
+    for (final key in _slotKeys.values) {
+      try {
+        await _vault.delete(key, protection: TokenProtection.biometric);
+      } on Exception {
+        // 取消驗證或金鑰已失效：憑證已登出，盡力而為。
+      }
+    }
+  }
+
+  Future<bool> _metaSaysBiometric() async {
+    try {
+      final raw = await _vault.read(
+        _metaKey,
+        protection: TokenProtection.passcode,
+      );
+      if (raw == null || raw.isEmpty) return false;
+      return (jsonDecode(raw) as Map<String, dynamic>)['protection'] ==
+          'biometric';
+    } on Exception {
+      return false;
+    }
   }
 
   @override

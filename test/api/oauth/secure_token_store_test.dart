@@ -43,7 +43,11 @@ class _FakeVault implements SecretVault {
   }
 
   @override
-  Future<void> delete(String key) async => data.remove(key);
+  Future<void> delete(String key, {TokenProtection? protection}) async =>
+      data.remove(key);
+
+  @override
+  bool get biometricUsesOwnNamespace => false;
 }
 
 /// refresh token 輪流用兩個槽位 key，測試只認前綴。

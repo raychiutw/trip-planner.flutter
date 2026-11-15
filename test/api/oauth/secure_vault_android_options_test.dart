@@ -1,13 +1,11 @@
-// 特徵化測試（characterization）：記錄目前 Android 上 passcode 與 biometric 兩種選項
-// 傳給 flutter_secure_storage 平台通道的參數。
+// Android 兩種選項傳給 flutter_secure_storage 平台通道的參數。
 //
-// 原始碼推論（flutter_secure_storage 10.3.1 android）：plugin 以 sharedPreferencesName
-// （無 storageNamespace 時）當 key 快取 FlutterSecureStorage 實例
-// （FlutterSecureStoragePlugin.java:87-101），且 initialize 在 preferences != null 時
-// 直接 return（FlutterSecureStorage.java:146-149），cipher 與 config 以該實例第一次
-// 呼叫的選項為準（:151、initializeStorageCipher）。下面證明兩種選項的實例快取 key
-// 相同、但 cipher 相關參數不同；若日後替 biometric 指定獨立 storageNamespace，
-// 這支測試會紅，屬預期，須連同遷移一起更新。
+// plugin（10.3.1 android）以 storageNamespace（沒有才用 sharedPreferencesName）當 key
+// 快取 FlutterSecureStorage 實例（FlutterSecureStoragePlugin.java:87-101），initialize
+// 在 preferences != null 時直接 return（FlutterSecureStorage.java:146-149），cipher 以
+// 實例第一次呼叫的選項為準。兩種選項若同一個實例，biometric 設定會被 passcode 的第一次
+// 呼叫蓋掉；所以 biometric 必須有獨立的 storageNamespace（同時隔離 SharedPreferences、
+// 金鑰存放區與 KeyStore alias）。
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,7 +34,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  test('passcode 與 biometric 的實例快取 key 相同，但 cipher 參數不同', () async {
+  test('passcode 與 biometric 的 plugin 實例快取 key 不同，cipher 參數也不同', () async {
     final vault = FlutterSecureVault();
     await vault.read('k', protection: TokenProtection.passcode);
     await vault.read('k', protection: TokenProtection.biometric);
@@ -44,9 +42,9 @@ void main() {
     final passcode = calls[0];
     final biometric = calls[1];
 
-    // 快取 key 的輸入：兩者都沒指定 storageNamespace／sharedPreferencesName。
+    // 快取 key 的輸入：passcode 維持原預設實例，biometric 有獨立 namespace。
     expect(passcode['storageNamespace'], '');
-    expect(biometric['storageNamespace'], '');
+    expect(biometric['storageNamespace'], 'biometric');
     expect(passcode['sharedPreferencesName'], '');
     expect(biometric['sharedPreferencesName'], '');
 
