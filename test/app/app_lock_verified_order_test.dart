@@ -57,7 +57,7 @@ void main() {
     expect(make().read(appLockProvider).locked, isTrue);
   });
 
-  test('冷啟動、biometric、沒有憑證：不發事件，App 鎖維持鎖定', () async {
+  test('冷啟動、biometric、沒有憑證：不發事件，App 鎖不被事件解開（走登出分支關閉）', () async {
     final c = ProviderContainer(
       overrides: [
         oauthTokenStoreProvider.overrideWithValue(_BioEmptyStore()),
@@ -71,11 +71,12 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    c.read(appLockProvider);
+    expect(c.read(appLockProvider).locked, isTrue);
     await c.read(authStateProvider.future);
 
     expect(c.read(credentialVerifiedProvider), 0);
-    expect(c.read(appLockProvider).locked, isTrue);
+    // 沒有憑證 = 未登入：與重構前相同，由 _onAuth 登出分支關閉 App 鎖（不是被事件解開）。
+    expect(c.read(appLockProvider).enabled, isFalse);
   });
 }
 
