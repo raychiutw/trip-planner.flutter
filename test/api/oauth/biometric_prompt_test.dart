@@ -218,6 +218,36 @@ void main() {
       expect(vault.refreshKeys, hasLength(1));
     });
 
+    // (d3) 冷啟動遇保留標記、沒先 read 就 adopt：_protection／_slot 都是預設值。
+    for (final seeded in ['a', 'b', null]) {
+      test('未 read 就 adopt（既有 biometric 憑證在槽位 ${seeded ?? '無'}）：只剩一個槽位、'
+          '與 meta 等級一致、無 biometric 殘留', () async {
+        if (seeded != null) {
+          final key = seeded == 'a'
+              ? 'tripline_oauth_refresh'
+              : 'tripline_oauth_refresh_b';
+          vault.data['tripline_oauth_tokens'] = jsonEncode({
+            ..._tok().toJson()..remove('refresh_token'),
+            'protection': 'biometric',
+            'refresh_slot': seeded,
+          });
+          vault.data[key] = 'OLD';
+          vault.level[key] = TokenProtection.biometric;
+        }
+
+        await SecureOAuthTokenStore(vault: vault).write(_tok(refresh: 'NEW'));
+
+        expect(vault.refreshKeys, hasLength(1));
+        final key = vault.refreshKeys.single;
+        expect(vault.data[key], 'NEW');
+        expect(meta()['protection'], 'passcode');
+        expect(vault.level[key], TokenProtection.passcode);
+        expect(vault.level.values, isNot(contains(TokenProtection.biometric)));
+        final r = SecureOAuthTokenStore(vault: vault);
+        expect((await r.read())!.refreshToken, 'NEW');
+      });
+    }
+
     test('clear 清光（含兩槽位與舊 key）', () async {
       final s = await biometricInstall();
       await s.write(_tok(refresh: 'R2'));
