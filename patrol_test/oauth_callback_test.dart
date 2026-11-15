@@ -35,6 +35,8 @@ class _RecordingRepository extends OAuthRepository {
     required String codeChallenge,
     required String state,
     String? biometricHint,
+    String? reauthIntent,
+    String? expectedAccount,
     String scope = '',
   }) {
     this.state = state;

@@ -44,6 +44,26 @@ void main() {
     expect(build().queryParameters.containsKey('biometric_hint'), isFalse);
   });
 
+  test('buildAuthorizeUrl：重新驗證帶 prompt=login、意圖與 expected_account；缺一不帶', () {
+    Uri build({String? intent, String? account}) => repo.buildAuthorizeUrl(
+      clientId: 'cid',
+      redirectUri: 'r',
+      codeChallenge: 'c',
+      state: 's',
+      reauthIntent: intent,
+      expectedAccount: account,
+    );
+    final q = build(intent: 'disable', account: 'u_1').queryParameters;
+    expect(q['prompt'], 'login');
+    expect(q['biometric_intent'], 'disable');
+    expect(q['expected_account'], 'u_1');
+    for (final u in [build(), build(intent: 'enable'), build(account: 'u')]) {
+      expect(u.queryParameters.containsKey('prompt'), isFalse);
+      expect(u.queryParameters.containsKey('biometric_intent'), isFalse);
+      expect(u.queryParameters.containsKey('expected_account'), isFalse);
+    }
+  });
+
   test('buildAuthorizeUrl：預設 scope 含行程讀寫（資源伺服器靠 token scope 授權）', () {
     final u = repo.buildAuthorizeUrl(
       clientId: 'cid',

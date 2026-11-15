@@ -232,6 +232,13 @@ class _FixtureLoginService implements OAuthLoginService {
     await _source.adopt(tokens);
     return tokens;
   }
+
+  @override
+  Future<void> reauthenticate({
+    required String intent,
+    required String expectedAccount,
+    String? biometricHint,
+  }) async {}
 }
 
 /// 不連網：登出時的撤銷直接成功。

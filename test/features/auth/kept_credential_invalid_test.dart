@@ -46,6 +46,13 @@ class _OtherAccountLogin implements OAuthLoginService {
     await _source.adopt(tokens);
     return tokens;
   }
+
+  @override
+  Future<void> reauthenticate({
+    required String intent,
+    required String expectedAccount,
+    String? biometricHint,
+  }) async {}
 }
 
 const _userA = UserInfo(id: 'a', email: 'a@example.com');

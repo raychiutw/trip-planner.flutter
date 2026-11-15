@@ -18,6 +18,7 @@ class FakeOAuthLoginService implements OAuthLoginService {
     this.onLogin,
     this.error,
     this.enableIntent = false,
+    this.reauthError,
   });
 
   final StoredBearerTokenSource _source;
@@ -28,6 +29,28 @@ class FakeOAuthLoginService implements OAuthLoginService {
   final bool enableIntent;
   int calls = 0;
   String? lastHint;
+
+  /// 重新驗證：[reauthError] 非 null 就丟出（模擬取消、帳號不符、失敗）。
+  final Object? reauthError;
+  int reauthCalls = 0;
+  String? lastReauthIntent;
+  String? lastExpectedAccount;
+  String? lastReauthHint;
+  Future<void> Function()? onReauth;
+
+  @override
+  Future<void> reauthenticate({
+    required String intent,
+    required String expectedAccount,
+    String? biometricHint,
+  }) async {
+    reauthCalls++;
+    lastReauthIntent = intent;
+    lastExpectedAccount = expectedAccount;
+    lastReauthHint = biometricHint;
+    await onReauth?.call();
+    if (reauthError != null) throw reauthError!;
+  }
 
   @override
   Future<OAuthTokens> login({
@@ -69,6 +92,7 @@ List<dynamic> fakeBrowserLoginOverrides({
   void Function()? onLogin,
   Object? error,
   bool enableIntent = false,
+  Object? reauthError,
 
   /// 登入入口會先問生物辨識種類；真平台通道在 widget test 不會於 pump 內完成，
   /// 預設換成假的。測試自己已 override 時傳 false，避免重複 override。
@@ -84,6 +108,7 @@ List<dynamic> fakeBrowserLoginOverrides({
       onLogin: onLogin,
       error: error,
       enableIntent: enableIntent,
+      reauthError: reauthError,
     );
     created?.call(service);
     return service;
