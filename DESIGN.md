@@ -137,10 +137,10 @@ iPhone 固定四個 root tabs：
 
 ### 5.2 生物辨識登入
 
-- **Tripline 決策**：登入只走系統瀏覽器（OAuth PKCE），App 內沒有密碼表單，也不保管密碼（ADR-0014）。App 內沒有獨立登入頁，歡迎頁（`/welcome`）是唯一入口；舊 `/login` 連結轉到歡迎頁並保留 `redirect_after`、`verified=1`（歡迎頁顯示「信箱已驗證」提示）。登入或解鎖進行中以不透明進度畫面蓋住歡迎頁內容，成功直接換到行程頁，不先露出歡迎頁。
+- **Tripline 決策**：登入只走系統瀏覽器（OAuth PKCE），App 內沒有密碼表單，也不保管密碼（ADR-0014）。App 內沒有獨立登入頁，歡迎頁（`/welcome`）是唯一入口（含「建立帳號」通往 `/signup`）；舊 `/login` 連結轉到歡迎頁並保留 `redirect_after`、`verified=1`（歡迎頁顯示「信箱已驗證」提示）。登入或解鎖進行中以不透明進度畫面蓋住歡迎頁內容，成功直接換到行程頁，不先露出歡迎頁。
 - **Tripline 決策**：生物辨識登入＝refresh token 改存成「讀取時要通過目前登記的生物辨識」的 Keychain／Keystore 項目；冷啟動讀取時由系統跳出 Face ID／Touch ID，之後的 refresh 在記憶體內完成，不會再次跳出。預設（未開啟）用裝置密碼等級保護；裝置沒設密碼時不落地，每次開 App 重新登入。
 - **Tripline 決策**：開啟有兩個入口：① 登入成功後詢問一次（每台裝置一次，在 App 鎖的詢問之後；只有裝置密碼、沒有生物辨識的裝置不問）；② 設定列「安全性」在裝置有生物辨識時出現，開啟前先通過一次驗證。關閉要先確認並通過驗證，會清掉 refresh token 並登出。與 App 鎖互相獨立。
-- **Tripline 決策**：受保護的憑證沒通過驗證時，停在歡迎頁，登入鈕改為解鎖（冷啟動自動解鎖一次，取消後可再按），不當成已登出；生物特徵變動使項目失效時清掉憑證並回到未登入，要求重新登入。
+- **Tripline 決策**：受保護的憑證沒通過驗證時，停在歡迎頁，登入鈕改為解鎖（冷啟動讀憑證時系統已跳一次驗證，取消後停在歡迎頁，使用者按登入鈕才再解鎖），不當成已登出；生物特徵變動使項目失效時清掉憑證並回到未登入，要求重新登入。
 - **Tripline 決策**：按鈕以裝置實際方式命名（「Face ID」「Touch ID」「生物辨識」），不使用籠統字眼。真機行為（Keychain access control、Android Keystore）須實機驗收（#490）。
 
 參考：[Settings](https://developer.apple.com/design/human-interface-guidelines/settings)、[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)、[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)。
