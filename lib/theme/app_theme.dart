@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoColors;
 import 'package:flutter/material.dart';
 
 import 'tokens.dart';
@@ -111,6 +112,12 @@ abstract final class AppTheme {
     );
   }
 
+  /// iOS `CupertinoSwitch` 關閉狀態的軌道填色（secondarySystemFill）。
+  static Color _iosSwitchOffTrack(Brightness brightness) =>
+      brightness == Brightness.dark
+      ? CupertinoColors.secondarySystemFill.darkColor
+      : CupertinoColors.secondarySystemFill.color;
+
   static ThemeData _buildTheme({
     required ColorScheme colorScheme,
     required Color hover,
@@ -146,6 +153,17 @@ abstract final class AppTheme {
           side: BorderSide(color: colorScheme.outlineVariant),
         ),
         margin: EdgeInsets.zero,
+      ),
+      // Android 的 Switch 與 iOS 的 CupertinoSwitch 外觀一致：關閉狀態沿用 iOS 的
+      // 軌道填色與白色滑塊（Material 預設在深色下會融進底色）。
+      switchTheme: SwitchThemeData(
+        thumbColor: const WidgetStatePropertyAll(CupertinoColors.white),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? colorScheme.primary
+              : _iosSwitchOffTrack(colorScheme.brightness),
+        ),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
