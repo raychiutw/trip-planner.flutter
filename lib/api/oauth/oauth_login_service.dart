@@ -71,7 +71,9 @@ class OAuthLoginService {
     required AuthorizationLauncher launcher,
     String clientId = OAuthConfig.clientId,
     ProofKeyStore? proofKeys,
-  }) : _repo = repository,
+    String Function()? webTheme,
+  }) : _webTheme = webTheme,
+       _repo = repository,
        _proofKeys = proofKeys,
        _source = source,
        _launcher = launcher,
@@ -82,6 +84,9 @@ class OAuthLoginService {
   final AuthorizationLauncher _launcher;
   final String _clientId;
   final ProofKeyStore? _proofKeys;
+
+  /// 每次開授權頁才取值：App 當下實際顯示的明暗（`light`／`dark`）。
+  final String Function()? _webTheme;
 
   /// [biometricHint]：授權網址帶給 web 的按鈕名稱提示（[OAuthProtocol] 的 hint 值）。
   /// 結果的 [OAuthLoginResult.enableBiometric] 表示 callback 帶了開啟生物辨識登入的旗標。
@@ -96,6 +101,7 @@ class OAuthLoginService {
       codeChallenge: challenge,
       state: state,
       biometricHint: biometricHint,
+      theme: _webTheme?.call(),
     );
 
     final params = await _authorize(authUrl, state);
@@ -190,6 +196,7 @@ class OAuthLoginService {
         codeChallenge: codeChallengeS256(verifier),
         state: state,
         biometricHint: biometricHint,
+        theme: _webTheme?.call(),
         reauthIntent: intent,
         expectedAccount: expectedAccount,
       ),
