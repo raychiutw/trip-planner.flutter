@@ -22,6 +22,14 @@ enum _Slot { a, b }
 
 /// 受保護的 refresh token 讀不出來(使用者取消或沒通過生物辨識)。
 /// 登入畫面據此提供「解鎖」入口,而不是當成已登出。
+/// App 層的生物特徵把關沒通過（取消、失敗）。儲存層把它當成「還鎖著」處理，不清憑證。
+/// 字串刻意不含 invalidated／itemnotfound，免得被誤判成憑證失效。
+class BiometricGateDenied implements Exception {
+  const BiometricGateDenied();
+  @override
+  String toString() => 'BiometricGateDenied';
+}
+
 class TokenStoreLockedException implements Exception {
   const TokenStoreLockedException();
   @override
@@ -70,9 +78,25 @@ abstract interface class SecretVault {
 }
 
 class FlutterSecureVault implements SecretVault {
-  FlutterSecureVault({FlutterSecureStorage? storage, TargetPlatform? platform})
-    : _storage = storage ?? const FlutterSecureStorage(),
-      _platform = platform ?? defaultTargetPlatform;
+  FlutterSecureVault({
+    FlutterSecureStorage? storage,
+    TargetPlatform? platform,
+    Future<bool> Function()? biometricGate,
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       _platform = platform ?? defaultTargetPlatform,
+       _biometricGate = biometricGate;
+
+  /// Android 的 biometric 實例已被外掛初始化的行程內旗標。外掛的生物辨識驗證只在
+  /// 實例初始化時做一次，之後的讀取不會再驗證，所以這個旗標成立後的每次讀取都要先過
+  /// [_biometricGate]（App 層的生物特徵驗證）。第一次（尚未初始化）由外掛自己驗證，
+  /// 不把關，免得跳兩次。
+  bool _biometricInstanceReady = false;
+
+  /// 回 false＝使用者沒通過（取消、失敗）；由 App 層提供，api 層不依賴 Flutter。
+  final Future<bool> Function()? _biometricGate;
+
+  bool _gatedInstance(TokenProtection p) =>
+      p == TokenProtection.biometric && biometricUsesOwnNamespace;
 
   final FlutterSecureStorage _storage;
   final TargetPlatform _platform;
@@ -105,24 +129,37 @@ class FlutterSecureVault implements SecretVault {
       : const AndroidOptions();
 
   @override
-  Future<String?> read(String key, {required TokenProtection protection}) =>
-      _storage.read(
-        key: key,
-        iOptions: _ios(protection),
-        aOptions: _android(protection),
-      );
+  Future<String?> read(
+    String key, {
+    required TokenProtection protection,
+  }) async {
+    if (_gatedInstance(protection) && _biometricInstanceReady) {
+      final gate = _biometricGate;
+      if (gate != null && !await gate()) throw const BiometricGateDenied();
+    }
+    final value = await _storage.read(
+      key: key,
+      iOptions: _ios(protection),
+      aOptions: _android(protection),
+    );
+    if (_gatedInstance(protection)) _biometricInstanceReady = true;
+    return value;
+  }
 
   @override
   Future<void> write(
     String key,
     String value, {
     required TokenProtection protection,
-  }) => _storage.write(
-    key: key,
-    value: value,
-    iOptions: _ios(protection),
-    aOptions: _android(protection),
-  );
+  }) async {
+    await _storage.write(
+      key: key,
+      value: value,
+      iOptions: _ios(protection),
+      aOptions: _android(protection),
+    );
+    if (_gatedInstance(protection)) _biometricInstanceReady = true;
+  }
 
   @override
   Future<void> delete(String key, {TokenProtection? protection}) async {
@@ -132,6 +169,7 @@ class FlutterSecureVault implements SecretVault {
         : TokenProtection.values;
     for (final p in targets) {
       await _storage.delete(key: key, iOptions: _ios(p), aOptions: _android(p));
+      if (_gatedInstance(p)) _biometricInstanceReady = true;
     }
   }
 }

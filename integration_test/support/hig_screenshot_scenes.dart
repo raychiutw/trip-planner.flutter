@@ -390,8 +390,10 @@ class _NoBiometric implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => null;
 
   @override
-  Future<BiometricOutcome> authenticate({required String reason}) =>
-      Completer<BiometricOutcome>().future;
+  Future<BiometricOutcome> authenticate({
+    required String reason,
+    bool biometricOnly = false,
+  }) => Completer<BiometricOutcome>().future;
 }
 
 /// 永遠等待使用者操作的驗證器(Face ID 裝置)。
@@ -403,15 +405,19 @@ class _PendingBiometric implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => BiometricKind.faceId;
 
   @override
-  Future<BiometricOutcome> authenticate({required String reason}) =>
-      Completer<BiometricOutcome>().future;
+  Future<BiometricOutcome> authenticate({
+    required String reason,
+    bool biometricOnly = false,
+  }) => Completer<BiometricOutcome>().future;
 }
 
 /// 立刻回報成功的驗證器(登入後詢問、設定頁情境)。
 class _OkBiometric extends _PendingBiometric {
   @override
-  Future<BiometricOutcome> authenticate({required String reason}) async =>
-      BiometricOutcome.success;
+  Future<BiometricOutcome> authenticate({
+    required String reason,
+    bool biometricOnly = false,
+  }) async => BiometricOutcome.success;
 }
 
 /// 以 MediaQuery 覆寫模擬系統設定：文字大小、提高對比。

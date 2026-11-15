@@ -51,7 +51,11 @@ abstract interface class BiometricAuthenticator {
   /// 目前可用的解鎖方式；null = 沒有生物辨識也沒有裝置密碼。
   Future<BiometricKind?> availableKind();
 
-  Future<BiometricOutcome> authenticate({required String reason});
+  /// [biometricOnly] 為 true 時不接受裝置密碼（用於「必須是生物特徵」的把關）。
+  Future<BiometricOutcome> authenticate({
+    required String reason,
+    bool biometricOnly = false,
+  });
 
   /// 最近一次非成功結果的原因碼（給提示與診斷用）；成功或沒有則為 null。
   String? get lastFailureCode;
@@ -83,10 +87,16 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
   }
 
   @override
-  Future<BiometricOutcome> authenticate({required String reason}) async {
+  Future<BiometricOutcome> authenticate({
+    required String reason,
+    bool biometricOnly = false,
+  }) async {
     lastFailureCode = null;
     try {
-      final ok = await _auth.authenticate(localizedReason: reason);
+      final ok = await _auth.authenticate(
+        localizedReason: reason,
+        biometricOnly: biometricOnly,
+      );
       if (ok) return BiometricOutcome.success;
       lastFailureCode = 'rejected';
       return BiometricOutcome.failed;
