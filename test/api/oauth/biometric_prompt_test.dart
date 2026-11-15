@@ -49,8 +49,9 @@ class PromptVault implements SecretVault {
     if (data.containsKey(key) && level[key] == TokenProtection.biometric) {
       prompts++; // SecItemUpdate 既有的 biometric 項目
     }
+    // SecItemUpdate 只改值，不會改既有項目的 access control。
+    level.putIfAbsent(key, () => protection);
     data[key] = value;
-    level[key] = protection;
   }
 
   @override
