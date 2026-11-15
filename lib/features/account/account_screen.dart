@@ -152,8 +152,9 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             '因此不會送出刪除要求。你可以查看安全刪除方式，使用註冊信箱提出申請。',
         confirmLabel: '查看安全刪除方式',
       );
-      if (viewHelp)
+      if (viewHelp) {
         unawaited(openAccountDeletionHelp(ref.read(webThemeProvider)()));
+      }
       return null;
     }
     return showCupertinoDialog<bool>(
