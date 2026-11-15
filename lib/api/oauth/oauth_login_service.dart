@@ -113,7 +113,8 @@ class OAuthLoginService {
     }
     if (!tokens.isDpop) await keys?.delete();
     await _source.adopt(tokens);
-    // 旗標只是「請在手機上開啟」的請求，不含憑證；disable 屬另一張票，這裡忽略。
+    // 旗標只是「請在手機上開啟」的請求，不含憑證。一般登入只認 enable；disable 只會出現在
+    // 設定頁的重新驗證（見 [reauthenticate]），登入收到時不處理。
     if (params['biometric_intent'] == 'enable') onEnableIntent?.call();
     return tokens;
   }
