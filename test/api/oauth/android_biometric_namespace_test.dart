@@ -261,7 +261,7 @@ void main() {
           .where((e) => e.value.method == 'read' && e.value.key.startsWith(_a))
           .map((e) => be.iosOptions[e.key]);
       expect(refreshReads, isNotEmpty);
-      expect(refreshReads, isNot(contains(passcodeParams)));
+      expect(refreshReads.any((o) => mapEquals(o, passcodeParams)), isFalse);
       // 沒有 bio_ns 標記。
       expect(
         jsonDecode(be.at('', 'tripline_oauth_tokens')!),
