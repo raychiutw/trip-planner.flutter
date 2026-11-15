@@ -44,11 +44,12 @@ final authorizationLauncherProvider = Provider<AuthorizationLauncher>(
   (ref) => const UnavailableAuthorizationLauncher(),
 );
 
-/// 開 web 時要帶的明暗（`light`／`dark`）。預設淺色；App 於 main() override 成
-/// 依外觀設定與系統明暗解析的版本（api 層不依賴 Flutter）。
+/// 開 web 時要帶的明暗（`light`／`dark`）。App 於 main() override 成依外觀設定與
+/// 系統明暗解析的版本（api 層不依賴 Flutter）。沒注入就取值會丟例外，不能悄悄
+/// 回 light 讓深色使用者看到淺色的 web。
 final webThemeProvider = Provider<String Function()>(
   (ref) =>
-      () => 'light',
+      () => throw StateError('webThemeProvider 必須在 main() 或測試中注入'),
 );
 
 final oauthLoginServiceProvider = Provider<OAuthLoginService>(
