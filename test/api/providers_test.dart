@@ -224,6 +224,42 @@ void main() {
         expect(c.read(credentialVerifiedProvider), 1);
       });
 
+      test('冷啟動、保護等級 biometric、沒有憑證 → 不發', () async {
+        final c = makeContainer(tokenStore: _BiometricStore());
+
+        expect(await c.read(authStateProvider.future), isNull);
+
+        expect(c.read(credentialVerifiedProvider), 0);
+      });
+
+      test('build 失敗後 invalidate 重試 → 不被誤判成冷啟動，事件只發一次', () async {
+        final s = _BiometricStore();
+        await s.write(_tokens()); // 無 id_token → 走 currentUser()
+        final repo = _MockAuthRepo();
+        var calls = 0;
+        when(() => repo.currentUser()).thenAnswer((_) async {
+          if (calls++ == 0) throw StateError('network');
+          return const UserInfo(id: 'u1hex', email: 'ray@example.com');
+        });
+        final c = ProviderContainer(
+          overrides: [
+            oauthTokenStoreProvider.overrideWithValue(s),
+            oauthRepositoryProvider.overrideWithValue(oauthRepo),
+            apiClientProvider.overrideWithValue(ApiClient(dio: dio)),
+            authRepositoryProvider.overrideWithValue(repo),
+            ...fakeBrowserLoginOverrides(),
+          ],
+        );
+        addTearDown(c.dispose);
+        await expectLater(c.read(authStateProvider.future), throwsStateError);
+        expect(c.read(credentialVerifiedProvider), 1);
+
+        c.invalidate(authStateProvider);
+        await c.read(authStateProvider.future);
+
+        expect(c.read(credentialVerifiedProvider), 1);
+      });
+
       test('之後的重新整理（憑證已在快取、沒有新的系統驗證）→ 不再發', () async {
         final s = _BiometricStore();
         await s.write(_tokens(idToken: _idToken()));

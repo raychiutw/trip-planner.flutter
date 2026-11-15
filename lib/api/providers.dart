@@ -104,6 +104,9 @@ class AuthLockedNotifier extends Notifier<bool> {
 
 /// 「登入憑證剛通過一次系統驗證」的事件（每發一次加 1）。**只有 [AuthNotifier] 寫入**，
 /// 訂閱者（App 鎖）收到就不必再要求第二次驗證；不要另外推斷時序。
+/// 計數器永不歸零：只在 App 鎖建立與非同步載入設定時讀（見 `AppLockController`）；
+/// 登出時 App 鎖會被關掉，所以不會沿用到下一次登入。`appLockProvider` 目前不會被重建，
+/// 若日後改成 autoDispose 或 invalidate，這個假設要重新檢查。
 final credentialVerifiedProvider =
     NotifierProvider<CredentialVerifiedNotifier, int>(
       CredentialVerifiedNotifier.new,
@@ -131,6 +134,10 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   // 上次快取擁有者標記(存 cacheStore;隨 clear 一起清、登入後重建)。
   static const _cacheOwnerKey = '__cache_owner__';
 
+  // 冷啟動只有第一次 build 算；自己記，不靠 AsyncNotifier 重建時保留舊值的語意
+  //（build 失敗重試、state 被設成 AsyncLoading 都會讓 state.hasValue 誤判）。
+  bool _coldStartDone = false;
+
   @override
   Future<UserInfo?> build() async {
     // refresh 被後端拒絕、憑證已清掉 → 回到未登入(離線快取保留,同一帳號重新登入還用得到)。
@@ -140,7 +147,9 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     ref.onDispose(sub.cancel);
 
     // 第一次 build 才是冷啟動；之後 invalidate 重建時憑證在快取裡，不會有新的系統驗證。
-    final user = await _resolveUser(coldStart: !state.hasValue);
+    final coldStart = !_coldStartDone;
+    _coldStartDone = true;
+    final user = await _resolveUser(coldStart: coldStart);
     await _enforceCacheOwner(user);
     return user;
   }
@@ -166,17 +175,18 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       return null;
     }
     ref.read(authLockedProvider.notifier).set(false);
+    ref.read(bearerTokenSourceProvider).unseal();
+    if (tokens == null) {
+      await ref.read(bearerTokenSourceProvider).discardProofKey();
+      return null;
+    }
     // 剛解開的憑證必然剛通過一次系統驗證：從鎖定解開，或冷啟動讀取生物辨識保護的憑證。
+    // 一定要有憑證才發：沒有憑證時沒有東西被驗證過。
     if (wasLocked ||
         (coldStart &&
             ref.read(oauthTokenStoreProvider).protection ==
                 TokenProtection.biometric)) {
       ref.read(credentialVerifiedProvider.notifier).emit();
-    }
-    ref.read(bearerTokenSourceProvider).unseal();
-    if (tokens == null) {
-      await ref.read(bearerTokenSourceProvider).discardProofKey();
-      return null;
     }
 
     // 有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。驗證未過必須落回
