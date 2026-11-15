@@ -113,6 +113,14 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
         }
       });
     });
+    ref.listen(biometricLoginProvider.select((s) => s.reauthNotice), (_, text) {
+      if (text == null) return;
+      Timer(const Duration(seconds: 4), () {
+        if (mounted) {
+          ref.read(biometricLoginProvider.notifier).clearReauthNotice();
+        }
+      });
+    });
     final signedIn = ref.watch(authStateProvider).value != null;
     final lock = ref.watch(appLockProvider);
     final showLock = lock.locked && signedIn;
@@ -159,6 +167,8 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
           const Positioned.fill(child: _BiometricLoginPrompt()),
         if (ref.watch(biometricLoginProvider).passcodeOnlyNotice)
           _notice(context, '這支手機沒有設定 Face ID／Touch ID，已用一般方式登入'),
+        if (ref.watch(biometricLoginProvider).reauthNotice case final text?)
+          _notice(context, text),
         if (_showDisabledNotice)
           _notice(context, '此裝置已沒有可用的生物辨識或裝置密碼，已關閉 App 鎖。'),
       ],

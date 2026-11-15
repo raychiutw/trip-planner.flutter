@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/oauth/oauth_login_service.dart';
 import '../api/oauth/oauth_providers.dart';
 import '../api/oauth/oauth_token_store.dart';
 import '../api/providers.dart';
@@ -24,6 +25,8 @@ class BiometricLoginState {
     this.enabled = false,
     this.promptPending = false,
     this.passcodeOnlyNotice = false,
+    this.reauthBusy = false,
+    this.reauthNotice,
   });
 
   /// refresh token 目前受生物辨識保護。
@@ -35,14 +38,25 @@ class BiometricLoginState {
   /// web 要求開啟、但這支手機只有裝置密碼：提示已用一般方式登入。
   final bool passcodeOnlyNotice;
 
+  /// 設定頁的重新驗證流程進行中：開關要禁用，避免重複觸發。
+  final bool reauthBusy;
+
+  /// 重新驗證被拒絕時給使用者看的一句話（例如帳號不同）。
+  final String? reauthNotice;
+
   BiometricLoginState copyWith({
     bool? enabled,
     bool? promptPending,
     bool? passcodeOnlyNotice,
+    bool? reauthBusy,
+    String? reauthNotice,
+    bool clearReauthNotice = false,
   }) => BiometricLoginState(
     enabled: enabled ?? this.enabled,
     promptPending: promptPending ?? this.promptPending,
     passcodeOnlyNotice: passcodeOnlyNotice ?? this.passcodeOnlyNotice,
+    reauthBusy: reauthBusy ?? this.reauthBusy,
+    reauthNotice: clearReauthNotice ? null : reauthNotice ?? this.reauthNotice,
   );
 }
 
@@ -105,6 +119,47 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     }
     await enable(); // 取消或失敗維持原狀，不報錯
   }
+
+  /// 設定頁開啟（[enable] 為 true）或關閉生物辨識登入（ADR-0018）：先重新驗證授權
+  /// （web 頁重新輸入密碼、且必須是目前帳號），回來再通過一次生物辨識才套用。
+  /// 取消、帳號不同、任何失敗都維持原狀；重新驗證本身不改變目前的登入。
+  Future<void> reauthenticate({required bool enable}) async {
+    if (state.reauthBusy) return;
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+    state = state.copyWith(reauthBusy: true, clearReauthNotice: true);
+    try {
+      final kind = await ref
+          .read(biometricAuthenticatorProvider)
+          .availableKind();
+      // 沒有生物辨識（只有裝置密碼）時沒東西可開；關閉不受裝置能力限制。
+      if (enable && (kind == null || kind == BiometricKind.passcode)) return;
+      try {
+        await ref
+            .read(oauthLoginServiceProvider)
+            .reauthenticate(
+              intent: enable ? 'enable' : 'disable',
+              expectedAccount: user.id,
+              biometricHint: _hintFor(kind),
+            );
+      } on OAuthLoginException catch (e) {
+        if (!e.cancelled && ref.mounted) {
+          state = state.copyWith(reauthNotice: e.userMessage);
+        }
+        return;
+      }
+      if (!ref.mounted) return;
+      if (enable) {
+        await this.enable();
+      } else {
+        await disable();
+      }
+    } finally {
+      if (ref.mounted) state = state.copyWith(reauthBusy: false);
+    }
+  }
+
+  void clearReauthNotice() => state = state.copyWith(clearReauthNotice: true);
 
   void clearPasscodeOnlyNotice() =>
       state = state.copyWith(passcodeOnlyNotice: false);
