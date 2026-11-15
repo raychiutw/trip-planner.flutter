@@ -33,10 +33,7 @@ class _OtherAccountLogin implements OAuthLoginService {
   final ProofKeyStore _keys;
 
   @override
-  Future<OAuthTokens> login({
-    String? biometricHint,
-    void Function()? onEnableIntent,
-  }) async {
+  Future<OAuthLoginResult> login({String? biometricHint}) async {
     await _keys.create();
     final tokens = OAuthTokens(
       accessToken: 'AT2',
@@ -45,7 +42,7 @@ class _OtherAccountLogin implements OAuthLoginService {
       expiresAt: DateTime.now().add(const Duration(minutes: 15)),
     );
     await _source.adopt(tokens);
-    return tokens;
+    return OAuthLoginResult(tokens);
   }
 
   @override

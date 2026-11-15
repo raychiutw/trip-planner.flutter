@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/oauth/oauth_login_service.dart';
+import '../api/oauth/oauth_protocol.dart';
 import '../api/oauth/oauth_providers.dart';
 import '../api/oauth/oauth_token_store.dart';
 import '../api/providers.dart';
@@ -64,6 +65,8 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
   bool _inFlight = false;
 
   /// 瀏覽器登入進行中：登入完成的詢問交給 [signInWithBrowser] 依旗標決定。
+  /// 保留理由：authState 在 login() 回傳「是否開啟」之前就先變成已登入，
+  /// [_onAuth] 若不略過會在旗標處理前先排出詢問。
   bool _signingIn = false;
 
   @override
@@ -138,7 +141,9 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
         await ref
             .read(oauthLoginServiceProvider)
             .reauthenticate(
-              intent: turnOn ? 'enable' : 'disable',
+              intent: turnOn
+                  ? OAuthProtocol.intentEnable
+                  : OAuthProtocol.intentDisable,
               expectedAccount: user.id,
               biometricHint: _hintFor(kind),
             );
@@ -166,9 +171,9 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
 
   /// 裝置只有密碼或沒有生物辨識時不帶，web 就不顯示專門鈕。
   static String? _hintFor(BiometricKind? kind) => switch (kind) {
-    BiometricKind.faceId => 'faceid',
-    BiometricKind.touchId => 'touchid',
-    BiometricKind.biometric => 'generic',
+    BiometricKind.faceId => OAuthProtocol.hintFaceId,
+    BiometricKind.touchId => OAuthProtocol.hintTouchId,
+    BiometricKind.biometric => OAuthProtocol.hintGeneric,
     BiometricKind.passcode || null => null,
   };
 

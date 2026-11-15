@@ -102,6 +102,20 @@ class AuthLockedNotifier extends Notifier<bool> {
   void set(bool locked) => state = locked;
 }
 
+/// 「登入憑證剛通過一次系統驗證」的事件（每發一次加 1）。**只有 [AuthNotifier] 寫入**，
+/// 訂閱者（App 鎖）收到就不必再要求第二次驗證；不要另外推斷時序。
+final credentialVerifiedProvider =
+    NotifierProvider<CredentialVerifiedNotifier, int>(
+      CredentialVerifiedNotifier.new,
+    );
+
+class CredentialVerifiedNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void emit() => state++;
+}
+
 /// 保留的生物辨識登入憑證已失效，已清掉；登入頁顯示 [userMessage]。
 class KeptCredentialInvalid implements Exception {
   const KeptCredentialInvalid(this.reason);
@@ -125,18 +139,24 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     });
     ref.onDispose(sub.cancel);
 
-    final user = await _resolveUser();
+    // 第一次 build 才是冷啟動；之後 invalidate 重建時憑證在快取裡，不會有新的系統驗證。
+    final user = await _resolveUser(coldStart: !state.hasValue);
     await _enforceCacheOwner(user);
     return user;
   }
 
   /// [explicit]：使用者主動登入／解鎖。冷啟動（false）遇到「登出後保留」的標記
   /// 視為已登出，不得讀憑證，否則受保護讀取會跳出驗證並悄悄把登出撤銷。
-  Future<UserInfo?> _resolveUser({bool explicit = false}) async {
+  /// [coldStart]：冷啟動第一次還原。
+  Future<UserInfo?> _resolveUser({
+    bool explicit = false,
+    bool coldStart = false,
+  }) async {
     if (!explicit && await _readKeptAccount(ref) != null) {
       await ref.read(bearerTokenSourceProvider).seal();
       return null;
     }
+    final wasLocked = ref.read(authLockedProvider);
     final OAuthTokens? tokens;
     try {
       tokens = await ref.read(oauthTokenStoreProvider).read();
@@ -146,6 +166,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       return null;
     }
     ref.read(authLockedProvider.notifier).set(false);
+    // 剛解開的憑證必然剛通過一次系統驗證：從鎖定解開，或冷啟動讀取生物辨識保護的憑證。
+    if (wasLocked ||
+        (coldStart &&
+            ref.read(oauthTokenStoreProvider).protection ==
+                TokenProtection.biometric)) {
+      ref.read(credentialVerifiedProvider.notifier).emit();
+    }
     ref.read(bearerTokenSourceProvider).unseal();
     if (tokens == null) {
       await ref.read(bearerTokenSourceProvider).discardProofKey();
@@ -189,17 +216,14 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 用系統瀏覽器登入(PKCE)。使用者取消不算錯誤,維持未登入。
-  /// 回傳 callback 是否帶 `biometric_intent=enable`（由呼叫端決定如何處理）。
+  /// 回傳 callback 是否要求開啟生物辨識登入（由呼叫端決定如何處理）。
   Future<bool> signInWithBrowser({String? biometricHint}) async {
     state = const AsyncLoading();
-    var enableIntent = false;
+    final OAuthLoginResult result;
     try {
-      await ref
+      result = await ref
           .read(oauthLoginServiceProvider)
-          .login(
-            biometricHint: biometricHint,
-            onEnableIntent: () => enableIntent = true,
-          );
+          .login(biometricHint: biometricHint);
     } on OAuthLoginException catch (e, stack) {
       state = e.cancelled ? const AsyncData(null) : AsyncError(e, stack);
       return false;
@@ -210,7 +234,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await _enforceCacheOwner(user);
       return user;
     });
-    return enableIntent;
+    return result.enableBiometric;
   }
 
   /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)。保留的憑證若已失效

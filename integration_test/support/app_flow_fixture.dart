@@ -220,17 +220,14 @@ class _FixtureLoginService implements OAuthLoginService {
   final FixtureSession _session;
 
   @override
-  Future<OAuthTokens> login({
-    String? biometricHint,
-    void Function()? onEnableIntent,
-  }) async {
+  Future<OAuthLoginResult> login({String? biometricHint}) async {
     _session.loginCalls++;
     final error = _session.loginError;
     if (error != null) throw error;
     _session.signedIn = true;
     final tokens = _fixtureTokens();
     await _source.adopt(tokens);
-    return tokens;
+    return OAuthLoginResult(tokens);
   }
 
   @override

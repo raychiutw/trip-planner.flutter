@@ -11,8 +11,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
-import '../api/oauth/oauth_providers.dart';
-import '../api/oauth/oauth_token_store.dart';
 import '../api/providers.dart';
 import '../api/settings_store.dart';
 import '../models/user.dart';
@@ -145,44 +143,37 @@ class AppLockController extends Notifier<AppLockState> {
   bool _inFlight = false;
 
   /// 看過「已登出」才算之後的登入是新登入；冷啟動還原 session 是 loading → user。
+  /// 這是「要不要詢問開啟 App 鎖」的判斷，與免二次驗證無關，所以保留。
   bool _signedOutSeen = false;
 
   @override
   AppLockState build() {
     ref.listen(authStateProvider, (_, next) => _onAuth(next));
-    // 登入憑證才剛通過生物辨識解開：同一個人、同一次驗證，不再要求 App 鎖。
-    ref.listen(authLockedProvider, (prev, locked) {
-      if (prev == true && !locked) _releaseAfterCredentialUnlock();
+    // 登入憑證才剛通過系統驗證：同一個人、同一次驗證，不再要求 App 鎖。
+    // 事件只由 AuthNotifier 發出（credentialVerifiedProvider），這裡不推斷時序。
+    ref.listen(credentialVerifiedProvider, (_, _) {
+      if (state.locked) state = state.copyWith(locked: false);
     });
     final enabled = _initialEnabled ?? false;
     if (_initialEnabled == null) unawaited(_loadSaved());
-    return AppLockState(enabled: enabled, locked: enabled);
+    return AppLockState(
+      enabled: enabled,
+      locked: enabled && !_verifiedThisLaunch,
+    );
   }
+
+  /// listen 只管訂閱之後的事件；憑證若在 App 鎖建立前就已驗證（認證比 App 鎖先解析完），
+  /// 建立時與非同步載入設定時都要把這件事算進初始鎖定狀態。登出後 App 鎖會被關掉，不沿用。
+  bool get _verifiedThisLaunch => ref.read(credentialVerifiedProvider) > 0;
 
   Future<void> _loadSaved() async {
     if (await _read(_enabledKey) == '1' && !state.enabled) {
-      state = state.copyWith(enabled: true, locked: true);
+      state = state.copyWith(enabled: true, locked: !_verifiedThisLaunch);
     }
-  }
-
-  /// 冷啟動以來第一次解出認證狀態（之後的 AsyncData 都是重新整理，不得放行）。
-  bool _firstAuthResolved = false;
-
-  void _releaseAfterCredentialUnlock() {
-    if (state.locked) state = state.copyWith(locked: false);
   }
 
   void _onAuth(AsyncValue<UserInfo?> next) {
     if (next is! AsyncData<UserInfo?>) return;
-    final coldRestore = !_firstAuthResolved;
-    _firstAuthResolved = true;
-    // 冷啟動還原 session 時，受生物辨識保護的憑證必然剛通過一次系統驗證。
-    if (coldRestore &&
-        next.value != null &&
-        ref.read(oauthTokenStoreProvider).protection ==
-            TokenProtection.biometric) {
-      _releaseAfterCredentialUnlock();
-    }
     if (next.value == null) {
       _signedOutSeen = true;
       // 登出：App 鎖是這台裝置上這個登入的設定，不留給下一位使用者。

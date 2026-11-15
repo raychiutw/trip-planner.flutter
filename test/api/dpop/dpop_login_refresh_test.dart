@@ -150,7 +150,7 @@ void main() {
 
   group('依 token_type 決定', () {
     test('回 DPoP：保留金鑰，登入後 tokenType 是 DPoP', () async {
-      final tokens = await loginService(keys).login();
+      final tokens = (await loginService(keys).login()).tokens;
 
       expect(tokens.isDpop, isTrue);
       expect(await keys.load(), isNotNull);
@@ -168,7 +168,7 @@ void main() {
     test('回 Bearer：金鑰用不到，立刻刪掉，不留孤兒', () async {
       reply = (_) => tokenBody('Bearer');
 
-      final tokens = await loginService(keys).login();
+      final tokens = (await loginService(keys).login()).tokens;
 
       expect(tokens.isDpop, isFalse);
       expect(await keys.load(), isNull);
