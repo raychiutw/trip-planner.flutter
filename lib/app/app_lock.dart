@@ -186,7 +186,8 @@ class AppLockController extends Notifier<AppLockState> {
     if (next.value == null) {
       _signedOutSeen = true;
       // 登出：App 鎖是這台裝置上這個登入的設定，不留給下一位使用者。
-      if (state.enabled || state.locked) {
+      // 憑證只是還沒解開（authLocked）不是登出：App 鎖設定要留著，等解鎖後放行。
+      if (!ref.read(authLockedProvider) && (state.enabled || state.locked)) {
         unawaited(_write(_enabledKey, '0'));
         state = state.copyWith(enabled: false, locked: false);
       }

@@ -1236,6 +1236,37 @@ void main() {
       expect(welcomeExposed(tester), isTrue);
     });
 
+    testWidgets('憑證被鎖只是還沒解開，不是登出：App 鎖設定不被清掉，解鎖後也只驗一次', (tester) async {
+      final r = await coldStart(
+        tester,
+        prompts: [false, false, true],
+        appLock: true,
+      );
+      expect(r.container.read(appLockProvider).enabled, isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TripsListScreen), findsOneWidget);
+      expect(lockScreen, findsNothing);
+      expect(r.container.read(appLockProvider).enabled, isTrue);
+      expect(r.bio.authenticateCalls, 0);
+    });
+
+    testWidgets('自動解鎖只在這次啟動做一次：離開再回歡迎頁不會再自動跳', (tester) async {
+      final r = await coldStart(tester, prompts: [false, false, true]);
+      expect(r.store.prompts, 2);
+
+      final router = r.container.read(appRouterProvider);
+      router.go('/signup');
+      await tester.pumpAndSettle();
+      router.go('/welcome');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(r.store.prompts, 2);
+    });
+
     testWidgets('兩套鎖都開、冷啟動憑證解鎖通過：不出現 App 鎖畫面，Face ID 總共一次', (tester) async {
       final r = await coldStart(tester, prompts: [true], appLock: true);
 
