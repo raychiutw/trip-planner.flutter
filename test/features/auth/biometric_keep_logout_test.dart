@@ -59,7 +59,7 @@ void main() {
       authRepositoryProvider.overrideWithValue(authRepo),
       biometricAuthenticatorProvider.overrideWithValue(bio),
       settingsStoreProvider.overrideWithValue(settings),
-      ...fakeBrowserLoginOverrides(),
+      ...fakeBrowserLoginOverrides(stubBiometric: false),
     ],
     child: MaterialApp.router(
       routerConfig: GoRouter(

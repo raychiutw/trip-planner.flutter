@@ -32,7 +32,10 @@ class _OtherAccountLogin implements OAuthLoginService {
   final ProofKeyStore _keys;
 
   @override
-  Future<OAuthTokens> login() async {
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     await _keys.create();
     final tokens = OAuthTokens(
       accessToken: 'AT2',
@@ -43,6 +46,13 @@ class _OtherAccountLogin implements OAuthLoginService {
     await _source.adopt(tokens);
     return tokens;
   }
+
+  @override
+  Future<void> reauthenticate({
+    required String intent,
+    required String expectedAccount,
+    String? biometricHint,
+  }) async {}
 }
 
 const _userA = UserInfo(id: 'a', email: 'a@example.com');

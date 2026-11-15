@@ -12,6 +12,7 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_lock.dart';
+import '../../app/biometric_login.dart';
 import '../../app/forget_this_phone.dart';
 import '../../theme/tokens.dart';
 
@@ -30,7 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (ref.read(authStateProvider).isLoading) return;
     setState(() => _attempted = true);
     // 失敗訊息由 authStateProvider 的 AsyncError 呈現；使用者取消則維持未登入。
-    await ref.read(authStateProvider.notifier).signInWithBrowser();
+    await ref.read(biometricLoginProvider.notifier).signInWithBrowser();
   }
 
   /// 受保護的登入憑證解鎖（跳出 Face ID／Touch ID）。
@@ -61,10 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final biometricKind = ref.watch(appLockKindProvider).value;
     // 登出後保留的生物辨識登入：標示帳號；只有裝置密碼的手機不提供入口。
     final keptAccount = ref.watch(keptBiometricAccountProvider).value;
-    final showKept =
-        keptAccount != null &&
-        biometricKind != null &&
-        biometricKind != BiometricKind.passcode;
+    final showKept = keptAccount != null && biometricKind.hasBiometric;
     final locked = ref.watch(authLockedProvider) && !showKept;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =

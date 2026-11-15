@@ -62,6 +62,7 @@ void main() {
         redirectUri: any(named: 'redirectUri'),
         codeChallenge: any(named: 'codeChallenge'),
         state: any(named: 'state'),
+        biometricHint: any(named: 'biometricHint'),
       ),
     ).thenAnswer(
       (i) => Uri.https('api.example', '/api/oauth/authorize', {
@@ -123,6 +124,18 @@ void main() {
     await expectLater(service.login(), throwsA(isA<OAuthLoginException>()));
   });
 
+  test('一般登入遇 access_denied → 仍是錯誤（cancelled 為 false），維持原行為', () async {
+    launcher.reply = (u) => {
+      'error': 'access_denied',
+      'state': u.queryParameters['state']!,
+    };
+    final error = await service.login().then<Object?>(
+      (_) => null,
+      onError: (Object e) => e,
+    );
+    expect((error! as OAuthLoginException).cancelled, isFalse);
+  });
+
   test('使用者在瀏覽器取消 → 取消例外原樣往上丟（不吞掉、不換 token）', () async {
     launcher.error = OAuthLoginException(
       '取消',
@@ -137,5 +150,43 @@ void main() {
     expect(error, isA<OAuthLoginException>());
     expect((error! as OAuthLoginException).cancelled, isTrue);
     expect((error as OAuthLoginException).userMessage, contains('取消'));
+  });
+
+  group('biometric_intent 旗標', () {
+    Future<bool> loginWith(Map<String, String> extra) async {
+      launcher.reply = (u) => {
+        'code': 'CODE',
+        'state': u.queryParameters['state']!,
+        ...extra,
+      };
+      var enable = false;
+      await service.login(onEnableIntent: () => enable = true);
+      return enable;
+    }
+
+    test('enable → 通知呼叫端，token 照常兌換並存下', () async {
+      expect(await loginWith({'biometric_intent': 'enable'}), isTrue);
+      expect((await store.read())!.refreshToken, 'RT');
+    });
+
+    test('沒有旗標、disable、未知值 → 不通知、不報錯、登入照常', () async {
+      expect(await loginWith({}), isFalse);
+      expect(await loginWith({'biometric_intent': 'disable'}), isFalse);
+      expect(await loginWith({'biometric_intent': 'x'}), isFalse);
+      expect((await store.read())!.refreshToken, 'RT');
+    });
+
+    test('biometricHint 傳給授權網址組裝', () async {
+      await service.login(biometricHint: 'touchid');
+      verify(
+        () => repo.buildAuthorizeUrl(
+          clientId: any(named: 'clientId'),
+          redirectUri: any(named: 'redirectUri'),
+          codeChallenge: any(named: 'codeChallenge'),
+          state: any(named: 'state'),
+          biometricHint: 'touchid',
+        ),
+      ).called(1);
+    });
   });
 }

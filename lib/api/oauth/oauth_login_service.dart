@@ -4,7 +4,9 @@
 library;
 
 import '../../models/oauth_tokens.dart';
+import '../dpop/proof_key.dart';
 import '../dpop/proof_key_store.dart';
+import 'id_token.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
 import 'pkce.dart';
@@ -15,6 +17,7 @@ class OAuthLoginException implements Exception {
     this.message, {
     String? userMessage,
     this.cancelled = false,
+    this.accountMismatch = false,
   }) : userMessage = userMessage ?? 'Tripline 登入失敗，請稍後再試';
 
   /// 除錯用原文，可能含 client_id；**不可直接顯示給使用者**。
@@ -25,6 +28,9 @@ class OAuthLoginException implements Exception {
 
   /// 使用者自己在瀏覽器關掉或取消，不算錯誤。
   final bool cancelled;
+
+  /// 重新驗證回來的帳號與目前登入的帳號不同。
+  final bool accountMismatch;
   @override
   String toString() => 'OAuthLoginException: $message';
 }
@@ -70,7 +76,12 @@ class OAuthLoginService {
   final String _clientId;
   final ProofKeyStore? _proofKeys;
 
-  Future<OAuthTokens> login() async {
+  /// [biometricHint]：授權網址帶給 web 的按鈕名稱提示（faceid／touchid／generic）。
+  /// [onEnableIntent]：登入完成後、callback 帶 `biometric_intent=enable` 時呼叫。
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     final verifier = generateCodeVerifier();
     final challenge = codeChallengeS256(verifier);
     final state = generateState();
@@ -80,25 +91,11 @@ class OAuthLoginService {
       redirectUri: OAuthConfig.redirectUri,
       codeChallenge: challenge,
       state: state,
+      biometricHint: biometricHint,
     );
 
-    final callback = await _launcher.authorize(
-      authUrl,
-      callbackHost: OAuthConfig.callbackHost,
-      callbackPath: OAuthConfig.callbackPath,
-    );
-
-    final params = callback.queryParameters;
-    // 只認 state 相符的 callback,防止別的網頁偽造回跳(CSRF)。
-    if (params['state'] != state) {
-      throw OAuthLoginException('callback 的 state 不符');
-    }
-    final error = params['error'];
-    if (error != null) throw OAuthLoginException('授權失敗:$error');
-    final code = params['code'];
-    if (code == null || code.isEmpty) {
-      throw OAuthLoginException('未取得授權碼');
-    }
+    final params = await _authorize(authUrl, state);
+    final code = params['code']!;
 
     // 每次登入一把新金鑰（ADR-0015）；伺服器沒綁定就用不到，立刻刪掉。
     final keys = _proofKeys;
@@ -118,6 +115,115 @@ class OAuthLoginService {
     }
     if (!tokens.isDpop) await keys?.delete();
     await _source.adopt(tokens);
+    // 旗標只是「請在手機上開啟」的請求，不含憑證；disable 屬另一張票，這裡忽略。
+    if (params['biometric_intent'] == 'enable') onEnableIntent?.call();
     return tokens;
+  }
+
+  /// 開系統瀏覽器等 callback；只認 state 相符的（防止別的網頁偽造回跳，CSRF），
+  /// 授權端回 error 或沒有授權碼就丟 [OAuthLoginException]。
+  ///
+  /// [reauth]：是否為重新驗證。重新驗證才把 `access_denied` 當使用者取消（一般登入
+  /// 維持原行為、顯示錯誤）；另外 api 判定帳號不符會回 `error=reauth_account_mismatch`
+  /// （state 照常驗證、無授權碼），這裡轉成 `accountMismatch`；一般登入維持一般錯誤。
+  Future<Map<String, String>> _authorize(
+    Uri authUrl,
+    String state, {
+    bool reauth = false,
+  }) async {
+    final callback = await _launcher.authorize(
+      authUrl,
+      callbackHost: OAuthConfig.callbackHost,
+      callbackPath: OAuthConfig.callbackPath,
+    );
+    final params = callback.queryParameters;
+    if (params['state'] != state) {
+      throw OAuthLoginException('callback 的 state 不符');
+    }
+    final error = params['error'];
+    if (error != null) {
+      if (reauth && error == 'reauth_account_mismatch') {
+        throw OAuthLoginException(
+          '授權端判定重新驗證的帳號與目前帳號不同',
+          userMessage: '登入的帳號與目前帳號不同',
+          accountMismatch: true,
+        );
+      }
+      throw OAuthLoginException(
+        '授權失敗:$error',
+        cancelled: reauth && error == 'access_denied',
+      );
+    }
+    final code = params['code'];
+    if (code == null || code.isEmpty) {
+      throw OAuthLoginException('未取得授權碼');
+    }
+    return params;
+  }
+
+  /// 重新驗證（設定頁開啟／關閉生物辨識登入，ADR-0018）：只確認「現在操作的人仍知道
+  /// 密碼、且是目前這個帳號」，**不改變目前的登入**。成功就正常返回；取消、帳號不同、
+  /// 其他失敗都丟 [OAuthLoginException]（取消 `cancelled`、帳號不同 `accountMismatch`）。
+  ///
+  /// 為了拿到 id_token 比對帳號，必須兌換授權碼；但 DPoP 金鑰槽只有一把，用正式的
+  /// [ProofKeyStore.create] 會先洗掉目前登入的金鑰（帳號不符時就把目前登入弄壞），
+  /// 所以改用拋棄式的記憶體金鑰兌換，換回來的憑證**一律不採用**並撤銷。
+  Future<void> reauthenticate({
+    required String intent,
+    required String expectedAccount,
+    String? biometricHint,
+  }) async {
+    final verifier = generateCodeVerifier();
+    final state = generateState();
+    final params = await _authorize(
+      _repo.buildAuthorizeUrl(
+        clientId: _clientId,
+        redirectUri: OAuthConfig.redirectUri,
+        codeChallenge: codeChallengeS256(verifier),
+        state: state,
+        biometricHint: biometricHint,
+        reauthIntent: intent,
+        expectedAccount: expectedAccount,
+      ),
+      state,
+      reauth: true,
+    );
+    // 旗標必須與發起時的意圖一致；不一致不兌換，免得多留一份授權。
+    if (params['biometric_intent'] != intent) {
+      throw OAuthLoginException('重新驗證的 callback 沒有帶預期的意圖');
+    }
+    final tokens = await _repo.exchangeCode(
+      code: params['code']!,
+      codeVerifier: verifier,
+      clientId: _clientId,
+      redirectUri: OAuthConfig.redirectUri,
+      proofKey: SoftwareProofKey.generate(),
+    );
+    try {
+      final idToken = tokens.idToken;
+      final claims = idToken == null
+          ? null
+          : verifiedIdTokenClaims(idToken, clientId: _clientId);
+      if (claims == null) throw OAuthLoginException('重新驗證沒有取得可驗證的 id_token');
+      if (claims['sub'] != expectedAccount) {
+        throw OAuthLoginException(
+          '重新驗證的帳號與目前帳號不同',
+          userMessage: '登入的帳號與目前帳號不同',
+          accountMismatch: true,
+        );
+      }
+    } finally {
+      // 盡力撤銷；失敗不影響結果（沒人拿得到這份憑證）。
+      final refresh = tokens.refreshToken;
+      if (refresh != null) {
+        await _repo
+            .revokeToken(
+              token: refresh,
+              clientId: _clientId,
+              tokenTypeHint: 'refresh_token',
+            )
+            .then<void>((_) {}, onError: (Object _) {});
+      }
+    }
   }
 }

@@ -12,6 +12,7 @@ import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
 
 import '../helpers/fake_biometric.dart';
+import '../helpers/fake_oauth.dart';
 
 const _user = UserInfo(id: 'u1', email: 'a@example.com');
 
@@ -37,6 +38,7 @@ void main() {
   late InMemoryOAuthTokenStore store;
   late FakeBiometricAuthenticator bio;
   late ProviderContainer container;
+  late FakeOAuthLoginService service;
 
   Future<void> pump(WidgetTester tester) async {
     store = InMemoryOAuthTokenStore();
@@ -56,6 +58,10 @@ void main() {
             settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
             biometricAuthenticatorProvider.overrideWithValue(bio),
             oauthTokenStoreProvider.overrideWithValue(store),
+            ...fakeBrowserLoginOverrides(
+              stubBiometric: false,
+              created: (s) => service = s,
+            ),
           ],
         ),
         child: MaterialApp(
@@ -127,8 +133,16 @@ void main() {
     expect(_prompt, findsNothing);
   });
 
+  /// 登入後把 App 鎖與生物辨識登入的詢問都按「稍後再說」，留下乾淨的設定列。
+  Future<void> signInAndDismissPrompts(WidgetTester tester) async {
+    await signInAndDismissAppLockPrompt(tester);
+    await tester.tap(find.byKey(const ValueKey('app-lock-dialog-cancel')));
+    await settle(tester);
+  }
+
   testWidgets('開啟時驗證被取消：保護等級不變', (tester) async {
     await pump(tester);
+    await signInAndDismissPrompts(tester);
     bio.outcomes.add(BiometricOutcome.cancelled);
 
     await tester.tap(find.byType(Switch));
@@ -138,8 +152,9 @@ void main() {
     expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
   });
 
-  testWidgets('設定列：開啟後可關閉，關閉要確認、驗證，並清掉憑證登出', (tester) async {
+  testWidgets('設定列：開啟後可關閉，關閉要確認、重新驗證、驗證，並清掉憑證登出', (tester) async {
     await pump(tester);
+    await signInAndDismissPrompts(tester);
     await tester.tap(find.byType(Switch));
     await settle(tester);
     expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
@@ -152,6 +167,7 @@ void main() {
     await settle(tester);
 
     expect(bio.authenticateCalls, 2); // 開啟一次、關閉一次
+    expect(service.reauthCalls, 2); // 兩次都先重新驗證
     expect(await store.read(), isNull);
     expect(
       (container.read(authStateProvider.notifier) as _FakeAuth).logouts,
@@ -161,6 +177,7 @@ void main() {
 
   testWidgets('關閉時在確認框按取消：什麼都不動', (tester) async {
     await pump(tester);
+    await signInAndDismissPrompts(tester);
     await tester.tap(find.byType(Switch));
     await settle(tester);
 

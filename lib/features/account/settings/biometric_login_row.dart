@@ -1,4 +1,5 @@
 /// 帳號設定的生物辨識登入：開啟＝refresh token 改受生物辨識保護；關閉＝登出並清掉。
+/// 兩者都先重新驗證授權（重新輸入密碼），再通過一次生物辨識才套用（ADR-0018）。
 library;
 
 import 'dart:async';
@@ -18,9 +19,11 @@ class BiometricLoginRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final kind = ref.watch(appLockKindProvider).value;
-    final enabled = ref.watch(biometricLoginProvider).enabled;
+    final bio = ref.watch(biometricLoginProvider);
+    final enabled = bio.enabled;
+    final busy = bio.reauthBusy;
     // 沒有生物辨識（只有裝置密碼或都沒有）又沒開過：沒東西可開。
-    if ((kind == null || kind == BiometricKind.passcode) && !enabled) {
+    if (!kind.hasBiometric && !enabled) {
       return const SizedBox.shrink();
     }
     final label = kind.lockLabel;
@@ -51,14 +54,19 @@ class BiometricLoginRow extends ConsumerWidget {
           ],
         ),
       );
-      if (ok == true) await controller.disable();
+      if (ok == true) await controller.reauthenticate(turnOn: false);
     }
 
     void toggle() {
+      if (busy) return;
       if (enabled) {
         unawaited(confirmDisable());
       } else {
-        unawaited(ref.read(biometricLoginProvider.notifier).enable());
+        unawaited(
+          ref
+              .read(biometricLoginProvider.notifier)
+              .reauthenticate(turnOn: true),
+        );
       }
     }
 
@@ -69,7 +77,10 @@ class BiometricLoginRow extends ConsumerWidget {
       subtitle: enabled
           ? '開啟 App 時用 $label 解鎖登入憑證，密碼不會存在這支手機'
           : '開啟後登入憑證只能用 $label 解鎖',
-      trailing: Switch.adaptive(value: enabled, onChanged: (_) => toggle()),
+      trailing: Switch.adaptive(
+        value: enabled,
+        onChanged: busy ? null : (_) => toggle(),
+      ),
       onTap: toggle,
     );
   }

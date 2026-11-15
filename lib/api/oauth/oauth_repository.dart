@@ -33,6 +33,9 @@ class OAuthRepository {
     required String redirectUri,
     required String codeChallenge,
     required String state,
+    String? biometricHint,
+    String? reauthIntent,
+    String? expectedAccount,
     String scope = 'openid profile email offline_access trips:read trips:write',
   }) {
     return Uri.parse('$_origin/api/oauth/authorize').replace(
@@ -44,6 +47,13 @@ class OAuthRepository {
         'state': state,
         'code_challenge': codeChallenge,
         'code_challenge_method': 'S256',
+        'biometric_hint': ?biometricHint,
+        // 重新驗證：三者必須同時帶，api 才會要求使用者重新輸入密碼（api#91）。
+        if (reauthIntent != null && expectedAccount != null) ...{
+          'prompt': 'login',
+          'biometric_intent': reauthIntent,
+          'expected_account': expectedAccount,
+        },
       },
     );
   }

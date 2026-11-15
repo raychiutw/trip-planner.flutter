@@ -69,6 +69,7 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
+import '../helpers/fake_biometric.dart';
 import '../helpers/fake_trip_map.dart';
 import '../helpers/fake_oauth.dart';
 
@@ -88,15 +89,31 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
 
   final OAuthLoginException? failWith;
   int signInCount = 0;
+  int unlockCount = 0;
+  // 非 null 時 unlock() 成功並登入為此使用者；null 表示取消（維持未登入）。
+  UserInfo? unlockAs;
+  Object? unlockError;
 
   @override
   Future<UserInfo?> build() async => null;
 
   @override
-  Future<void> signInWithBrowser() async {
+  Future<void> unlock() async {
+    unlockCount++;
+    final error = unlockError;
+    if (error != null) {
+      state = AsyncError(error, StackTrace.empty);
+      return;
+    }
+    state = AsyncData(unlockAs);
+  }
+
+  @override
+  Future<bool> signInWithBrowser({String? biometricHint}) async {
     signInCount++;
     final error = failWith;
     if (error != null) state = AsyncError(error, StackTrace.empty);
+    return false;
   }
 }
 
@@ -688,6 +705,12 @@ void main() {
     final container = _buildContainer(
       currentUser: null,
       authNotifier: () => spy,
+      extraOverrides: [
+        // 登入入口會先問生物辨識種類；真平台通道在 pump 內不會完成。
+        biometricAuthenticatorProvider.overrideWithValue(
+          FakeBiometricAuthenticator(kind: null),
+        ),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -743,25 +766,29 @@ void main() {
     );
   });
 
-  // 回歸：保留模式登出後 router 把人導到 /welcome；歡迎頁的登入鈕若直接開瀏覽器，
-  // 登入頁的 Face ID 入口永遠到不了（0.40 實際發生）。
+  // 已開啟生物辨識登入：歡迎頁登入鈕直接解鎖，不經登入畫面、不開瀏覽器。
   for (final key in ['welcome-login-top', 'welcome-login-hero']) {
-    testWidgets('Welcome 有保留的生物辨識登入（$key）：轉到有 Face ID 入口的登入畫面，不直接開瀏覽器', (
-      tester,
-    ) async {
+    Future<_BrowserLoginSpyNotifier> pumpKept(
+      WidgetTester tester, {
+      BiometricKind kind = BiometricKind.faceId,
+      void Function(_BrowserLoginSpyNotifier)? configure,
+    }) async {
       final spy = _BrowserLoginSpyNotifier();
+      configure?.call(spy);
       final container = _buildContainer(
         currentUser: null,
         authNotifier: () => spy,
         extraOverrides: [
+          biometricAuthenticatorProvider.overrideWithValue(
+            FakeBiometricAuthenticator(kind: null),
+          ),
           keptBiometricAccountProvider.overrideWith(
             (ref) async => 'a@example.com',
           ),
-          appLockKindProvider.overrideWith((ref) async => BiometricKind.faceId),
+          appLockKindProvider.overrideWith((ref) async => kind),
         ],
       );
       addTearDown(container.dispose);
-
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -770,16 +797,62 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(WelcomeScreen), findsOneWidget);
+      return spy;
+    }
+
+    testWidgets('Welcome 有保留憑證且支援生物辨識（$key）：直接解鎖並進入 App，不經登入畫面', (
+      tester,
+    ) async {
+      final spy = await pumpKept(
+        tester,
+        configure: (s) => s.unlockAs = _loggedInUser,
+      );
 
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
 
-      expect(spy.signInCount, 0, reason: '不得直接開瀏覽器');
+      expect(spy.unlockCount, 1);
+      expect(spy.signInCount, 0, reason: '不得開瀏覽器');
+      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.byType(WelcomeScreen), findsNothing);
+    });
+
+    testWidgets('Welcome 解鎖取消（$key）：轉到登入畫面，仍有 Face ID 入口', (tester) async {
+      final spy = await pumpKept(tester);
+
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+
+      expect(spy.unlockCount, 1);
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(
         find.byKey(const ValueKey('login-biometric-button')),
         findsOneWidget,
       );
+    });
+
+    testWidgets('Welcome 解鎖失敗（$key）：轉到登入畫面顯示錯誤', (tester) async {
+      final spy = await pumpKept(
+        tester,
+        configure: (s) => s.unlockError = OAuthLoginException('boom'),
+      );
+
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+
+      expect(spy.unlockCount, 1);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('login-error-banner')), findsOneWidget);
+    });
+
+    testWidgets('Welcome 有保留憑證但只有裝置密碼（$key）：照舊直接開瀏覽器', (tester) async {
+      final spy = await pumpKept(tester, kind: BiometricKind.passcode);
+
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+
+      expect(spy.unlockCount, 0);
+      expect(spy.signInCount, 1);
     });
   }
 
@@ -788,6 +861,11 @@ void main() {
       currentUser: null,
       authNotifier: () =>
           _BrowserLoginSpyNotifier(failWith: OAuthLoginException('boom')),
+      extraOverrides: [
+        biometricAuthenticatorProvider.overrideWithValue(
+          FakeBiometricAuthenticator(kind: null),
+        ),
+      ],
     );
     addTearDown(container.dispose);
 

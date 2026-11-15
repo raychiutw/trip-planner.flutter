@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:tripline/api/api_client.dart';
+import 'package:tripline/app/app_lock.dart' show biometricAuthenticatorProvider;
+import 'fake_biometric.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
@@ -11,16 +13,52 @@ import 'package:tripline/models/oauth_tokens.dart';
 /// 測試用的瀏覽器登入：不開瀏覽器，直接把一組憑證交給憑證來源，
 /// 之後身分由（被 mock 的）`currentUser()` 解析。
 class FakeOAuthLoginService implements OAuthLoginService {
-  FakeOAuthLoginService(this._source, {this.onLogin, this.error});
+  FakeOAuthLoginService(
+    this._source, {
+    this.onLogin,
+    this.error,
+    this.enableIntent = false,
+    this.reauthError,
+  });
 
   final StoredBearerTokenSource _source;
   final void Function()? onLogin;
   final Object? error;
+
+  /// 模擬 callback 帶 `biometric_intent=enable`。
+  final bool enableIntent;
   int calls = 0;
+  String? lastHint;
+
+  /// 重新驗證：[reauthError] 非 null 就丟出（模擬取消、帳號不符、失敗）。
+  final Object? reauthError;
+  int reauthCalls = 0;
+  String? lastReauthIntent;
+  String? lastExpectedAccount;
+  String? lastReauthHint;
+  Future<void> Function()? onReauth;
 
   @override
-  Future<OAuthTokens> login() async {
+  Future<void> reauthenticate({
+    required String intent,
+    required String expectedAccount,
+    String? biometricHint,
+  }) async {
+    reauthCalls++;
+    lastReauthIntent = intent;
+    lastExpectedAccount = expectedAccount;
+    lastReauthHint = biometricHint;
+    await onReauth?.call();
+    if (reauthError != null) throw reauthError!;
+  }
+
+  @override
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     calls++;
+    lastHint = biometricHint;
     onLogin?.call();
     if (error != null) throw error!;
     final tokens = OAuthTokens(
@@ -29,6 +67,7 @@ class FakeOAuthLoginService implements OAuthLoginService {
       expiresAt: DateTime.now().add(const Duration(minutes: 15)),
     );
     await _source.adopt(tokens);
+    if (enableIntent) onEnableIntent?.call();
     return tokens;
   }
 }
@@ -52,12 +91,24 @@ List<dynamic> fakeBrowserLoginOverrides({
   void Function(FakeOAuthLoginService service)? created,
   void Function()? onLogin,
   Object? error,
+  bool enableIntent = false,
+  Object? reauthError,
+
+  /// 登入入口會先問生物辨識種類；真平台通道在 widget test 不會於 pump 內完成，
+  /// 預設換成假的。測試自己已 override 時傳 false，避免重複 override。
+  bool stubBiometric = true,
 }) => [
+  if (stubBiometric)
+    biometricAuthenticatorProvider.overrideWithValue(
+      FakeBiometricAuthenticator(kind: null),
+    ),
   oauthLoginServiceProvider.overrideWith((ref) {
     final service = FakeOAuthLoginService(
       ref.watch(bearerTokenSourceProvider),
       onLogin: onLogin,
       error: error,
+      enableIntent: enableIntent,
+      reauthError: reauthError,
     );
     created?.call(service);
     return service;

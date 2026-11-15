@@ -37,6 +37,9 @@ enum BiometricKind {
 extension BiometricKindLabel on BiometricKind? {
   /// 尚未查到裝置種類（或不可用）時的通用說法。
   String get lockLabel => this?.label ?? '生物辨識';
+
+  /// 裝置有真正的生物辨識（只有裝置密碼不算）：保留憑證的解鎖入口才成立。
+  bool get hasBiometric => this != null && this != BiometricKind.passcode;
 }
 
 enum BiometricOutcome { success, cancelled, failed }
