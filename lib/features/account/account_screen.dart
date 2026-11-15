@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../app/error_message.dart';
 import '../../api/auth_repository.dart';
+import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/logout_confirm.dart';
 import '../../app/adaptive.dart';
@@ -87,7 +88,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               const _SettingsGroup(),
               _PrivacyAndAccountGroup(
                 loadingDeletion: _loadingAccountDeletion,
-                onPrivacyPolicy: openPrivacyPolicy,
+                onPrivacyPolicy: () =>
+                    unawaited(openPrivacyPolicy(ref.read(webThemeProvider)())),
                 onDeleteAccount: _confirmDeleteAccount,
               ),
               _LogoutRow(onTap: () => _confirmLogout(context, ref)),
@@ -150,7 +152,9 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             '因此不會送出刪除要求。你可以查看安全刪除方式，使用註冊信箱提出申請。',
         confirmLabel: '查看安全刪除方式',
       );
-      if (viewHelp) unawaited(openAccountDeletionHelp());
+      if (viewHelp) {
+        unawaited(openAccountDeletionHelp(ref.read(webThemeProvider)()));
+      }
       return null;
     }
     return showCupertinoDialog<bool>(

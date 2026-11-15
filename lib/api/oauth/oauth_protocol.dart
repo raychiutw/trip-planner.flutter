@@ -6,6 +6,9 @@ library;
 abstract final class OAuthProtocol {
   // 授權網址參數名
   static const biometricHintParam = 'biometric_hint';
+
+  /// 授權網址帶給 web 的明暗（`light`／`dark`）。
+  static const themeParam = 'theme';
   static const promptParam = 'prompt';
   static const biometricIntentParam = 'biometric_intent';
   static const expectedAccountParam = 'expected_account';

@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'api/oauth/oauth_token_store.dart';
 import 'api/providers.dart';
 import 'app/hardware_proof_key_store.dart';
 import 'app/web_auth_launcher.dart';
+import 'app/web_theme.dart';
 import 'app/accessibility_scope.dart';
 import 'app/app_lock.dart';
 import 'app/app_lock_host.dart';
@@ -112,6 +114,13 @@ Future<void> main() async {
             ),
             authorizationLauncherProvider.overrideWithValue(
               const WebAuthLauncher(),
+            ),
+            webThemeProvider.overrideWith(
+              (ref) =>
+                  () => resolveWebTheme(
+                    ref.read(themeModeProvider),
+                    PlatformDispatcher.instance.platformBrightness,
+                  ),
             ),
             themeModeProvider.overrideWith(
               () => ThemeModeController(initialMode: initialThemeMode),

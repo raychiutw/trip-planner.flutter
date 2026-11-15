@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
+import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
@@ -26,6 +28,27 @@ import 'package:tripline/ui/tp_settings_group.dart';
 class MockAuthRepository extends Mock implements AuthRepository {}
 
 class MockTripRepository extends Mock implements TripRepository {}
+
+/// 攔截 url_launcher 的 launch，回傳實際開出去的網址清單。
+List<String> _captureLaunches(WidgetTester tester) {
+  final launched = <String>[];
+  const channel = MethodChannel('plugins.flutter.io/url_launcher');
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+    call,
+  ) async {
+    if (call.method == 'launch') {
+      launched.add((call.arguments as Map)['url'] as String);
+    }
+    return true;
+  });
+  addTearDown(
+    () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      null,
+    ),
+  );
+  return launched;
+}
 
 void main() {
   late MockAuthRepository mockAuthRepository;
@@ -53,6 +76,7 @@ void main() {
     UserInfo user = verifiedUser,
     AppVersion version = const AppVersion(version: '0.9.1', buildNumber: '12'),
     MockAiDataConsentRepo? consent,
+    String? webTheme,
   }) async {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => user);
     // 內容較長，放大測試視窗確保全部 row 都在畫面內。
@@ -71,6 +95,11 @@ void main() {
           aiDataConsentRepositoryProvider.overrideWithValue(
             consent ?? unenforcedConsentRepo(),
           ),
+          if (webTheme != null)
+            webThemeProvider.overrideWith(
+              (ref) =>
+                  () => webTheme,
+            ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -768,5 +797,50 @@ void main() {
         findsOneWidget,
       );
     });
+  });
+
+  testWidgets('點隱私權政策：外開網址帶 App 當下的 theme', (tester) async {
+    final launched = _captureLaunches(tester);
+    await pumpAccountScreen(tester, webTheme: 'dark');
+
+    final row = find.text('隱私權政策');
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+
+    expect(launched, hasLength(1));
+    final uri = Uri.parse(launched.single);
+    expect(uri.path, '/privacy');
+    expect(uri.queryParameters['theme'], 'dark');
+  });
+
+  testWidgets('查看安全刪除方式：外開網址帶 App 當下的 theme 與錨點', (tester) async {
+    final launched = _captureLaunches(tester);
+    when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
+      (_) async => const AccountDeletionPreview(
+        hasPassword: false,
+        tripsOwned: 0,
+        collaboratorsAffected: 0,
+      ),
+    );
+    await pumpAccountScreen(tester, webTheme: 'light');
+
+    final deleteRow = find.byKey(const ValueKey('settings-delete-account'));
+    await tester.ensureVisible(deleteRow);
+    await tester.tap(deleteRow);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('查看安全刪除方式'));
+    await tester.pumpAndSettle();
+
+    expect(launched, hasLength(1));
+    final uri = Uri.parse(launched.single);
+    expect(uri.queryParameters['theme'], 'light');
+    expect(uri.fragment, 'delete-account');
+  });
+
+  test('webThemeProvider 沒被 main 注入時要大聲失敗，不能悄悄回 light', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    expect(() => container.read(webThemeProvider)(), throwsStateError);
   });
 }

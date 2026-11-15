@@ -201,4 +201,52 @@ void main() {
       ).called(1);
     });
   });
+
+  group('授權網址帶 theme（App 當下實際明暗）', () {
+    late String current;
+    late OAuthLoginService themed;
+
+    setUp(() {
+      current = 'dark';
+      // 用真的 repository 組網址，才看得到最終送給瀏覽器的 query。
+      themed = OAuthLoginService(
+        repository: OAuthRepository(origin: 'https://api.example'),
+        source: source,
+        launcher: launcher,
+        clientId: 'cid',
+        webTheme: () => current,
+      );
+      launcher.reply = (u) => {
+        'error': OAuthProtocol.errorAccessDenied,
+        'state': u.queryParameters['state']!,
+      };
+    });
+
+    test('登入：帶 theme，原有參數不變；每次呼叫重新取值', () async {
+      await expectLater(themed.login(), throwsA(isA<OAuthLoginException>()));
+      var q = launcher.lastAuthorizeUrl!.queryParameters;
+      expect(q['theme'], 'dark');
+      expect(q['code_challenge_method'], 'S256');
+      expect(q['client_id'], 'cid');
+      expect(q['state'], isNotEmpty);
+
+      current = 'light';
+      await expectLater(themed.login(), throwsA(isA<OAuthLoginException>()));
+      q = launcher.lastAuthorizeUrl!.queryParameters;
+      expect(q['theme'], 'light');
+    });
+
+    test('重新驗證也帶 theme，prompt=login 仍在', () async {
+      await expectLater(
+        themed.reauthenticate(
+          intent: OAuthProtocol.intentEnable,
+          expectedAccount: 'u1',
+        ),
+        throwsA(isA<OAuthLoginException>()),
+      );
+      final q = launcher.lastAuthorizeUrl!.queryParameters;
+      expect(q['theme'], 'dark');
+      expect(q[OAuthProtocol.promptParam], OAuthProtocol.promptLogin);
+    });
+  });
 }
