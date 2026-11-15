@@ -61,10 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final biometricKind = ref.watch(appLockKindProvider).value;
     // 登出後保留的生物辨識登入：標示帳號；只有裝置密碼的手機不提供入口。
     final keptAccount = ref.watch(keptBiometricAccountProvider).value;
-    final showKept =
-        keptAccount != null &&
-        biometricKind != null &&
-        biometricKind != BiometricKind.passcode;
+    final showKept = keptAccount != null && biometricKind.hasBiometric;
     final locked = ref.watch(authLockedProvider) && !showKept;
     final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
