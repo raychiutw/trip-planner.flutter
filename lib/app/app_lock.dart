@@ -156,12 +156,19 @@ class AppLockController extends Notifier<AppLockState> {
     });
     final enabled = _initialEnabled ?? false;
     if (_initialEnabled == null) unawaited(_loadSaved());
-    return AppLockState(enabled: enabled, locked: enabled);
+    return AppLockState(
+      enabled: enabled,
+      locked: enabled && !_verifiedThisLaunch,
+    );
   }
+
+  /// listen 只管訂閱之後的事件；憑證若在 App 鎖建立前就已驗證（認證比 App 鎖先解析完），
+  /// 建立時與非同步載入設定時都要把這件事算進初始鎖定狀態。登出後 App 鎖會被關掉，不沿用。
+  bool get _verifiedThisLaunch => ref.read(credentialVerifiedProvider) > 0;
 
   Future<void> _loadSaved() async {
     if (await _read(_enabledKey) == '1' && !state.enabled) {
-      state = state.copyWith(enabled: true, locked: true);
+      state = state.copyWith(enabled: true, locked: !_verifiedThisLaunch);
     }
   }
 
