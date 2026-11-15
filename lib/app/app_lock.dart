@@ -42,7 +42,9 @@ extension BiometricKindLabel on BiometricKind? {
   bool get hasBiometric => this != null && this != BiometricKind.passcode;
 }
 
-enum BiometricOutcome { success, cancelled, failed }
+/// [interrupted]：被系統中斷（App 剛回前景、另一個驗證還在進行、系統取消），
+/// 不是使用者取消也不是驗證失敗；呼叫端可等前景後重試一次。
+enum BiometricOutcome { success, cancelled, interrupted, failed }
 
 /// 平台生物辨識的最小介面（測試以假的替換）。
 abstract interface class BiometricAuthenticator {
@@ -50,6 +52,9 @@ abstract interface class BiometricAuthenticator {
   Future<BiometricKind?> availableKind();
 
   Future<BiometricOutcome> authenticate({required String reason});
+
+  /// 最近一次非成功結果的原因碼（給提示與診斷用）；成功或沒有則為 null。
+  String? get lastFailureCode;
 }
 
 class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
@@ -57,6 +62,9 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
     : _auth = auth ?? LocalAuthentication();
 
   final LocalAuthentication _auth;
+
+  @override
+  String? lastFailureCode;
 
   @override
   Future<BiometricKind?> availableKind() async {
@@ -76,16 +84,24 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
 
   @override
   Future<BiometricOutcome> authenticate({required String reason}) async {
+    lastFailureCode = null;
     try {
       final ok = await _auth.authenticate(localizedReason: reason);
-      return ok ? BiometricOutcome.success : BiometricOutcome.failed;
+      if (ok) return BiometricOutcome.success;
+      lastFailureCode = 'rejected';
+      return BiometricOutcome.failed;
     } on LocalAuthException catch (e) {
+      lastFailureCode = e.code.name;
       return switch (e.code) {
-        LocalAuthExceptionCode.userCanceled ||
-        LocalAuthExceptionCode.systemCanceled => BiometricOutcome.cancelled,
+        LocalAuthExceptionCode.userCanceled => BiometricOutcome.cancelled,
+        // 被系統中斷：App 剛回前景、另一個驗證還在進行、系統取消。不是使用者的決定。
+        LocalAuthExceptionCode.systemCanceled ||
+        LocalAuthExceptionCode.uiUnavailable ||
+        LocalAuthExceptionCode.authInProgress => BiometricOutcome.interrupted,
         _ => BiometricOutcome.failed,
       };
     } catch (_) {
+      lastFailureCode = 'unexpected';
       return BiometricOutcome.failed;
     }
   }

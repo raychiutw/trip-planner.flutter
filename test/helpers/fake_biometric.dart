@@ -18,11 +18,18 @@ class FakeBiometricAuthenticator implements BiometricAuthenticator {
   int authenticateCalls = 0;
 
   @override
+  String? lastFailureCode;
+
+  /// 每次 authenticate 被呼叫時觸發（測試記錄呼叫順序用）。
+  void Function()? onAuthenticate;
+
+  @override
   Future<BiometricKind?> availableKind() async => kind;
 
   @override
   Future<BiometricOutcome> authenticate({required String reason}) async {
     authenticateCalls++;
+    onAuthenticate?.call();
     return outcomes.isEmpty ? BiometricOutcome.success : outcomes.removeAt(0);
   }
 }

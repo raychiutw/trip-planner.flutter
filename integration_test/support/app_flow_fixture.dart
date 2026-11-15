@@ -1530,6 +1530,9 @@ Offset _outsideMenuPoint(WidgetTester tester) => Offset(
 
 /// 裝置沒有生物辨識與裝置密碼：登入流程不帶提示、不詢問。
 class _NoBiometricAuthenticator implements BiometricAuthenticator {
+  @override
+  String? get lastFailureCode => null;
+
   const _NoBiometricAuthenticator();
 
   @override
