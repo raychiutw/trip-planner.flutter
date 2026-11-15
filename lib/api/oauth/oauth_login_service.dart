@@ -123,12 +123,13 @@ class OAuthLoginService {
   /// 開系統瀏覽器等 callback；只認 state 相符的（防止別的網頁偽造回跳，CSRF），
   /// 授權端回 error 或沒有授權碼就丟 [OAuthLoginException]。
   ///
-  /// [denyIsCancel]：授權頁回 `access_denied` 是否算使用者取消。一般登入維持原行為
-  /// （顯示錯誤）；只有重新驗證把它當取消。
+  /// [reauth]：是否為重新驗證。重新驗證才把 `access_denied` 當使用者取消（一般登入
+  /// 維持原行為、顯示錯誤）；另外 api 判定帳號不符會回 `error=reauth_account_mismatch`
+  /// （state 照常驗證、無授權碼），這裡轉成 `accountMismatch`；一般登入維持一般錯誤。
   Future<Map<String, String>> _authorize(
     Uri authUrl,
     String state, {
-    bool denyIsCancel = false,
+    bool reauth = false,
   }) async {
     final callback = await _launcher.authorize(
       authUrl,
@@ -141,9 +142,16 @@ class OAuthLoginService {
     }
     final error = params['error'];
     if (error != null) {
+      if (reauth && error == 'reauth_account_mismatch') {
+        throw OAuthLoginException(
+          '授權端判定重新驗證的帳號與目前帳號不同',
+          userMessage: '登入的帳號與目前帳號不同',
+          accountMismatch: true,
+        );
+      }
       throw OAuthLoginException(
         '授權失敗:$error',
-        cancelled: denyIsCancel && error == 'access_denied',
+        cancelled: reauth && error == 'access_denied',
       );
     }
     final code = params['code'];
@@ -178,7 +186,7 @@ class OAuthLoginService {
         expectedAccount: expectedAccount,
       ),
       state,
-      denyIsCancel: true,
+      reauth: true,
     );
     // 旗標必須與發起時的意圖一致；不一致不兌換，免得多留一份授權。
     if (params['biometric_intent'] != intent) {

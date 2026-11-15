@@ -124,9 +124,9 @@ void main() {
         biometricHint: hint,
       );
 
-  Future<Object?> reauthError({String intent = 'enable'}) => reauth(
-    intent: intent,
-  ).then<Object?>((_) => null, onError: (Object e) => e);
+  Future<Object?> reauthError({String intent = 'enable'}) =>
+      reauth(intent: intent)
+          .then<Object?>((_) => null, onError: (Object e) => e);
 
   Future<void> expectCurrentLoginUntouched() async {
     expect((await store.read())!.refreshToken, 'OLD_RT');
@@ -278,5 +278,55 @@ void main() {
 
     expect(e.accountMismatch, isFalse);
     await expectCurrentLoginUntouched();
+  });
+
+  group('callback 帶 error=reauth_account_mismatch（api 判定帳號不符）', () {
+    void replyMismatch({String? state}) {
+      launcher.reply = (u) => {
+        'error': 'reauth_account_mismatch',
+        'state': state ?? u.queryParameters['state']!,
+      };
+    }
+
+    test('丟 accountMismatch 與提示文字；不兌換授權碼、目前登入原封不動', () async {
+      replyMismatch();
+
+      final e = await reauthError() as OAuthLoginException;
+
+      expect(e.accountMismatch, isTrue);
+      expect(e.cancelled, isFalse);
+      expect(e.userMessage, '登入的帳號與目前帳號不同');
+      verifyNever(
+        () => repo.exchangeCode(
+          code: any(named: 'code'),
+          codeVerifier: any(named: 'codeVerifier'),
+          clientId: any(named: 'clientId'),
+          redirectUri: any(named: 'redirectUri'),
+          proofKey: any(named: 'proofKey'),
+        ),
+      );
+      await expectCurrentLoginUntouched();
+    });
+
+    test('state 對不上：照常拒絕，不當成帳號不符', () async {
+      replyMismatch(state: 'forged');
+
+      final e = await reauthError() as OAuthLoginException;
+
+      expect(e.accountMismatch, isFalse);
+      await expectCurrentLoginUntouched();
+    });
+
+    test('一般登入收到同樣的 error：維持一般錯誤（不是取消、不是帳號不符）', () async {
+      replyMismatch();
+
+      final e = await service.login().then<Object?>(
+        (_) => null,
+        onError: (Object e) => e,
+      ) as OAuthLoginException;
+
+      expect(e.accountMismatch, isFalse);
+      expect(e.cancelled, isFalse);
+    });
   });
 }
