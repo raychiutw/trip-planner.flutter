@@ -384,6 +384,9 @@ typedef MockAuthRepositoryAlias = MockAuthRepository;
 /// 沒有生物辨識的裝置：不會跳出任何生物辨識詢問。
 class _NoBiometric implements BiometricAuthenticator {
   @override
+  String? get lastFailureCode => null;
+
+  @override
   Future<BiometricKind?> availableKind() async => null;
 
   @override
@@ -393,6 +396,9 @@ class _NoBiometric implements BiometricAuthenticator {
 
 /// 永遠等待使用者操作的驗證器(Face ID 裝置)。
 class _PendingBiometric implements BiometricAuthenticator {
+  @override
+  String? get lastFailureCode => null;
+
   @override
   Future<BiometricKind?> availableKind() async => BiometricKind.faceId;
 

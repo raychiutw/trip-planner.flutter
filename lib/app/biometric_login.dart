@@ -8,6 +8,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart'
+    show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/oauth/oauth_login_service.dart';
@@ -189,10 +191,26 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     if (_inFlight) return false;
     _inFlight = true;
     try {
-      final outcome = await ref
-          .read(biometricAuthenticatorProvider)
-          .authenticate(reason: '開啟生物辨識登入');
-      if (outcome != BiometricOutcome.success) return false;
+      final auth = ref.read(biometricAuthenticatorProvider);
+      final waitForeground = ref.read(foregroundWaiterProvider);
+      // 從 web 授權頁回來的當下 App 還沒穩定，先等前景；仍被系統中斷就再等一次重試一次。
+      await waitForeground();
+      var outcome = await auth.authenticate(reason: '開啟生物辨識登入');
+      if (outcome == BiometricOutcome.interrupted) {
+        await waitForeground();
+        outcome = await auth.authenticate(reason: '開啟生物辨識登入');
+      }
+      if (outcome != BiometricOutcome.success) {
+        // 使用者自己取消不打擾；其他失敗要讓人知道，不能開關沒變又沒有任何訊息。
+        if (outcome != BiometricOutcome.cancelled && ref.mounted) {
+          state = state.copyWith(
+            reauthNotice:
+                '生物辨識驗證沒有通過，沒有開啟生物辨識登入'
+                '（原因碼：${auth.lastFailureCode ?? 'unknown'}）。',
+          );
+        }
+        return false;
+      }
       final stored = await ref
           .read(oauthTokenStoreProvider)
           .setProtection(TokenProtection.biometric);
@@ -232,6 +250,35 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
       await ref.read(settingsStoreProvider).write(key, value);
     } catch (_) {}
   }
+}
+
+/// 開啟流程要驗證指紋前，等 App 回到前景（從 web 授權頁回來的當下 Activity 還在切換）。
+final foregroundWaiterProvider = Provider<Future<void> Function()>(
+  (ref) => waitUntilForeground,
+);
+
+/// 等 App 回到前景（回來後再多等一小段穩定時間）；一直沒回來就逾時放行（不能永遠卡住）。
+/// 從 Chrome 授權分頁回來的當下，Activity 的生命週期還在抖動，這時叫指紋驗證
+/// 會被系統中斷（local_auth 回 systemCanceled／uiUnavailable）。
+Future<void> waitUntilForeground() async {
+  const settle = Duration(milliseconds: 250);
+  const timeout = Duration(seconds: 5);
+  final binding = WidgetsBinding.instance;
+  final state = binding.lifecycleState;
+  // 已在前景就不用等；只有真的等過背景，才多給一小段穩定時間。
+  if (state == null || state == AppLifecycleState.resumed) return;
+  final resumed = Completer<void>();
+  final listener = AppLifecycleListener(
+    onResume: () {
+      if (!resumed.isCompleted) resumed.complete();
+    },
+  );
+  try {
+    await resumed.future.timeout(timeout, onTimeout: () {});
+  } finally {
+    listener.dispose();
+  }
+  await Future<void>.delayed(settle);
 }
 
 final biometricLoginProvider =

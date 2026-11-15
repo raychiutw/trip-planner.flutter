@@ -54,6 +54,7 @@ void main() {
         authStateProvider.overrideWith(_FakeAuth.new),
         settingsStoreProvider.overrideWithValue(settings),
         biometricAuthenticatorProvider.overrideWithValue(bio),
+        foregroundWaiterProvider.overrideWithValue(() async {}),
         oauthTokenStoreProvider.overrideWithValue(store),
       ],
     );

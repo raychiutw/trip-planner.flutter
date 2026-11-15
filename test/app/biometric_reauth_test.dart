@@ -62,6 +62,7 @@ void main() {
         oauthRepositoryProvider.overrideWithValue(oauthRepo),
         authRepositoryProvider.overrideWithValue(authRepo),
         biometricAuthenticatorProvider.overrideWithValue(bio),
+        foregroundWaiterProvider.overrideWithValue(() async {}),
         settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
         ...fakeBrowserLoginOverrides(
           stubBiometric: false,
