@@ -4,9 +4,7 @@
 library;
 
 import '../../models/oauth_tokens.dart';
-import '../dpop/proof_key.dart';
 import '../dpop/proof_key_store.dart';
-import 'id_token.dart';
 import 'oauth_config.dart';
 import 'oauth_repository.dart';
 import 'pkce.dart';
@@ -165,9 +163,8 @@ class OAuthLoginService {
   /// 密碼、且是目前這個帳號」，**不改變目前的登入**。成功就正常返回；取消、帳號不同、
   /// 其他失敗都丟 [OAuthLoginException]（取消 `cancelled`、帳號不同 `accountMismatch`）。
   ///
-  /// 為了拿到 id_token 比對帳號，必須兌換授權碼；但 DPoP 金鑰槽只有一把，用正式的
-  /// [ProofKeyStore.create] 會先洗掉目前登入的金鑰（帳號不符時就把目前登入弄壞），
-  /// 所以改用拋棄式的記憶體金鑰兌換，換回來的憑證**一律不採用**並撤銷。
+  /// 帳號比對由 api 在伺服器端完成（見 callback 旗標檢查），這裡不兌換授權碼：
+  /// 沒有新憑證、不動 DPoP 金鑰、不會在「已登入裝置」多留一筆。
   Future<void> reauthenticate({
     required String intent,
     required String expectedAccount,
@@ -188,42 +185,10 @@ class OAuthLoginService {
       state,
       reauth: true,
     );
-    // 旗標必須與發起時的意圖一致；不一致不兌換，免得多留一份授權。
+    // api 只在批准者就是 expected_account 時才加 biometric_intent 旗標（不符會導回
+    // error=reauth_account_mismatch），所以旗標與發起時的意圖一致即證明帳號相同；缺漏或不一致一律拒絕。
     if (params['biometric_intent'] != intent) {
       throw OAuthLoginException('重新驗證的 callback 沒有帶預期的意圖');
-    }
-    final tokens = await _repo.exchangeCode(
-      code: params['code']!,
-      codeVerifier: verifier,
-      clientId: _clientId,
-      redirectUri: OAuthConfig.redirectUri,
-      proofKey: SoftwareProofKey.generate(),
-    );
-    try {
-      final idToken = tokens.idToken;
-      final claims = idToken == null
-          ? null
-          : verifiedIdTokenClaims(idToken, clientId: _clientId);
-      if (claims == null) throw OAuthLoginException('重新驗證沒有取得可驗證的 id_token');
-      if (claims['sub'] != expectedAccount) {
-        throw OAuthLoginException(
-          '重新驗證的帳號與目前帳號不同',
-          userMessage: '登入的帳號與目前帳號不同',
-          accountMismatch: true,
-        );
-      }
-    } finally {
-      // 盡力撤銷；失敗不影響結果（沒人拿得到這份憑證）。
-      final refresh = tokens.refreshToken;
-      if (refresh != null) {
-        await _repo
-            .revokeToken(
-              token: refresh,
-              clientId: _clientId,
-              tokenTypeHint: 'refresh_token',
-            )
-            .then<void>((_) {}, onError: (Object _) {});
-      }
     }
   }
 }
