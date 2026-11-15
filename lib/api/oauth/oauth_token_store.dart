@@ -16,6 +16,8 @@ import '../../models/oauth_tokens.dart';
 
 enum TokenProtection { passcode, biometric }
 
+enum _Slot { a, b }
+
 /// 受保護的 refresh token 讀不出來(使用者取消或沒通過生物辨識)。
 /// 登入畫面據此提供「解鎖」入口,而不是當成已登出。
 class TokenStoreLockedException implements Exception {
@@ -119,11 +121,20 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     : _vault = vault ?? FlutterSecureVault();
 
   static const _metaKey = 'tripline_oauth_tokens';
-  static const _refreshKey = 'tripline_oauth_refresh';
+  // refresh token 輪流用兩個槽位：iOS 對既有的 biometric 項目改值（SecItemUpdate）
+  // 疑似會再要求一次驗證（未經真機證實），所以輪替一律「寫進不存在的槽位＋刪舊槽位」。
+  // 槽位 a 沿用舊版的單一 key，meta 沒有 refresh_slot 欄位＝舊資料＝槽位 a。
+  static const _slotKeys = {
+    _Slot.a: 'tripline_oauth_refresh',
+    _Slot.b: 'tripline_oauth_refresh_b',
+  };
   static const _keptKey = 'tripline_oauth_kept_account';
 
   final SecretVault _vault;
   TokenProtection _protection = TokenProtection.passcode;
+
+  /// 目前有效的 refresh token 槽位（讀到 meta 或寫入成功後更新）。
+  _Slot _slot = _Slot.a;
 
   /// 讀到或寫入過的憑證留在記憶體:輪替 refresh token 與每次取用都不用再碰
   /// Keychain,生物辨識只在冷啟動讀取時出現。
@@ -158,9 +169,11 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
         ? TokenProtection.biometric
         : TokenProtection.passcode;
 
+    _slot = meta['refresh_slot'] == 'b' ? _Slot.b : _Slot.a;
+
     final String? refresh;
     try {
-      refresh = await _vault.read(_refreshKey, protection: _protection);
+      refresh = await _vault.read(_slotKeys[_slot]!, protection: _protection);
     } on Exception catch (e) {
       if (_isInvalidated(e)) {
         // 生物特徵變動或項目失效:當作已登出,要求重新登入。
@@ -180,26 +193,47 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   }
 
   /// 落地；存不進去回 false（記憶體仍留著，下次開 app 重新登入）。
+  ///
+  /// 順序：(1) 刪目標槽位殘留 (2) 新 token 寫進目標槽位（項目不存在＝新增）
+  /// (3) meta 指標改指目標 (4) 刪舊槽位。任何時刻磁碟上至少有一個可讀的槽位；
+  /// (2)(3) 之間失敗，指標仍指舊槽位；(3)(4) 之間失敗，殘留的舊槽位下次 (1) 收拾。
   Future<bool> _persist(OAuthTokens persisted) async {
+    final refresh = persisted.refreshToken;
+    final rotates = refresh != null && refresh.isNotEmpty;
+    // 沒有 refresh token 可寫時不換槽位，指標才不會指到空的槽位。
+    final target = !rotates ? _slot : (_slot == _Slot.a ? _Slot.b : _Slot.a);
     final meta = {...persisted.toJson()}..remove('refresh_token');
     meta['protection'] = _protection.name;
+    meta['refresh_slot'] = target.name;
     try {
+      if (rotates) {
+        await _vault.delete(_slotKeys[target]!);
+        await _vault.write(
+          _slotKeys[target]!,
+          refresh,
+          protection: _protection,
+        );
+      }
       await _vault.write(
         _metaKey,
         jsonEncode(meta),
         protection: TokenProtection.passcode,
       );
-      final refresh = persisted.refreshToken;
-      if (refresh != null && refresh.isNotEmpty) {
-        await _vault.write(_refreshKey, refresh, protection: _protection);
-      }
-      return true;
     } on Exception {
       // 裝置沒設密碼等,存不進去:只留記憶體,下次開 app 重新登入。
-      await _vault.delete(_metaKey);
-      await _vault.delete(_refreshKey);
+      // 只收拾這次寫到一半的目標槽位，舊槽位與 meta 原封不動。
+      if (rotates) await _vault.delete(_slotKeys[target]!);
       return false;
     }
+    final old = _slot;
+    _slot = target;
+    if (!rotates) return true;
+    try {
+      await _vault.delete(_slotKeys[old]!);
+    } on Exception {
+      // 舊槽位刪不掉：指標已指向新的，殘留的下次輪替會清。
+    }
+    return true;
   }
 
   @override
@@ -207,13 +241,10 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     final current = await read();
     if (current == null || protection == _protection) return true;
     final previous = _protection;
-    // 不同 access control 的同名項目不能原地改，先刪再寫。
-    await _vault.delete(_refreshKey);
+    // 新槽位以新等級新增、成功後才刪舊槽位；失敗時舊項目與 meta 都沒動，退回原等級即可。
     _protection = protection;
     if (await _persist(current)) return true;
-    // 新等級存不進去：退回原等級並盡力把憑證存回去，UI 不會顯示成已開啟。
     _protection = previous;
-    await _persist(current);
     return false;
   }
 
@@ -222,7 +253,9 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     _cache = null;
     _protection = TokenProtection.passcode;
     await _vault.delete(_metaKey);
-    await _vault.delete(_refreshKey);
+    for (final key in _slotKeys.values) {
+      await _vault.delete(key);
+    }
     await _vault.delete(_keptKey);
   }
 
