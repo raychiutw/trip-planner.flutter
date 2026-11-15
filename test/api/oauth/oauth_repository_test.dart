@@ -32,6 +32,18 @@ void main() {
     expect(u.queryParameters['state'], 'st');
   });
 
+  test('buildAuthorizeUrl：biometricHint 帶成 biometric_hint；沒給就不出現', () {
+    Uri build({String? hint}) => repo.buildAuthorizeUrl(
+      clientId: 'cid',
+      redirectUri: 'r',
+      codeChallenge: 'c',
+      state: 's',
+      biometricHint: hint,
+    );
+    expect(build(hint: 'faceid').queryParameters['biometric_hint'], 'faceid');
+    expect(build().queryParameters.containsKey('biometric_hint'), isFalse);
+  });
+
   test('buildAuthorizeUrl：預設 scope 含行程讀寫（資源伺服器靠 token scope 授權）', () {
     final u = repo.buildAuthorizeUrl(
       clientId: 'cid',

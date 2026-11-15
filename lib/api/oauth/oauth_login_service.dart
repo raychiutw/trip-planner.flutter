@@ -70,7 +70,10 @@ class OAuthLoginService {
   final String _clientId;
   final ProofKeyStore? _proofKeys;
 
-  Future<OAuthTokens> login() async {
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     final verifier = generateCodeVerifier();
     final challenge = codeChallengeS256(verifier);
     final state = generateState();
@@ -80,6 +83,7 @@ class OAuthLoginService {
       redirectUri: OAuthConfig.redirectUri,
       codeChallenge: challenge,
       state: state,
+      biometricHint: biometricHint,
     );
 
     final callback = await _launcher.authorize(

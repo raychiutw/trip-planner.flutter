@@ -33,6 +33,7 @@ class OAuthRepository {
     required String redirectUri,
     required String codeChallenge,
     required String state,
+    String? biometricHint,
     String scope = 'openid profile email offline_access trips:read trips:write',
   }) {
     return Uri.parse('$_origin/api/oauth/authorize').replace(

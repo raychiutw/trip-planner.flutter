@@ -11,16 +11,24 @@ import 'package:tripline/models/oauth_tokens.dart';
 /// 測試用的瀏覽器登入：不開瀏覽器，直接把一組憑證交給憑證來源，
 /// 之後身分由（被 mock 的）`currentUser()` 解析。
 class FakeOAuthLoginService implements OAuthLoginService {
-  FakeOAuthLoginService(this._source, {this.onLogin, this.error});
+  FakeOAuthLoginService(this._source, {this.onLogin, this.error, this.enableIntent = false});
 
   final StoredBearerTokenSource _source;
   final void Function()? onLogin;
   final Object? error;
+
+  /// 模擬 callback 帶 `biometric_intent=enable`。
+  final bool enableIntent;
   int calls = 0;
+  String? lastHint;
 
   @override
-  Future<OAuthTokens> login() async {
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     calls++;
+    lastHint = biometricHint;
     onLogin?.call();
     if (error != null) throw error!;
     final tokens = OAuthTokens(
@@ -29,6 +37,7 @@ class FakeOAuthLoginService implements OAuthLoginService {
       expiresAt: DateTime.now().add(const Duration(minutes: 15)),
     );
     await _source.adopt(tokens);
+    if (enableIntent) onEnableIntent?.call();
     return tokens;
   }
 }
@@ -52,12 +61,14 @@ List<dynamic> fakeBrowserLoginOverrides({
   void Function(FakeOAuthLoginService service)? created,
   void Function()? onLogin,
   Object? error,
+  bool enableIntent = false,
 }) => [
   oauthLoginServiceProvider.overrideWith((ref) {
     final service = FakeOAuthLoginService(
       ref.watch(bearerTokenSourceProvider),
       onLogin: onLogin,
       error: error,
+      enableIntent: enableIntent,
     );
     created?.call(service);
     return service;

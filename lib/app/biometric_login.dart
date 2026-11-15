@@ -20,7 +20,11 @@ const _promptedKey = 'bio_login_prompted';
 
 @immutable
 class BiometricLoginState {
-  const BiometricLoginState({this.enabled = false, this.promptPending = false});
+  const BiometricLoginState({
+    this.enabled = false,
+    this.promptPending = false,
+    this.passcodeOnlyNotice = false,
+  });
 
   /// refresh token 目前受生物辨識保護。
   final bool enabled;
@@ -28,11 +32,18 @@ class BiometricLoginState {
   /// 登入成功後，要詢問是否開啟。
   final bool promptPending;
 
-  BiometricLoginState copyWith({bool? enabled, bool? promptPending}) =>
-      BiometricLoginState(
-        enabled: enabled ?? this.enabled,
-        promptPending: promptPending ?? this.promptPending,
-      );
+  /// web 要求開啟、但這支手機只有裝置密碼：提示已用一般方式登入。
+  final bool passcodeOnlyNotice;
+
+  BiometricLoginState copyWith({
+    bool? enabled,
+    bool? promptPending,
+    bool? passcodeOnlyNotice,
+  }) => BiometricLoginState(
+    enabled: enabled ?? this.enabled,
+    promptPending: promptPending ?? this.promptPending,
+    passcodeOnlyNotice: passcodeOnlyNotice ?? this.passcodeOnlyNotice,
+  );
 }
 
 class BiometricLoginController extends Notifier<BiometricLoginState> {
@@ -66,6 +77,11 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     // 沒有生物辨識（只有裝置密碼）時不問：裝置密碼保護已是預設。
     if (kind == null || kind == BiometricKind.passcode) return;
     if (ref.mounted) state = state.copyWith(promptPending: true);
+  }
+
+  /// 瀏覽器登入（TODO 骨架）。
+  Future<void> signInWithBrowser() async {
+    await ref.read(authStateProvider.notifier).signInWithBrowser();
   }
 
   /// 回答登入後的詢問；不論選哪個都記為已問過。
