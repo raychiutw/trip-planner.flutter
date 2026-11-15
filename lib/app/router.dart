@@ -76,9 +76,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             // 登出後保留了生物辨識登入：直接解鎖（跳 Face ID），成功由 redirect
             // 進 App；取消或失敗才轉到登入畫面（那裡有 Face ID 與瀏覽器兩個入口）。
             final kept = await ref.read(keptBiometricAccountProvider.future);
-            final kind = await ref.read(appLockKindProvider.future);
+            // 沒有保留憑證就不必查裝置種類（省一次平台呼叫）。
+            final kind = kept == null
+                ? null
+                : await ref.read(appLockKindProvider.future);
             if (!context.mounted) return;
-            if (kept != null && kind.hasBiometric) {
+            if (kind.hasBiometric) {
               await ref.read(authStateProvider.notifier).unlock();
               if (!context.mounted) return;
               if (ref.read(authStateProvider).value == null) {
