@@ -83,6 +83,7 @@ void main() {
           if (tokenStore != null)
             oauthTokenStoreProvider.overrideWithValue(tokenStore),
           ...fakeBrowserLoginOverrides(
+            stubBiometric: false,
             created: (s) => loginService = s,
             onLogin: onLogin,
             error: loginError,

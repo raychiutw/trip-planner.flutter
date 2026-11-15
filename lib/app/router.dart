@@ -35,6 +35,7 @@ import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
 import 'app_lock.dart';
+import 'biometric_login.dart';
 import 'auth_redirect_policy.dart';
 import 'legacy_aliases.dart';
 
@@ -90,7 +91,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               return;
             }
             final signIn = ref
-                .read(authStateProvider.notifier)
+                .read(biometricLoginProvider.notifier)
                 .signInWithBrowser();
             await signIn;
             if (!context.mounted) return;

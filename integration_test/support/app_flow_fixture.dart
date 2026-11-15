@@ -26,6 +26,7 @@ import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/accessibility_scope.dart';
+import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
@@ -219,7 +220,10 @@ class _FixtureLoginService implements OAuthLoginService {
   final FixtureSession _session;
 
   @override
-  Future<OAuthTokens> login() async {
+  Future<OAuthTokens> login({
+    String? biometricHint,
+    void Function()? onEnableIntent,
+  }) async {
     _session.loginCalls++;
     final error = _session.loginError;
     if (error != null) throw error;
@@ -462,6 +466,10 @@ class AppFlowFixture {
     return ProviderScope(
       overrides: [
         ...authOverrides,
+        // 登入入口會先問生物辨識種類；真平台通道在 host 測試的 pump 內不會完成。
+        biometricAuthenticatorProvider.overrideWithValue(
+          const _NoBiometricAuthenticator(),
+        ),
         ...extraOverrides,
         apiClientProvider.overrideWithValue(realApiClient ?? apiClient),
         if (realCacheStore != null)
@@ -1515,3 +1523,15 @@ Offset _outsideMenuPoint(WidgetTester tester) => Offset(
   4,
   tester.view.physicalSize.height / tester.view.devicePixelRatio / 2,
 );
+
+/// 裝置沒有生物辨識與裝置密碼：登入流程不帶提示、不詢問。
+class _NoBiometricAuthenticator implements BiometricAuthenticator {
+  const _NoBiometricAuthenticator();
+
+  @override
+  Future<BiometricKind?> availableKind() async => null;
+
+  @override
+  Future<BiometricOutcome> authenticate({required String reason}) async =>
+      BiometricOutcome.failed;
+}

@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:tripline/api/api_client.dart';
+import 'package:tripline/app/app_lock.dart' show biometricAuthenticatorProvider;
+import 'fake_biometric.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
@@ -11,7 +13,12 @@ import 'package:tripline/models/oauth_tokens.dart';
 /// 測試用的瀏覽器登入：不開瀏覽器，直接把一組憑證交給憑證來源，
 /// 之後身分由（被 mock 的）`currentUser()` 解析。
 class FakeOAuthLoginService implements OAuthLoginService {
-  FakeOAuthLoginService(this._source, {this.onLogin, this.error, this.enableIntent = false});
+  FakeOAuthLoginService(
+    this._source, {
+    this.onLogin,
+    this.error,
+    this.enableIntent = false,
+  });
 
   final StoredBearerTokenSource _source;
   final void Function()? onLogin;
@@ -62,7 +69,15 @@ List<dynamic> fakeBrowserLoginOverrides({
   void Function()? onLogin,
   Object? error,
   bool enableIntent = false,
+
+  /// 登入入口會先問生物辨識種類；真平台通道在 widget test 不會於 pump 內完成，
+  /// 預設換成假的。測試自己已 override 時傳 false，避免重複 override。
+  bool stubBiometric = true,
 }) => [
+  if (stubBiometric)
+    biometricAuthenticatorProvider.overrideWithValue(
+      FakeBiometricAuthenticator(kind: null),
+    ),
   oauthLoginServiceProvider.overrideWith((ref) {
     final service = FakeOAuthLoginService(
       ref.watch(bearerTokenSourceProvider),

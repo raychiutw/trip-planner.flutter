@@ -45,6 +45,7 @@ class OAuthRepository {
         'state': state,
         'code_challenge': codeChallenge,
         'code_challenge_method': 'S256',
+        'biometric_hint': ?biometricHint,
       },
     );
   }

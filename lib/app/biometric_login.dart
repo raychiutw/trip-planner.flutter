@@ -49,6 +49,9 @@ class BiometricLoginState {
 class BiometricLoginController extends Notifier<BiometricLoginState> {
   bool _inFlight = false;
 
+  /// 瀏覽器登入進行中：登入完成的詢問交給 [signInWithBrowser] 依旗標決定。
+  bool _signingIn = false;
+
   @override
   BiometricLoginState build() {
     ref.listen(authStateProvider, (_, next) => _onAuth(next));
@@ -66,7 +69,7 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
       return;
     }
     state = state.copyWith(enabled: _storeEnabled);
-    unawaited(_maybePrompt());
+    if (!_signingIn) unawaited(_maybePrompt());
   }
 
   /// 登入成功後只問一次；裝置沒有生物辨識或已經開啟就不問。
@@ -79,10 +82,40 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     if (ref.mounted) state = state.copyWith(promptPending: true);
   }
 
-  /// 瀏覽器登入（TODO 骨架）。
+  /// 瀏覽器登入：授權網址帶按鈕名稱提示；callback 若帶 `biometric_intent=enable`，
+  /// 登入完成後走 [enable]（先過生物辨識才改保護），並視為已問過、不再詢問。
+  /// 沒有旗標時與以往相同（[_onAuth] 照常排詢問）。
   Future<void> signInWithBrowser() async {
-    await ref.read(authStateProvider.notifier).signInWithBrowser();
+    final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
+    _signingIn = true;
+    final bool enableIntent;
+    try {
+      enableIntent = await ref
+          .read(authStateProvider.notifier)
+          .signInWithBrowser(biometricHint: _hintFor(kind));
+    } finally {
+      _signingIn = false;
+    }
+    if (!ref.mounted || ref.read(authStateProvider).value == null) return;
+    if (!enableIntent) return unawaited(_maybePrompt());
+    await _write(_promptedKey, '1');
+    if (kind == null || kind == BiometricKind.passcode) {
+      if (ref.mounted) state = state.copyWith(passcodeOnlyNotice: true);
+      return;
+    }
+    await enable(); // 取消或失敗維持原狀，不報錯
   }
+
+  void clearPasscodeOnlyNotice() =>
+      state = state.copyWith(passcodeOnlyNotice: false);
+
+  /// 裝置只有密碼或沒有生物辨識時不帶，web 就不顯示專門鈕。
+  static String? _hintFor(BiometricKind? kind) => switch (kind) {
+    BiometricKind.faceId => 'faceid',
+    BiometricKind.touchId => 'touchid',
+    BiometricKind.biometric => 'generic',
+    BiometricKind.passcode || null => null,
+  };
 
   /// 回答登入後的詢問；不論選哪個都記為已問過。
   Future<void> answerPrompt({required bool enable}) async {
