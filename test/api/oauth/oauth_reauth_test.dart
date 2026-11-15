@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/dpop/proof_key_store.dart';
@@ -33,13 +31,6 @@ class _FakeLauncher implements AuthorizationLauncher {
   }
 }
 
-String _idToken(String sub) {
-  String enc(Map<String, dynamic> m) =>
-      base64Url.encode(utf8.encode(jsonEncode(m))).replaceAll('=', '');
-  final exp = DateTime.now().add(const Duration(minutes: 10));
-  return '${enc({'alg': 'none'})}.${enc({'sub': sub, 'aud': 'cid', 'email': 'a@example.com', 'exp': exp.millisecondsSinceEpoch ~/ 1000})}.sig';
-}
-
 void main() {
   late _MockRepo repo;
   late InMemoryOAuthTokenStore store;
@@ -47,18 +38,15 @@ void main() {
   late _FakeLauncher launcher;
   late OAuthLoginService service;
   late OAuthTokens oldTokens;
-  late String newIdTokenSub;
 
   OAuthTokens newTokens() => OAuthTokens(
     accessToken: 'NEW_AT',
     refreshToken: 'NEW_RT',
     tokenType: 'DPoP',
-    idToken: _idToken(newIdTokenSub),
     expiresAt: DateTime.now().add(const Duration(minutes: 15)),
   );
 
   setUp(() async {
-    newIdTokenSub = 'u1';
     repo = _MockRepo();
     store = InMemoryOAuthTokenStore();
     keys = InMemoryProofKeyStore();
@@ -128,6 +116,25 @@ void main() {
     intent: intent,
   ).then<Object?>((_) => null, onError: (Object e) => e);
 
+  void verifyNoExchangeOrRevoke() {
+    verifyNever(
+      () => repo.exchangeCode(
+        code: any(named: 'code'),
+        codeVerifier: any(named: 'codeVerifier'),
+        clientId: any(named: 'clientId'),
+        redirectUri: any(named: 'redirectUri'),
+        proofKey: any(named: 'proofKey'),
+      ),
+    );
+    verifyNever(
+      () => repo.revokeToken(
+        token: any(named: 'token'),
+        clientId: any(named: 'clientId'),
+        tokenTypeHint: any(named: 'tokenTypeHint'),
+      ),
+    );
+  }
+
   Future<void> expectCurrentLoginUntouched() async {
     expect((await store.read())!.refreshToken, 'OLD_RT');
   }
@@ -139,6 +146,7 @@ void main() {
     };
     final e = await reauthError();
     expect((e! as OAuthLoginException).cancelled, isTrue);
+    verifyNoExchangeOrRevoke();
   });
 
   test('授權網址帶 意圖、expected_account、biometric_hint', () async {
@@ -162,7 +170,7 @@ void main() {
     ).called(1);
   });
 
-  test('同帳號且 callback 帶相同意圖：成功，目前登入的憑證與金鑰原封不動', () async {
+  test('callback 帶相同意圖：成功，不兌換授權碼、不撤銷，目前登入的憑證與金鑰原封不動', () async {
     launcher.reply = (u) => {
       'code': 'CODE',
       'state': u.queryParameters['state']!,
@@ -174,90 +182,22 @@ void main() {
 
     await expectCurrentLoginUntouched();
     expect(await keys.load(), same(oldKey), reason: '重新驗證不能換掉目前登入的金鑰');
-    // 為了拿到 id_token 才兌換授權碼；兌換回來的憑證不採用，並撤銷避免殘留授權。
-    verify(
-      () => repo.revokeToken(
-        token: 'NEW_RT',
-        clientId: 'cid',
-        tokenTypeHint: 'refresh_token',
-      ),
-    ).called(1);
+    verifyNoExchangeOrRevoke();
   });
 
-  test('兌換授權碼用的是拋棄式金鑰，不是目前登入的金鑰', () async {
-    final oldKey = await keys.load();
-    await reauth();
+  for (final flag in <String?>[null, 'disable', '']) {
+    test('callback 旗標為 ${flag ?? '缺漏'}、意圖 enable：拒絕，不兌換不撤銷', () async {
+      launcher.reply = (u) => {
+        'code': 'CODE',
+        'state': u.queryParameters['state']!,
+        'biometric_intent': ?flag,
+      };
 
-    final used = verify(
-      () => repo.exchangeCode(
-        code: any(named: 'code'),
-        codeVerifier: any(named: 'codeVerifier'),
-        clientId: any(named: 'clientId'),
-        redirectUri: any(named: 'redirectUri'),
-        proofKey: captureAny(named: 'proofKey'),
-      ),
-    ).captured.single;
-    expect(used, isNotNull);
-    expect(used, isNot(same(oldKey)));
-  });
-
-  test('帳號不同：丟 accountMismatch，目前登入原封不動，新憑證撤銷、不採用', () async {
-    newIdTokenSub = 'someone-else';
-
-    final e = await reauthError();
-
-    expect(e, isA<OAuthLoginException>());
-    expect((e! as OAuthLoginException).accountMismatch, isTrue);
-    await expectCurrentLoginUntouched();
-    verify(
-      () => repo.revokeToken(
-        token: 'NEW_RT',
-        clientId: 'cid',
-        tokenTypeHint: 'refresh_token',
-      ),
-    ).called(1);
-  });
-
-  test('id_token 缺漏：無法證明是同帳號 → 拒絕（fail-closed）', () async {
-    when(
-      () => repo.exchangeCode(
-        code: any(named: 'code'),
-        codeVerifier: any(named: 'codeVerifier'),
-        clientId: any(named: 'clientId'),
-        redirectUri: any(named: 'redirectUri'),
-        proofKey: any(named: 'proofKey'),
-      ),
-    ).thenAnswer(
-      (_) async => OAuthTokens(
-        accessToken: 'NEW_AT',
-        refreshToken: 'NEW_RT',
-        tokenType: 'DPoP',
-        expiresAt: DateTime.now().add(const Duration(minutes: 15)),
-      ),
-    );
-
-    expect(await reauthError(), isA<OAuthLoginException>());
-    await expectCurrentLoginUntouched();
-  });
-
-  test('callback 沒帶 biometric_intent（或與請求不同）：拒絕，不兌換授權碼', () async {
-    launcher.reply = (u) => {
-      'code': 'CODE',
-      'state': u.queryParameters['state']!,
-    };
-
-    expect(await reauthError(), isA<OAuthLoginException>());
-    verifyNever(
-      () => repo.exchangeCode(
-        code: any(named: 'code'),
-        codeVerifier: any(named: 'codeVerifier'),
-        clientId: any(named: 'clientId'),
-        redirectUri: any(named: 'redirectUri'),
-        proofKey: any(named: 'proofKey'),
-      ),
-    );
-    await expectCurrentLoginUntouched();
-  });
+      expect(await reauthError(), isA<OAuthLoginException>());
+      verifyNoExchangeOrRevoke();
+      await expectCurrentLoginUntouched();
+    });
+  }
 
   test('使用者關掉授權視窗：取消例外原樣往上丟，目前登入原封不動', () async {
     launcher.error = OAuthLoginException('取消', cancelled: true);
@@ -296,15 +236,7 @@ void main() {
       expect(e.accountMismatch, isTrue);
       expect(e.cancelled, isFalse);
       expect(e.userMessage, '登入的帳號與目前帳號不同');
-      verifyNever(
-        () => repo.exchangeCode(
-          code: any(named: 'code'),
-          codeVerifier: any(named: 'codeVerifier'),
-          clientId: any(named: 'clientId'),
-          redirectUri: any(named: 'redirectUri'),
-          proofKey: any(named: 'proofKey'),
-        ),
-      );
+      verifyNoExchangeOrRevoke();
       await expectCurrentLoginUntouched();
     });
 
@@ -314,6 +246,7 @@ void main() {
       final e = await reauthError() as OAuthLoginException;
 
       expect(e.accountMismatch, isFalse);
+      verifyNoExchangeOrRevoke();
       await expectCurrentLoginUntouched();
     });
 
