@@ -53,6 +53,21 @@ void main() {
     );
   });
 
+  test('buildAuthorizeUrl：theme 帶成 theme；沒給就不出現，其餘參數不變', () {
+    Uri build({String? theme}) => repo.buildAuthorizeUrl(
+      clientId: 'cid',
+      redirectUri: 'r',
+      codeChallenge: 'c',
+      state: 's',
+      theme: theme,
+    );
+    expect(build(theme: 'dark').queryParameters['theme'], 'dark');
+    expect(build(theme: 'light').queryParameters['theme'], 'light');
+    expect(build().queryParameters.containsKey('theme'), isFalse);
+    expect(build(theme: 'dark').queryParameters['code_challenge'], 'c');
+    expect(build(theme: 'dark').queryParameters['state'], 's');
+  });
+
   test('buildAuthorizeUrl：重新驗證帶 prompt=login、意圖與 expected_account；缺一不帶', () {
     Uri build({String? intent, String? account}) => repo.buildAuthorizeUrl(
       clientId: 'cid',

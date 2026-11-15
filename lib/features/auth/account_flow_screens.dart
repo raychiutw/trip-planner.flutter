@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/error_message.dart';
@@ -251,7 +252,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       alignment: AlignmentDirectional.centerStart,
                       child: TextButton(
                         key: const ValueKey('signup-privacy-policy-link'),
-                        onPressed: openPrivacyPolicy,
+                        onPressed: () =>
+                            openPrivacyPolicy(ref.read(webThemeProvider)()),
                         child: const Text('查看個資條款'),
                       ),
                     ),

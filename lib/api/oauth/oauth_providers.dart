@@ -44,11 +44,19 @@ final authorizationLauncherProvider = Provider<AuthorizationLauncher>(
   (ref) => const UnavailableAuthorizationLauncher(),
 );
 
+/// 開 web 時要帶的明暗（`light`／`dark`）。預設淺色；App 於 main() override 成
+/// 依外觀設定與系統明暗解析的版本（api 層不依賴 Flutter）。
+final webThemeProvider = Provider<String Function()>(
+  (ref) =>
+      () => 'light',
+);
+
 final oauthLoginServiceProvider = Provider<OAuthLoginService>(
   (ref) => OAuthLoginService(
     launcher: ref.watch(authorizationLauncherProvider),
     repository: ref.watch(oauthRepositoryProvider),
     source: ref.watch(bearerTokenSourceProvider),
     proofKeys: ref.watch(proofKeyStoreProvider),
+    webTheme: ref.watch(webThemeProvider),
   ),
 );
