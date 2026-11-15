@@ -50,9 +50,6 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
     'ResetPasswordScreen': _HeaderContract.authException,
     'VerifyEmailScreen': _HeaderContract.authException,
   },
-  'lib/features/auth/login_screen.dart': {
-    'LoginScreen': _HeaderContract.authException,
-  },
   'lib/features/auth/welcome_screen.dart': {
     'WelcomeScreen': _HeaderContract.authException,
   },

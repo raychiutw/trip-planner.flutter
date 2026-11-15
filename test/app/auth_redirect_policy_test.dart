@@ -65,11 +65,17 @@ void main() {
     expect(redirect('/trips/t1', loggedIn: true), isNull);
   });
 
-  test('welcome 的登入按鈕沿用 redirect_after', () {
-    expect(loginLocationFromWelcome(Uri.parse('/welcome')), '/login');
+  test('舊 /login 轉到 /welcome，保留有效的 redirect_after 與 verified', () {
+    expect(welcomeLocationFromLogin(Uri.parse('/login')), '/welcome');
     expect(
-      loginLocationFromWelcome(Uri.parse('/welcome?redirect_after=%2Fmap')),
-      '/login?redirect_after=%2Fmap',
+      welcomeLocationFromLogin(
+        Uri.parse('/login?redirect_after=%2Fmap&verified=1'),
+      ),
+      '/welcome?redirect_after=%2Fmap&verified=1',
+    );
+    expect(
+      welcomeLocationFromLogin(Uri.parse('/login?redirect_after=%2F%2Fevil')),
+      '/welcome',
     );
   });
 

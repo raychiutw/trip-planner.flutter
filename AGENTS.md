@@ -99,7 +99,7 @@ Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 li
 - access token 只放記憶體（15 分鐘）；refresh token 每次使用即輪替，落地於 Keychain／Keystore，保護等級 `passcode`（預設）或 `biometric`；裝置沒設密碼時不落地。
 - `ApiClient` 統一帶 `Authorization`：token 綁定金鑰時是 `DPoP <token>` 加每請求重簽的 proof，否則 `Bearer <token>`（ADR-0015）；**不送 `Cookie`、不送 `Origin`**，不得繞過它用 raw Dio 呼叫 API。DPoP 金鑰每次登入產生、隨登入憑證刪除，硬體優先、退軟體；SSE 同樣帶標頭並處理 `event: reconnect`。
 - refresh 被後端拒絕（400／401）會清憑證，並經 `bearerTokenSource.signedOut` 讓 `authStateProvider` 回到未登入。
-- `currentUser()` 收到 401 時回傳 `null`，不 throw。登入後跳轉靠 router redirect；`LoginScreen` 本身不導航。
+- `currentUser()` 收到 401 時回傳 `null`，不 throw。登入後跳轉靠 router redirect；歡迎頁（`WelcomeRoute`）本身不導航。
 - 預設 API origin 已是新 api；舊入口已退役，新認證連不上它，指向其他後端須同時換掉認證，不是只改 `TRIPLINE_API_ORIGIN`。
 
 ### ApiClient 行為規則

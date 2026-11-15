@@ -58,10 +58,18 @@ String welcomeLocationWithRedirect(Uri uri) {
   return '/welcome?redirect_after=${Uri.encodeComponent(requestedLocation)}';
 }
 
-String loginLocationFromWelcome(Uri uri) {
+/// 舊 `/login` 已併入歡迎頁：轉到 `/welcome`，保留有效的 `redirect_after` 與
+/// `verified=1`（Email 驗證成功提示）。
+String welcomeLocationFromLogin(Uri uri) {
   final redirectAfter = redirectAfterLogin(uri);
-  if (redirectAfter == '/trips') return '/login';
-  return '/login?redirect_after=${Uri.encodeComponent(redirectAfter)}';
+  final query = <String, String>{
+    if (redirectAfter != '/trips') 'redirect_after': redirectAfter,
+    if (uri.queryParameters['verified'] == '1') 'verified': '1',
+  };
+  return Uri(
+    path: '/welcome',
+    queryParameters: query.isEmpty ? null : query,
+  ).toString();
 }
 
 /// 登入後只跳站內路徑:拒絕 scheme / authority / `//` 與登入頁本身。

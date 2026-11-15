@@ -14,7 +14,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/features/account/settings/forget_this_phone_row.dart';
-import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/auth/welcome_route.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
 
@@ -27,7 +27,7 @@ class _MockOAuthRepo extends Mock implements OAuthRepository {}
 
 const _user = UserInfo(id: 'u1', email: 'ray@example.com');
 const _row = ValueKey('settings-forget-phone');
-const _entry = ValueKey('login-biometric-button');
+const _entry = ValueKey('welcome-kept-account');
 
 void main() {
   late InMemoryOAuthTokenStore store;
@@ -90,7 +90,7 @@ void main() {
                 builder: (_, _) => Consumer(
                   builder: (context, ref, _) =>
                       ref.watch(authStateProvider).value == null
-                      ? const LoginScreen()
+                      ? const WelcomeRoute()
                       : const Scaffold(body: ForgetThisPhoneRow()),
                 ),
               ),
@@ -152,7 +152,7 @@ void main() {
         tokenTypeHint: 'refresh_token',
       ),
     ).called(1);
-    expect(find.byKey(const ValueKey('login-browser-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('welcome-login-hero')), findsOneWidget);
     expect(find.byKey(_entry), findsNothing);
     expect(find.textContaining('伺服器端尚未撤銷'), findsNothing);
   });

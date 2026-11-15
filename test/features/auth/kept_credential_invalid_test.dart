@@ -15,7 +15,8 @@ import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
-import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/app/biometric_login.dart';
+import 'package:tripline/features/auth/welcome_route.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
 
@@ -57,8 +58,17 @@ class _OtherAccountLogin implements OAuthLoginService {
 
 const _userA = UserInfo(id: 'a', email: 'a@example.com');
 const _userB = UserInfo(id: 'b', email: 'b@example.com');
-const _entry = ValueKey('login-biometric-button');
-const _browser = ValueKey('login-browser-button');
+const _hero = ValueKey('welcome-login-hero');
+// 有保留憑證時歡迎頁才會顯示的帳號標示：視為「Face ID 入口存在」。
+const _entry = ValueKey('welcome-kept-account');
+
+/// 解鎖成功時歡迎頁的進度畫面會一直留著（正式環境由 router 換頁），
+/// 測試直接掛 WelcomeRoute 沒有換頁，不能 pumpAndSettle（轉圈永不停）。
+Future<void> pumpAfterLogin(WidgetTester tester) async {
+  for (var i = 0; i < 20; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
 
 void main() {
   late InMemoryOAuthTokenStore store;
@@ -86,7 +96,7 @@ void main() {
     ],
     child: MaterialApp.router(
       routerConfig: GoRouter(
-        routes: [GoRoute(path: '/', builder: (_, _) => const LoginScreen())],
+        routes: [GoRoute(path: '/', builder: (_, _) => const WelcomeRoute())],
       ),
     ),
   );
@@ -144,12 +154,12 @@ void main() {
       final c = await pumpKept(tester);
       tokenEndpointRejects(status);
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
 
       await expectCleared(c);
       expect(find.byKey(_entry), findsNothing);
-      expect(find.byKey(_browser), findsOneWidget);
+      expect(find.byKey(_hero), findsOneWidget);
       expect(find.text('登入已失效，請用瀏覽器重新登入'), findsOneWidget);
     });
   }
@@ -164,8 +174,8 @@ void main() {
       ),
     ).thenThrow(Exception('offline'));
 
-    await tester.tap(find.byKey(_entry));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_hero));
+    await pumpAfterLogin(tester);
 
     expect(find.text('登入已失效，請用瀏覽器重新登入'), findsNothing);
     expect(c.read(authStateProvider).value?.email, 'a@example.com');
@@ -180,8 +190,8 @@ void main() {
       final c = await pumpKept(tester);
       tokenEndpointRejects(status);
 
-      await tester.tap(find.byKey(_entry));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_hero));
+      await pumpAfterLogin(tester);
 
       expect(find.text('登入已失效，請用瀏覽器重新登入'), findsNothing);
       expect(c.read(authStateProvider).value?.email, 'a@example.com');
@@ -194,8 +204,8 @@ void main() {
     final c = await pumpKept(tester);
     await keys.delete(); // 硬體金鑰失效 → load() 回 null
 
-    await tester.tap(find.byKey(_entry));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_hero));
+    await pumpAfterLogin(tester);
 
     await expectCleared(c);
     expect(find.byKey(_entry), findsNothing);
@@ -206,8 +216,8 @@ void main() {
     final c = await pumpKept(tester);
     await store.clear(); // SecureOAuthTokenStore 讀到 invalidated 時的行為
 
-    await tester.tap(find.byKey(_entry));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_hero));
+    await pumpAfterLogin(tester);
 
     await expectCleared(c);
     expect(find.byKey(_entry), findsNothing);
@@ -222,8 +232,8 @@ void main() {
     final c = await pumpKept(tester);
     when(() => authRepo.currentUser()).thenAnswer((_) async => null);
 
-    await tester.tap(find.byKey(_entry));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_hero));
+    await pumpAfterLogin(tester);
 
     expect(find.textContaining('生物辨識資料已變更'), findsNothing);
     expect(find.text('登入已失效，請用瀏覽器重新登入'), findsNothing);
@@ -238,8 +248,8 @@ void main() {
     await pumpKept(tester);
     when(() => authRepo.currentUser()).thenThrow(Exception('offline'));
 
-    await tester.tap(find.byKey(_entry));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_hero));
+    await pumpAfterLogin(tester);
 
     expect(find.textContaining('生物辨識資料已變更'), findsNothing);
     expect(await store.readKeptAccount(), 'a@example.com');
@@ -253,7 +263,8 @@ void main() {
     final oldKey = await keys.load();
     when(() => authRepo.currentUser()).thenAnswer((_) async => _userB);
 
-    await tester.tap(find.byKey(_browser));
+    // 歡迎頁在有保留憑證時登入鈕是解鎖，瀏覽器登入由控制器直接觸發。
+    await c.read(biometricLoginProvider.notifier).signInWithBrowser();
     await tester.pumpAndSettle();
 
     expect(c.read(authStateProvider).value?.email, 'b@example.com');
@@ -269,7 +280,8 @@ void main() {
     await cache.writeResponse('trip:1', 'A 的資料');
     when(() => authRepo.currentUser()).thenAnswer((_) async => _userB);
 
-    await tester.tap(find.byKey(_browser));
+    // 歡迎頁在有保留憑證時登入鈕是解鎖，瀏覽器登入由控制器直接觸發。
+    await c.read(biometricLoginProvider.notifier).signInWithBrowser();
     await tester.pumpAndSettle();
 
     expect(c.read(authStateProvider).value?.email, 'b@example.com');

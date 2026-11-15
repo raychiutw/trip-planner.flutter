@@ -7,7 +7,6 @@ import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/app/adaptive_content.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
-import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
@@ -44,18 +43,16 @@ void main() {
     return tester.getSize(find.byKey(authCardKey)).width;
   }
 
-  testWidgets('login 與 _AuthScaffold 的認證卡片寬度必須一致', (tester) async {
-    // 這兩個畫面是同一張視覺卡片的不同內容。先前 login_screen 寫死 400、
-    // _AuthScaffold 寫死 420，兩份實作各自漂移 —— 使用者在 login → 忘記密碼
-    // 之間切換時卡片會橫向跳動。這個測試守的就是「不再漂移」。
-    final loginWidth = await renderedCardWidth(tester, const LoginScreen());
+  testWidgets('_AuthScaffold 的認證卡片寬度符合 AppContentWidth.authCard', (
+    tester,
+  ) async {
+    // 登入頁已併入歡迎頁，認證卡片只剩帳號流程頁共用 _AuthScaffold；
+    // 量算繪後寬度，抓得到被外層壓成滿版的情況。
     final forgotWidth = await renderedCardWidth(
       tester,
       const ForgotPasswordScreen(),
     );
 
-    expect(loginWidth, forgotWidth);
-    // 兩邊一致但一起壞掉（例如被外層壓成滿版）也要抓得到。
-    expect(loginWidth, AppContentWidth.authCard);
+    expect(forgotWidth, AppContentWidth.authCard);
   });
 }

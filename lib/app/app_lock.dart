@@ -11,6 +11,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../api/oauth/oauth_providers.dart';
+import '../api/oauth/oauth_token_store.dart';
 import '../api/providers.dart';
 import '../api/settings_store.dart';
 import '../models/user.dart';
@@ -148,6 +150,10 @@ class AppLockController extends Notifier<AppLockState> {
   @override
   AppLockState build() {
     ref.listen(authStateProvider, (_, next) => _onAuth(next));
+    // 登入憑證才剛通過生物辨識解開：同一個人、同一次驗證，不再要求 App 鎖。
+    ref.listen(authLockedProvider, (prev, locked) {
+      if (prev == true && !locked) _releaseAfterCredentialUnlock();
+    });
     final enabled = _initialEnabled ?? false;
     if (_initialEnabled == null) unawaited(_loadSaved());
     return AppLockState(enabled: enabled, locked: enabled);
@@ -159,12 +165,29 @@ class AppLockController extends Notifier<AppLockState> {
     }
   }
 
+  /// 冷啟動以來第一次解出認證狀態（之後的 AsyncData 都是重新整理，不得放行）。
+  bool _firstAuthResolved = false;
+
+  void _releaseAfterCredentialUnlock() {
+    if (state.locked) state = state.copyWith(locked: false);
+  }
+
   void _onAuth(AsyncValue<UserInfo?> next) {
     if (next is! AsyncData<UserInfo?>) return;
+    final coldRestore = !_firstAuthResolved;
+    _firstAuthResolved = true;
+    // 冷啟動還原 session 時，受生物辨識保護的憑證必然剛通過一次系統驗證。
+    if (coldRestore &&
+        next.value != null &&
+        ref.read(oauthTokenStoreProvider).protection ==
+            TokenProtection.biometric) {
+      _releaseAfterCredentialUnlock();
+    }
     if (next.value == null) {
       _signedOutSeen = true;
       // 登出：App 鎖是這台裝置上這個登入的設定，不留給下一位使用者。
-      if (state.enabled || state.locked) {
+      // 憑證只是還沒解開（authLocked）不是登出：App 鎖設定要留著，等解鎖後放行。
+      if (!ref.read(authLockedProvider) && (state.enabled || state.locked)) {
         unawaited(_write(_enabledKey, '0'));
         state = state.copyWith(enabled: false, locked: false);
       }
