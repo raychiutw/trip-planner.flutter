@@ -102,6 +102,23 @@ class AuthLockedNotifier extends Notifier<bool> {
   void set(bool locked) => state = locked;
 }
 
+/// 「登入憑證剛通過一次系統驗證」的事件（每發一次加 1）。**只有 [AuthNotifier] 寫入**，
+/// 訂閱者（App 鎖）收到就不必再要求第二次驗證；不要另外推斷時序。
+/// 計數器永不歸零：只在 App 鎖建立與非同步載入設定時讀（見 `AppLockController`）；
+/// 登出時 App 鎖會被關掉，所以不會沿用到下一次登入。`appLockProvider` 目前不會被重建，
+/// 若日後改成 autoDispose 或 invalidate，這個假設要重新檢查。
+final credentialVerifiedProvider =
+    NotifierProvider<CredentialVerifiedNotifier, int>(
+      CredentialVerifiedNotifier.new,
+    );
+
+class CredentialVerifiedNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void emit() => state++;
+}
+
 /// 保留的生物辨識登入憑證已失效，已清掉；登入頁顯示 [userMessage]。
 class KeptCredentialInvalid implements Exception {
   const KeptCredentialInvalid(this.reason);
@@ -117,6 +134,10 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   // 上次快取擁有者標記(存 cacheStore;隨 clear 一起清、登入後重建)。
   static const _cacheOwnerKey = '__cache_owner__';
 
+  // 冷啟動只有第一次 build 算；自己記，不靠 AsyncNotifier 重建時保留舊值的語意
+  //（build 失敗重試、state 被設成 AsyncLoading 都會讓 state.hasValue 誤判）。
+  bool _coldStartDone = false;
+
   @override
   Future<UserInfo?> build() async {
     // refresh 被後端拒絕、憑證已清掉 → 回到未登入(離線快取保留,同一帳號重新登入還用得到)。
@@ -125,18 +146,26 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     });
     ref.onDispose(sub.cancel);
 
-    final user = await _resolveUser();
+    // 第一次 build 才是冷啟動；之後 invalidate 重建時憑證在快取裡，不會有新的系統驗證。
+    final coldStart = !_coldStartDone;
+    _coldStartDone = true;
+    final user = await _resolveUser(coldStart: coldStart);
     await _enforceCacheOwner(user);
     return user;
   }
 
   /// [explicit]：使用者主動登入／解鎖。冷啟動（false）遇到「登出後保留」的標記
   /// 視為已登出，不得讀憑證，否則受保護讀取會跳出驗證並悄悄把登出撤銷。
-  Future<UserInfo?> _resolveUser({bool explicit = false}) async {
+  /// [coldStart]：冷啟動第一次還原。
+  Future<UserInfo?> _resolveUser({
+    bool explicit = false,
+    bool coldStart = false,
+  }) async {
     if (!explicit && await _readKeptAccount(ref) != null) {
       await ref.read(bearerTokenSourceProvider).seal();
       return null;
     }
+    final wasLocked = ref.read(authLockedProvider);
     final OAuthTokens? tokens;
     try {
       tokens = await ref.read(oauthTokenStoreProvider).read();
@@ -150,6 +179,14 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     if (tokens == null) {
       await ref.read(bearerTokenSourceProvider).discardProofKey();
       return null;
+    }
+    // 剛解開的憑證必然剛通過一次系統驗證：從鎖定解開，或冷啟動讀取生物辨識保護的憑證。
+    // 一定要有憑證才發：沒有憑證時沒有東西被驗證過。
+    if (wasLocked ||
+        (coldStart &&
+            ref.read(oauthTokenStoreProvider).protection ==
+                TokenProtection.biometric)) {
+      ref.read(credentialVerifiedProvider.notifier).emit();
     }
 
     // 有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。驗證未過必須落回
@@ -189,17 +226,14 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 用系統瀏覽器登入(PKCE)。使用者取消不算錯誤,維持未登入。
-  /// 回傳 callback 是否帶 `biometric_intent=enable`（由呼叫端決定如何處理）。
+  /// 回傳 callback 是否要求開啟生物辨識登入（由呼叫端決定如何處理）。
   Future<bool> signInWithBrowser({String? biometricHint}) async {
     state = const AsyncLoading();
-    var enableIntent = false;
+    final OAuthLoginResult result;
     try {
-      await ref
+      result = await ref
           .read(oauthLoginServiceProvider)
-          .login(
-            biometricHint: biometricHint,
-            onEnableIntent: () => enableIntent = true,
-          );
+          .login(biometricHint: biometricHint);
     } on OAuthLoginException catch (e, stack) {
       state = e.cancelled ? const AsyncData(null) : AsyncError(e, stack);
       return false;
@@ -210,7 +244,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       await _enforceCacheOwner(user);
       return user;
     });
-    return enableIntent;
+    return result.enableBiometric;
   }
 
   /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)。保留的憑證若已失效

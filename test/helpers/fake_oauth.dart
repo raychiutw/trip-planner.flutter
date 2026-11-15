@@ -53,10 +53,7 @@ class FakeOAuthLoginService implements OAuthLoginService {
   }
 
   @override
-  Future<OAuthTokens> login({
-    String? biometricHint,
-    void Function()? onEnableIntent,
-  }) async {
+  Future<OAuthLoginResult> login({String? biometricHint}) async {
     calls++;
     lastHint = biometricHint;
     onLogin?.call();
@@ -67,8 +64,7 @@ class FakeOAuthLoginService implements OAuthLoginService {
       expiresAt: DateTime.now().add(const Duration(minutes: 15)),
     );
     await _source.adopt(tokens);
-    if (enableIntent) onEnableIntent?.call();
-    return tokens;
+    return OAuthLoginResult(tokens, enableBiometric: enableIntent);
   }
 }
 
