@@ -132,6 +132,15 @@ void main() {
     expect((await store.read())!.refreshToken, 'OLD_RT');
   }
 
+  test('重新驗證遇 access_denied → 視為取消（cancelled 為 true）', () async {
+    launcher.reply = (u) => {
+      'error': 'access_denied',
+      'state': u.queryParameters['state']!,
+    };
+    final e = await reauthError();
+    expect((e! as OAuthLoginException).cancelled, isTrue);
+  });
+
   test('授權網址帶 意圖、expected_account、biometric_hint', () async {
     launcher.reply = (u) => {
       'code': 'CODE',

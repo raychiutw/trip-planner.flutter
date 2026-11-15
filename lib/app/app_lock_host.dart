@@ -74,6 +74,13 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
     super.dispose();
   }
 
+  /// 提示顯示 4 秒後清掉（與 [_noticeTimer] 不同：這兩個提示的狀態在 provider 裡）。
+  void _clearLater(void Function(BiometricLoginController ctl) clear) {
+    Timer(const Duration(seconds: 4), () {
+      if (mounted) clear(ref.read(biometricLoginProvider.notifier));
+    });
+  }
+
   /// 頂端的短暫提示條。
   Widget _notice(BuildContext context, String text) {
     final scheme = Theme.of(context).colorScheme;
@@ -107,19 +114,11 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
       shown,
     ) {
       if (!shown) return;
-      Timer(const Duration(seconds: 4), () {
-        if (mounted) {
-          ref.read(biometricLoginProvider.notifier).clearPasscodeOnlyNotice();
-        }
-      });
+      _clearLater((ctl) => ctl.clearPasscodeOnlyNotice());
     });
     ref.listen(biometricLoginProvider.select((s) => s.reauthNotice), (_, text) {
       if (text == null) return;
-      Timer(const Duration(seconds: 4), () {
-        if (mounted) {
-          ref.read(biometricLoginProvider.notifier).clearReauthNotice();
-        }
-      });
+      _clearLater((ctl) => ctl.clearReauthNotice());
     });
     final signedIn = ref.watch(authStateProvider).value != null;
     final lock = ref.watch(appLockProvider);

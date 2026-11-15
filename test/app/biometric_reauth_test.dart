@@ -82,7 +82,7 @@ void main() {
   group('開啟', () {
     test('重新驗證通過 + 生物辨識通過 → 改成生物辨識保護；授權帶 enable 與目前帳號', () async {
       await setUpWith();
-      await ctl().reauthenticate(enable: true);
+      await ctl().reauthenticate(turnOn: true);
 
       expect(service.reauthCalls, 1);
       expect(service.lastReauthIntent, 'enable');
@@ -98,7 +98,7 @@ void main() {
     test('重新驗證通過但生物辨識被取消 → 維持原狀、不報錯', () async {
       await setUpWith();
       bio.outcomes.add(BiometricOutcome.cancelled);
-      await ctl().reauthenticate(enable: true);
+      await ctl().reauthenticate(turnOn: true);
 
       expect(bio.authenticateCalls, 1);
       expect(store.protection, TokenProtection.passcode);
@@ -109,7 +109,7 @@ void main() {
 
     test('沒有通過重新驗證（任何失敗）→ 不問生物辨識、不套用', () async {
       await setUpWith(reauthError: OAuthLoginException('boom'));
-      await ctl().reauthenticate(enable: true);
+      await ctl().reauthenticate(turnOn: true);
 
       expect(bio.authenticateCalls, 0);
       expect(store.protection, TokenProtection.passcode);
@@ -120,7 +120,7 @@ void main() {
     test('只有裝置密碼：不發起重新驗證（沒東西可開）', () async {
       await setUpWith();
       bio.kind = BiometricKind.passcode;
-      await ctl().reauthenticate(enable: true);
+      await ctl().reauthenticate(turnOn: true);
 
       expect(service.reauthCalls, 0);
       expect(store.protection, TokenProtection.passcode);
@@ -130,7 +130,7 @@ void main() {
   group('關閉', () {
     test('重新驗證 + 生物辨識通過 → 憑證與 DPoP 金鑰一起清除並登出', () async {
       await setUpWith(biometric: true);
-      await ctl().reauthenticate(enable: false);
+      await ctl().reauthenticate(turnOn: false);
 
       expect(service.lastReauthIntent, 'disable');
       expect(bio.authenticateCalls, 1);
@@ -142,7 +142,7 @@ void main() {
     test('生物辨識被取消 → 不清、不登出', () async {
       await setUpWith(biometric: true);
       bio.outcomes.add(BiometricOutcome.cancelled);
-      await ctl().reauthenticate(enable: false);
+      await ctl().reauthenticate(turnOn: false);
 
       expect(container.read(authStateProvider).value, _user);
       expect((await store.read())!.refreshToken, 'RT');
@@ -154,7 +154,7 @@ void main() {
         biometric: true,
         reauthError: OAuthLoginException('boom'),
       );
-      await ctl().reauthenticate(enable: false);
+      await ctl().reauthenticate(turnOn: false);
 
       expect(bio.authenticateCalls, 0);
       expect(container.read(authStateProvider).value, _user);
@@ -170,7 +170,7 @@ void main() {
           biometric: !enable,
           reauthError: OAuthLoginException('取消', cancelled: true),
         );
-        await ctl().reauthenticate(enable: enable);
+        await ctl().reauthenticate(turnOn: enable);
 
         expect(bio.authenticateCalls, 0);
         expect(
@@ -191,7 +191,7 @@ void main() {
             accountMismatch: true,
           ),
         );
-        await ctl().reauthenticate(enable: enable);
+        await ctl().reauthenticate(turnOn: enable);
 
         expect(st().reauthNotice, '登入的帳號與目前帳號不同');
         expect(bio.authenticateCalls, 0);
@@ -210,9 +210,9 @@ void main() {
     await setUpWith();
     service.onReauth = () async {
       expect(st().reauthBusy, isTrue);
-      await ctl().reauthenticate(enable: true);
+      await ctl().reauthenticate(turnOn: true);
     };
-    await ctl().reauthenticate(enable: true);
+    await ctl().reauthenticate(turnOn: true);
 
     expect(service.reauthCalls, 1);
   });
