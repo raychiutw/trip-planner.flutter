@@ -154,6 +154,14 @@ class _Hero extends StatelessWidget {
   }
 }
 
+/// 文字連結的文字左緣要跟標題、主按鈕的內容左緣對齊：去掉 TextButton 預設的
+/// 水平內距，點擊區仍保持 44pt 高。
+final _flushLinkStyle = TextButton.styleFrom(
+  padding: EdgeInsets.zero,
+  minimumSize: const Size(0, 44),
+  alignment: AlignmentDirectional.centerStart,
+);
+
 class _HeroCopy extends StatelessWidget {
   const _HeroCopy({
     required this.onLogin,
@@ -214,6 +222,7 @@ class _HeroCopy extends StatelessWidget {
           TextButton(
             key: const ValueKey('welcome-signup'),
             onPressed: onSignup,
+            style: _flushLinkStyle,
             child: const Text('沒有帳號，建立帳號'),
           ),
         if (keptAccount case final account?) ...[
@@ -228,6 +237,7 @@ class _HeroCopy extends StatelessWidget {
           TextButton(
             key: const ValueKey('welcome-forget-phone'),
             onPressed: onForgetPhone,
+            style: _flushLinkStyle,
             child: const Text('忘記這支手機'),
           ),
         ],
