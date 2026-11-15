@@ -17,6 +17,9 @@ class FakeBiometricAuthenticator implements BiometricAuthenticator {
 
   int authenticateCalls = 0;
 
+  /// 每次 authenticate 收到的 biometricOnly。
+  final biometricOnlyCalls = <bool>[];
+
   @override
   String? lastFailureCode;
 
@@ -27,8 +30,12 @@ class FakeBiometricAuthenticator implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => kind;
 
   @override
-  Future<BiometricOutcome> authenticate({required String reason}) async {
+  Future<BiometricOutcome> authenticate({
+    required String reason,
+    bool biometricOnly = false,
+  }) async {
     authenticateCalls++;
+    biometricOnlyCalls.add(biometricOnly);
     onAuthenticate?.call();
     return outcomes.isEmpty ? BiometricOutcome.success : outcomes.removeAt(0);
   }

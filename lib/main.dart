@@ -20,6 +20,7 @@ import 'api/oauth/oauth_token_store.dart';
 import 'api/providers.dart';
 import 'app/hardware_proof_key_store.dart';
 import 'app/web_auth_launcher.dart';
+import 'app/android_unlock_gate.dart';
 import 'app/web_theme.dart';
 import 'app/accessibility_scope.dart';
 import 'app/app_lock.dart';
@@ -105,7 +106,9 @@ Future<void> main() async {
           retry: appProviderRetry,
           overrides: [
             settingsStoreProvider.overrideWithValue(settingsStore),
-            oauthTokenStoreProvider.overrideWithValue(SecureOAuthTokenStore()),
+            oauthTokenStoreProvider.overrideWithValue(
+              createProductionTokenStore(LocalAuthBiometricAuthenticator()),
+            ),
             proofKeyStoreProvider.overrideWithValue(
               FallbackProofKeyStore(
                 hardware: HardwareProofKeyStore(),
