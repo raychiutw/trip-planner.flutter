@@ -163,7 +163,9 @@ class AppLockController extends Notifier<AppLockState> {
   }
 
   /// listen 只管訂閱之後的事件；憑證若在 App 鎖建立前就已驗證（認證比 App 鎖先解析完），
-  /// 建立時與非同步載入設定時都要把這件事算進初始鎖定狀態。登出後 App 鎖會被關掉，不沿用。
+  /// 建立時與非同步載入設定時都要把這件事算進初始鎖定狀態。
+  /// 計數器永不歸零，所以只在這兩個時機讀；登出時 App 鎖會被關掉，不沿用到下一次登入。
+  /// `appLockProvider` 目前不會被重建，若日後改成 autoDispose 或 invalidate，這個假設要重新檢查。
   bool get _verifiedThisLaunch => ref.read(credentialVerifiedProvider) > 0;
 
   Future<void> _loadSaved() async {
@@ -178,6 +180,8 @@ class AppLockController extends Notifier<AppLockState> {
       _signedOutSeen = true;
       // 登出：App 鎖是這台裝置上這個登入的設定，不留給下一位使用者。
       // 憑證只是還沒解開（authLocked）不是登出：App 鎖設定要留著，等解鎖後放行。
+      // 這裡讀 authLockedProvider 是為了分辨「憑證還沒解開」與「登出」，
+      // 否則冷啟動取消 Face ID 會把 App 鎖設定清掉。
       if (!ref.read(authLockedProvider) && (state.enabled || state.locked)) {
         unawaited(_write(_enabledKey, '0'));
         state = state.copyWith(enabled: false, locked: false);

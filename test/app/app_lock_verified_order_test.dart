@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/api/oauth/oauth_providers.dart';
+import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/models/user.dart';
@@ -54,4 +56,30 @@ void main() {
   test('沒有事件：照舊以鎖定開始', () {
     expect(make().read(appLockProvider).locked, isTrue);
   });
+
+  test('冷啟動、biometric、沒有憑證：不發事件，App 鎖維持鎖定', () async {
+    final c = ProviderContainer(
+      overrides: [
+        oauthTokenStoreProvider.overrideWithValue(_BioEmptyStore()),
+        biometricAuthenticatorProvider.overrideWithValue(
+          FakeBiometricAuthenticator(),
+        ),
+        appLockProvider.overrideWith(
+          () => AppLockController(initialEnabled: true),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    c.read(appLockProvider);
+    await c.read(authStateProvider.future);
+
+    expect(c.read(credentialVerifiedProvider), 0);
+    expect(c.read(appLockProvider).locked, isTrue);
+  });
+}
+
+class _BioEmptyStore extends InMemoryOAuthTokenStore {
+  @override
+  TokenProtection get protection => TokenProtection.biometric;
 }
