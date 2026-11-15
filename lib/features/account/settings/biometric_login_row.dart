@@ -23,7 +23,7 @@ class BiometricLoginRow extends ConsumerWidget {
     final enabled = bio.enabled;
     final busy = bio.reauthBusy;
     // 沒有生物辨識（只有裝置密碼或都沒有）又沒開過：沒東西可開。
-    if ((kind == null || kind == BiometricKind.passcode) && !enabled) {
+    if (!kind.hasBiometric && !enabled) {
       return const SizedBox.shrink();
     }
     final label = kind.lockLabel;
@@ -54,7 +54,7 @@ class BiometricLoginRow extends ConsumerWidget {
           ],
         ),
       );
-      if (ok == true) await controller.reauthenticate(enable: false);
+      if (ok == true) await controller.reauthenticate(turnOn: false);
     }
 
     void toggle() {
@@ -65,7 +65,7 @@ class BiometricLoginRow extends ConsumerWidget {
         unawaited(
           ref
               .read(biometricLoginProvider.notifier)
-              .reauthenticate(enable: true),
+              .reauthenticate(turnOn: true),
         );
       }
     }

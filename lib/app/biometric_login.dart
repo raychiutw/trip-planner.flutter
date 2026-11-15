@@ -92,7 +92,7 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     if (await _read(_promptedKey) == '1') return;
     final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
     // 沒有生物辨識（只有裝置密碼）時不問：裝置密碼保護已是預設。
-    if (kind == null || kind == BiometricKind.passcode) return;
+    if (!kind.hasBiometric) return;
     if (ref.mounted) state = state.copyWith(promptPending: true);
   }
 
@@ -113,17 +113,17 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     if (!ref.mounted || ref.read(authStateProvider).value == null) return;
     if (!enableIntent) return unawaited(_maybePrompt());
     await _write(_promptedKey, '1');
-    if (kind == null || kind == BiometricKind.passcode) {
+    if (!kind.hasBiometric) {
       if (ref.mounted) state = state.copyWith(passcodeOnlyNotice: true);
       return;
     }
     await enable(); // 取消或失敗維持原狀，不報錯
   }
 
-  /// 設定頁開啟（[enable] 為 true）或關閉生物辨識登入（ADR-0018）：先重新驗證授權
+  /// 設定頁開啟（[turnOn] 為 true）或關閉生物辨識登入（ADR-0018）：先重新驗證授權
   /// （web 頁重新輸入密碼、且必須是目前帳號），回來再通過一次生物辨識才套用。
   /// 取消、帳號不同、任何失敗都維持原狀；重新驗證本身不改變目前的登入。
-  Future<void> reauthenticate({required bool enable}) async {
+  Future<void> reauthenticate({required bool turnOn}) async {
     if (state.reauthBusy) return;
     final user = ref.read(authStateProvider).value;
     if (user == null) return;
@@ -133,12 +133,12 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
           .read(biometricAuthenticatorProvider)
           .availableKind();
       // 沒有生物辨識（只有裝置密碼）時沒東西可開；關閉不受裝置能力限制。
-      if (enable && (kind == null || kind == BiometricKind.passcode)) return;
+      if (turnOn && !kind.hasBiometric) return;
       try {
         await ref
             .read(oauthLoginServiceProvider)
             .reauthenticate(
-              intent: enable ? 'enable' : 'disable',
+              intent: turnOn ? 'enable' : 'disable',
               expectedAccount: user.id,
               biometricHint: _hintFor(kind),
             );
@@ -149,8 +149,8 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
         return;
       }
       if (!ref.mounted) return;
-      if (enable) {
-        await this.enable();
+      if (turnOn) {
+        await enable();
       } else {
         await disable();
       }

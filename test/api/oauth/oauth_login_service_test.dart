@@ -124,6 +124,18 @@ void main() {
     await expectLater(service.login(), throwsA(isA<OAuthLoginException>()));
   });
 
+  test('一般登入遇 access_denied → 仍是錯誤（cancelled 為 false），維持原行為', () async {
+    launcher.reply = (u) => {
+      'error': 'access_denied',
+      'state': u.queryParameters['state']!,
+    };
+    final error = await service.login().then<Object?>(
+      (_) => null,
+      onError: (Object e) => e,
+    );
+    expect((error! as OAuthLoginException).cancelled, isFalse);
+  });
+
   test('使用者在瀏覽器取消 → 取消例外原樣往上丟（不吞掉、不換 token）', () async {
     launcher.error = OAuthLoginException(
       '取消',
