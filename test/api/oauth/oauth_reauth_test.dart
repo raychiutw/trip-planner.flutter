@@ -124,9 +124,9 @@ void main() {
         biometricHint: hint,
       );
 
-  Future<Object?> reauthError({String intent = 'enable'}) =>
-      reauth(intent: intent)
-          .then<Object?>((_) => null, onError: (Object e) => e);
+  Future<Object?> reauthError({String intent = 'enable'}) => reauth(
+    intent: intent,
+  ).then<Object?>((_) => null, onError: (Object e) => e);
 
   Future<void> expectCurrentLoginUntouched() async {
     expect((await store.read())!.refreshToken, 'OLD_RT');
