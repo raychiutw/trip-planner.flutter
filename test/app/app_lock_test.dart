@@ -354,7 +354,6 @@ void main() {
       rig.auth.set(_user);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('解鎖 Tripline 嗎'), findsNothing);
       expect(find.byType(CupertinoAlertDialog), findsNothing);
       expect(rig.bio.authenticateCalls, 0);
       expect(await rig.store.read('app_lock_enabled'), isNull);

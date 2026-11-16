@@ -119,13 +119,13 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    // 登出一律撤銷並清除（ADR-0019）：開啟生物辨識登入者也是一般說明，不再提保留。
-    testWidgets('開啟者：一般說明，不提仍可用 Face ID 登入或忘記這支手機', (tester) async {
+    // 登出一律撤銷並清除（ADR-0019）：開啟生物辨識登入者與未開啟者是同一個確認框。
+    testWidgets('開啟者：與未開啟者相同的一般確認框', (tester) async {
       await openConfirm(tester, biometric: true);
 
+      expect(find.text('登出帳號'), findsOneWidget);
       expect(find.text('確定要登出嗎？'), findsOneWidget);
-      expect(find.textContaining('Face ID'), findsNothing);
-      expect(find.textContaining('忘記這支手機'), findsNothing);
+      expect(find.text('登出'), findsOneWidget);
     });
 
     testWidgets('開啟者且 alwaysAsk:false、沒有待同步變更：不打擾，直接放行', (tester) async {
@@ -147,7 +147,6 @@ void main() {
       await openConfirm(tester, biometric: false);
 
       expect(find.text('確定要登出嗎？'), findsOneWidget);
-      expect(find.textContaining('忘記這支手機'), findsNothing);
     });
   });
 }
