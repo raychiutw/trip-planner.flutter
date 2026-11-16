@@ -4,6 +4,7 @@
 ///   成功由 router redirect 進 App；取消留在原頁。
 /// - 其餘：開系統瀏覽器登入，失敗在本頁顯示錯誤。
 /// - 冷啟動讀憑證時系統本身會跳一次驗證；取消就停在這裡，等使用者按登入鈕。
+/// - 解鎖時發現憑證已失效（已清掉）：接著開 web 登入頁，不必再按一次。
 library;
 
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
@@ -64,8 +65,10 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
   }
 
   Future<void> _unlock() async {
-    await ref.read(authStateProvider.notifier).unlock();
+    final invalid = await ref.read(authStateProvider.notifier).unlock();
     if (!mounted) return;
+    // 憑證已失效並清掉（refresh 被拒、生物特徵變更）：同一次按下直接開 web 登入頁。
+    if (invalid != null) return _browserLogin();
     // 取消不是錯誤（unlock 回到未登入、沒有 error）。
     final error = ref.read(authStateProvider).error;
     if (error != null) showAppError(context, _message(error));

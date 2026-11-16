@@ -15,10 +15,12 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/api/dpop/proof_key.dart';
 import 'package:tripline/api/dpop/proof_key_store.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
+import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/api/providers.dart';
@@ -110,10 +112,11 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => null;
 
   @override
-  Future<void> unlock() async {
+  Future<InvalidReason?> unlock() async {
     unlockCount++;
     await gate?.future;
     state = AsyncData(unlockAs);
+    return null;
   }
 
   @override
@@ -167,6 +170,29 @@ class _ScriptedStore extends InMemoryOAuthTokenStore {
   Future<void> lock() async {
     _open = false;
     await super.lock();
+  }
+}
+
+/// 不連網的 refresh：預設輪替成功；[rejectRefresh] 為 true 時模擬伺服器拒絕（撤銷、過期）。
+class _RefreshingOAuthRepository extends RecordingOAuthRepository {
+  bool rejectRefresh = false;
+  int refreshes = 0;
+
+  @override
+  Future<OAuthTokens> refresh({
+    required String refreshToken,
+    required String clientId,
+    ProofKey? proofKey,
+  }) async {
+    refreshes++;
+    if (rejectRefresh) {
+      throw const ApiError(status: 400, code: 'invalid_grant', message: 'x');
+    }
+    return OAuthTokens(
+      accessToken: 'AT2',
+      refreshToken: '${refreshToken}2',
+      expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+    );
   }
 }
 
@@ -1206,6 +1232,7 @@ void main() {
         ProviderContainer container,
         _ScriptedStore store,
         FakeBiometricAuthenticator bio,
+        _RefreshingOAuthRepository oauth,
         int Function() browserLogins,
       })
     >
@@ -1214,6 +1241,7 @@ void main() {
       required List<bool> prompts,
       bool appLock = false,
       bool legacyKept = false,
+      bool rejectRefresh = false,
       bool settle = true,
     }) async {
       final store = _ScriptedStore(prompts);
@@ -1230,6 +1258,7 @@ void main() {
         await store.lock();
       }
       final bio = FakeBiometricAuthenticator();
+      final oauth = _RefreshingOAuthRepository()..rejectRefresh = rejectRefresh;
       final auth = _MockAuthRepository();
       when(auth.currentUser).thenAnswer((_) async => user);
       FakeOAuthLoginService? login;
@@ -1239,6 +1268,7 @@ void main() {
         resolveAuthFromRepository: true,
         extraOverrides: [
           oauthTokenStoreProvider.overrideWithValue(store),
+          oauthRepositoryProvider.overrideWithValue(oauth),
           proofKeyStoreProvider.overrideWithValue(InMemoryProofKeyStore()),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           if (appLock)
@@ -1264,6 +1294,7 @@ void main() {
         container: container,
         store: store,
         bio: bio,
+        oauth: oauth,
         browserLogins: () => login?.calls ?? 0,
       );
     }
@@ -1346,6 +1377,41 @@ void main() {
       expect(r.store.prompts, 2);
       expect(r.browserLogins(), 0, reason: '憑證被鎖時按登入是解鎖，不是開瀏覽器');
       expect(find.byType(TripsListScreen), findsOneWidget);
+    });
+
+    testWidgets('冷啟動 Face ID 通過即 refresh 並進「我的行程」，不經歡迎頁', (tester) async {
+      final r = await coldStart(tester, prompts: [true]);
+
+      expect(find.byType(TripsListScreen), findsOneWidget);
+      expect(r.oauth.refreshes, 1);
+      expect(r.browserLogins(), 0);
+    });
+
+    testWidgets('冷啟動 Face ID 通過但 refresh 被拒：清除憑證停在歡迎頁；按登入開 web 登入頁', (
+      tester,
+    ) async {
+      final r = await coldStart(tester, prompts: [true], rejectRefresh: true);
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(await r.store.read(), isNull);
+      expect(r.browserLogins(), 0, reason: '不自動開瀏覽器，等使用者按登入');
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.browserLogins(), 1);
+    });
+
+    testWidgets('取消後按登入：解鎖通過但 refresh 被拒 → 清除憑證並直接開 web 登入頁', (tester) async {
+      final r = await coldStart(tester, prompts: [false, true]);
+      r.oauth.rejectRefresh = true;
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.store.prompts, 2, reason: '按登入先再讀一次受保護憑證');
+      expect(r.browserLogins(), 1, reason: '憑證失效：同一次按下直接開 web 登入頁');
+      expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
     });
 
     testWidgets('解鎖成功：從按下到落在 /trips 每一格都不露出歡迎頁', (tester) async {
