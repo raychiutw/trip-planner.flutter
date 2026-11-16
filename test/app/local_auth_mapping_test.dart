@@ -86,21 +86,46 @@ void main() {
       () => auth.getAvailableBiometrics(),
     ).thenAnswer((_) async => types);
 
-    test('有 strong → 生物辨識', () async {
+    test('有 strong → App 鎖與生物辨識登入都是生物辨識', () async {
       stubTypes([BiometricType.weak, BiometricType.strong]);
       expect(await sut.availableKind(), BiometricKind.biometric);
+      expect(await sut.biometricLoginKind(), BiometricKind.biometric);
     });
 
-    test('只有 weak → 只算裝置密碼，不提供生物辨識登入', () async {
+    test('只有 weak → App 鎖照樣用生物辨識（不受影響）', () async {
       stubTypes([BiometricType.weak]);
       final kind = await sut.availableKind();
+      expect(kind, BiometricKind.biometric);
+      expect(kind.hasBiometric, isTrue);
+    });
+
+    test('只有 weak → 生物辨識登入只算裝置密碼，不提供', () async {
+      stubTypes([BiometricType.weak]);
+      final kind = await sut.biometricLoginKind();
       expect(kind, BiometricKind.passcode);
       expect(kind.hasBiometric, isFalse);
     });
 
-    test('沒有登記生物特徵 → 裝置密碼', () async {
+    test('沒有登記生物特徵 → 都是裝置密碼', () async {
       stubTypes([]);
       expect(await sut.availableKind(), BiometricKind.passcode);
+      expect(await sut.biometricLoginKind(), BiometricKind.passcode);
+    });
+  });
+
+  group('iOS 可用種類（生物辨識登入與 App 鎖相同）', () {
+    setUp(() {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      when(() => auth.isDeviceSupported()).thenAnswer((_) async => true);
+      when(
+        () => auth.getAvailableBiometrics(),
+      ).thenAnswer((_) async => [BiometricType.face]);
+    });
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('Face ID', () async {
+      expect(await sut.availableKind(), BiometricKind.faceId);
+      expect(await sut.biometricLoginKind(), BiometricKind.faceId);
     });
   });
 }

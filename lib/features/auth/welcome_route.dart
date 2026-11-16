@@ -50,7 +50,7 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
   /// 憑證被鎖，而且裝置有生物辨識：登入鈕走解鎖。
   Future<bool> _canUnlock() async {
     if (!ref.read(authLockedProvider)) return false;
-    return (await ref.read(appLockKindProvider.future)).hasBiometric;
+    return (await ref.read(biometricLoginKindProvider.future)).hasBiometric;
   }
 
   Future<void> _login() async {

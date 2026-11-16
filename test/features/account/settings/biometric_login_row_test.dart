@@ -9,6 +9,7 @@ import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/app_lock_host.dart';
 import 'package:tripline/app/biometric_login.dart';
+import 'package:tripline/features/account/settings/app_lock_row.dart';
 import 'package:tripline/features/account/settings/biometric_login_row.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
@@ -55,7 +56,9 @@ void main() {
   Future<void> pump(
     WidgetTester tester, {
     BiometricKind? kind = BiometricKind.faceId,
+    BiometricKind? loginKind,
     bool biometric = false,
+    Widget body = const BiometricLoginRow(),
   }) async {
     store = InMemoryOAuthTokenStore();
     await store.write(
@@ -66,7 +69,7 @@ void main() {
       ),
     );
     if (biometric) await store.setProtection(TokenProtection.biometric);
-    bio = FakeBiometricAuthenticator(kind: kind);
+    bio = FakeBiometricAuthenticator(kind: kind)..loginKindOverride = loginKind;
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container = ProviderContainer(
@@ -81,7 +84,7 @@ void main() {
         ),
         child: MaterialApp(
           builder: (context, child) => AppLockHost(child: child!),
-          home: const Scaffold(body: BiometricLoginRow()),
+          home: Scaffold(body: body),
         ),
       ),
     );
@@ -90,11 +93,11 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('登入後不再詢問是否開啟生物辨識登入', (tester) async {
+  testWidgets('登入後不會自動要求生物辨識驗證', (tester) async {
     await pump(tester);
 
-    expect(find.byKey(const ValueKey('bio-login-prompt')), findsNothing);
     expect(bio.authenticateCalls, 0);
+    expect(store.protection, TokenProtection.passcode);
   });
 
   testWidgets('開啟：驗證一次生物辨識就改成生物辨識保護', (tester) async {
@@ -155,6 +158,21 @@ void main() {
         );
       });
     }
+
+    // Android 只有 weak 生物辨識：生物辨識登入不提供（只接受 STRONG），App 鎖照常可用。
+    testWidgets('Android 只有 weak：不顯示生物辨識登入，App 鎖仍以生物辨識顯示', (tester) async {
+      await pump(
+        tester,
+        kind: BiometricKind.biometric,
+        loginKind: BiometricKind.passcode,
+        body: const Column(children: [BiometricLoginRow(), AppLockRow()]),
+      );
+      expect(
+        find.byKey(const ValueKey('settings-biometric-login')),
+        findsNothing,
+      );
+      expect(find.text('生物辨識 解鎖'), findsOneWidget);
+    });
 
     testWidgets('對照：有 Face ID 時顯示', (tester) async {
       await pump(tester);

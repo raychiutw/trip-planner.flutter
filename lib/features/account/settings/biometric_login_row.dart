@@ -17,7 +17,7 @@ class BiometricLoginRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final kind = ref.watch(appLockKindProvider).value;
+    final kind = ref.watch(biometricLoginKindProvider).value;
     // 沒有生物辨識（只有裝置密碼或都沒有）：這個功能不存在。
     if (!kind.hasBiometric) return const SizedBox.shrink();
     final enabled = ref.watch(biometricLoginProvider).enabled;

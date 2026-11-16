@@ -125,6 +125,17 @@ void main() {
       expect(s.passcodeOnlyNotice, isTrue);
       expect(container.read(authStateProvider).hasError, isFalse);
     });
+
+    test('Android 只有 weak（App 鎖可用、生物辨識登入不可用）：同只有裝置密碼', () async {
+      bio.kind = BiometricKind.biometric;
+      bio.loginKindOverride = BiometricKind.passcode;
+      final s = await signIn();
+
+      expect(_FakeAuth.lastHint, isNull, reason: 'web 不顯示生物辨識鈕');
+      expect(bio.authenticateCalls, 0);
+      expect(store.protection, TokenProtection.passcode);
+      expect(s.passcodeOnlyNotice, isTrue);
+    });
   });
 
   test('沒有旗標：不驗證、不改保護、登入後也不詢問', () async {

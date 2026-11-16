@@ -83,7 +83,9 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
   /// 瀏覽器登入：授權網址帶按鈕名稱提示；callback 若帶 `biometric_intent=enable`，
   /// 登入完成後直接驗證一次生物辨識（[enable]），取消則維持一般保存、登入照常完成。
   Future<void> signInWithBrowser() async {
-    final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
+    final kind = await ref
+        .read(biometricAuthenticatorProvider)
+        .biometricLoginKind();
     final enableIntent = await ref
         .read(authStateProvider.notifier)
         .signInWithBrowser(biometricHint: _hintFor(kind));

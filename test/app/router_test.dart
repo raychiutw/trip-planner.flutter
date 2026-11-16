@@ -863,7 +863,7 @@ void main() {
             FakeBiometricAuthenticator(kind: null),
           ),
           authLockedProvider.overrideWith(_LockedNotifier.new),
-          appLockKindProvider.overrideWith((ref) async => kind),
+          biometricLoginKindProvider.overrideWith((ref) async => kind),
         ],
       );
       addTearDown(container.dispose);
@@ -1021,7 +1021,7 @@ void main() {
           ),
           if (locked) ...[
             authLockedProvider.overrideWith(_LockedNotifier.new),
-            appLockKindProvider.overrideWith(
+            biometricLoginKindProvider.overrideWith(
               (ref) async => BiometricKind.faceId,
             ),
           ],

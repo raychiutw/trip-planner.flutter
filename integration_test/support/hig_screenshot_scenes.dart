@@ -390,6 +390,9 @@ class _NoBiometric implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => null;
 
   @override
+  Future<BiometricKind?> biometricLoginKind() async => null;
+
+  @override
   Future<BiometricOutcome> authenticate({
     required String reason,
     bool biometricOnly = false,
@@ -403,6 +406,9 @@ class _PendingBiometric implements BiometricAuthenticator {
 
   @override
   Future<BiometricKind?> availableKind() async => BiometricKind.faceId;
+
+  @override
+  Future<BiometricKind?> biometricLoginKind() async => BiometricKind.faceId;
 
   @override
   Future<BiometricOutcome> authenticate({

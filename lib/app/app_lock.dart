@@ -48,8 +48,12 @@ enum BiometricOutcome { success, cancelled, interrupted, failed }
 
 /// 平台生物辨識的最小介面（測試以假的替換）。
 abstract interface class BiometricAuthenticator {
-  /// 目前可用的解鎖方式；null = 沒有生物辨識也沒有裝置密碼。
+  /// 目前可用的解鎖方式（App 鎖用）；null = 沒有生物辨識也沒有裝置密碼。
   Future<BiometricKind?> availableKind();
+
+  /// 生物辨識登入可用的種類：與 [availableKind] 相同，但 Android 只認 BIOMETRIC_STRONG
+  /// （受保護的金鑰只接受 strong；只有 weak 時建不起來，當成只有裝置密碼；ADR-0019）。
+  Future<BiometricKind?> biometricLoginKind();
 
   /// [biometricOnly] 為 true 時不接受裝置密碼（用於「必須是生物特徵」的把關）。
   Future<BiometricOutcome> authenticate({
@@ -71,7 +75,14 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
   String? lastFailureCode;
 
   @override
-  Future<BiometricKind?> availableKind() async {
+  Future<BiometricKind?> availableKind() => _kind(strongOnly: false);
+
+  @override
+  Future<BiometricKind?> biometricLoginKind() => _kind(strongOnly: true);
+
+  /// [strongOnly]：Android 只認 BIOMETRIC_STRONG（生物辨識登入）。local_auth_android 以
+  /// canAuthenticate(BIOMETRIC_WEAK／STRONG) 回 weak／strong。
+  Future<BiometricKind?> _kind({required bool strongOnly}) async {
     try {
       if (!await _auth.isDeviceSupported()) return null;
       final types = await _auth.getAvailableBiometrics();
@@ -80,8 +91,7 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
           defaultTargetPlatform == TargetPlatform.iOS) {
         return BiometricKind.touchId;
       }
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        // 生物辨識登入只接受 BIOMETRIC_STRONG；只有 weak 時金鑰建不起來，當成只有裝置密碼。
+      if (strongOnly && defaultTargetPlatform == TargetPlatform.android) {
         return types.contains(BiometricType.strong)
             ? BiometricKind.biometric
             : BiometricKind.passcode;
@@ -134,6 +144,11 @@ final appLockClockProvider = Provider<DateTime Function()>(
 
 final appLockKindProvider = FutureProvider.autoDispose<BiometricKind?>(
   (ref) => ref.watch(biometricAuthenticatorProvider).availableKind(),
+);
+
+/// 生物辨識登入可用的種類（Android 只認 strong，見 [BiometricAuthenticator.biometricLoginKind]）。
+final biometricLoginKindProvider = FutureProvider.autoDispose<BiometricKind?>(
+  (ref) => ref.watch(biometricAuthenticatorProvider).biometricLoginKind(),
 );
 
 /// 在建立 App 前讀回是否開啟，冷啟動第一幀就能鎖住。

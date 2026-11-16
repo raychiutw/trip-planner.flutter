@@ -1532,6 +1532,9 @@ class _NoBiometricAuthenticator implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => null;
 
   @override
+  Future<BiometricKind?> biometricLoginKind() async => null;
+
+  @override
   Future<BiometricOutcome> authenticate({
     required String reason,
     bool biometricOnly = false,

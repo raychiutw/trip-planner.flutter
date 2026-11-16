@@ -29,8 +29,15 @@ class FakeBiometricAuthenticator implements BiometricAuthenticator {
   /// 驗證「進行中」要做的事（例如模擬驗證期間登出、換帳號），做完才回傳結果。
   Future<void> Function()? whileAuthenticating;
 
+  /// 生物辨識登入可用的種類；null＝與 [kind] 相同（模擬 Android 只有 weak 時另設）。
+  BiometricKind? loginKindOverride;
+
   @override
   Future<BiometricKind?> availableKind() async => kind;
+
+  @override
+  Future<BiometricKind?> biometricLoginKind() async =>
+      loginKindOverride ?? kind;
 
   @override
   Future<BiometricOutcome> authenticate({
