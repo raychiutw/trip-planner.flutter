@@ -144,6 +144,6 @@ void main() {
     expect(bio.authenticateCalls, 0);
     expect(store.protection, TokenProtection.passcode);
     expect(s.passcodeOnlyNotice, isFalse);
-    expect(s.notice, isNull);
+    expect(s.enableFailureMessage, isNull);
   });
 }

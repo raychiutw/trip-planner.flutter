@@ -7,6 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/providers.dart';
 import 'adaptive.dart';
 
+/// 登出確認的說明：有待同步變更就先講清楚會遺失。App 鎖畫面的登出確認共用這段。
+String logoutConfirmMessage(int pending) =>
+    pending == 0 ? '確定要登出嗎？' : '還有 $pending 筆變更尚未同步，登出後會遺失。確定要登出嗎？';
+
 /// 回傳 true 才可繼續登出。[alwaysAsk] 為 false 時，沒有待同步變更就不打擾。
 Future<bool> confirmLogout(
   BuildContext context,
@@ -25,7 +29,7 @@ Future<bool> confirmLogout(
     title: title,
     message: message != null
         ? (pending == 0 ? message : '$message還有 $pending 筆變更尚未同步，登出後會遺失。')
-        : (pending == 0 ? '確定要登出嗎？' : '還有 $pending 筆變更尚未同步，登出後會遺失。確定要登出嗎？'),
+        : logoutConfirmMessage(pending),
     confirmLabel: confirmLabel,
   );
 }

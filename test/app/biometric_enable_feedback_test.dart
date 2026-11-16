@@ -88,7 +88,7 @@ void main() {
     expect(events, ['wait', 'auth', 'wait', 'auth']);
     expect(store.protection, TokenProtection.biometric);
     expect(st().enabled, isTrue);
-    expect(st().notice, isNull);
+    expect(st().enableFailureMessage, isNull);
   });
 
   test('連續被中斷：不開啟，並顯示帶原因碼的提示', () async {
@@ -102,8 +102,8 @@ void main() {
     expect(bio.authenticateCalls, 2);
     expect(store.protection, TokenProtection.passcode);
     expect(st().enabled, isFalse);
-    expect(st().notice, contains('uiUnavailable'));
-    expect(st().notice, contains('沒有開啟'));
+    expect(st().enableFailureMessage, contains('uiUnavailable'));
+    expect(st().enableFailureMessage, contains('沒有開啟'));
   });
 
   test('驗證失敗：不開啟，並顯示帶原因碼的提示（不再靜默）', () async {
@@ -114,7 +114,7 @@ void main() {
 
     expect(bio.authenticateCalls, 1);
     expect(st().enabled, isFalse);
-    expect(st().notice, contains('noBiometricsEnrolled'));
+    expect(st().enableFailureMessage, contains('noBiometricsEnrolled'));
   });
 
   test('使用者自己取消：維持原狀，不顯示提示', () async {
@@ -124,6 +124,6 @@ void main() {
 
     expect(bio.authenticateCalls, 1);
     expect(st().enabled, isFalse);
-    expect(st().notice, isNull);
+    expect(st().enableFailureMessage, isNull);
   });
 }

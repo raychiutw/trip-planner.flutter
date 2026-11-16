@@ -18,6 +18,7 @@ import '../ui/tp_filled_button.dart';
 import 'adaptive.dart';
 import 'app_lock.dart';
 import 'biometric_login.dart';
+import 'logout_confirm.dart';
 
 class AppLockHost extends ConsumerStatefulWidget {
   const AppLockHost({super.key, required this.child});
@@ -117,9 +118,12 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
       if (!shown) return;
       _clearLater((ctl) => ctl.clearPasscodeOnlyNotice());
     });
-    ref.listen(biometricLoginProvider.select((s) => s.notice), (_, text) {
+    ref.listen(biometricLoginProvider.select((s) => s.enableFailureMessage), (
+      _,
+      text,
+    ) {
       if (text == null) return;
-      _clearLater((ctl) => ctl.clearNotice());
+      _clearLater((ctl) => ctl.clearEnableFailureMessage());
     });
     final signedIn = ref.watch(authStateProvider).value != null;
     final lock = ref.watch(appLockProvider);
@@ -160,7 +164,8 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
           ),
         if (ref.watch(biometricLoginProvider).passcodeOnlyNotice)
           _notice(context, '這支手機沒有設定 Face ID／Touch ID，已用一般方式登入'),
-        if (ref.watch(biometricLoginProvider).notice case final text?)
+        if (ref.watch(biometricLoginProvider).enableFailureMessage
+            case final text?)
           _notice(context, text),
         if (_showDisabledNotice)
           _notice(context, '此裝置已沒有可用的生物辨識或裝置密碼，已關閉 App 鎖。'),
@@ -315,9 +320,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
             child: _HostDialog(
               dialogKey: const ValueKey('app-lock-logout-dialog'),
               title: '登出帳號',
-              message: _pendingCount == 0
-                  ? '確定要登出嗎？'
-                  : '還有 $_pendingCount 筆變更尚未同步，登出後會遺失。確定要登出嗎？',
+              message: logoutConfirmMessage(_pendingCount),
               cancelLabel: '取消',
               confirmLabel: '登出',
               destructive: true,

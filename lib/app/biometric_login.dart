@@ -26,7 +26,7 @@ class BiometricLoginState {
   const BiometricLoginState({
     this.enabled = false,
     this.passcodeOnlyNotice = false,
-    this.notice,
+    this.enableFailureMessage,
   });
 
   /// refresh token 目前受生物辨識保護。
@@ -35,18 +35,20 @@ class BiometricLoginState {
   /// web 要求開啟、但這支手機只有裝置密碼：提示已用一般方式登入。
   final bool passcodeOnlyNotice;
 
-  /// 開啟沒有成功時給使用者看的一句話（使用者自己取消不顯示）。
-  final String? notice;
+  /// 開啟生物辨識登入沒有成功時給使用者看的一句話（使用者自己取消不顯示）。
+  final String? enableFailureMessage;
 
   BiometricLoginState copyWith({
     bool? enabled,
     bool? passcodeOnlyNotice,
-    String? notice,
-    bool clearNotice = false,
+    String? enableFailureMessage,
+    bool clearEnableFailureMessage = false,
   }) => BiometricLoginState(
     enabled: enabled ?? this.enabled,
     passcodeOnlyNotice: passcodeOnlyNotice ?? this.passcodeOnlyNotice,
-    notice: clearNotice ? null : notice ?? this.notice,
+    enableFailureMessage: clearEnableFailureMessage
+        ? null
+        : enableFailureMessage ?? this.enableFailureMessage,
   );
 }
 
@@ -98,7 +100,8 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     await enable(); // 取消或失敗維持一般保存，不影響登入
   }
 
-  void clearNotice() => state = state.copyWith(clearNotice: true);
+  void clearEnableFailureMessage() =>
+      state = state.copyWith(clearEnableFailureMessage: true);
 
   void clearPasscodeOnlyNotice() =>
       state = state.copyWith(passcodeOnlyNotice: false);
@@ -133,7 +136,7 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
         // 使用者自己取消不打擾；其他失敗要讓人知道，不能開關沒變又沒有任何訊息。
         if (outcome != BiometricOutcome.cancelled) {
           state = state.copyWith(
-            notice:
+            enableFailureMessage:
                 '生物辨識驗證沒有通過，沒有開啟生物辨識登入'
                 '（原因碼：${auth.lastFailureCode ?? 'unknown'}）。',
           );
