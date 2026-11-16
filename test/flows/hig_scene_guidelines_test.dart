@@ -87,7 +87,6 @@ const _scenesWithDialog = {
   'favorites-remove-confirm',
   'account-delete-preview-failed',
   'collab-revoke-invite-confirm',
-  'account-biometric-disable-confirm',
   'account-session-revoke-confirm',
   'developer-app-delete-confirm',
   'note-delete-confirm',

@@ -116,9 +116,9 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
       if (!shown) return;
       _clearLater((ctl) => ctl.clearPasscodeOnlyNotice());
     });
-    ref.listen(biometricLoginProvider.select((s) => s.reauthNotice), (_, text) {
+    ref.listen(biometricLoginProvider.select((s) => s.notice), (_, text) {
       if (text == null) return;
-      _clearLater((ctl) => ctl.clearReauthNotice());
+      _clearLater((ctl) => ctl.clearNotice());
     });
     final signedIn = ref.watch(authStateProvider).value != null;
     final lock = ref.watch(appLockProvider);
@@ -159,14 +159,9 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
           ),
         if (lock.promptPending && signedIn && !showLock)
           Positioned.fill(child: _EnablePrompt()),
-        if (ref.watch(biometricLoginProvider).promptPending &&
-            signedIn &&
-            !showLock &&
-            !lock.promptPending)
-          const Positioned.fill(child: _BiometricLoginPrompt()),
         if (ref.watch(biometricLoginProvider).passcodeOnlyNotice)
           _notice(context, '這支手機沒有設定 Face ID／Touch ID，已用一般方式登入'),
-        if (ref.watch(biometricLoginProvider).reauthNotice case final text?)
+        if (ref.watch(biometricLoginProvider).notice case final text?)
           _notice(context, text),
         if (_showDisabledNotice)
           _notice(context, '此裝置已沒有可用的生物辨識或裝置密碼，已關閉 App 鎖。'),
@@ -240,26 +235,6 @@ class _EnablePrompt extends ConsumerWidget {
       dialogKey: const ValueKey('app-lock-prompt'),
       title: '要用 $label 解鎖 Tripline 嗎？',
       message: '開啟後，每次打開 App 都要先通過 $label，別人拿到你的手機也看不到行程。之後可以在「帳號 → 安全性」變更。',
-      cancelLabel: '稍後再說',
-      confirmLabel: '開啟',
-      onCancel: () => unawaited(controller.answerPrompt(enable: false)),
-      onConfirm: () => unawaited(controller.answerPrompt(enable: true)),
-    );
-  }
-}
-
-/// 登入成功後詢問是否開啟生物辨識登入（排在 App 鎖的詢問之後）。
-class _BiometricLoginPrompt extends ConsumerWidget {
-  const _BiometricLoginPrompt();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final label = ref.watch(appLockKindProvider).value.lockLabel;
-    final controller = ref.read(biometricLoginProvider.notifier);
-    return _HostDialog(
-      dialogKey: const ValueKey('bio-login-prompt'),
-      title: '要用 $label 登入 Tripline 嗎？',
-      message: '開啟後，登入憑證只能用 $label 解鎖，密碼不會存在這支手機。之後可以在「帳號 → 安全性」關閉。',
       cancelLabel: '稍後再說',
       confirmLabel: '開啟',
       onCancel: () => unawaited(controller.answerPrompt(enable: false)),

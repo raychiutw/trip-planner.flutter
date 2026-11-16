@@ -26,6 +26,9 @@ class FakeBiometricAuthenticator implements BiometricAuthenticator {
   /// 每次 authenticate 被呼叫時觸發（測試記錄呼叫順序用）。
   void Function()? onAuthenticate;
 
+  /// 驗證「進行中」要做的事（例如模擬驗證期間登出、換帳號），做完才回傳結果。
+  Future<void> Function()? whileAuthenticating;
+
   @override
   Future<BiometricKind?> availableKind() async => kind;
 
@@ -37,6 +40,7 @@ class FakeBiometricAuthenticator implements BiometricAuthenticator {
     authenticateCalls++;
     biometricOnlyCalls.add(biometricOnly);
     onAuthenticate?.call();
+    await whileAuthenticating?.call();
     return outcomes.isEmpty ? BiometricOutcome.success : outcomes.removeAt(0);
   }
 }

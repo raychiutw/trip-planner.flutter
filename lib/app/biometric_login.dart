@@ -1,7 +1,9 @@
-/// 生物辨識登入：用 Face ID／Touch ID 保護本機的登入憑證（ADR-0014）。
+/// 生物辨識登入：用 Face ID／Touch ID／指紋保護本機的登入憑證（ADR-0019）。
 ///
 /// 開啟後 refresh token 改存成「讀取時要通過生物辨識」的 Keychain／Keystore 項目，
-/// 冷啟動讀取時由系統跳出驗證；App 不保管密碼。關閉會清掉 refresh token 並登出。
+/// 冷啟動讀取時由系統跳出驗證；App 不保管密碼。只在登入期間有效：登出一律撤銷並清除。
+/// 開啟的入口：web 登入頁的生物辨識鈕（callback 帶 `biometric_intent=enable`）或設定頁
+/// 開關，都只驗一次生物辨識；關閉改回一般保存，不驗證、不登出。
 /// 與 App 鎖（[appLockProvider]）互相獨立。
 library;
 
@@ -12,7 +14,6 @@ import 'package:flutter/widgets.dart'
     show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/oauth/oauth_login_service.dart';
 import '../api/oauth/oauth_protocol.dart';
 import '../api/oauth/oauth_providers.dart';
 import '../api/oauth/oauth_token_store.dart';
@@ -20,56 +21,42 @@ import '../api/providers.dart';
 import '../models/user.dart';
 import 'app_lock.dart';
 
-const _promptedKey = 'bio_login_prompted';
-
 @immutable
 class BiometricLoginState {
   const BiometricLoginState({
     this.enabled = false,
-    this.promptPending = false,
     this.passcodeOnlyNotice = false,
-    this.reauthBusy = false,
-    this.reauthNotice,
+    this.notice,
   });
 
   /// refresh token 目前受生物辨識保護。
   final bool enabled;
 
-  /// 登入成功後，要詢問是否開啟。
-  final bool promptPending;
-
   /// web 要求開啟、但這支手機只有裝置密碼：提示已用一般方式登入。
   final bool passcodeOnlyNotice;
 
-  /// 設定頁的重新驗證流程進行中：開關要禁用，避免重複觸發。
-  final bool reauthBusy;
-
-  /// 重新驗證被拒絕時給使用者看的一句話（例如帳號不同）。
-  final String? reauthNotice;
+  /// 開啟沒有成功時給使用者看的一句話（使用者自己取消不顯示）。
+  final String? notice;
 
   BiometricLoginState copyWith({
     bool? enabled,
-    bool? promptPending,
     bool? passcodeOnlyNotice,
-    bool? reauthBusy,
-    String? reauthNotice,
-    bool clearReauthNotice = false,
+    String? notice,
+    bool clearNotice = false,
   }) => BiometricLoginState(
     enabled: enabled ?? this.enabled,
-    promptPending: promptPending ?? this.promptPending,
     passcodeOnlyNotice: passcodeOnlyNotice ?? this.passcodeOnlyNotice,
-    reauthBusy: reauthBusy ?? this.reauthBusy,
-    reauthNotice: clearReauthNotice ? null : reauthNotice ?? this.reauthNotice,
+    notice: clearNotice ? null : notice ?? this.notice,
   );
 }
 
 class BiometricLoginController extends Notifier<BiometricLoginState> {
   bool _inFlight = false;
 
-  /// 瀏覽器登入進行中：登入完成的詢問交給 [signInWithBrowser] 依旗標決定。
-  /// 保留理由：authState 在 login() 回傳「是否開啟」之前就先變成已登入，
-  /// [_onAuth] 若不略過會在旗標處理前先排出詢問。
-  bool _signingIn = false;
+  /// 登入狀態的世代編號：登出（含 refresh 被拒的過期）或換帳號就加一。
+  /// 生物辨識驗證回來時世代已變，代表驗證期間登入狀態改變，結果要丟棄（ADR-0019）。
+  int _generation = 0;
+  String? _userId;
 
   @override
   BiometricLoginState build() {
@@ -82,91 +69,34 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
 
   void _onAuth(AsyncValue<UserInfo?> next) {
     if (next is! AsyncData<UserInfo?>) return;
-    if (next.value == null) {
-      // 登出：待答的詢問作廢，保護等級已隨憑證一起重置。
+    final userId = next.value?.id;
+    if (userId == null || userId != _userId) _generation++;
+    _userId = userId;
+    if (userId == null) {
+      // 登出：保護等級已隨憑證一起重置，提示也作廢。
       state = BiometricLoginState(enabled: _storeEnabled);
       return;
     }
     state = state.copyWith(enabled: _storeEnabled);
-    if (!_signingIn) unawaited(_maybePrompt());
-  }
-
-  /// 登入成功後只問一次；裝置沒有生物辨識或已經開啟就不問。
-  Future<void> _maybePrompt() async {
-    if (state.enabled) return;
-    if (await _read(_promptedKey) == '1') return;
-    final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
-    // 沒有生物辨識（只有裝置密碼）時不問：裝置密碼保護已是預設。
-    if (!kind.hasBiometric) return;
-    if (ref.mounted) state = state.copyWith(promptPending: true);
   }
 
   /// 瀏覽器登入：授權網址帶按鈕名稱提示；callback 若帶 `biometric_intent=enable`，
-  /// 登入完成後走 [enable]（先過生物辨識才改保護），並視為已問過、不再詢問。
-  /// 沒有旗標時與以往相同（[_onAuth] 照常排詢問）。
+  /// 登入完成後直接驗證一次生物辨識（[enable]），取消則維持一般保存、登入照常完成。
   Future<void> signInWithBrowser() async {
     final kind = await ref.read(biometricAuthenticatorProvider).availableKind();
-    _signingIn = true;
-    final bool enableIntent;
-    try {
-      enableIntent = await ref
-          .read(authStateProvider.notifier)
-          .signInWithBrowser(biometricHint: _hintFor(kind));
-    } finally {
-      _signingIn = false;
-    }
-    if (!ref.mounted || ref.read(authStateProvider).value == null) return;
-    if (!enableIntent) return unawaited(_maybePrompt());
-    await _write(_promptedKey, '1');
+    final enableIntent = await ref
+        .read(authStateProvider.notifier)
+        .signInWithBrowser(biometricHint: _hintFor(kind));
+    if (!enableIntent || !ref.mounted) return;
+    if (ref.read(authStateProvider).value == null) return;
     if (!kind.hasBiometric) {
-      if (ref.mounted) state = state.copyWith(passcodeOnlyNotice: true);
+      state = state.copyWith(passcodeOnlyNotice: true);
       return;
     }
-    await enable(); // 取消或失敗維持原狀，不報錯
+    await enable(); // 取消或失敗維持一般保存，不影響登入
   }
 
-  /// 設定頁開啟（[turnOn] 為 true）或關閉生物辨識登入（ADR-0018）：先重新驗證授權
-  /// （web 頁重新輸入密碼、且必須是目前帳號），回來再通過一次生物辨識才套用。
-  /// 取消、帳號不同、任何失敗都維持原狀；重新驗證本身不改變目前的登入。
-  Future<void> reauthenticate({required bool turnOn}) async {
-    if (state.reauthBusy) return;
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
-    state = state.copyWith(reauthBusy: true, clearReauthNotice: true);
-    try {
-      final kind = await ref
-          .read(biometricAuthenticatorProvider)
-          .availableKind();
-      // 沒有生物辨識（只有裝置密碼）時沒東西可開；關閉不受裝置能力限制。
-      if (turnOn && !kind.hasBiometric) return;
-      try {
-        await ref
-            .read(oauthLoginServiceProvider)
-            .reauthenticate(
-              intent: turnOn
-                  ? OAuthProtocol.intentEnable
-                  : OAuthProtocol.intentDisable,
-              expectedAccount: user.id,
-              biometricHint: _hintFor(kind),
-            );
-      } on OAuthLoginException catch (e) {
-        if (!e.cancelled && ref.mounted) {
-          state = state.copyWith(reauthNotice: e.userMessage);
-        }
-        return;
-      }
-      if (!ref.mounted) return;
-      if (turnOn) {
-        await enable();
-      } else {
-        await disable();
-      }
-    } finally {
-      if (ref.mounted) state = state.copyWith(reauthBusy: false);
-    }
-  }
-
-  void clearReauthNotice() => state = state.copyWith(clearReauthNotice: true);
+  void clearNotice() => state = state.copyWith(clearNotice: true);
 
   void clearPasscodeOnlyNotice() =>
       state = state.copyWith(passcodeOnlyNotice: false);
@@ -179,32 +109,29 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
     BiometricKind.passcode || null => null,
   };
 
-  /// 回答登入後的詢問；不論選哪個都記為已問過。
-  Future<void> answerPrompt({required bool enable}) async {
-    state = state.copyWith(promptPending: false);
-    await _write(_promptedKey, '1');
-    if (enable) await this.enable();
-  }
-
-  /// 開啟：先驗證身分，通過才把 refresh token 改存成受生物辨識保護。
+  /// 開啟：驗證一次生物辨識（不接受改用裝置密碼），通過才把 refresh token 改存成
+  /// 受生物辨識保護。驗證期間登入狀態改變（登出、過期、換帳號）就丟棄結果。
   Future<bool> enable() async {
     if (_inFlight) return false;
     _inFlight = true;
     try {
+      if (ref.read(authStateProvider).value == null) return false;
+      final generation = _generation;
       final auth = ref.read(biometricAuthenticatorProvider);
       final waitForeground = ref.read(foregroundWaiterProvider);
       // 從 web 授權頁回來的當下 App 還沒穩定，先等前景；仍被系統中斷就再等一次重試一次。
       await waitForeground();
-      var outcome = await auth.authenticate(reason: '開啟生物辨識登入');
+      var outcome = await _verify(auth);
       if (outcome == BiometricOutcome.interrupted) {
         await waitForeground();
-        outcome = await auth.authenticate(reason: '開啟生物辨識登入');
+        outcome = await _verify(auth);
       }
+      if (!ref.mounted || generation != _generation) return false;
       if (outcome != BiometricOutcome.success) {
         // 使用者自己取消不打擾；其他失敗要讓人知道，不能開關沒變又沒有任何訊息。
-        if (outcome != BiometricOutcome.cancelled && ref.mounted) {
+        if (outcome != BiometricOutcome.cancelled) {
           state = state.copyWith(
-            reauthNotice:
+            notice:
                 '生物辨識驗證沒有通過，沒有開啟生物辨識登入'
                 '（原因碼：${auth.lastFailureCode ?? 'unknown'}）。',
           );
@@ -214,41 +141,29 @@ class BiometricLoginController extends Notifier<BiometricLoginState> {
       final stored = await ref
           .read(oauthTokenStoreProvider)
           .setProtection(TokenProtection.biometric);
-      if (ref.mounted) state = state.copyWith(enabled: stored);
+      if (ref.mounted) state = state.copyWith(enabled: _storeEnabled);
       return stored;
     } finally {
       _inFlight = false;
     }
   }
 
-  /// 關閉：先驗證身分，通過才清掉 refresh token 並登出。
+  static Future<BiometricOutcome> _verify(BiometricAuthenticator auth) =>
+      auth.authenticate(reason: '開啟生物辨識登入', biometricOnly: true);
+
+  /// 關閉：refresh token 改回一般保存（裝置密碼保護）。不驗證、不登出（ADR-0019）。
   Future<bool> disable() async {
     if (_inFlight) return false;
     _inFlight = true;
     try {
-      final outcome = await ref
-          .read(biometricAuthenticatorProvider)
-          .authenticate(reason: '驗證身分以關閉生物辨識登入');
-      if (outcome != BiometricOutcome.success) return false;
-      await ref.read(authStateProvider.notifier).logout();
-      return true;
+      final stored = await ref
+          .read(oauthTokenStoreProvider)
+          .setProtection(TokenProtection.passcode);
+      if (ref.mounted) state = state.copyWith(enabled: _storeEnabled);
+      return stored;
     } finally {
       _inFlight = false;
     }
-  }
-
-  Future<String?> _read(String key) async {
-    try {
-      return await ref.read(settingsStoreProvider).read(key);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _write(String key, String value) async {
-    try {
-      await ref.read(settingsStoreProvider).write(key, value);
-    } catch (_) {}
   }
 }
 

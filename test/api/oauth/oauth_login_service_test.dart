@@ -119,7 +119,7 @@ void main() {
 
   test('授權端回 error → 丟出登入例外，不換 token', () async {
     launcher.reply = (u) => {
-      'error': OAuthProtocol.errorAccessDenied,
+      'error': 'access_denied',
       'state': u.queryParameters['state']!,
     };
     await expectLater(service.login(), throwsA(isA<OAuthLoginException>()));
@@ -127,7 +127,7 @@ void main() {
 
   test('一般登入遇 access_denied → 仍是錯誤（cancelled 為 false），維持原行為', () async {
     launcher.reply = (u) => {
-      'error': OAuthProtocol.errorAccessDenied,
+      'error': 'access_denied',
       'state': u.queryParameters['state']!,
     };
     final error = await service.login().then<Object?>(
@@ -176,9 +176,7 @@ void main() {
     test('沒有旗標、disable、未知值 → 不通知、不報錯、登入照常', () async {
       expect(await loginWith({}), isFalse);
       expect(
-        await loginWith({
-          OAuthProtocol.biometricIntentParam: OAuthProtocol.intentDisable,
-        }),
+        await loginWith({OAuthProtocol.biometricIntentParam: 'disable'}),
         isFalse,
       );
       expect(
@@ -217,7 +215,7 @@ void main() {
         webTheme: () => current,
       );
       launcher.reply = (u) => {
-        'error': OAuthProtocol.errorAccessDenied,
+        'error': 'access_denied',
         'state': u.queryParameters['state']!,
       };
     });
@@ -236,17 +234,23 @@ void main() {
       expect(q['theme'], 'light');
     });
 
-    test('重新驗證也帶 theme，prompt=login 仍在', () async {
-      await expectLater(
-        themed.reauthenticate(
-          intent: OAuthProtocol.intentEnable,
-          expectedAccount: 'u1',
-        ),
-        throwsA(isA<OAuthLoginException>()),
-      );
-      final q = launcher.lastAuthorizeUrl!.queryParameters;
-      expect(q['theme'], 'dark');
-      expect(q[OAuthProtocol.promptParam], OAuthProtocol.promptLogin);
-    });
+    test(
+      '不帶重新驗證參數（prompt、biometric_intent、expected_account），仍帶 biometry 提示',
+      () async {
+        await expectLater(
+          themed.login(biometricHint: OAuthProtocol.hintFaceId),
+          throwsA(isA<OAuthLoginException>()),
+        );
+        final q = launcher.lastAuthorizeUrl!.queryParameters;
+        expect(q[OAuthProtocol.biometricHintParam], OAuthProtocol.hintFaceId);
+        for (final removed in [
+          'prompt',
+          'biometric_intent',
+          'expected_account',
+        ]) {
+          expect(q.containsKey(removed), isFalse, reason: removed);
+        }
+      },
+    );
   });
 }
