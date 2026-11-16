@@ -1,6 +1,6 @@
 # App 截圖逐張檢查報告（#531／#537 素材）
 
-檢查日期：2026-11-04。對象：[`2026-11-04-hig-screenshots/`](2026-11-04-hig-screenshots/) 的 141 個場景（淺色、深色各一張，iPhone 17 模擬器；另有 2 個場景的「提高對比」變體 `-hc` 圖，不算場景，見該資料夾 README）。依據：[HIG 檢查表](../research/2026-11-04-hig-screen-checklist.md)。
+檢查日期：2026-11-04。對象：[`2026-11-04-hig-screenshots/`](2026-11-04-hig-screenshots/) 的 140 個場景（淺色、深色各一張，iPhone 17 模擬器；另有 2 個場景的「提高對比」變體 `-hc` 圖，不算場景，見該資料夾 README）。依據：[HIG 檢查表](../research/2026-11-04-hig-screen-checklist.md)。
 
 ## 怎麼檢查的
 
@@ -18,18 +18,18 @@
 | 符合 | 51 |
 | 未見明顯問題 | 52 |
 | 疑慮 | 1 |
-| 張力（與檢查表建議衝突，但屬已知專案決策） | 12 |
+| 張力（與檢查表建議衝突，但屬已知專案決策） | 11 |
 | 已處理（#547，`entry-add`／`entry-copy`／`entry-edit`／`entry-move` 改整頁 modal 後重拍） | 4 |
 | 已處理（#574 第一批，A12、A13、A16、A17 後重拍） | 8 |
 | 已處理（#574 第二批，A20～A27 後重拍） | 10 |
 | 無法判讀 | 3 |
 | 場景無效（截圖沒有證明想證明的畫面） | 0（原 3 個已修並重拍） |
 | 未看 | 0 |
-| **合計** | **141** |
+| **合計** | **140** |
 
 合計等於下方逐場景表的列數，也等於 `light/`、`dark/` 各自的非 `-hc` 截圖數與 `higScenes()` 的場景數；`test/docs/hig_report_totals_test.dart` 守住這個等式。
 
-142 個場景全部看過，分十一輪：第一輪看 72 個、第二輪補看 30 個（含 20 個 `ax-*` 大字級場景）、第三輪補 8 個彈出層場景、第四輪補 4 個不可復原動作的確認框、第五輪補 11 個（生物辨識、登入裝置與開發者 App 的確認框、左滑刪除、六種表單 sheet）、第六輪（#546／#549）重拍 `trip-edit` 並補 `trip-edit-save-failed`（`trip-edit` 由疑慮轉符合，總數 +1）、第七輪（#558／#560）補 4 個：`sync-conflict-sheet`、`sync-conflict-sheet-many`、`add-to-trip-time-conflict-alert`、`trip-edit-delete-day-confirm`、第八輪（#559／#561）補 4 個：`entry-edit-sheet-remote-conflict`、`entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`、第九輪（#549 補圖）補 1 個：`trip-edit-finish-blocked-confirm`、第十輪（#529）補 1 個：`account-change-password`、第十一輪（#390）補 6 個：`chat-ai-data-consent-sheet`、`chat-ai-data-owner-missing-sheet`、`trip-health-ai-data-consent-sheet`、`account-ai-data-settings`、`account-ai-data-settings-stale`、`account-ai-data-withdraw-confirm`。**#544 修正並全量重拍後**重算過一次判定（修正前：符合 34、疑慮 13）。上列各輪次的加總是 72＋30＋8＋4＋11＋1＋4＋4＋1＋1＋6＝142；之後 #646 讓設定頁關閉生物辨識登入不再跳確認框，移除「關閉生物辨識登入」確認框場景（原列張力），現為 141。
+142 個場景全部看過，分十一輪：第一輪看 72 個、第二輪補看 30 個（含 20 個 `ax-*` 大字級場景）、第三輪補 8 個彈出層場景、第四輪補 4 個不可復原動作的確認框、第五輪補 11 個（生物辨識、登入裝置與開發者 App 的確認框、左滑刪除、六種表單 sheet）、第六輪（#546／#549）重拍 `trip-edit` 並補 `trip-edit-save-failed`（`trip-edit` 由疑慮轉符合，總數 +1）、第七輪（#558／#560）補 4 個：`sync-conflict-sheet`、`sync-conflict-sheet-many`、`add-to-trip-time-conflict-alert`、`trip-edit-delete-day-confirm`、第八輪（#559／#561）補 4 個：`entry-edit-sheet-remote-conflict`、`entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`、第九輪（#549 補圖）補 1 個：`trip-edit-finish-blocked-confirm`、第十輪（#529）補 1 個：`account-change-password`、第十一輪（#390）補 6 個：`chat-ai-data-consent-sheet`、`chat-ai-data-owner-missing-sheet`、`trip-health-ai-data-consent-sheet`、`account-ai-data-settings`、`account-ai-data-settings-stale`、`account-ai-data-withdraw-confirm`。**#544 修正並全量重拍後**重算過一次判定（修正前：符合 34、疑慮 13）。上列各輪次的加總是 72＋30＋8＋4＋11＋1＋4＋4＋1＋1＋6＝142；之後 #646 讓設定頁關閉生物辨識登入不再跳確認框，移除「關閉生物辨識登入」確認框場景（原列張力），為 141；#647 移除登入後「要不要開 App 鎖」的詢問，刪掉 `app-lock-enable-prompt` 場景（原列張力），現為 140。
 
 B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-trip-map-2x` 因地圖是 fixture 除外），分段控制元件在大字級改垂直堆疊是刻意設計。「未見明顯問題」只代表目視沒看到，沒有量字級，也沒有逐一量對比。
 
@@ -55,7 +55,7 @@ B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-t
 
 第 2、3、12 項是**證據本身的缺陷，已於重拍後修正**（場景沒有證明想證明的畫面），不是 App 缺陷。這三個場景原本的守門（proof）只確認「畫面上有錯誤元素」或根本沒有 proof；現在 proof 都改成確認想證明的那一種，並用 mutation（把修正改回去）驗過會轉紅。
 
-與專案決策有張力（非新發現）：`account-home`、`account-home-security` 有生物辨識開關與外觀設定（F7、H1）；`app-lock-enable-prompt` 在 App 內詢問是否開 Face ID（F7）。
+與專案決策有張力（非新發現）：`account-home`、`account-home-security` 有生物辨識開關與外觀設定（F7、H1）。
 
 ## 逐場景結果
 
@@ -86,7 +86,6 @@ B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-t
 | `add-to-trip-direct` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `add-to-trip-invalid-favorite` | 淺深已看（重拍） | 符合 | G6、G7 | 重拍後用專案的 TpStateView：警示圖示、原因與「返回」鈕；底部分頁列仍顯示（屬 A4 待決定）（#544 A2 已修） |
 | `add-to-trip-missing-data` | 淺深已看（重拍） | 符合 | G6、G7 | 重拍後用專案的 TpStateView：警示圖示、原因與「返回」鈕；底部分頁列仍顯示（屬 A4 待決定）（#544 A2 已修） |
-| `app-lock-enable-prompt` | 淺深已看 | 張力 | F7 | App 內詢問是否開啟 Face ID，與 F7 建議有張力（同上）；alert 結構符合 G2、G3 |
 | `app-lock-locked-ax-2x` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `app-lock-locked` | 淺深已看 | 未見明顯問題 | — | 目視未發現與檢查表衝突之處；僅看圖，未量字級與對比 |
 | `auth-check-email` | 淺深已看 | 符合 | D3、D4 | 返回用標準符號、單一 prominent 動作在右上；文字說明齊全 |

@@ -150,7 +150,7 @@ class HigFakes {
   bool? appLockEnabled;
 
   /// 預設裝置沒有生物辨識：否則每個已登入場景都會被「要用 Face ID 登入嗎？」詢問蓋住，
-  /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]／[_OkBiometric]。
+  /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]。
   BiometricAuthenticator biometric = _NoBiometric();
 
   /// 停留點詳情的 watch 流（[_entryDetailLive] 建立）：場景在 act 裡往裡面送「協作者的新版本」，
@@ -409,15 +409,6 @@ class _PendingBiometric implements BiometricAuthenticator {
     required String reason,
     bool biometricOnly = false,
   }) => Completer<BiometricOutcome>().future;
-}
-
-/// 立刻回報成功的驗證器(登入後詢問、設定頁情境)。
-class _OkBiometric extends _PendingBiometric {
-  @override
-  Future<BiometricOutcome> authenticate({
-    required String reason,
-    bool biometricOnly = false,
-  }) async => BiometricOutcome.success;
 }
 
 /// 以 MediaQuery 覆寫模擬系統設定：文字大小、提高對比。
@@ -2303,14 +2294,6 @@ List<HigScene> higScenes() => [
     },
     textScale: 2.0,
     settle: false,
-  ),
-  HigScene(
-    'app-lock-enable-prompt',
-    '#462',
-    loggedIn: false,
-    location: '/welcome',
-    stub: (f) => f.biometric = _OkBiometric(),
-    act: (tester, f) async => _tapKey(tester, 'welcome-login-hero'),
   ),
   HigScene(
     'account-home-security',

@@ -68,7 +68,6 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | 畫面 | 狀態 | 場景 |
 |---|---|---|
 | App 鎖（鎖定畫面） | 已有場景 | `app-lock-locked` `app-lock-locked-ax-2x` |
-| App 鎖（開啟提示） | 已有場景 | `app-lock-enable-prompt` |
 
 ## 二、彈出層（sheet／dialog／picker）
 

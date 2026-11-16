@@ -126,13 +126,13 @@ iPhone 固定四個 root tabs：
   - 歧義的來源：[Managing accounts](https://developer.apple.com/design/human-interface-guidelines/managing-accounts)（頁面未標日期）："In general, avoid offering an app-specific setting for opting in to biometric authentication. People turn on biometric authentication at the system level, so presenting an in-app setting is redundant and could be confusing."。強度是 avoid 且帶 "In general"，不是 must；脈絡是帳號登入的認證方式（opting in），App 鎖處理的是「冷啟動是否再驗證一次」，HIG 沒有明確區分兩者，因此判定為字面有歧義、傾向容許，不是違規。
   - 支持的一手句：[Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy)（2023-06-21）："To further protect access to apps that people keep logged in on their device, use biometric identification like Face ID, Optic ID, or Touch ID."。Tripline 的 session 長期存在 secure storage，屬於這個情境；該句沒有要求預設開啟，也沒有禁止提供開關。
   - 取捨：預設關閉、使用者主動開啟是 Tripline 的做法，HIG 原文並無「預設關閉」的要求。
-- **Tripline 決策**：鎖定時機是冷啟動，以及離開前景超過 1 分鐘再回來；短暫切 App 不鎖。1 分鐘為固定值，不開放設定。
+- **Tripline 決策**：鎖定時機是冷啟動，以及離開前景超過 1 分鐘再回來；短暫切 App 不鎖。1 分鐘為固定值，不開放設定。冷啟動若已為讀受保護的登入憑證驗證過生物辨識（生物辨識登入），就不再鎖一次；離開前景超過 1 分鐘回來照舊上鎖（ADR-0019）。
 - **Tripline 決策**：鎖定畫面蓋住所有路由與 sheet，一出現就自動喚起系統驗證；取消或失敗後留在鎖定畫面，提供「使用 … 解鎖」重試與「登出」。登出前確認，並明講未同步變更會遺失。
 - **Tripline 決策**：開啟與關閉都要先通過一次驗證，避免別人代為關閉。
-- **Tripline 決策**：每次**新登入**成功後（含註冊後登入、OAuth）主動詢問是否開啟，每台裝置只問一次，選「開啟」或「稍後再說」都不再問；冷啟動還原既有 session 不問；裝置不可用時不問也不記為已問過。
-- **Tripline 決策**：登出清除「是否開啟」（App 鎖屬於這台裝置上這個登入），保留「已問過」，避免登出再登入又被問。
+- **Tripline 決策**：登入後不主動詢問是否開啟，只能在設定頁開啟（ADR-0019，取代先前「新登入後詢問一次」的決定）。
+- **Tripline 決策**：登出清除「是否開啟」（App 鎖屬於這台裝置上這個登入）。
 - **Tripline 決策**：裝置不再有生物辨識與密碼時自動關閉並簡短告知，不得把使用者鎖在 App 外。
-- **Tripline 決策**：Face ID 權限在詢問框說明價值之後才由系統請求（§15 just-in-time）；鎖定畫面、開關與詢問框須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
+- **Tripline 決策**：Face ID 權限在使用者於設定頁開啟時才由系統請求（§15 just-in-time）；鎖定畫面與開關須有清楚的 semantics，並隨 Dynamic Type 與 Reduce Motion。
 - **Tripline 決策**：App 鎖開啟時，離開前景（inactive）就以純色加鎖頭蓋住內容，App 切換器截圖不會露出行程與旅伴資料；未開啟不遮蔽。此條取代先前「不遮蔽」的決定，對應 #462 故事 14。材質與 Face ID 實際流程須真機驗收。
 
 ### 5.2 生物辨識登入
