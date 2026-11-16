@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0019
 ---
 
 # 生物辨識登入留在本機：不在後端存 passkey，登出後保留受保護的憑證
