@@ -49,6 +49,12 @@ abstract class OAuthTokenStore {
   Future<bool> setProtection(TokenProtection protection);
   Future<void> clear();
 
+  /// 與 [clear] 相同，但不碰存取時要驗證的區域（Android 的 biometric namespace：
+  /// 外掛對它的任何呼叫都會先初始化 cipher 而跳出驗證），所以保證不跳驗證。
+  /// 那裡的殘留沒有 meta 指向、讀不到，下次以生物辨識保護寫入時會先刪再寫。
+  /// iOS Keychain 刪除不需驗證，與 [clear] 等效。給舊版保留憑證的啟動遷移用（ADR-0019）。
+  Future<void> clearWithoutPrompt();
+
   /// 丟掉記憶體中的明文（等同重開 App）,下一次 [read] 重新走受保護的讀取
   /// (受生物辨識保護時會再跳出驗證)。不刪任何落地資料。
   Future<void> lock();
@@ -397,6 +403,13 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
         (_protection == TokenProtection.biometric ||
             _storedProtection == TokenProtection.biometric ||
             await _metaSaysBiometric());
+    await _clear(touchBiometric: touchBiometric);
+  }
+
+  @override
+  Future<void> clearWithoutPrompt() => _clear(touchBiometric: false);
+
+  Future<void> _clear({required bool touchBiometric}) async {
     _cache = null;
     _protection = TokenProtection.passcode;
     _storedProtection = TokenProtection.passcode;
@@ -495,6 +508,9 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
     _locked = false;
     _protection = TokenProtection.passcode;
   }
+
+  @override
+  Future<void> clearWithoutPrompt() => clear();
 
   @override
   Future<bool> hasLegacyKeptMarker() async => legacyKeptMarker;

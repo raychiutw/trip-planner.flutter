@@ -83,6 +83,16 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
     }
   }
 
+  /// 同 [clear]，但保證不跳出驗證（見 [OAuthTokenStore.clearWithoutPrompt]）。
+  Future<void> clearWithoutPrompt() async {
+    _memory = null;
+    try {
+      await _store.clearWithoutPrompt();
+    } finally {
+      await _proofKeys?.delete();
+    }
+  }
+
   InvalidReason? _lastInvalid;
 
   /// 立刻取一次 access token（必要時 refresh），回傳憑證是否因此被判失效並清掉；

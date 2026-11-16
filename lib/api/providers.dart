@@ -3,6 +3,8 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show FlutterError, FlutterErrorDetails;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/oauth_tokens.dart';
@@ -149,12 +151,22 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     bool explicit = false,
     bool coldStart = false,
   }) async {
-    // 舊版登出後保留的憑證（ADR-0019 遷移）：不讀（會跳生物辨識）、不撤銷，直接刪掉
-    // 憑證、DPoP 金鑰與標記，回到未登入。伺服器端那份最多 30 天後自行失效。
+    // 舊版登出後保留的憑證（ADR-0019 遷移）：不讀、不撤銷、不驗證，直接刪掉憑證、
+    // DPoP 金鑰與標記，回到未登入。伺服器端那份最多 30 天後自行失效。
+    // 用 clearWithoutPrompt：一般 clear 在 Android 會碰 biometric namespace 而跳驗證。
     if (!explicit && await _hasLegacyKeptMarker(ref)) {
       try {
-        await ref.read(bearerTokenSourceProvider).clear();
-      } catch (_) {}
+        await ref.read(bearerTokenSourceProvider).clearWithoutPrompt();
+      } catch (error, stack) {
+        // 刪不掉不擋啟動（照樣當未登入），但要留下紀錄。
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'legacy kept credential migration',
+          ),
+        );
+      }
       return null;
     }
     final wasLocked = ref.read(authLockedProvider);

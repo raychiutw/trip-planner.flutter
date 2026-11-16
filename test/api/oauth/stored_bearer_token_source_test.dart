@@ -30,6 +30,9 @@ class _WriteFailStore implements OAuthTokenStore {
     cleared = true;
     _tokens = null;
   }
+
+  @override
+  Future<void> clearWithoutPrompt() => clear();
 }
 
 OAuthTokens _tok({
