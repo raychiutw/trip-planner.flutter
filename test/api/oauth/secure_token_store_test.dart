@@ -19,6 +19,9 @@ class _FakeVault implements SecretVault {
   Duration readDelay = Duration.zero;
   PlatformException? readError;
 
+  /// 寫入前呼叫，回傳 true 即解除；用來在多次寫入之間插入其他操作（例如登出）。
+  Future<bool> Function(String key, TokenProtection protection)? beforeWrite;
+
   @override
   Future<String?> read(
     String key, {
@@ -37,6 +40,8 @@ class _FakeVault implements SecretVault {
     String value, {
     required TokenProtection protection,
   }) async {
+    final hook = beforeWrite;
+    if (hook != null && await hook(key, protection)) beforeWrite = null;
     writes.add((key, protection));
     ops.add(('write', key, protection));
     if (failWrites ||
@@ -276,6 +281,38 @@ void main() {
 
       expect(await store.hasLegacyKeptMarker(), isFalse);
       expect(vault.data, isEmpty);
+    });
+  });
+
+  group('寫入期間登出（clear）不得把憑證寫回', () {
+    test('改保護等級寫到一半時 clear：結束後磁碟上沒有任何憑證', () async {
+      await store.write(_tok());
+      vault.beforeWrite = (key, protection) async {
+        // 新槽位寫入前登出：clear 刪光，之後的寫入不得讓憑證復活。
+        if (protection != TokenProtection.biometric) return false;
+        await store.clear();
+        return true;
+      };
+
+      await store.setProtection(TokenProtection.biometric);
+
+      expect(vault.data, isEmpty);
+      expect(await SecureOAuthTokenStore(vault: vault).read(), isNull);
+      expect(store.protection, TokenProtection.passcode);
+    });
+
+    test('輪替寫到一半時 clear（meta 寫入前）：結束後磁碟上沒有任何憑證', () async {
+      await store.write(_tok());
+      vault.beforeWrite = (key, _) async {
+        if (key != 'tripline_oauth_tokens') return false;
+        await store.clear();
+        return true;
+      };
+
+      await store.write(_tok(refresh: 'RT2'));
+
+      expect(vault.data, isEmpty);
+      expect(await SecureOAuthTokenStore(vault: vault).read(), isNull);
     });
   });
 }

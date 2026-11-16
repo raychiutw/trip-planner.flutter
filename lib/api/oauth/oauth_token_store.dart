@@ -217,6 +217,10 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   /// 目前有效的 refresh token 槽位（讀到 meta 或寫入成功後更新）。
   _Slot _slot = _Slot.a;
 
+  /// 每次 clear 加一。寫入跨多次 vault 呼叫，期間若被 clear（登出）就要收回剛寫的
+  /// 項目，不能讓已登出的憑證被寫回（ADR-0019）。
+  int _clearEpoch = 0;
+
   /// 讀到或寫入過的憑證留在記憶體:輪替 refresh token 與每次取用都不用再碰
   /// Keychain,生物辨識只在冷啟動讀取時出現。
   OAuthTokens? _cache;
@@ -348,6 +352,8 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
         _vault.biometricUsesOwnNamespace) {
       meta['bio_ns'] = _bioNs;
     }
+    final epoch = _clearEpoch;
+    final targetProtection = _protection;
     try {
       if (rotates) {
         await _vault.delete(_slotKeys[target]!, protection: _protection);
@@ -367,6 +373,14 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
       // 只收拾這次寫到一半的目標槽位，舊槽位與 meta 原封不動。
       if (rotates) {
         await _vault.delete(_slotKeys[target]!, protection: _protection);
+      }
+      return false;
+    }
+    if (epoch != _clearEpoch) {
+      // 寫入期間被 clear（登出）：收回這次寫下的項目，clear 的結果為準。
+      await _vault.delete(_metaKey, protection: TokenProtection.passcode);
+      if (rotates) {
+        await _vault.delete(_slotKeys[target]!, protection: targetProtection);
       }
       return false;
     }
@@ -410,6 +424,7 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   Future<void> clearWithoutPrompt() => _clear(touchBiometric: false);
 
   Future<void> _clear({required bool touchBiometric}) async {
+    _clearEpoch++;
     _cache = null;
     _protection = TokenProtection.passcode;
     _storedProtection = TokenProtection.passcode;
