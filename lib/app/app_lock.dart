@@ -80,6 +80,12 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
           defaultTargetPlatform == TargetPlatform.iOS) {
         return BiometricKind.touchId;
       }
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // 生物辨識登入只接受 BIOMETRIC_STRONG；只有 weak 時金鑰建不起來，當成只有裝置密碼。
+        return types.contains(BiometricType.strong)
+            ? BiometricKind.biometric
+            : BiometricKind.passcode;
+      }
       return types.isEmpty ? BiometricKind.passcode : BiometricKind.biometric;
     } catch (_) {
       return null;

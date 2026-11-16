@@ -107,6 +107,9 @@ class FlutterSecureVault implements SecretVault {
   static const _iosPasscode = IOSOptions(
     accessibility: KeychainAccessibility.passcode,
   );
+  // 只接受生物辨識（ADR-0019）：passcode accessibility＝WhenPasscodeSetThisDeviceOnly
+  // （僅限這台裝置），access control 只有 biometryCurrentSet（不能改用裝置密碼，生物
+  // 特徵增減後項目失效）。不可加 `or`／devicePasscode 或改成 userPresence。
   static const _iosBiometric = IOSOptions(
     accessibility: KeychainAccessibility.passcode,
     accessControlFlags: [AccessControlFlag.biometryCurrentSet],
@@ -114,11 +117,16 @@ class FlutterSecureVault implements SecretVault {
   // flutter_secure_storage 以 storageNamespace／sharedPreferencesName 為 key 快取 plugin
   // 實例，cipher 以第一次呼叫的選項為準；不分開的話 biometric 設定會被 passcode 的第一次
   // 呼叫蓋掉（Android 上「生物辨識登入」就沒有綁生物辨識）。
+  // strongBiometricOnly：金鑰只接受 BIOMETRIC_STRONG，外掛同時設
+  // setInvalidatedByBiometricEnrollment(true)（新增或更改指紋即失效）；驗證視窗沒有裝置
+  // 密碼選項，所以要給取消鈕。
   static const _androidBiometric = AndroidOptions.biometric(
     storageNamespace: 'biometric',
     enforceBiometrics: true,
     biometricType: AndroidBiometricType.strongBiometricOnly,
     biometricPromptTitle: '登入 Tripline',
+    biometricPromptSubtitle: '使用生物辨識登入',
+    biometricPromptNegativeButton: '取消',
   );
 
   IOSOptions _ios(TokenProtection p) =>

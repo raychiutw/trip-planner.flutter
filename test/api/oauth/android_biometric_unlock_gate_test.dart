@@ -167,6 +167,30 @@ void main() {
     expect(s, isNotNull);
   });
 
+  test('冷啟動讀過後 refresh 輪替多次：不把關、外掛不再驗證，新憑證仍在生物辨識實例', () async {
+    final v0 = vaultFor(TargetPlatform.android);
+    final s0 = storeWith(v0);
+    await s0.write(_tok('R1'));
+    await s0.setProtection(TokenProtection.biometric);
+
+    be.restartProcess(); // 冷啟動
+    final s = storeWith(vaultFor(TargetPlatform.android));
+    be.bioInits = 0;
+    gateCalls = 0;
+    await s.read(); // 外掛自己驗證一次
+    await s.write(_tok('R2'));
+    await s.write(_tok('R3'));
+
+    expect(be.bioInits, 1, reason: '只有冷啟動那次驗證');
+    expect(gateCalls, 0, reason: '寫入不把關');
+    expect(s.protection, TokenProtection.biometric);
+    final refreshItems = be.items.entries.where(
+      (e) => e.key.contains('tripline_oauth_refresh'),
+    );
+    expect(refreshItems.map((e) => e.key.split('|').first), ['biometric']);
+    expect(refreshItems.single.value, 'R3');
+  });
+
   test('biometric 項目寫入成功也算初始化過：下一次讀取要把關', () async {
     final v = vaultFor(TargetPlatform.android);
     await v.write('k', 'v', protection: TokenProtection.biometric);
