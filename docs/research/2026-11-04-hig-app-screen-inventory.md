@@ -90,7 +90,6 @@ HIG 取證的驗收依據：App 的每個路由與彈出層，各對到哪個 mo
 | `confirmAndRunIrreversibleAction` | 協作、分享 | 部分 | `share-revoke-confirm` `collab-remove-member-confirm` `collab-revoke-invite-confirm`（重新產生、刪除分享連結同一支元件，未各拍一張） |
 | `confirmAndDelete` | 停留點 POI、時間軸、筆記 | 已有場景 | `timeline-delete-entry-confirm` `note-delete-confirm` `entry-alternate-remove-confirm` |
 | `showCupertinoDialog`（直接呼叫，帳號畫面） | 刪除帳號確認 | 已有場景 | `account-delete-dialog` |
-| `showCupertinoDialog`（直接呼叫，生物辨識登入列） | 關閉生物辨識確認 | 已有場景 | `account-biometric-disable-confirm`（原清單寫成「開啟」確認；程式碼只有「關閉並登出」這一個確認，已更正） |
 
 ## 三、缺口摘要
 

@@ -1,6 +1,6 @@
 # App 截圖逐張檢查報告（#531／#537 素材）
 
-檢查日期：2026-11-04。對象：[`2026-11-04-hig-screenshots/`](2026-11-04-hig-screenshots/) 的 142 個場景（淺色、深色各一張，iPhone 17 模擬器；另有 2 個場景的「提高對比」變體 `-hc` 圖，不算場景，見該資料夾 README）。依據：[HIG 檢查表](../research/2026-11-04-hig-screen-checklist.md)。
+檢查日期：2026-11-04。對象：[`2026-11-04-hig-screenshots/`](2026-11-04-hig-screenshots/) 的 141 個場景（淺色、深色各一張，iPhone 17 模擬器；另有 2 個場景的「提高對比」變體 `-hc` 圖，不算場景，見該資料夾 README）。依據：[HIG 檢查表](../research/2026-11-04-hig-screen-checklist.md)。
 
 ## 怎麼檢查的
 
@@ -18,18 +18,18 @@
 | 符合 | 51 |
 | 未見明顯問題 | 52 |
 | 疑慮 | 1 |
-| 張力（與檢查表建議衝突，但屬已知專案決策） | 13 |
+| 張力（與檢查表建議衝突，但屬已知專案決策） | 12 |
 | 已處理（#547，`entry-add`／`entry-copy`／`entry-edit`／`entry-move` 改整頁 modal 後重拍） | 4 |
 | 已處理（#574 第一批，A12、A13、A16、A17 後重拍） | 8 |
 | 已處理（#574 第二批，A20～A27 後重拍） | 10 |
 | 無法判讀 | 3 |
 | 場景無效（截圖沒有證明想證明的畫面） | 0（原 3 個已修並重拍） |
 | 未看 | 0 |
-| **合計** | **142** |
+| **合計** | **141** |
 
 合計等於下方逐場景表的列數，也等於 `light/`、`dark/` 各自的非 `-hc` 截圖數與 `higScenes()` 的場景數；`test/docs/hig_report_totals_test.dart` 守住這個等式。
 
-142 個場景全部看過，分十一輪：第一輪看 72 個、第二輪補看 30 個（含 20 個 `ax-*` 大字級場景）、第三輪補 8 個彈出層場景、第四輪補 4 個不可復原動作的確認框、第五輪補 11 個（生物辨識、登入裝置與開發者 App 的確認框、左滑刪除、六種表單 sheet）、第六輪（#546／#549）重拍 `trip-edit` 並補 `trip-edit-save-failed`（`trip-edit` 由疑慮轉符合，總數 +1）、第七輪（#558／#560）補 4 個：`sync-conflict-sheet`、`sync-conflict-sheet-many`、`add-to-trip-time-conflict-alert`、`trip-edit-delete-day-confirm`、第八輪（#559／#561）補 4 個：`entry-edit-sheet-remote-conflict`、`entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`、第九輪（#549 補圖）補 1 個：`trip-edit-finish-blocked-confirm`、第十輪（#529）補 1 個：`account-change-password`、第十一輪（#390）補 6 個：`chat-ai-data-consent-sheet`、`chat-ai-data-owner-missing-sheet`、`trip-health-ai-data-consent-sheet`、`account-ai-data-settings`、`account-ai-data-settings-stale`、`account-ai-data-withdraw-confirm`。**#544 修正並全量重拍後**重算過一次判定（修正前：符合 34、疑慮 13）。上列各輪次的加總是 72＋30＋8＋4＋11＋1＋4＋4＋1＋1＋6＝142。
+142 個場景全部看過，分十一輪：第一輪看 72 個、第二輪補看 30 個（含 20 個 `ax-*` 大字級場景）、第三輪補 8 個彈出層場景、第四輪補 4 個不可復原動作的確認框、第五輪補 11 個（生物辨識、登入裝置與開發者 App 的確認框、左滑刪除、六種表單 sheet）、第六輪（#546／#549）重拍 `trip-edit` 並補 `trip-edit-save-failed`（`trip-edit` 由疑慮轉符合，總數 +1）、第七輪（#558／#560）補 4 個：`sync-conflict-sheet`、`sync-conflict-sheet-many`、`add-to-trip-time-conflict-alert`、`trip-edit-delete-day-confirm`、第八輪（#559／#561）補 4 個：`entry-edit-sheet-remote-conflict`、`entry-edit-overwrite-confirm`、`note-edit-overwrite-confirm`、`travel-edit-overwrite-confirm`、第九輪（#549 補圖）補 1 個：`trip-edit-finish-blocked-confirm`、第十輪（#529）補 1 個：`account-change-password`、第十一輪（#390）補 6 個：`chat-ai-data-consent-sheet`、`chat-ai-data-owner-missing-sheet`、`trip-health-ai-data-consent-sheet`、`account-ai-data-settings`、`account-ai-data-settings-stale`、`account-ai-data-withdraw-confirm`。**#544 修正並全量重拍後**重算過一次判定（修正前：符合 34、疑慮 13）。上列各輪次的加總是 72＋30＋8＋4＋11＋1＋4＋4＋1＋1＋6＝142；之後 #646 讓設定頁關閉生物辨識登入不再跳確認框，移除「關閉生物辨識登入」確認框場景（原列張力），現為 141。
 
 B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-trip-map-2x` 因地圖是 fixture 除外），分段控制元件在大字級改垂直堆疊是刻意設計。「未見明顯問題」只代表目視沒看到，沒有量字級，也沒有逐一量對比。
 
@@ -184,7 +184,6 @@ B2（放大 200%）逐張看過：能判讀的 `ax-*` 場景沒有截斷（`ax-t
 | `collab-remove-member-confirm` | 淺深已看 | 張力 | G4、C1 | 同上，移除共編成員；標題帶成員 Email，後果寫得清楚；紅字屬 T2（#551） |
 | `collab-revoke-invite-confirm` | 淺深已看 | 張力 | G4、C1 | 邀請列的直接按鈕觸發，依規則用 alert 而非 action sheet；「撤銷」紅字比其他確認框更偏橘，對比與一致性屬 T2（#551） |
 | `timeline-delete-entry-confirm` | 淺深已看 | 張力 | G4、C1 | 時間軸「刪除停留點」的 action sheet，說明寫出會重算交通時間與不可復原；紅字屬 T2（#551）。畫面上方日期條壓在 Day 1 標題上是點選單前的自動捲動造成的狀態，不是靜止畫面，未判定為缺陷 |
-| `account-biometric-disable-confirm` | 淺深已看 | 張力 | G4、C1 | 關閉生物辨識登入（alert）：說清楚會登出、取消在左；紅字屬 T2（#551）。場景需先關掉登入後的兩個詢問才看得到 |
 | `account-session-revoke-confirm` | 淺深已看 | 張力 | G4、C1 | 裝置詳情的「登出此裝置」是實心深紅鈕，確認框的「登出」卻是另一個偏橘的紅；兩個紅並存，屬 T2（#551） |
 | `developer-app-delete-confirm` | 淺深已看 | 疑慮 | D、版面 | 確認框本身合規（標題、後果、取消）；但**場景裡編輯頁捲到底，「停用應用程式」鈕仍有一半在螢幕外**（中心點 y=894、螢幕高 874，點不到，是用 onPressed 觸發才拍到），記為 A19，待真機確認是否真的被切掉 |
 | `note-delete-confirm` | 淺深已看 | 張力 | G4、C1 | 左滑刪除後的 alert，標題與說明點名那筆航班；紅字屬 T2（#551）。刪除只有左滑一條路徑，另有自訂語意動作 |
