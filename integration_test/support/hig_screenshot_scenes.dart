@@ -150,7 +150,7 @@ class HigFakes {
   bool? appLockEnabled;
 
   /// 預設裝置沒有生物辨識：否則每個已登入場景都會被「要用 Face ID 登入嗎？」詢問蓋住，
-  /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]／[_OkBiometric]。
+  /// 截圖與量測量到的是對話框而不是畫面本體。需要的場景自行換成 [_PendingBiometric]。
   BiometricAuthenticator biometric = _NoBiometric();
 
   /// 停留點詳情的 watch 流（[_entryDetailLive] 建立）：場景在 act 裡往裡面送「協作者的新版本」，
@@ -390,6 +390,9 @@ class _NoBiometric implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => null;
 
   @override
+  Future<BiometricKind?> biometricLoginKind() async => null;
+
+  @override
   Future<BiometricOutcome> authenticate({
     required String reason,
     bool biometricOnly = false,
@@ -405,19 +408,13 @@ class _PendingBiometric implements BiometricAuthenticator {
   Future<BiometricKind?> availableKind() async => BiometricKind.faceId;
 
   @override
-  Future<BiometricOutcome> authenticate({
-    required String reason,
-    bool biometricOnly = false,
-  }) => Completer<BiometricOutcome>().future;
-}
+  Future<BiometricKind?> biometricLoginKind() async => BiometricKind.faceId;
 
-/// 立刻回報成功的驗證器(登入後詢問、設定頁情境)。
-class _OkBiometric extends _PendingBiometric {
   @override
   Future<BiometricOutcome> authenticate({
     required String reason,
     bool biometricOnly = false,
-  }) async => BiometricOutcome.success;
+  }) => Completer<BiometricOutcome>().future;
 }
 
 /// 以 MediaQuery 覆寫模擬系統設定：文字大小、提高對比。
@@ -1800,22 +1797,6 @@ List<HigScene> higScenes() => [
 
   // ── 彈出層補強 3：帳號類的不可復原確認 ──
   HigScene(
-    'account-biometric-disable-confirm',
-    '#531',
-    location: '/trips?account=home',
-    stub: (f) => f.biometric = _OkBiometric(),
-    act: (tester, f) async {
-      // 有生物辨識的裝置登入後會先跳 App 鎖與生物辨識登入兩個詢問，先都「稍後再說」。
-      for (var i = 0; i < 2 && find.text('稍後再說').evaluate().isNotEmpty; i++) {
-        await _tapText(tester, '稍後再說');
-      }
-      // 先開啟（驗證通過後 enabled=true），再按一次才會跳「關閉並登出」確認。
-      await _tapKey(tester, 'settings-biometric-login');
-      await _tapKey(tester, 'settings-biometric-login');
-    },
-    proof: () => find.byKey(const ValueKey('bio-disable-dialog')),
-  ),
-  HigScene(
     'account-session-revoke-confirm',
     '#531',
     location: '/trips?account=sessions',
@@ -2319,14 +2300,6 @@ List<HigScene> higScenes() => [
     },
     textScale: 2.0,
     settle: false,
-  ),
-  HigScene(
-    'app-lock-enable-prompt',
-    '#462',
-    loggedIn: false,
-    location: '/welcome',
-    stub: (f) => f.biometric = _OkBiometric(),
-    act: (tester, f) async => _tapKey(tester, 'welcome-login-hero'),
   ),
   HigScene(
     'account-home-security',

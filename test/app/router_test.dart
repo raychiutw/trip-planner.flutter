@@ -15,6 +15,7 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/api/dpop/proof_key.dart';
 import 'package:tripline/api/dpop/proof_key_store.dart';
 import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
@@ -89,6 +90,12 @@ class _FakeAuthNotifier extends AuthNotifier {
 }
 
 /// 記錄有沒有被要求走瀏覽器登入（不開真的瀏覽器）。
+/// 受保護的憑證還沒解鎖（冷啟動時取消了生物辨識）。
+class _LockedNotifier extends AuthLockedNotifier {
+  @override
+  bool build() => true;
+}
+
 class _BrowserLoginSpyNotifier extends AuthNotifier {
   _BrowserLoginSpyNotifier({this.failWith});
 
@@ -100,21 +107,16 @@ class _BrowserLoginSpyNotifier extends AuthNotifier {
   Completer<void>? gate;
   // 非 null 時 unlock() 成功並登入為此使用者；null 表示取消（維持未登入）。
   UserInfo? unlockAs;
-  Object? unlockError;
 
   @override
   Future<UserInfo?> build() async => null;
 
   @override
-  Future<void> unlock() async {
+  Future<InvalidReason?> unlock() async {
     unlockCount++;
     await gate?.future;
-    final error = unlockError;
-    if (error != null) {
-      state = AsyncError(error, StackTrace.empty);
-      return;
-    }
     state = AsyncData(unlockAs);
+    return null;
   }
 
   @override
@@ -168,6 +170,29 @@ class _ScriptedStore extends InMemoryOAuthTokenStore {
   Future<void> lock() async {
     _open = false;
     await super.lock();
+  }
+}
+
+/// 不連網的 refresh：預設輪替成功；[rejectRefresh] 為 true 時模擬伺服器拒絕（撤銷、過期）。
+class _RefreshingOAuthRepository extends RecordingOAuthRepository {
+  bool rejectRefresh = false;
+  int refreshes = 0;
+
+  @override
+  Future<OAuthTokens> refresh({
+    required String refreshToken,
+    required String clientId,
+    ProofKey? proofKey,
+  }) async {
+    refreshes++;
+    if (rejectRefresh) {
+      throw const ApiError(status: 400, code: 'invalid_grant', message: 'x');
+    }
+    return OAuthTokens(
+      accessToken: 'AT2',
+      refreshToken: '${refreshToken}2',
+      expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+    );
   }
 }
 
@@ -821,9 +846,9 @@ void main() {
     );
   });
 
-  // 已開啟生物辨識登入：歡迎頁登入鈕直接解鎖，不經登入畫面、不開瀏覽器。
+  // 憑證被鎖（已開啟生物辨識登入、冷啟動取消驗證）：歡迎頁登入鈕直接解鎖，不開瀏覽器。
   for (final key in ['welcome-login-top', 'welcome-login-hero']) {
-    Future<_BrowserLoginSpyNotifier> pumpKept(
+    Future<_BrowserLoginSpyNotifier> pumpLocked(
       WidgetTester tester, {
       BiometricKind kind = BiometricKind.faceId,
       void Function(_BrowserLoginSpyNotifier)? configure,
@@ -837,10 +862,8 @@ void main() {
           biometricAuthenticatorProvider.overrideWithValue(
             FakeBiometricAuthenticator(kind: null),
           ),
-          keptBiometricAccountProvider.overrideWith(
-            (ref) async => 'a@example.com',
-          ),
-          appLockKindProvider.overrideWith((ref) async => kind),
+          authLockedProvider.overrideWith(_LockedNotifier.new),
+          biometricLoginKindProvider.overrideWith((ref) async => kind),
         ],
       );
       addTearDown(container.dispose);
@@ -855,10 +878,8 @@ void main() {
       return spy;
     }
 
-    testWidgets('Welcome 有保留憑證且支援生物辨識（$key）：直接解鎖並進入 App，不經登入畫面', (
-      tester,
-    ) async {
-      final spy = await pumpKept(
+    testWidgets('Welcome 憑證被鎖且支援生物辨識（$key）：直接解鎖並進入 App，不經登入畫面', (tester) async {
+      final spy = await pumpLocked(
         tester,
         configure: (s) => s.unlockAs = _loggedInUser,
       );
@@ -872,7 +893,7 @@ void main() {
     });
 
     testWidgets('Welcome 解鎖取消（$key）：留在歡迎頁、不顯示錯誤，可再按一次', (tester) async {
-      final spy = await pumpKept(tester);
+      final spy = await pumpLocked(tester);
 
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
@@ -888,23 +909,8 @@ void main() {
       expect(spy.unlockCount, 2);
     });
 
-    testWidgets('Welcome 憑證已失效（$key）：留在歡迎頁並顯示失效訊息', (tester) async {
-      final spy = await pumpKept(
-        tester,
-        configure: (s) =>
-            s.unlockError = const KeptCredentialInvalid(InvalidReason.rejected),
-      );
-
-      await tester.tap(find.byKey(ValueKey(key)));
-      await tester.pumpAndSettle();
-
-      expect(spy.unlockCount, 1);
-      expect(find.byType(WelcomeScreen), findsOneWidget);
-      expect(find.text('登入已失效，請用瀏覽器重新登入'), findsOneWidget);
-    });
-
-    testWidgets('Welcome 有保留憑證但只有裝置密碼（$key）：照舊直接開瀏覽器', (tester) async {
-      final spy = await pumpKept(tester, kind: BiometricKind.passcode);
+    testWidgets('Welcome 憑證被鎖但只有裝置密碼（$key）：照舊直接開瀏覽器', (tester) async {
+      final spy = await pumpLocked(tester, kind: BiometricKind.passcode);
 
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
@@ -1002,8 +1008,8 @@ void main() {
     expect(find.byType(SignupScreen), findsOneWidget);
   });
 
-  for (final kept in [false, true]) {
-    testWidgets('登入進行中禁止重複觸發（${kept ? "解鎖" : "瀏覽器登入"}只啟動一次）', (tester) async {
+  for (final locked in [false, true]) {
+    testWidgets('登入進行中禁止重複觸發（${locked ? "解鎖" : "瀏覽器登入"}只啟動一次）', (tester) async {
       final gate = Completer<void>();
       final spy = _BrowserLoginSpyNotifier()..gate = gate;
       final container = _buildContainer(
@@ -1013,11 +1019,9 @@ void main() {
           biometricAuthenticatorProvider.overrideWithValue(
             FakeBiometricAuthenticator(kind: null),
           ),
-          if (kept) ...[
-            keptBiometricAccountProvider.overrideWith(
-              (ref) async => 'a@example.com',
-            ),
-            appLockKindProvider.overrideWith(
+          if (locked) ...[
+            authLockedProvider.overrideWith(_LockedNotifier.new),
+            biometricLoginKindProvider.overrideWith(
               (ref) async => BiometricKind.faceId,
             ),
           ],
@@ -1044,8 +1048,8 @@ void main() {
       gate.complete();
       await tester.pumpAndSettle();
 
-      expect(kept ? spy.unlockCount : spy.signInCount, 1);
-      expect(kept ? spy.signInCount : spy.unlockCount, 0);
+      expect(locked ? spy.unlockCount : spy.signInCount, 1);
+      expect(locked ? spy.signInCount : spy.unlockCount, 0);
     });
   }
 
@@ -1228,6 +1232,7 @@ void main() {
         ProviderContainer container,
         _ScriptedStore store,
         FakeBiometricAuthenticator bio,
+        _RefreshingOAuthRepository oauth,
         int Function() browserLogins,
       })
     >
@@ -1235,7 +1240,8 @@ void main() {
       WidgetTester tester, {
       required List<bool> prompts,
       bool appLock = false,
-      String? kept,
+      bool legacyKept = false,
+      bool rejectRefresh = false,
       bool settle = true,
     }) async {
       final store = _ScriptedStore(prompts);
@@ -1247,11 +1253,12 @@ void main() {
         ),
       );
       await store.setProtection(TokenProtection.biometric);
-      if (kept != null) {
-        await store.writeKeptAccount(kept);
+      if (legacyKept) {
+        store.legacyKeptMarker = true;
         await store.lock();
       }
       final bio = FakeBiometricAuthenticator();
+      final oauth = _RefreshingOAuthRepository()..rejectRefresh = rejectRefresh;
       final auth = _MockAuthRepository();
       when(auth.currentUser).thenAnswer((_) async => user);
       FakeOAuthLoginService? login;
@@ -1261,6 +1268,7 @@ void main() {
         resolveAuthFromRepository: true,
         extraOverrides: [
           oauthTokenStoreProvider.overrideWithValue(store),
+          oauthRepositoryProvider.overrideWithValue(oauth),
           proofKeyStoreProvider.overrideWithValue(InMemoryProofKeyStore()),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           if (appLock)
@@ -1286,6 +1294,7 @@ void main() {
         container: container,
         store: store,
         bio: bio,
+        oauth: oauth,
         browserLogins: () => login?.calls ?? 0,
       );
     }
@@ -1370,6 +1379,41 @@ void main() {
       expect(find.byType(TripsListScreen), findsOneWidget);
     });
 
+    testWidgets('冷啟動 Face ID 通過即 refresh 並進「我的行程」，不經歡迎頁', (tester) async {
+      final r = await coldStart(tester, prompts: [true]);
+
+      expect(find.byType(TripsListScreen), findsOneWidget);
+      expect(r.oauth.refreshes, 1);
+      expect(r.browserLogins(), 0);
+    });
+
+    testWidgets('冷啟動 Face ID 通過但 refresh 被拒：清除憑證停在歡迎頁；按登入開 web 登入頁', (
+      tester,
+    ) async {
+      final r = await coldStart(tester, prompts: [true], rejectRefresh: true);
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(await r.store.read(), isNull);
+      expect(r.browserLogins(), 0, reason: '不自動開瀏覽器，等使用者按登入');
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.browserLogins(), 1);
+    });
+
+    testWidgets('取消後按登入：解鎖通過但 refresh 被拒 → 清除憑證並直接開 web 登入頁', (tester) async {
+      final r = await coldStart(tester, prompts: [false, true]);
+      r.oauth.rejectRefresh = true;
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.store.prompts, 2, reason: '按登入先再讀一次受保護憑證');
+      expect(r.browserLogins(), 1, reason: '憑證失效：同一次按下直接開 web 登入頁');
+      expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
+    });
+
     testWidgets('解鎖成功：從按下到落在 /trips 每一格都不露出歡迎頁', (tester) async {
       await coldStart(tester, prompts: [false, true]);
 
@@ -1427,16 +1471,13 @@ void main() {
       expect(login?.calls, 1, reason: '只有裝置密碼：登入鈕走瀏覽器，不是解鎖');
     });
 
-    testWidgets('登出後保留憑證的冷啟動：不自動解鎖（使用者明確登出過）', (tester) async {
-      final r = await coldStart(
-        tester,
-        prompts: [true],
-        kept: 'ray@example.com',
-      );
+    testWidgets('舊版登出後保留憑證的冷啟動：刪掉憑證、不跳驗證，停在歡迎頁', (tester) async {
+      final r = await coldStart(tester, prompts: [true], legacyKept: true);
 
       expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(r.store.prompts, 0);
       expect(r.bio.authenticateCalls, 0);
+      expect(r.store.legacyKeptMarker, isFalse);
     });
 
     testWidgets('解鎖成功後落點是 /trips（沒有 redirect_after）', (tester) async {

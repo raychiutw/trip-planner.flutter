@@ -49,14 +49,19 @@ abstract class OAuthTokenStore {
   Future<bool> setProtection(TokenProtection protection);
   Future<void> clear();
 
-  /// 登出但保留憑證:丟掉記憶體中的明文,下一次 [read] 重新走受保護的讀取
+  /// 與 [clear] 相同，但不碰存取時要驗證的區域（Android 的 biometric namespace：
+  /// 外掛對它的任何呼叫都會先初始化 cipher 而跳出驗證），所以保證不跳驗證。
+  /// 那裡的殘留沒有 meta 指向、讀不到，下次以生物辨識保護寫入時會先刪再寫。
+  /// iOS Keychain 刪除不需驗證，與 [clear] 等效。給舊版保留憑證的啟動遷移用（ADR-0019）。
+  Future<void> clearWithoutPrompt();
+
+  /// 丟掉記憶體中的明文（等同重開 App）,下一次 [read] 重新走受保護的讀取
   /// (受生物辨識保護時會再跳出驗證)。不刪任何落地資料。
   Future<void> lock();
 
-  /// 「登出後保留」的帳號標示（顯示名稱或信箱，非機密）；null = 沒有保留。
-  /// 與憑證放在同一個受保護儲存，[clear] 一併清掉，兩者同生同滅。
-  Future<String?> readKeptAccount();
-  Future<void> writeKeptAccount(String? label);
+  /// 舊版（0.41.x）「登出但保留憑證」留下的標記是否還在。只讀不寫：新版不再保留，
+  /// 啟動時看到就把憑證刪掉（ADR-0019）；標記由 [clear] 一併刪除。讀它不會跳出驗證。
+  Future<bool> hasLegacyKeptMarker();
 }
 
 /// Keychain／Keystore 的最小介面(測試以假的替換)。
@@ -107,6 +112,9 @@ class FlutterSecureVault implements SecretVault {
   static const _iosPasscode = IOSOptions(
     accessibility: KeychainAccessibility.passcode,
   );
+  // 只接受生物辨識（ADR-0019）：passcode accessibility＝WhenPasscodeSetThisDeviceOnly
+  // （僅限這台裝置），access control 只有 biometryCurrentSet（不能改用裝置密碼，生物
+  // 特徵增減後項目失效）。不可加 `or`／devicePasscode 或改成 userPresence。
   static const _iosBiometric = IOSOptions(
     accessibility: KeychainAccessibility.passcode,
     accessControlFlags: [AccessControlFlag.biometryCurrentSet],
@@ -114,11 +122,16 @@ class FlutterSecureVault implements SecretVault {
   // flutter_secure_storage 以 storageNamespace／sharedPreferencesName 為 key 快取 plugin
   // 實例，cipher 以第一次呼叫的選項為準；不分開的話 biometric 設定會被 passcode 的第一次
   // 呼叫蓋掉（Android 上「生物辨識登入」就沒有綁生物辨識）。
+  // strongBiometricOnly：金鑰只接受 BIOMETRIC_STRONG，外掛同時設
+  // setInvalidatedByBiometricEnrollment(true)（新增或更改指紋即失效）；驗證視窗沒有裝置
+  // 密碼選項，所以要給取消鈕。
   static const _androidBiometric = AndroidOptions.biometric(
     storageNamespace: 'biometric',
     enforceBiometrics: true,
     biometricType: AndroidBiometricType.strongBiometricOnly,
     biometricPromptTitle: '登入 Tripline',
+    biometricPromptSubtitle: '使用生物辨識登入',
+    biometricPromptNegativeButton: '取消',
   );
 
   IOSOptions _ios(TokenProtection p) =>
@@ -188,6 +201,8 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     _Slot.a: 'tripline_oauth_refresh',
     _Slot.b: 'tripline_oauth_refresh_b',
   };
+
+  /// 舊版「登出後保留」的帳號標記；新版只讀不寫，[clear] 會刪掉。
   static const _keptKey = 'tripline_oauth_kept_account';
 
   final SecretVault _vault;
@@ -201,6 +216,10 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   /// 目前有效的 refresh token 槽位（讀到 meta 或寫入成功後更新）。
   _Slot _slot = _Slot.a;
+
+  /// 每次 clear 加一。寫入跨多次 vault 呼叫，期間若被 clear（登出）就要收回剛寫的
+  /// 項目，不能讓已登出的憑證被寫回（ADR-0019）。
+  int _clearEpoch = 0;
 
   /// 讀到或寫入過的憑證留在記憶體:輪替 refresh token 與每次取用都不用再碰
   /// Keychain,生物辨識只在冷啟動讀取時出現。
@@ -333,6 +352,8 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
         _vault.biometricUsesOwnNamespace) {
       meta['bio_ns'] = _bioNs;
     }
+    final epoch = _clearEpoch;
+    final targetProtection = _protection;
     try {
       if (rotates) {
         await _vault.delete(_slotKeys[target]!, protection: _protection);
@@ -352,6 +373,14 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
       // 只收拾這次寫到一半的目標槽位，舊槽位與 meta 原封不動。
       if (rotates) {
         await _vault.delete(_slotKeys[target]!, protection: _protection);
+      }
+      return false;
+    }
+    if (epoch != _clearEpoch) {
+      // 寫入期間被 clear（登出）：收回這次寫下的項目，clear 的結果為準。
+      await _vault.delete(_metaKey, protection: TokenProtection.passcode);
+      if (rotates) {
+        await _vault.delete(_slotKeys[target]!, protection: targetProtection);
       }
       return false;
     }
@@ -388,6 +417,14 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
         (_protection == TokenProtection.biometric ||
             _storedProtection == TokenProtection.biometric ||
             await _metaSaysBiometric());
+    await _clear(touchBiometric: touchBiometric);
+  }
+
+  @override
+  Future<void> clearWithoutPrompt() => _clear(touchBiometric: false);
+
+  Future<void> _clear({required bool touchBiometric}) async {
+    _clearEpoch++;
     _cache = null;
     _protection = TokenProtection.passcode;
     _storedProtection = TokenProtection.passcode;
@@ -427,15 +464,10 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   }
 
   @override
-  Future<String?> readKeptAccount() async {
+  Future<bool> hasLegacyKeptMarker() async {
     final v = await _vault.read(_keptKey, protection: TokenProtection.passcode);
-    return (v == null || v.isEmpty) ? null : v;
+    return v != null && v.isNotEmpty;
   }
-
-  @override
-  Future<void> writeKeptAccount(String? label) => label == null || label.isEmpty
-      ? _vault.delete(_keptKey)
-      : _vault.write(_keptKey, label, protection: TokenProtection.passcode);
 
   /// iOS errSecItemNotFound／Android KeyPermanentlyInvalidated 這類「項目已不可用」。
   static bool _isInvalidated(Object e) {
@@ -450,7 +482,9 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 class InMemoryOAuthTokenStore implements OAuthTokenStore {
   OAuthTokens? _tokens;
   TokenProtection _protection = TokenProtection.passcode;
-  String? _kept;
+
+  /// 模擬舊版留下的「登出後保留」標記（[clear] 會清掉）。
+  bool legacyKeptMarker = false;
 
   @override
   TokenProtection get protection => _protection;
@@ -485,15 +519,14 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   @override
   Future<void> clear() async {
     _tokens = null;
-    _kept = null;
+    legacyKeptMarker = false;
     _locked = false;
     _protection = TokenProtection.passcode;
   }
 
   @override
-  Future<String?> readKeptAccount() async => _kept;
+  Future<void> clearWithoutPrompt() => clear();
 
   @override
-  Future<void> writeKeptAccount(String? label) async =>
-      _kept = (label == null || label.isEmpty) ? null : label;
+  Future<bool> hasLegacyKeptMarker() async => legacyKeptMarker;
 }

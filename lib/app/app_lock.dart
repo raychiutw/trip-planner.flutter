@@ -2,7 +2,8 @@
 ///
 /// 開啟後，冷啟動與離開前景超過 [appLockAfterBackground] 再回來時要通過
 /// Face ID / Touch ID（可退回裝置密碼）。驗證失敗或取消只留在鎖定畫面，
-/// 不登出、不清 session、不清離線資料。
+/// 不登出、不清 session、不清離線資料。冷啟動已為讀受保護憑證驗證過就不再上鎖；
+/// 只能在設定頁開啟，登入後不主動詢問（ADR-0019）。
 library;
 
 import 'dart:async';
@@ -16,7 +17,6 @@ import '../api/settings_store.dart';
 import '../models/user.dart';
 
 const _enabledKey = 'app_lock_enabled';
-const _promptedKey = 'app_lock_prompted';
 
 /// 離開前景超過這段時間再回來才鎖；短暫切 App 不打擾。
 const appLockAfterBackground = Duration(minutes: 1);
@@ -48,8 +48,12 @@ enum BiometricOutcome { success, cancelled, interrupted, failed }
 
 /// 平台生物辨識的最小介面（測試以假的替換）。
 abstract interface class BiometricAuthenticator {
-  /// 目前可用的解鎖方式；null = 沒有生物辨識也沒有裝置密碼。
+  /// 目前可用的解鎖方式（App 鎖用）；null = 沒有生物辨識也沒有裝置密碼。
   Future<BiometricKind?> availableKind();
+
+  /// 生物辨識登入可用的種類：與 [availableKind] 相同，但 Android 只認 BIOMETRIC_STRONG
+  /// （受保護的金鑰只接受 strong；只有 weak 時建不起來，當成只有裝置密碼；ADR-0019）。
+  Future<BiometricKind?> biometricLoginKind();
 
   /// [biometricOnly] 為 true 時不接受裝置密碼（用於「必須是生物特徵」的把關）。
   Future<BiometricOutcome> authenticate({
@@ -71,7 +75,14 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
   String? lastFailureCode;
 
   @override
-  Future<BiometricKind?> availableKind() async {
+  Future<BiometricKind?> availableKind() => _kind(strongOnly: false);
+
+  @override
+  Future<BiometricKind?> biometricLoginKind() => _kind(strongOnly: true);
+
+  /// [strongOnly]：Android 只認 BIOMETRIC_STRONG（生物辨識登入）。local_auth_android 以
+  /// canAuthenticate(BIOMETRIC_WEAK／STRONG) 回 weak／strong。
+  Future<BiometricKind?> _kind({required bool strongOnly}) async {
     try {
       if (!await _auth.isDeviceSupported()) return null;
       final types = await _auth.getAvailableBiometrics();
@@ -79,6 +90,11 @@ class LocalAuthBiometricAuthenticator implements BiometricAuthenticator {
       if (types.contains(BiometricType.fingerprint) &&
           defaultTargetPlatform == TargetPlatform.iOS) {
         return BiometricKind.touchId;
+      }
+      if (strongOnly && defaultTargetPlatform == TargetPlatform.android) {
+        return types.contains(BiometricType.strong)
+            ? BiometricKind.biometric
+            : BiometricKind.passcode;
       }
       return types.isEmpty ? BiometricKind.passcode : BiometricKind.biometric;
     } catch (_) {
@@ -130,6 +146,11 @@ final appLockKindProvider = FutureProvider.autoDispose<BiometricKind?>(
   (ref) => ref.watch(biometricAuthenticatorProvider).availableKind(),
 );
 
+/// 生物辨識登入可用的種類（Android 只認 strong，見 [BiometricAuthenticator.biometricLoginKind]）。
+final biometricLoginKindProvider = FutureProvider.autoDispose<BiometricKind?>(
+  (ref) => ref.watch(biometricAuthenticatorProvider).biometricLoginKind(),
+);
+
 /// 在建立 App 前讀回是否開啟，冷啟動第一幀就能鎖住。
 Future<bool> loadInitialAppLockEnabled(SettingsStore store) async {
   try {
@@ -141,24 +162,15 @@ Future<bool> loadInitialAppLockEnabled(SettingsStore store) async {
 
 @immutable
 class AppLockState {
-  const AppLockState({
-    required this.enabled,
-    required this.locked,
-    this.promptPending = false,
-  });
+  const AppLockState({required this.enabled, required this.locked});
 
   final bool enabled;
   final bool locked;
 
-  /// 新登入後要主動詢問是否開啟。
-  final bool promptPending;
-
-  AppLockState copyWith({bool? enabled, bool? locked, bool? promptPending}) =>
-      AppLockState(
-        enabled: enabled ?? this.enabled,
-        locked: locked ?? this.locked,
-        promptPending: promptPending ?? this.promptPending,
-      );
+  AppLockState copyWith({bool? enabled, bool? locked}) => AppLockState(
+    enabled: enabled ?? this.enabled,
+    locked: locked ?? this.locked,
+  );
 }
 
 class AppLockController extends Notifier<AppLockState> {
@@ -167,10 +179,6 @@ class AppLockController extends Notifier<AppLockState> {
   final bool? _initialEnabled;
   DateTime? _hiddenAt;
   bool _inFlight = false;
-
-  /// 看過「已登出」才算之後的登入是新登入；冷啟動還原 session 是 loading → user。
-  /// 這是「要不要詢問開啟 App 鎖」的判斷，與免二次驗證無關，所以保留。
-  bool _signedOutSeen = false;
 
   @override
   AppLockState build() {
@@ -203,7 +211,6 @@ class AppLockController extends Notifier<AppLockState> {
   void _onAuth(AsyncValue<UserInfo?> next) {
     if (next is! AsyncData<UserInfo?>) return;
     if (next.value == null) {
-      _signedOutSeen = true;
       // 登出：App 鎖是這台裝置上這個登入的設定，不留給下一位使用者。
       // 憑證只是還沒解開（authLocked）不是登出：App 鎖設定要留著，等解鎖後放行。
       // 這裡讀 authLockedProvider 是為了分辨「憑證還沒解開」與「登出」，
@@ -212,27 +219,7 @@ class AppLockController extends Notifier<AppLockState> {
         unawaited(_write(_enabledKey, '0'));
         state = state.copyWith(enabled: false, locked: false);
       }
-    } else if (_signedOutSeen) {
-      _signedOutSeen = false;
-      unawaited(_maybePrompt());
     }
-  }
-
-  Future<void> _maybePrompt() async {
-    if (await _read(_promptedKey) == '1') return;
-    // 裝置不可用時不問、也不記已問過，等之後可用再問一次。
-    if (await ref.read(biometricAuthenticatorProvider).availableKind() ==
-        null) {
-      return;
-    }
-    state = state.copyWith(promptPending: true);
-  }
-
-  /// 回答登入後的詢問；不論選哪個都記為已問過。
-  Future<void> answerPrompt({required bool enable}) async {
-    state = state.copyWith(promptPending: false);
-    await _write(_promptedKey, '1');
-    if (enable) await setEnabled(true);
   }
 
   /// 開啟與關閉都要先通過一次驗證；未通過回 false、狀態不變。

@@ -1,9 +1,10 @@
-/// 歡迎頁的登入邏輯（歡迎頁是唯一登入入口，ADR-0014／ADR-0017）。
+/// 歡迎頁的登入邏輯（歡迎頁是唯一登入入口，ADR-0014／ADR-0019）。
 ///
-/// - 有保留憑證（登出後保留）或憑證被鎖，且裝置有生物辨識：登入鈕＝解鎖一次，
-///   成功由 router redirect 進 App；取消留在原頁；憑證失效顯示訊息。
+/// - 憑證被鎖，且裝置有生物辨識：登入鈕＝解鎖一次，
+///   成功由 router redirect 進 App；取消留在原頁。
 /// - 其餘：開系統瀏覽器登入，失敗在本頁顯示錯誤。
 /// - 冷啟動讀憑證時系統本身會跳一次驗證；取消就停在這裡，等使用者按登入鈕。
+/// - 解鎖時發現憑證已失效（已清掉）：接著開 web 登入頁，不必再按一次。
 library;
 
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
@@ -16,7 +17,6 @@ import '../../api/providers.dart';
 import '../../app/app_feedback.dart';
 import '../../app/app_lock.dart';
 import '../../app/biometric_login.dart';
-import '../../app/forget_this_phone.dart';
 import 'welcome_screen.dart';
 
 class WelcomeRoute extends ConsumerStatefulWidget {
@@ -47,11 +47,10 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
     }
   }
 
-  /// 有保留憑證或憑證被鎖，而且裝置有生物辨識：登入鈕走解鎖。
+  /// 憑證被鎖，而且裝置有生物辨識：登入鈕走解鎖。
   Future<bool> _canUnlock() async {
-    final kept = await ref.read(keptBiometricAccountProvider.future);
-    if (kept == null && !ref.read(authLockedProvider)) return false;
-    return (await ref.read(appLockKindProvider.future)).hasBiometric;
+    if (!ref.read(authLockedProvider)) return false;
+    return (await ref.read(biometricLoginKindProvider.future)).hasBiometric;
   }
 
   Future<void> _login() async {
@@ -66,9 +65,11 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
   }
 
   Future<void> _unlock() async {
-    await ref.read(authStateProvider.notifier).unlock();
+    final invalid = await ref.read(authStateProvider.notifier).unlock();
     if (!mounted) return;
-    // 取消不是錯誤（unlock 回到未登入、沒有 error）；憑證失效才要說明。
+    // 憑證已失效並清掉（refresh 被拒、生物特徵變更）：同一次按下直接開 web 登入頁。
+    if (invalid != null) return _browserLogin();
+    // 取消不是錯誤（unlock 回到未登入、沒有 error）。
     final error = ref.read(authStateProvider).error;
     if (error != null) showAppError(context, _message(error));
   }
@@ -82,16 +83,11 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
 
   String _message(Object error) => switch (error) {
     OAuthLoginException() => error.userMessage,
-    KeptCredentialInvalid() => error.userMessage,
     _ => 'Tripline 登入失敗，請稍後再試',
   };
 
   @override
   Widget build(BuildContext context) {
-    final kept = ref.watch(keptBiometricAccountProvider).value;
-    // 只有裝置密碼的手機沒有解鎖入口，不標示帳號也不提供忘記這支手機。
-    final showKept =
-        kept != null && (ref.watch(appLockKindProvider).value).hasBiometric;
     return Stack(
       children: [
         Positioned.fill(
@@ -99,10 +95,6 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
             onLogin: _login,
             onSignup: () => context.go('/signup'),
             emailVerified: widget.emailVerified,
-            keptAccount: showKept ? kept : null,
-            onForgetPhone: showKept
-                ? () => confirmAndForgetThisPhone(context, ref)
-                : null,
           ),
         ),
         if (_busy) const Positioned.fill(child: _LoginProgress()),

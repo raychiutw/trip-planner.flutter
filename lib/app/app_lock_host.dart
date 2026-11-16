@@ -1,4 +1,4 @@
-/// App 鎖的根層級外殼：鎖定畫面、登入後的詢問，以及回前景時機。
+/// App 鎖的根層級外殼：鎖定畫面、提示條，以及回前景時機。
 ///
 /// 放在 `MaterialApp.router` 的 builder 內、Navigator 之上，所以鎖定畫面會蓋住
 /// 所有路由與 sheet。這一層沒有 Navigator／Overlay，`adaptive.dart` 的確認框與
@@ -18,6 +18,7 @@ import '../ui/tp_filled_button.dart';
 import 'adaptive.dart';
 import 'app_lock.dart';
 import 'biometric_login.dart';
+import 'logout_confirm.dart';
 
 class AppLockHost extends ConsumerStatefulWidget {
   const AppLockHost({super.key, required this.child});
@@ -56,6 +57,7 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
   Future<void> _resumed() async {
     // 使用者可能剛去系統設定登錄或移除生物辨識，設定列與鎖定畫面要讀到新狀態。
     ref.invalidate(appLockKindProvider);
+    ref.invalidate(biometricLoginKindProvider);
     final disabled = await ref
         .read(appLockProvider.notifier)
         .onResumed(ref.read(appLockClockProvider)());
@@ -116,9 +118,12 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
       if (!shown) return;
       _clearLater((ctl) => ctl.clearPasscodeOnlyNotice());
     });
-    ref.listen(biometricLoginProvider.select((s) => s.reauthNotice), (_, text) {
+    ref.listen(biometricLoginProvider.select((s) => s.enableFailureMessage), (
+      _,
+      text,
+    ) {
       if (text == null) return;
-      _clearLater((ctl) => ctl.clearReauthNotice());
+      _clearLater((ctl) => ctl.clearEnableFailureMessage());
     });
     final signedIn = ref.watch(authStateProvider).value != null;
     final lock = ref.watch(appLockProvider);
@@ -157,16 +162,10 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
               ),
             ),
           ),
-        if (lock.promptPending && signedIn && !showLock)
-          Positioned.fill(child: _EnablePrompt()),
-        if (ref.watch(biometricLoginProvider).promptPending &&
-            signedIn &&
-            !showLock &&
-            !lock.promptPending)
-          const Positioned.fill(child: _BiometricLoginPrompt()),
         if (ref.watch(biometricLoginProvider).passcodeOnlyNotice)
           _notice(context, '這支手機沒有設定 Face ID／Touch ID，已用一般方式登入'),
-        if (ref.watch(biometricLoginProvider).reauthNotice case final text?)
+        if (ref.watch(biometricLoginProvider).enableFailureMessage
+            case final text?)
           _notice(context, text),
         if (_showDisabledNotice)
           _notice(context, '此裝置已沒有可用的生物辨識或裝置密碼，已關閉 App 鎖。'),
@@ -229,43 +228,6 @@ class _HostDialog extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _EnablePrompt extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final label = ref.watch(appLockKindProvider).value.lockLabel;
-    final controller = ref.read(appLockProvider.notifier);
-    return _HostDialog(
-      dialogKey: const ValueKey('app-lock-prompt'),
-      title: '要用 $label 解鎖 Tripline 嗎？',
-      message: '開啟後，每次打開 App 都要先通過 $label，別人拿到你的手機也看不到行程。之後可以在「帳號 → 安全性」變更。',
-      cancelLabel: '稍後再說',
-      confirmLabel: '開啟',
-      onCancel: () => unawaited(controller.answerPrompt(enable: false)),
-      onConfirm: () => unawaited(controller.answerPrompt(enable: true)),
-    );
-  }
-}
-
-/// 登入成功後詢問是否開啟生物辨識登入（排在 App 鎖的詢問之後）。
-class _BiometricLoginPrompt extends ConsumerWidget {
-  const _BiometricLoginPrompt();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final label = ref.watch(appLockKindProvider).value.lockLabel;
-    final controller = ref.read(biometricLoginProvider.notifier);
-    return _HostDialog(
-      dialogKey: const ValueKey('bio-login-prompt'),
-      title: '要用 $label 登入 Tripline 嗎？',
-      message: '開啟後，登入憑證只能用 $label 解鎖，密碼不會存在這支手機。之後可以在「帳號 → 安全性」關閉。',
-      cancelLabel: '稍後再說',
-      confirmLabel: '開啟',
-      onCancel: () => unawaited(controller.answerPrompt(enable: false)),
-      onConfirm: () => unawaited(controller.answerPrompt(enable: true)),
-    );
-  }
 }
 
 class AppLockScreen extends ConsumerStatefulWidget {
@@ -358,9 +320,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
             child: _HostDialog(
               dialogKey: const ValueKey('app-lock-logout-dialog'),
               title: '登出帳號',
-              message: _pendingCount == 0
-                  ? '確定要登出嗎？'
-                  : '還有 $_pendingCount 筆變更尚未同步，登出後會遺失。確定要登出嗎？',
+              message: logoutConfirmMessage(_pendingCount),
               cancelLabel: '取消',
               confirmLabel: '登出',
               destructive: true,

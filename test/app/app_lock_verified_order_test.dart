@@ -53,6 +53,28 @@ void main() {
     expect(c.read(appLockProvider).enabled, isTrue);
   });
 
+  test('冷啟動已驗證不上鎖；之後離開前景超過一分鐘回來照樣上鎖', () async {
+    final c = make();
+    c.read(credentialVerifiedProvider.notifier).emit();
+    final lock = c.read(appLockProvider.notifier);
+    final t0 = DateTime(2026, 11, 16, 9);
+
+    // 冷啟動那次 onResumed（AppLockHost 第一幀後呼叫）不得因已驗證以外的原因上鎖。
+    await lock.onResumed(t0);
+    expect(c.read(appLockProvider).locked, isFalse);
+
+    lock.onHidden(t0);
+    await lock.onResumed(t0.add(appLockAfterBackground ~/ 2));
+    expect(c.read(appLockProvider).locked, isFalse, reason: '不到一分鐘不鎖');
+
+    lock.onHidden(t0);
+    await lock.onResumed(
+      t0.add(appLockAfterBackground + const Duration(seconds: 1)),
+    );
+    expect(c.read(appLockProvider).locked, isTrue);
+    expect(c.read(appLockProvider).enabled, isTrue);
+  });
+
   test('沒有事件：照舊以鎖定開始', () {
     expect(make().read(appLockProvider).locked, isTrue);
   });

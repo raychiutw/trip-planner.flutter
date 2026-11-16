@@ -58,4 +58,19 @@ void main() {
     expect(biometric['keyCipherAlgorithm'], 'AES_GCM_NoPadding');
     expect(biometric['biometricType'], 'strongBiometricOnly');
   });
+
+  // 只接受 BIOMETRIC_STRONG 時，外掛的驗證視窗沒有「改用裝置密碼」，一定要有取消鈕
+  // （FlutterSecureStorage.java 只在 strongBiometricOnly 時 setNegativeButton）。
+  // 外掛預設的副標是「Use biometrics or device credentials」，與只接受生物辨識矛盾。
+  test('biometric 驗證視窗：中文取消鈕，文字不提裝置密碼', () async {
+    final vault = FlutterSecureVault();
+    await vault.read('k', protection: TokenProtection.biometric);
+
+    final biometric = calls.single;
+    expect(biometric['biometricPromptNegativeButton'], '取消');
+    final subtitle = biometric['biometricPromptSubtitle']! as String;
+    expect(subtitle, isNot(contains('credential')));
+    expect(subtitle, isNot(contains('密碼')));
+    expect(subtitle, contains('生物辨識'));
+  });
 }

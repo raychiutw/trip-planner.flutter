@@ -12,8 +12,6 @@ class WelcomeScreen extends StatelessWidget {
     required this.onLogin,
     this.emailVerified = false,
     this.onSignup,
-    this.keptAccount,
-    this.onForgetPhone,
   });
 
   final VoidCallback onLogin;
@@ -23,10 +21,6 @@ class WelcomeScreen extends StatelessWidget {
 
   /// 從 Email 驗證連結回來（`verified=1`）：顯示「信箱已驗證」提示。
   final bool emailVerified;
-
-  /// 登出後保留的生物辨識登入所標示的帳號（有才顯示帳號與「忘記這支手機」）。
-  final String? keptAccount;
-  final VoidCallback? onForgetPhone;
 
   @override
   Widget build(BuildContext context) => _buildContent(context);
@@ -82,8 +76,6 @@ class WelcomeScreen extends StatelessWidget {
               onLogin: onLogin,
               emailVerified: emailVerified,
               onSignup: onSignup,
-              keptAccount: keptAccount,
-              onForgetPhone: onForgetPhone,
             ),
           ),
           const SliverToBoxAdapter(child: _Features()),
@@ -100,15 +92,11 @@ class _Hero extends StatelessWidget {
     required this.onLogin,
     required this.emailVerified,
     required this.onSignup,
-    required this.keptAccount,
-    required this.onForgetPhone,
   });
 
   final VoidCallback onLogin;
   final bool emailVerified;
   final VoidCallback? onSignup;
-  final String? keptAccount;
-  final VoidCallback? onForgetPhone;
 
   @override
   Widget build(BuildContext context) {
@@ -122,8 +110,6 @@ class _Hero extends StatelessWidget {
             onLogin: onLogin,
             emailVerified: emailVerified,
             onSignup: onSignup,
-            keptAccount: keptAccount,
-            onForgetPhone: onForgetPhone,
           );
           const art = _LandingArt(
             key: ValueKey('welcome-hero-art'),
@@ -167,15 +153,11 @@ class _HeroCopy extends StatelessWidget {
     required this.onLogin,
     required this.emailVerified,
     required this.onSignup,
-    required this.keptAccount,
-    required this.onForgetPhone,
   });
 
   final VoidCallback onLogin;
   final bool emailVerified;
   final VoidCallback? onSignup;
-  final String? keptAccount;
-  final VoidCallback? onForgetPhone;
 
   @override
   Widget build(BuildContext context) {
@@ -225,22 +207,6 @@ class _HeroCopy extends StatelessWidget {
             style: _flushLinkStyle,
             child: const Text('沒有帳號，建立帳號'),
           ),
-        if (keptAccount case final account?) ...[
-          const SizedBox(height: TpSpacing.s2),
-          Text(
-            account,
-            key: const ValueKey('welcome-kept-account'),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          TextButton(
-            key: const ValueKey('welcome-forget-phone'),
-            onPressed: onForgetPhone,
-            style: _flushLinkStyle,
-            child: const Text('忘記這支手機'),
-          ),
-        ],
       ],
     );
   }

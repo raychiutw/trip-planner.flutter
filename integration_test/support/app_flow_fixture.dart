@@ -229,13 +229,6 @@ class _FixtureLoginService implements OAuthLoginService {
     await _source.adopt(tokens);
     return OAuthLoginResult(tokens);
   }
-
-  @override
-  Future<void> reauthenticate({
-    required String intent,
-    required String expectedAccount,
-    String? biometricHint,
-  }) async {}
 }
 
 /// 不連網：登出時的撤銷直接成功。
@@ -1537,6 +1530,9 @@ class _NoBiometricAuthenticator implements BiometricAuthenticator {
 
   @override
   Future<BiometricKind?> availableKind() async => null;
+
+  @override
+  Future<BiometricKind?> biometricLoginKind() async => null;
 
   @override
   Future<BiometricOutcome> authenticate({

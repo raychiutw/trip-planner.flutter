@@ -22,7 +22,7 @@ class _MockOAuthRepo extends Mock implements OAuthRepository {}
 
 const _user = UserInfo(id: 'u1', email: 'ray@example.com');
 
-/// 設定頁開啟生物辨識登入：web 重新驗證回來後的指紋步驟。
+/// 開啟生物辨識登入的指紋步驟（設定頁開關或 web 登入頁旗標回來後）。
 /// Android 實機曾「回到 App 沒有指紋提示、開關維持關閉、沒有任何訊息」。
 void main() {
   late InMemoryOAuthTokenStore store;
@@ -74,7 +74,7 @@ void main() {
 
   test('驗證指紋前先等 App 回到前景', () async {
     await setUp0();
-    await ctl().reauthenticate(turnOn: true);
+    await ctl().enable();
 
     expect(events, ['wait', 'auth']);
     expect(st().enabled, isTrue);
@@ -83,12 +83,12 @@ void main() {
   test('被系統中斷一次：再等前景並重試，重試通過就開啟', () async {
     await setUp0();
     bio.outcomes.add(BiometricOutcome.interrupted);
-    await ctl().reauthenticate(turnOn: true);
+    await ctl().enable();
 
     expect(events, ['wait', 'auth', 'wait', 'auth']);
     expect(store.protection, TokenProtection.biometric);
     expect(st().enabled, isTrue);
-    expect(st().reauthNotice, isNull);
+    expect(st().enableFailureMessage, isNull);
   });
 
   test('連續被中斷：不開啟，並顯示帶原因碼的提示', () async {
@@ -97,33 +97,33 @@ void main() {
     bio.outcomes
       ..add(BiometricOutcome.interrupted)
       ..add(BiometricOutcome.interrupted);
-    await ctl().reauthenticate(turnOn: true);
+    await ctl().enable();
 
     expect(bio.authenticateCalls, 2);
     expect(store.protection, TokenProtection.passcode);
     expect(st().enabled, isFalse);
-    expect(st().reauthNotice, contains('uiUnavailable'));
-    expect(st().reauthNotice, contains('沒有開啟'));
+    expect(st().enableFailureMessage, contains('uiUnavailable'));
+    expect(st().enableFailureMessage, contains('沒有開啟'));
   });
 
   test('驗證失敗：不開啟，並顯示帶原因碼的提示（不再靜默）', () async {
     await setUp0();
     bio.lastFailureCode = 'noBiometricsEnrolled';
     bio.outcomes.add(BiometricOutcome.failed);
-    await ctl().reauthenticate(turnOn: true);
+    await ctl().enable();
 
     expect(bio.authenticateCalls, 1);
     expect(st().enabled, isFalse);
-    expect(st().reauthNotice, contains('noBiometricsEnrolled'));
+    expect(st().enableFailureMessage, contains('noBiometricsEnrolled'));
   });
 
   test('使用者自己取消：維持原狀，不顯示提示', () async {
     await setUp0();
     bio.outcomes.add(BiometricOutcome.cancelled);
-    await ctl().reauthenticate(turnOn: true);
+    await ctl().enable();
 
     expect(bio.authenticateCalls, 1);
     expect(st().enabled, isFalse);
-    expect(st().reauthNotice, isNull);
+    expect(st().enableFailureMessage, isNull);
   });
 }

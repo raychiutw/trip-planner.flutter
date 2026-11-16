@@ -64,7 +64,7 @@ void main() {
 
   Future<BiometricLoginState> signIn() async {
     await container.read(biometricLoginProvider.notifier).signInWithBrowser();
-    // 登入後的詢問要等幾個 async 讀寫才出現。
+    // 讓登入後可能排出的 async 讀寫跑完，才看得出「沒有詢問」。
     for (var i = 0; i < 10; i++) {
       await Future<void>.delayed(Duration.zero);
     }
@@ -90,24 +90,22 @@ void main() {
   group('收到 biometric_intent=enable', () {
     setUp(() => _FakeAuth.enableIntent = true);
 
-    test('先通過生物辨識才改成生物辨識保護，且不再詢問', () async {
+    test('直接驗證一次生物辨識（只接受生物辨識），通過改成生物辨識保護', () async {
       final s = await signIn();
 
-      expect(bio.authenticateCalls, 1);
+      expect(bio.biometricOnlyCalls, [true]);
       expect(store.protection, TokenProtection.biometric);
       expect(s.enabled, isTrue);
-      expect(s.promptPending, isFalse, reason: '旗標處理過就不再問');
-      expect(await settings.read('bio_login_prompted'), '1');
+      expect(container.read(authStateProvider).value, _user);
     });
 
-    test('沒通過生物辨識（取消）→ 保護等級不變、不報錯、不再詢問', () async {
+    test('沒通過生物辨識（取消）→ 一般保存、不報錯、登入照常完成', () async {
       bio.outcomes.add(BiometricOutcome.cancelled);
       final s = await signIn();
 
       expect(bio.authenticateCalls, 1);
       expect(store.protection, TokenProtection.passcode);
       expect(s.enabled, isFalse);
-      expect(s.promptPending, isFalse, reason: '取消後也不再問第二次');
       expect(s.passcodeOnlyNotice, isFalse);
       expect(container.read(authStateProvider).value, _user);
     });
@@ -125,17 +123,27 @@ void main() {
       expect(bio.authenticateCalls, 0);
       expect(store.protection, TokenProtection.passcode);
       expect(s.passcodeOnlyNotice, isTrue);
-      expect(s.promptPending, isFalse);
       expect(container.read(authStateProvider).hasError, isFalse);
+    });
+
+    test('Android 只有 weak（App 鎖可用、生物辨識登入不可用）：同只有裝置密碼', () async {
+      bio.kind = BiometricKind.biometric;
+      bio.loginKindOverride = BiometricKind.passcode;
+      final s = await signIn();
+
+      expect(_FakeAuth.lastHint, isNull, reason: 'web 不顯示生物辨識鈕');
+      expect(bio.authenticateCalls, 0);
+      expect(store.protection, TokenProtection.passcode);
+      expect(s.passcodeOnlyNotice, isTrue);
     });
   });
 
-  test('沒有旗標：行為與現在相同（不驗證、不改保護、照常詢問）', () async {
+  test('沒有旗標：不驗證、不改保護、登入後也不詢問', () async {
     final s = await signIn();
 
     expect(bio.authenticateCalls, 0);
     expect(store.protection, TokenProtection.passcode);
-    expect(s.promptPending, isTrue);
     expect(s.passcodeOnlyNotice, isFalse);
+    expect(s.enableFailureMessage, isNull);
   });
 }

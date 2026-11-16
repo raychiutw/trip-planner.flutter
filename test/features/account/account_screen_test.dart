@@ -13,6 +13,7 @@ import 'package:tripline/api/oauth/oauth_token_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/app/app_lock.dart';
 import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/account/account_sheet.dart';
 import 'package:tripline/features/account/account_screen.dart';
@@ -20,6 +21,7 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 import '../../helpers/ai_data_consent_fixtures.dart';
+import '../../helpers/fake_biometric.dart';
 import '../../helpers/fake_oauth.dart';
 import 'package:tripline/models/ai_data_consent.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
@@ -77,6 +79,7 @@ void main() {
     AppVersion version = const AppVersion(version: '0.9.1', buildNumber: '12'),
     MockAiDataConsentRepo? consent,
     String? webTheme,
+    BiometricAuthenticator? biometric,
   }) async {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => user);
     // 內容較長，放大測試視窗確保全部 row 都在畫面內。
@@ -95,6 +98,8 @@ void main() {
           aiDataConsentRepositoryProvider.overrideWithValue(
             consent ?? unenforcedConsentRepo(),
           ),
+          if (biometric != null)
+            biometricAuthenticatorProvider.overrideWithValue(biometric),
           if (webTheme != null)
             webThemeProvider.overrideWith(
               (ref) =>
@@ -355,6 +360,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel(RegExp('刪除帳號')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  // ADR-0019：設定頁「安全性」區是 App 鎖與生物辨識登入開關（開啟者的開關是開著的）。
+  testWidgets('開啟生物辨識登入者：安全性區有 App 鎖與開著的生物辨識登入開關', (tester) async {
+    await tokenStore.setProtection(TokenProtection.biometric);
+
+    await pumpAccountScreen(tester, biometric: FakeBiometricAuthenticator());
+
+    expect(find.text('安全性'), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-app-lock')), findsOneWidget);
+    final bioRow = find.byKey(const ValueKey('settings-biometric-login'));
+    expect(bioRow, findsOneWidget);
+    expect(
+      tester
+          .widget<Switch>(
+            find.descendant(of: bioRow, matching: find.byType(Switch)),
+          )
+          .value,
+      isTrue,
+    );
   });
 
   testWidgets('帳號頁底部顯示版本與 build number', (tester) async {

@@ -10,11 +10,17 @@ class _FakeVault implements SecretVault {
   final writes = <(String, TokenProtection)>[];
   final reads = <(String, TokenProtection)>[];
 
+  /// 依序記錄寫入與刪除（op, key, protection），用來斷言「先刪再寫」。
+  final ops = <(String, String, TokenProtection?)>[];
+
   /// 模擬：裝置沒設密碼、或生物辨識被取消／特徵變動。
   bool failWrites = false;
   bool failBiometricWrites = false;
   Duration readDelay = Duration.zero;
   PlatformException? readError;
+
+  /// 寫入前呼叫，回傳 true 即解除；用來在多次寫入之間插入其他操作（例如登出）。
+  Future<bool> Function(String key, TokenProtection protection)? beforeWrite;
 
   @override
   Future<String?> read(
@@ -34,7 +40,10 @@ class _FakeVault implements SecretVault {
     String value, {
     required TokenProtection protection,
   }) async {
+    final hook = beforeWrite;
+    if (hook != null && await hook(key, protection)) beforeWrite = null;
     writes.add((key, protection));
+    ops.add(('write', key, protection));
     if (failWrites ||
         (failBiometricWrites && protection == TokenProtection.biometric)) {
       throw PlatformException(code: 'no-passcode');
@@ -43,8 +52,10 @@ class _FakeVault implements SecretVault {
   }
 
   @override
-  Future<void> delete(String key, {TokenProtection? protection}) async =>
-      data.remove(key);
+  Future<void> delete(String key, {TokenProtection? protection}) async {
+    ops.add(('delete', key, protection));
+    data.remove(key);
+  }
 
   @override
   bool get biometricUsesOwnNamespace => false;
@@ -154,6 +165,44 @@ void main() {
     expect(_refreshOnDisk(vault), 'RT2');
   });
 
+  test('refresh 輪替保留生物辨識等級：目標槽位先刪再以 biometric 新增，不讀受保護項目', () async {
+    await store.write(_tok());
+    await store.setProtection(TokenProtection.biometric);
+    final restarted = SecureOAuthTokenStore(vault: vault);
+    await restarted.read(); // 冷啟動：唯一一次受保護讀取
+    vault.reads.clear();
+    vault.ops.clear();
+
+    await restarted.write(_tok(refresh: 'RT2'));
+    await restarted.write(_tok(refresh: 'RT3'));
+
+    expect(restarted.protection, TokenProtection.biometric);
+    expect(vault.reads, isEmpty, reason: '輪替不讀 Keychain，不會跳生物辨識');
+    final refreshOps = vault.ops.where((o) => _isRefreshKey(o.$2)).toList();
+    for (final o in refreshOps.where((o) => o.$1 == 'write')) {
+      expect(o.$3, TokenProtection.biometric);
+    }
+    // 每次輪替：寫入前先刪掉目標槽位殘留（iOS 改既有 biometric 項目可能要驗證）。
+    for (var i = 0; i < refreshOps.length; i++) {
+      final o = refreshOps[i];
+      if (o.$1 != 'write') continue;
+      expect(refreshOps[i - 1], ('delete', o.$2, TokenProtection.biometric));
+    }
+    expect(refreshOps.where((o) => o.$1 == 'write'), hasLength(2));
+    final meta =
+        jsonDecode(vault.data['tripline_oauth_tokens']!)
+            as Map<String, dynamic>;
+    expect(meta['protection'], 'biometric');
+    // 下次冷啟動仍以生物辨識等級讀。
+    final again = SecureOAuthTokenStore(vault: vault);
+    expect((await again.read())!.refreshToken, 'RT3');
+    expect(again.protection, TokenProtection.biometric);
+    expect(
+      vault.reads.where((r) => _isRefreshKey(r.$1)).single.$2,
+      TokenProtection.biometric,
+    );
+  });
+
   test('clear：全部刪除並回到預設保護等級', () async {
     await store.write(_tok());
     await store.setProtection(TokenProtection.biometric);
@@ -205,43 +254,65 @@ void main() {
     expect(vault.reads.where((r) => _isRefreshKey(r.$1)), hasLength(1));
   });
 
-  group('保留標記（登出後保留的帳號標示）', () {
-    test('寫入後讀得到，且用裝置密碼等級存（讀取不觸發生物辨識）', () async {
-      await store.writeKeptAccount('ray@example.com');
+  group('舊版保留標記（ADR-0019 遷移只讀不寫）', () {
+    const keptKey = 'tripline_oauth_kept_account';
 
-      expect(await store.readKeptAccount(), 'ray@example.com');
-      expect(vault.writes.where((w) => w.$1 == 'tripline_oauth_kept_account'), [
-        ('tripline_oauth_kept_account', TokenProtection.passcode),
+    test('舊版留下的標記讀得到，且只用裝置密碼等級讀（不觸發生物辨識）', () async {
+      vault.data[keptKey] = 'ray@example.com';
+
+      expect(await store.hasLegacyKeptMarker(), isTrue);
+      expect(vault.reads.where((r) => r.$1 == keptKey), [
+        (keptKey, TokenProtection.passcode),
       ]);
     });
 
-    test('lock() 不動標記；clear() 與憑證同滅', () async {
-      await store.write(_tok());
-      await store.writeKeptAccount('ray@example.com');
-
-      await store.lock();
-      expect(await store.readKeptAccount(), 'ray@example.com');
-
-      await store.clear();
-      expect(await store.readKeptAccount(), isNull);
-      expect(vault.data, isEmpty);
+    test('沒有標記或空字串：視為沒有', () async {
+      expect(await store.hasLegacyKeptMarker(), isFalse);
+      vault.data[keptKey] = '';
+      expect(await store.hasLegacyKeptMarker(), isFalse);
     });
 
-    test('寫 null 或空字串＝清掉', () async {
-      await store.writeKeptAccount('ray@example.com');
-      await store.writeKeptAccount(null);
-      expect(await store.readKeptAccount(), isNull);
-    });
-
-    test('生物特徵變更使 refresh token 失效時，儲存層清憑證也一併清掉標記', () async {
+    test('clear() 與憑證一併刪掉標記', () async {
       await store.write(_tok());
       await store.setProtection(TokenProtection.biometric);
-      await store.writeKeptAccount('ray@example.com');
-      await store.lock();
-      vault.readError = PlatformException(code: 'KeyPermanentlyInvalidated');
+      vault.data[keptKey] = 'ray@example.com';
 
-      expect(await store.read(), isNull);
-      expect(await store.readKeptAccount(), isNull);
+      await store.clear();
+
+      expect(await store.hasLegacyKeptMarker(), isFalse);
+      expect(vault.data, isEmpty);
+    });
+  });
+
+  group('寫入期間登出（clear）不得把憑證寫回', () {
+    test('改保護等級寫到一半時 clear：結束後磁碟上沒有任何憑證', () async {
+      await store.write(_tok());
+      vault.beforeWrite = (key, protection) async {
+        // 新槽位寫入前登出：clear 刪光，之後的寫入不得讓憑證復活。
+        if (protection != TokenProtection.biometric) return false;
+        await store.clear();
+        return true;
+      };
+
+      await store.setProtection(TokenProtection.biometric);
+
+      expect(vault.data, isEmpty);
+      expect(await SecureOAuthTokenStore(vault: vault).read(), isNull);
+      expect(store.protection, TokenProtection.passcode);
+    });
+
+    test('輪替寫到一半時 clear（meta 寫入前）：結束後磁碟上沒有任何憑證', () async {
+      await store.write(_tok());
+      vault.beforeWrite = (key, _) async {
+        if (key != 'tripline_oauth_tokens') return false;
+        await store.clear();
+        return true;
+      };
+
+      await store.write(_tok(refresh: 'RT2'));
+
+      expect(vault.data, isEmpty);
+      expect(await SecureOAuthTokenStore(vault: vault).read(), isNull);
     });
   });
 }

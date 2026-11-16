@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoAlertDialog;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,9 +40,7 @@ class _Rig {
     InMemorySettingsStore? store,
     this.textScale = 1,
   }) : bio = FakeBiometricAuthenticator(kind: kind, outcomes: outcomes),
-       store = (store ?? InMemorySettingsStore())
-         // 生物辨識登入的詢問（登入後只問一次）不是這裡要測的，先標成已問過。
-         ..write('bio_login_prompted', '1'),
+       store = store ?? InMemorySettingsStore(),
        auth = _FakeAuth(user),
        enabledAtStart = enabled;
 
@@ -99,7 +98,6 @@ Future<void> _foreground(WidgetTester tester) async {
 }
 
 final _lockScreen = find.byKey(const ValueKey('app-lock-screen'));
-final _prompt = find.byKey(const ValueKey('app-lock-prompt'));
 
 void main() {
   testWidgets('預設關閉：不鎖、不顯示鎖定畫面', (tester) async {
@@ -347,89 +345,29 @@ void main() {
     });
   });
 
-  group('新登入後詢問', () {
-    testWidgets('新登入後問一次；稍後再說不開啟，之後登出再登入也不再問', (tester) async {
+  group('登入後不詢問要不要開 App 鎖', () {
+    testWidgets('新登入（含開啟生物辨識登入後）：不跳詢問、不記任何旗標', (tester) async {
       final rig = _Rig(user: null);
       await tester.pumpWidget(rig.build());
       await tester.pumpAndSettle();
-      expect(_prompt, findsNothing);
 
       rig.auth.set(_user);
       await tester.pumpAndSettle();
-      expect(_prompt, findsOneWidget);
-      expect(find.text('要用 Face ID 解鎖 Tripline 嗎？'), findsOneWidget);
-      // 開關實際在「帳號 → 安全性」群組，文案指的路徑必須存在。
-      expect(find.textContaining('帳號 → 安全性'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('app-lock-dialog-cancel')));
-      await tester.pumpAndSettle();
-      expect(_prompt, findsNothing);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
+      expect(rig.bio.authenticateCalls, 0);
       expect(await rig.store.read('app_lock_enabled'), isNull);
-      expect(await rig.store.read('app_lock_prompted'), '1');
-
-      rig.auth.set(null);
-      await tester.pumpAndSettle();
-      rig.auth.set(_user);
-      await tester.pumpAndSettle();
-      expect(_prompt, findsNothing);
+      expect(find.text('SECRET'), findsOneWidget);
     });
 
-    testWidgets('選開啟：先驗證成功才開啟，且標記已問過', (tester) async {
-      final rig = _Rig(user: null);
-      await tester.pumpWidget(rig.build());
-      await tester.pumpAndSettle();
-      rig.auth.set(_user);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('app-lock-dialog-confirm')));
-      await tester.pumpAndSettle();
-      expect(rig.bio.authenticateCalls, 1);
-      expect(await rig.store.read('app_lock_enabled'), '1');
-      expect(await rig.store.read('app_lock_prompted'), '1');
-    });
-
-    testWidgets('選開啟但驗證取消：維持關閉，仍標記已問過', (tester) async {
-      final rig = _Rig(user: null, outcomes: [BiometricOutcome.cancelled]);
-      await tester.pumpWidget(rig.build());
-      await tester.pumpAndSettle();
-      rig.auth.set(_user);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('app-lock-dialog-confirm')));
-      await tester.pumpAndSettle();
-      expect(await rig.store.read('app_lock_enabled'), isNull);
-      expect(await rig.store.read('app_lock_prompted'), '1');
-    });
-
-    testWidgets('冷啟動還原既有 session 不詢問', (tester) async {
-      final rig = _Rig();
-      await tester.pumpWidget(rig.build());
-      await tester.pumpAndSettle();
-      expect(_prompt, findsNothing);
-      expect(await rig.store.read('app_lock_prompted'), isNull);
-    });
-
-    testWidgets('裝置不可用：不詢問也不記錄已問過', (tester) async {
-      final rig = _Rig(user: null, kind: null);
-      await tester.pumpWidget(rig.build());
-      await tester.pumpAndSettle();
-      rig.auth.set(_user);
-      await tester.pumpAndSettle();
-
-      expect(_prompt, findsNothing);
-      expect(await rig.store.read('app_lock_prompted'), isNull);
-    });
-
-    testWidgets('登出清掉開啟旗標但保留已問過', (tester) async {
+    testWidgets('登出清掉開啟旗標', (tester) async {
       final rig = _Rig(enabled: true, outcomes: []);
       await tester.pumpWidget(rig.build());
       await tester.pumpAndSettle();
-      await rig.store.write('app_lock_prompted', '1');
 
       rig.auth.set(null);
       await tester.pumpAndSettle();
       expect(await rig.store.read('app_lock_enabled'), '0');
-      expect(await rig.store.read('app_lock_prompted'), '1');
     });
   });
 }

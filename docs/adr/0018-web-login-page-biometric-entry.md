@@ -1,10 +1,12 @@
 ---
-status: accepted
+status: accepted, partially superseded by ADR-0019
 ---
+
+> 註（2026-11-16）：「設定頁開啟與關閉都要重新驗證密碼」與 `prompt=login` 相關內容已由 [ADR-0019](0019-logout-revokes-biometric-login-only-while-signed-in.md) 取代；其餘決定照舊。
 
 # web 登入頁提供 Face ID／指紋的「開啟」入口：意圖走授權請求，憑證仍只在手機
 
-補充 [ADR-0017](0017-biometric-login-stays-on-device.md)，不推翻它：生物辨識與憑證仍只在手機上，後端不存 passkey 或任何憑證。ADR-0017 的「登入頁入口」只涵蓋 App 內的登入畫面；歡迎頁的登入鈕直接開瀏覽器後，使用者沒有地方第一次開啟，只能登入後去設定頁。本 ADR 讓使用者在 **web 登入頁**就能開啟，並規定已開啟後的路徑與設定頁的開關。
+補充 [ADR-0017](0017-biometric-login-stays-on-device.md)，不推翻它（ADR-0017 已由 [ADR-0019](0019-logout-revokes-biometric-login-only-while-signed-in.md) 取代）：生物辨識與憑證仍只在手機上，後端不存 passkey 或任何憑證。ADR-0017 的「登入頁入口」只涵蓋 App 內的登入畫面；歡迎頁的登入鈕直接開瀏覽器後，使用者沒有地方第一次開啟，只能登入後去設定頁。本 ADR 讓使用者在 **web 登入頁**就能開啟，並規定已開啟後的路徑與設定頁的開關。
 
 ## Decision
 

@@ -117,14 +117,13 @@ void main() {
     expect(vault.prompts, 1);
   });
 
-  test('(b) 登出後保留→unlock＋verify：只有 1 次提示', () async {
+  test('(b) 憑證被鎖→unlock＋verify：只有 1 次提示', () async {
     final s = await biometricInstall();
     final src = sourceOf(s);
-    await src.seal();
+    await s.lock();
     vault.prompts = 0;
 
     await s.read(); // 解鎖（唯一一次受保護的讀）
-    src.unseal();
     await src.verify(); // 第一個請求 refresh 並輪替
 
     expect(vault.prompts, 1);

@@ -38,9 +38,9 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'favorites': {'搜尋收藏 361x36'},
   'favorites-load-failed': {'搜尋收藏 361x36'},
   'account-developer-app-new': {'(無標籤) 40x40'},
-  // 設定頁多了「變更密碼」列後內容超出一屏，場景往下捲時頂端的個人資料列只露出 21pt（新增「忘記這支手機」列後少 1pt），
-  // 語意樹的矩形被捲動區裁成 21（量測限制，列本身不小於 44pt；#529）。
-  'account-home-security': {'Ray 393x21'},
+  // 設定頁多了「變更密碼」列後內容超出一屏，場景往下捲時頂端的個人資料列只露出 22pt，
+  // 語意樹的矩形被捲動區裁成 22（量測限制，列本身不小於 44pt；#529）。
+  'account-home-security': {'Ray 393x22'},
   'account-delete-dialog': {'目前密碼（重新驗證） 230x31'},
   'share-manage': {'(無標籤) 40x40'},
   'share-custom-expiry-missing': {'(無標籤) 40x40'},
@@ -53,7 +53,6 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'ax-chat-2x': {'加入適合親子的水族館行程 345x43'},
   'offline-banner-network': {'搜尋行程 361x36'},
   'offline-banner-pending': {'搜尋行程 361x36', '立即重試 100x40'},
-  'app-lock-enable-prompt': {'搜尋行程 361x36'},
   // 彈出層場景：sheet 頂端的拖曳把手（36x4）來自 liquid_glass_widgets 套件，語意帶 onTap（點了關閉 sheet），
   // 尺寸確實小於 44pt；lib/ 內沒有這個語意，要修得在套件層（A18 追蹤）。
   // 通知橫幅場景的底下是收藏頁，搜尋欄同 'favorites'。
@@ -83,11 +82,9 @@ const _scenesWithDialog = {
   'account-delete-dialog',
   'chat-voice-consent',
   'invite-wrong-account-pending',
-  'app-lock-enable-prompt',
   'favorites-remove-confirm',
   'account-delete-preview-failed',
   'collab-revoke-invite-confirm',
-  'account-biometric-disable-confirm',
   'account-session-revoke-confirm',
   'developer-app-delete-confirm',
   'note-delete-confirm',
