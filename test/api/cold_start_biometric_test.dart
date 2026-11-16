@@ -130,6 +130,17 @@ void main() {
       expect((await store.read())?.refreshToken, 'RT');
     });
 
+    test('refresh 拋出非預期錯誤：不當成失效，憑證保留、照常登入', () async {
+      refreshAnswers(() async => throw StateError('unexpected'));
+      final c = make();
+
+      expect(
+        (await c.read(authStateProvider.future))?.email,
+        'ray@example.com',
+      );
+      expect((await store.read())?.refreshToken, 'RT');
+    });
+
     test('一般保護（passcode）憑證：冷啟動不額外 refresh', () async {
       await store.setProtection(TokenProtection.passcode);
       final c = make();
