@@ -357,6 +357,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // ADR-0019：登出一律撤銷並清除，「忘記這支手機」已併入登出。
+  testWidgets('開啟生物辨識登入者的設定頁沒有「忘記這支手機」', (tester) async {
+    await tokenStore.setProtection(TokenProtection.biometric);
+
+    await pumpAccountScreen(tester);
+
+    expect(find.text('安全性'), findsOneWidget);
+    expect(find.text('忘記這支手機'), findsNothing);
+  });
+
   testWidgets('帳號頁底部顯示版本與 build number', (tester) async {
     await pumpAccountScreen(tester);
 

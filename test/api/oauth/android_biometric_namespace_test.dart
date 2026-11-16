@@ -105,7 +105,7 @@ void main() {
       await s.write(_tok('R1'));
       await s.write(_tok('R2')); // refresh 輪替
       await s.setProtection(TokenProtection.passcode); // 已是 passcode
-      await s.writeKeptAccount('ray');
+      be.put('', 'tripline_oauth_kept_account', 'ray'); // 舊版保留標記
       final r = android();
       expect((await r.read())!.refreshToken, 'R2');
       await r.clear();
@@ -152,7 +152,7 @@ void main() {
       await s.write(_tok('R1'));
       await s.setProtection(TokenProtection.biometric);
       await s.write(_tok('R2'));
-      await s.writeKeptAccount('ray');
+      be.put('', 'tripline_oauth_kept_account', 'ray'); // 舊版保留標記
       be.put('biometric', _a, 'stale'); // 殘留的另一個槽位
 
       await android().clear(); // 全新 store（沒 read 過）也要認得出 biometric

@@ -3,14 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-/// 歡迎頁「建立帳號」「忘記這支手機」兩個文字連結的文字左緣，要跟主標題、
+/// 歡迎頁「建立帳號」文字連結的文字左緣，要跟主標題、
 /// 主按鈕的內容左緣對齊（Android 實機曾縮進約 30px）。iOS 與 Android、
 /// 淺色與深色都必須是同一個位置。
 void main() {
-  const links = {
-    'welcome-signup': '沒有帳號，建立帳號',
-    'welcome-forget-phone': '忘記這支手機',
-  };
+  const links = {'welcome-signup': '沒有帳號，建立帳號'};
 
   for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
     for (final brightness in Brightness.values) {
@@ -28,12 +25,7 @@ void main() {
             theme: base.copyWith(platform: platform),
             home: MediaQuery(
               data: MediaQueryData(size: size, platformBrightness: brightness),
-              child: WelcomeScreen(
-                onLogin: () {},
-                onSignup: () {},
-                keptAccount: '洋蔥',
-                onForgetPhone: () {},
-              ),
+              child: WelcomeScreen(onLogin: () {}, onSignup: () {}),
             ),
           ),
         );
@@ -42,10 +34,6 @@ void main() {
         final headlineLeft = tester
             .getTopLeft(find.byKey(const ValueKey('welcome-headline')))
             .dx;
-        final accountLeft = tester
-            .getTopLeft(find.byKey(const ValueKey('welcome-kept-account')))
-            .dx;
-        expect(accountLeft, closeTo(headlineLeft, 0.5), reason: '帳號列');
 
         for (final MapEntry(:key, :value) in links.entries) {
           final button = find.byKey(ValueKey(key));

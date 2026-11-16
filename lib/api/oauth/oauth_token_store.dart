@@ -49,14 +49,13 @@ abstract class OAuthTokenStore {
   Future<bool> setProtection(TokenProtection protection);
   Future<void> clear();
 
-  /// 登出但保留憑證:丟掉記憶體中的明文,下一次 [read] 重新走受保護的讀取
+  /// 丟掉記憶體中的明文（等同重開 App）,下一次 [read] 重新走受保護的讀取
   /// (受生物辨識保護時會再跳出驗證)。不刪任何落地資料。
   Future<void> lock();
 
-  /// 「登出後保留」的帳號標示（顯示名稱或信箱，非機密）；null = 沒有保留。
-  /// 與憑證放在同一個受保護儲存，[clear] 一併清掉，兩者同生同滅。
-  Future<String?> readKeptAccount();
-  Future<void> writeKeptAccount(String? label);
+  /// 舊版（0.41.x）「登出但保留憑證」留下的標記是否還在。只讀不寫：新版不再保留，
+  /// 啟動時看到就把憑證刪掉（ADR-0019）；標記由 [clear] 一併刪除。讀它不會跳出驗證。
+  Future<bool> hasLegacyKeptMarker();
 }
 
 /// Keychain／Keystore 的最小介面(測試以假的替換)。
@@ -188,6 +187,8 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     _Slot.a: 'tripline_oauth_refresh',
     _Slot.b: 'tripline_oauth_refresh_b',
   };
+
+  /// 舊版「登出後保留」的帳號標記；新版只讀不寫，[clear] 會刪掉。
   static const _keptKey = 'tripline_oauth_kept_account';
 
   final SecretVault _vault;
@@ -427,15 +428,10 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   }
 
   @override
-  Future<String?> readKeptAccount() async {
+  Future<bool> hasLegacyKeptMarker() async {
     final v = await _vault.read(_keptKey, protection: TokenProtection.passcode);
-    return (v == null || v.isEmpty) ? null : v;
+    return v != null && v.isNotEmpty;
   }
-
-  @override
-  Future<void> writeKeptAccount(String? label) => label == null || label.isEmpty
-      ? _vault.delete(_keptKey)
-      : _vault.write(_keptKey, label, protection: TokenProtection.passcode);
 
   /// iOS errSecItemNotFound／Android KeyPermanentlyInvalidated 這類「項目已不可用」。
   static bool _isInvalidated(Object e) {
@@ -450,7 +446,9 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 class InMemoryOAuthTokenStore implements OAuthTokenStore {
   OAuthTokens? _tokens;
   TokenProtection _protection = TokenProtection.passcode;
-  String? _kept;
+
+  /// 模擬舊版留下的「登出後保留」標記（[clear] 會清掉）。
+  bool legacyKeptMarker = false;
 
   @override
   TokenProtection get protection => _protection;
@@ -485,15 +483,11 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   @override
   Future<void> clear() async {
     _tokens = null;
-    _kept = null;
+    legacyKeptMarker = false;
     _locked = false;
     _protection = TokenProtection.passcode;
   }
 
   @override
-  Future<String?> readKeptAccount() async => _kept;
-
-  @override
-  Future<void> writeKeptAccount(String? label) async =>
-      _kept = (label == null || label.isEmpty) ? null : label;
+  Future<bool> hasLegacyKeptMarker() async => legacyKeptMarker;
 }

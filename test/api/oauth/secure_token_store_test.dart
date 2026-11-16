@@ -205,43 +205,33 @@ void main() {
     expect(vault.reads.where((r) => _isRefreshKey(r.$1)), hasLength(1));
   });
 
-  group('保留標記（登出後保留的帳號標示）', () {
-    test('寫入後讀得到，且用裝置密碼等級存（讀取不觸發生物辨識）', () async {
-      await store.writeKeptAccount('ray@example.com');
+  group('舊版保留標記（ADR-0019 遷移只讀不寫）', () {
+    const keptKey = 'tripline_oauth_kept_account';
 
-      expect(await store.readKeptAccount(), 'ray@example.com');
-      expect(vault.writes.where((w) => w.$1 == 'tripline_oauth_kept_account'), [
-        ('tripline_oauth_kept_account', TokenProtection.passcode),
+    test('舊版留下的標記讀得到，且只用裝置密碼等級讀（不觸發生物辨識）', () async {
+      vault.data[keptKey] = 'ray@example.com';
+
+      expect(await store.hasLegacyKeptMarker(), isTrue);
+      expect(vault.reads.where((r) => r.$1 == keptKey), [
+        (keptKey, TokenProtection.passcode),
       ]);
     });
 
-    test('lock() 不動標記；clear() 與憑證同滅', () async {
-      await store.write(_tok());
-      await store.writeKeptAccount('ray@example.com');
-
-      await store.lock();
-      expect(await store.readKeptAccount(), 'ray@example.com');
-
-      await store.clear();
-      expect(await store.readKeptAccount(), isNull);
-      expect(vault.data, isEmpty);
+    test('沒有標記或空字串：視為沒有', () async {
+      expect(await store.hasLegacyKeptMarker(), isFalse);
+      vault.data[keptKey] = '';
+      expect(await store.hasLegacyKeptMarker(), isFalse);
     });
 
-    test('寫 null 或空字串＝清掉', () async {
-      await store.writeKeptAccount('ray@example.com');
-      await store.writeKeptAccount(null);
-      expect(await store.readKeptAccount(), isNull);
-    });
-
-    test('生物特徵變更使 refresh token 失效時，儲存層清憑證也一併清掉標記', () async {
+    test('clear() 與憑證一併刪掉標記', () async {
       await store.write(_tok());
       await store.setProtection(TokenProtection.biometric);
-      await store.writeKeptAccount('ray@example.com');
-      await store.lock();
-      vault.readError = PlatformException(code: 'KeyPermanentlyInvalidated');
+      vault.data[keptKey] = 'ray@example.com';
 
-      expect(await store.read(), isNull);
-      expect(await store.readKeptAccount(), isNull);
+      await store.clear();
+
+      expect(await store.hasLegacyKeptMarker(), isFalse);
+      expect(vault.data, isEmpty);
     });
   });
 }
