@@ -1,4 +1,4 @@
-/// App 鎖的根層級外殼：鎖定畫面、登入後的詢問，以及回前景時機。
+/// App 鎖的根層級外殼：鎖定畫面、提示條，以及回前景時機。
 ///
 /// 放在 `MaterialApp.router` 的 builder 內、Navigator 之上，所以鎖定畫面會蓋住
 /// 所有路由與 sheet。這一層沒有 Navigator／Overlay，`adaptive.dart` 的確認框與
@@ -157,8 +157,6 @@ class _AppLockHostState extends ConsumerState<AppLockHost> {
               ),
             ),
           ),
-        if (lock.promptPending && signedIn && !showLock)
-          Positioned.fill(child: _EnablePrompt()),
         if (ref.watch(biometricLoginProvider).passcodeOnlyNotice)
           _notice(context, '這支手機沒有設定 Face ID／Touch ID，已用一般方式登入'),
         if (ref.watch(biometricLoginProvider).notice case final text?)
@@ -224,23 +222,6 @@ class _HostDialog extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _EnablePrompt extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final label = ref.watch(appLockKindProvider).value.lockLabel;
-    final controller = ref.read(appLockProvider.notifier);
-    return _HostDialog(
-      dialogKey: const ValueKey('app-lock-prompt'),
-      title: '要用 $label 解鎖 Tripline 嗎？',
-      message: '開啟後，每次打開 App 都要先通過 $label，別人拿到你的手機也看不到行程。之後可以在「帳號 → 安全性」變更。',
-      cancelLabel: '稍後再說',
-      confirmLabel: '開啟',
-      onCancel: () => unawaited(controller.answerPrompt(enable: false)),
-      onConfirm: () => unawaited(controller.answerPrompt(enable: true)),
-    );
-  }
 }
 
 class AppLockScreen extends ConsumerStatefulWidget {

@@ -72,10 +72,7 @@ void main() {
         container: container = ProviderContainer(
           overrides: [
             authStateProvider.overrideWith(_FakeAuth.new),
-            // App 鎖的詢問屬另一張票；這裡標成已問過，免得蓋住設定列。
-            settingsStoreProvider.overrideWithValue(
-              InMemorySettingsStore()..write('app_lock_prompted', '1'),
-            ),
+            settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
             biometricAuthenticatorProvider.overrideWithValue(bio),
             foregroundWaiterProvider.overrideWithValue(() async {}),
             oauthTokenStoreProvider.overrideWithValue(store),

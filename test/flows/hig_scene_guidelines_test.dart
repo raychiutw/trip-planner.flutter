@@ -53,7 +53,6 @@ const _knownTapTargetViolations = <String, Set<String>>{
   'ax-chat-2x': {'加入適合親子的水族館行程 345x43'},
   'offline-banner-network': {'搜尋行程 361x36'},
   'offline-banner-pending': {'搜尋行程 361x36', '立即重試 100x40'},
-  'app-lock-enable-prompt': {'搜尋行程 361x36'},
   // 彈出層場景：sheet 頂端的拖曳把手（36x4）來自 liquid_glass_widgets 套件，語意帶 onTap（點了關閉 sheet），
   // 尺寸確實小於 44pt；lib/ 內沒有這個語意，要修得在套件層（A18 追蹤）。
   // 通知橫幅場景的底下是收藏頁，搜尋欄同 'favorites'。
@@ -83,7 +82,6 @@ const _scenesWithDialog = {
   'account-delete-dialog',
   'chat-voice-consent',
   'invite-wrong-account-pending',
-  'app-lock-enable-prompt',
   'favorites-remove-confirm',
   'account-delete-preview-failed',
   'collab-revoke-invite-confirm',
