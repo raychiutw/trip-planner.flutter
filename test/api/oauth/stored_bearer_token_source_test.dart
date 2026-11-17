@@ -32,8 +32,15 @@ class _WriteFailStore implements OAuthTokenStore {
   @override
   Future<void> setSealedAfterLogout(bool kept) async {}
 
+  /// 照真實契約：只回身分資訊，不含 refresh token。
   @override
-  Future<OAuthTokens?> peek() async => _tokens;
+  Future<OAuthTokens?> peek() async {
+    final tokens = _tokens;
+    return tokens == null
+        ? null
+        : OAuthTokens.fromJson({...tokens.toJson()}..remove('refresh_token'));
+  }
+
   @override
   Future<void> clear() async {
     cleared = true;
