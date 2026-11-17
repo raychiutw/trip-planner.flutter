@@ -13,7 +13,6 @@ import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
-import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
@@ -236,7 +235,7 @@ void main() {
       expect(c.read(authLockedProvider), isFalse);
     });
 
-    group('按登入時憑證已失效：清除並回報失效（歡迎頁據此開 web 登入頁）', () {
+    group('按登入時憑證已失效：清除並回到未登入（歡迎頁據此開 web 登入頁）', () {
       Future<ProviderContainer> loggedOut() async {
         final c = container();
         await c.read(authStateProvider.future);
@@ -250,6 +249,7 @@ void main() {
         expect(await keys.load(), isNull, reason: '金鑰與憑證一起清掉');
         expect(await store.hasLogoutKeep(), isFalse);
         expect(store.protection, TokenProtection.passcode);
+        expect(c.read(authLockedProvider), isFalse, reason: '不再走解鎖');
       }
 
       test('refresh 被拒（過期、被 web 撤銷）', () async {
@@ -264,9 +264,8 @@ void main() {
           const ApiError(status: 400, code: 'invalid_grant', message: 'x'),
         );
 
-        final invalid = await c.read(authStateProvider.notifier).unlock();
+        await c.read(authStateProvider.notifier).unlock();
 
-        expect(invalid, InvalidReason.rejected);
         await expectCleared(c);
       });
 
@@ -274,9 +273,8 @@ void main() {
         final c = await loggedOut();
         store.invalidateNextRead = true;
 
-        final invalid = await c.read(authStateProvider.notifier).unlock();
+        await c.read(authStateProvider.notifier).unlock();
 
-        expect(invalid, InvalidReason.keyLost);
         await expectCleared(c);
       });
     });

@@ -136,9 +136,6 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   //（build 失敗重試、state 被設成 AsyncLoading 都會讓 state.hasValue 誤判）。
   bool _coldStartDone = false;
 
-  /// 這次還原或解鎖時發現憑證不能用而清掉的原因（給 [unlock] 回報）。
-  InvalidReason? _invalid;
-
   @override
   Future<UserInfo?> build() async {
     // refresh 被後端拒絕、憑證已清掉 → 回到未登入(離線快取保留,同一帳號重新登入還用得到)。
@@ -200,7 +197,6 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     if (tokens == null) {
       // 剛才還鎖著（憑證在）卻讀出空的：受保護讀取時系統回報項目失效（生物特徵變更），
       // 儲存層已自行清掉。
-      if (wasLocked) _invalid = InvalidReason.keyLost;
       await ref.read(bearerTokenSourceProvider).discardProofKey();
       return null;
     }
@@ -213,11 +209,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       // 先發事件再 refresh：App 鎖不必等網路，也不會在 refresh 期間再跳一次驗證。
       ref.read(credentialVerifiedProvider.notifier).emit();
       // 通過即 refresh（ADR-0019）：憑證不能用就在這裡清掉，不先進「我的行程」再被踢出。
-      final invalid = await _verifyCredential();
-      if (invalid != null) {
-        _invalid = invalid;
-        return null;
-      }
+      if (await _verifyCredential() != null) return null;
     }
 
     // 有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。驗證未過必須落回
@@ -288,17 +280,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 受保護的憑證解鎖:重新讀取一次(會跳出生物辨識)，通過即 refresh。
-  /// 回傳非 null 代表憑證已失效（refresh 被拒、生物特徵變更）並已清掉，
-  /// 呼叫端要改走 web 登入（ADR-0019）；取消或失敗回 null，憑證仍在。
-  Future<InvalidReason?> unlock() async {
-    _invalid = null;
+  /// 解鎖後仍未登入（不是錯誤）時，呼叫端改開 web 登入頁（ADR-0020）：生物辨識取消或
+  /// 失敗（保留的憑證先不刪），或憑證已失效（refresh 被拒、生物特徵變更）並已清掉。
+  Future<void> unlock() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final user = await _resolveUser(explicit: true);
       await _enforceCacheOwner(user);
       return user;
     });
-    return _invalid;
   }
 
   /// PATCH /account/profile；畫面離開後仍由認證 owner 刷新帳號資料。

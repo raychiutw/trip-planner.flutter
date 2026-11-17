@@ -12,7 +12,6 @@ import 'package:tripline/api/oauth/oauth_config.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
-import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 
@@ -162,17 +161,16 @@ void main() {
       return c;
     }
 
-    test('通過：refresh 並登入，回報憑證可用', () async {
+    test('通過：refresh 並登入', () async {
       final c = await cancelledColdStart();
 
-      final invalid = await c.read(authStateProvider.notifier).unlock();
+      await c.read(authStateProvider.notifier).unlock();
 
-      expect(invalid, isNull);
       expect(c.read(authStateProvider).value?.email, 'ray@example.com');
       expect(refreshes, 1);
     });
 
-    test('refresh 被拒：清除憑證、未登入，回報 rejected（呼叫端改開 web 登入頁）', () async {
+    test('refresh 被拒：清除憑證、未登入且不再是「還沒解開」（呼叫端改開 web 登入頁）', () async {
       final c = await cancelledColdStart();
       refreshAnswers(
         () async => throw const ApiError(
@@ -182,34 +180,34 @@ void main() {
         ),
       );
 
-      final invalid = await c.read(authStateProvider.notifier).unlock();
+      await c.read(authStateProvider.notifier).unlock();
 
-      expect(invalid, InvalidReason.rejected);
       expect(c.read(authStateProvider).value, isNull);
       expect(c.read(authStateProvider).hasError, isFalse);
+      expect(c.read(authLockedProvider), isFalse);
       expect(await store.read(), isNull);
     });
 
-    test('生物特徵變更使憑證失效：回報 keyLost、未登入、金鑰一併刪除', () async {
+    test('生物特徵變更使憑證失效：未登入、不再是「還沒解開」、金鑰一併刪除', () async {
       final c = await cancelledColdStart();
       await keys.create();
       store.invalidateNextRead = true;
 
-      final invalid = await c.read(authStateProvider.notifier).unlock();
+      await c.read(authStateProvider.notifier).unlock();
 
-      expect(invalid, InvalidReason.keyLost);
       expect(c.read(authStateProvider).value, isNull);
+      expect(c.read(authLockedProvider), isFalse);
+      expect(await store.read(), isNull);
       expect(await keys.load(), isNull);
     });
 
-    test('再次取消：仍是「還沒解開」，不回報失效、憑證保留', () async {
+    test('再次取消：仍是「還沒解開」、憑證保留', () async {
       final c = await cancelledColdStart();
       store.unlockSucceeds = false;
       await store.lock();
 
-      final invalid = await c.read(authStateProvider.notifier).unlock();
+      await c.read(authStateProvider.notifier).unlock();
 
-      expect(invalid, isNull);
       expect(c.read(authLockedProvider), isTrue);
       store.unlockSucceeds = true;
       expect(await store.read(), isNotNull);
