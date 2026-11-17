@@ -892,21 +892,23 @@ void main() {
       expect(find.byType(WelcomeScreen), findsNothing);
     });
 
-    testWidgets('Welcome 解鎖取消（$key）：留在歡迎頁、不顯示錯誤，可再按一次', (tester) async {
+    testWidgets('Welcome 解鎖取消或失敗（$key）：同一次按下開 web 登入頁、不顯示錯誤（ADR-0020）', (
+      tester,
+    ) async {
       final spy = await pumpLocked(tester);
 
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
 
       expect(spy.unlockCount, 1);
-      expect(spy.signInCount, 0);
+      expect(spy.signInCount, 1, reason: '生物辨識取消或失敗就開 web 登入頁');
       expect(find.byType(WelcomeScreen), findsOneWidget);
-      expect(welcomeExposed(tester), isTrue, reason: '取消後進度畫面要撤掉');
+      expect(welcomeExposed(tester), isTrue, reason: 'web 也沒登入：進度畫面要撤掉');
       expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
 
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
-      expect(spy.unlockCount, 2);
+      expect(spy.unlockCount, 2, reason: '憑證還被鎖：再按一次仍先解鎖');
     });
 
     testWidgets('Welcome 憑證被鎖但只有裝置密碼（$key）：照舊直接開瀏覽器', (tester) async {
@@ -1011,7 +1013,10 @@ void main() {
   for (final locked in [false, true]) {
     testWidgets('登入進行中禁止重複觸發（${locked ? "解鎖" : "瀏覽器登入"}只啟動一次）', (tester) async {
       final gate = Completer<void>();
-      final spy = _BrowserLoginSpyNotifier()..gate = gate;
+      // 解鎖成功（取消會接著開 web 登入頁，這裡只看重複觸發）。
+      final spy = _BrowserLoginSpyNotifier()
+        ..gate = gate
+        ..unlockAs = locked ? _loggedInUser : null;
       final container = _buildContainer(
         currentUser: null,
         authNotifier: () => spy,
@@ -1243,6 +1248,7 @@ void main() {
       bool legacyKept = false,
       bool rejectRefresh = false,
       bool settle = true,
+      Object? loginError,
     }) async {
       final store = _ScriptedStore(prompts);
       await store.write(
@@ -1277,6 +1283,7 @@ void main() {
             ),
           ...fakeBrowserLoginOverrides(
             stubBiometric: false,
+            error: loginError,
             created: (s) => login = s,
           ),
           biometricAuthenticatorProvider.overrideWithValue(bio),
@@ -1495,6 +1502,30 @@ void main() {
       expect(r.browserLogins(), 0, reason: '不開 web 登入頁');
       expect(find.byType(TripsListScreen), findsOneWidget);
       expect(r.bio.authenticateCalls, 0, reason: '不重複驗證');
+    });
+
+    testWidgets('開啟者登出後按登入、生物辨識取消：開 web 登入頁，保留的憑證仍在', (tester) async {
+      final r = await coldStart(
+        tester,
+        prompts: [true, false],
+        loginError: OAuthLoginException(
+          '使用者取消登入',
+          userMessage: '已取消登入',
+          cancelled: true,
+        ),
+      );
+      await r.container.read(authStateProvider.notifier).logout();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.store.prompts, 2, reason: '先跳生物辨識');
+      expect(r.browserLogins(), 1, reason: '取消就開 web 登入頁');
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
+      expect(await r.store.hasLogoutKeep(), isTrue, reason: '保留的憑證先不刪');
+      expect((await r.store.read())?.refreshToken, isNotNull);
     });
 
     testWidgets('舊版登出後保留憑證的冷啟動：刪掉憑證、不跳驗證，停在歡迎頁', (tester) async {
