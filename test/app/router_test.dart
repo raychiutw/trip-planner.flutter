@@ -1471,6 +1471,32 @@ void main() {
       expect(login?.calls, 1, reason: '只有裝置密碼：登入鈕走瀏覽器，不是解鎖');
     });
 
+    testWidgets('開啟者登出後按登入：生物辨識讀取 → refresh → 進「我的行程」，不開瀏覽器', (tester) async {
+      final r = await coldStart(tester, prompts: [true, true], appLock: true);
+      expect(find.byType(TripsListScreen), findsOneWidget);
+      final refreshesBefore = r.oauth.refreshes;
+
+      await r.container.read(authStateProvider.notifier).logout();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(r.store.prompts, 1, reason: '登出本身不跳驗證');
+      expect(
+        r.container.read(appLockProvider).enabled,
+        isFalse,
+        reason: '登出照舊關掉 App 鎖',
+      );
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.store.prompts, 2, reason: '按登入直接跳生物辨識');
+      expect(r.oauth.refreshes, refreshesBefore + 1, reason: '通過即 refresh');
+      expect(r.browserLogins(), 0, reason: '不開 web 登入頁');
+      expect(find.byType(TripsListScreen), findsOneWidget);
+      expect(r.bio.authenticateCalls, 0, reason: '不重複驗證');
+    });
+
     testWidgets('舊版登出後保留憑證的冷啟動：刪掉憑證、不跳驗證，停在歡迎頁', (tester) async {
       final r = await coldStart(tester, prompts: [true], legacyKept: true);
 

@@ -88,6 +88,15 @@ Future<bool> _hasLegacyKeptMarker(Ref ref) async {
   }
 }
 
+/// 開啟生物辨識登入者登出時留下的「登出保留」標記（ADR-0020）；讀不到視為沒有。
+Future<bool> _hasLogoutKeep(Ref ref) async {
+  try {
+    return await ref.read(oauthTokenStoreProvider).hasLogoutKeep();
+  } catch (_) {
+    return false;
+  }
+}
+
 /// 受保護的登入憑證還沒解鎖(使用者取消或沒通過生物辨識)。
 /// 登入畫面據此多提供「解鎖」入口。
 final authLockedProvider = NotifierProvider<AuthLockedNotifier, bool>(
@@ -169,6 +178,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       }
       return null;
     }
+    // 主動登出但保留憑證（ADR-0020）：冷啟動不讀（會跳生物辨識），停在歡迎頁等使用者
+    // 按「登入」。標成「還沒解開」，登入鈕據此走解鎖。
+    if (!explicit && await _hasLogoutKeep(ref)) {
+      await ref.read(bearerTokenSourceProvider).seal();
+      ref.read(authLockedProvider.notifier).set(true);
+      return null;
+    }
     final wasLocked = ref.read(authLockedProvider);
     final OAuthTokens? tokens;
     try {
@@ -179,6 +195,8 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       return null;
     }
     ref.read(authLockedProvider.notifier).set(false);
+    // 使用者主動登入或解鎖成功：不再是「登出保留」，下次冷啟動照常還原。
+    if (explicit) await _endLogoutKeep();
     if (tokens == null) {
       // 剛才還鎖著（憑證在）卻讀出空的：受保護讀取時系統回報項目失效（生物特徵變更），
       // 儲存層已自行清掉。
@@ -292,11 +310,46 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return user;
   }
 
-  /// 登出：不論有沒有開啟生物辨識登入，都先嘗試伺服器端撤銷，再清掉本機憑證、
-  /// DPoP 金鑰與離線快取（ADR-0019）。撤銷失敗（離線、伺服器錯誤）不能擋住本機登出。
-  Future<void> logout() async {
+  /// 登出。開啟生物辨識登入者（憑證受生物辨識保護）保留憑證與 DPoP 金鑰、不撤銷，
+  /// 之後在歡迎頁按「登入」用生物辨識解鎖（ADR-0020）。其餘情況與 [clear] 為 true
+  /// （切換帳號）先嘗試伺服器端撤銷，再清掉本機憑證、DPoP 金鑰與離線快取（ADR-0019）；
+  /// 撤銷失敗（離線、伺服器錯誤）不能擋住本機登出。
+  Future<void> logout({bool clear = false}) async {
+    if (!clear &&
+        state.value != null &&
+        ref.read(oauthTokenStoreProvider).protection ==
+            TokenProtection.biometric &&
+        await _keepForBiometricLogin()) {
+      return;
+    }
     await _tryRevoke();
     await _clearLocalAuth();
+  }
+
+  /// 登出保留：先留標記（冷啟動據此不讀受保護憑證），再封存憑證、清離線快取。
+  /// 標記寫不進去就回 false，改走撤銷並清除，不留下冷啟動會自動解鎖的憑證。
+  Future<bool> _keepForBiometricLogin() async {
+    try {
+      await ref.read(oauthTokenStoreProvider).setLogoutKeep(true);
+    } catch (_) {
+      return false;
+    }
+    try {
+      await ref.read(bearerTokenSourceProvider).seal();
+      await ref.read(cacheStoreProvider).clear();
+    } finally {
+      // 先回到未登入（App 鎖據此視為登出而關閉），再標成「還沒解開」讓登入鈕走解鎖。
+      state = const AsyncData(null);
+      ref.read(authLockedProvider.notifier).set(true);
+    }
+    return true;
+  }
+
+  Future<void> _endLogoutKeep() async {
+    ref.read(bearerTokenSourceProvider).unseal();
+    try {
+      await ref.read(oauthTokenStoreProvider).setLogoutKeep(false);
+    } catch (_) {}
   }
 
   Future<bool> _tryRevoke() =>

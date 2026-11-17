@@ -62,6 +62,12 @@ abstract class OAuthTokenStore {
   /// 舊版（0.41.x）「登出但保留憑證」留下的標記是否還在。只讀不寫：新版不再保留，
   /// 啟動時看到就把憑證刪掉（ADR-0019）；標記由 [clear] 一併刪除。讀它不會跳出驗證。
   Future<bool> hasLegacyKeptMarker();
+
+  /// 開啟生物辨識登入者主動登出、保留憑證的「登出保留」標記（ADR-0020）。冷啟動看到
+  /// 就停在歡迎頁、不讀受保護憑證（不跳驗證），等使用者按「登入」才解鎖。
+  /// 與舊版保留標記用不同的鍵，啟動遷移不會誤刪；讀它不會跳出驗證。由 [clear] 一併刪除。
+  Future<bool> hasLogoutKeep();
+  Future<void> setLogoutKeep(bool kept);
 }
 
 /// Keychain／Keystore 的最小介面(測試以假的替換)。
@@ -204,6 +210,9 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   /// 舊版「登出後保留」的帳號標記；新版只讀不寫，[clear] 會刪掉。
   static const _keptKey = 'tripline_oauth_kept_account';
+
+  /// 新版「登出保留」標記（ADR-0020）；刻意與 [_keptKey] 不同鍵，啟動遷移才分得開。
+  static const _logoutKeepKey = 'tripline_oauth_logout_keep';
 
   final SecretVault _vault;
   TokenProtection _protection = TokenProtection.passcode;
@@ -433,6 +442,7 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
       await _vault.delete(key, protection: TokenProtection.passcode);
     }
     await _vault.delete(_keptKey, protection: TokenProtection.passcode);
+    await _vault.delete(_logoutKeepKey, protection: TokenProtection.passcode);
     if (!touchBiometric) return;
     for (final key in _slotKeys.values) {
       try {
@@ -469,6 +479,16 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     return v != null && v.isNotEmpty;
   }
 
+  @override
+  Future<bool> hasLogoutKeep() async =>
+      await _vault.read(_logoutKeepKey, protection: TokenProtection.passcode) ==
+      '1';
+
+  @override
+  Future<void> setLogoutKeep(bool kept) => kept
+      ? _vault.write(_logoutKeepKey, '1', protection: TokenProtection.passcode)
+      : _vault.delete(_logoutKeepKey, protection: TokenProtection.passcode);
+
   /// iOS errSecItemNotFound／Android KeyPermanentlyInvalidated 這類「項目已不可用」。
   static bool _isInvalidated(Object e) {
     final text = e.toString().toLowerCase();
@@ -485,6 +505,8 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
 
   /// 模擬舊版留下的「登出後保留」標記（[clear] 會清掉）。
   bool legacyKeptMarker = false;
+
+  bool _logoutKeep = false;
 
   @override
   TokenProtection get protection => _protection;
@@ -520,6 +542,7 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   Future<void> clear() async {
     _tokens = null;
     legacyKeptMarker = false;
+    _logoutKeep = false;
     _locked = false;
     _protection = TokenProtection.passcode;
   }
@@ -529,4 +552,10 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<bool> hasLegacyKeptMarker() async => legacyKeptMarker;
+
+  @override
+  Future<bool> hasLogoutKeep() async => _logoutKeep;
+
+  @override
+  Future<void> setLogoutKeep(bool kept) async => _logoutKeep = kept;
 }

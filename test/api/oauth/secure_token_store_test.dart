@@ -284,6 +284,48 @@ void main() {
     });
   });
 
+  group('登出保留標記（ADR-0020）與舊版保留標記分開', () {
+    const keptKey = 'tripline_oauth_kept_account';
+
+    test('寫入登出保留：讀得到，但不是舊版標記（啟動遷移不會誤刪）', () async {
+      await store.setLogoutKeep(true);
+
+      expect(await store.hasLogoutKeep(), isTrue);
+      expect(await store.hasLegacyKeptMarker(), isFalse);
+      expect(vault.data.containsKey(keptKey), isFalse);
+    });
+
+    test('舊版標記不算登出保留', () async {
+      vault.data[keptKey] = 'ray@example.com';
+
+      expect(await store.hasLogoutKeep(), isFalse);
+    });
+
+    test('只用裝置密碼等級讀寫（不觸發生物辨識）', () async {
+      await store.setLogoutKeep(true);
+      vault.reads.clear();
+
+      await store.hasLogoutKeep();
+
+      expect(vault.reads.map((r) => r.$2).toSet(), {TokenProtection.passcode});
+    });
+
+    test('setLogoutKeep(false)、clear()、clearWithoutPrompt() 都會刪掉', () async {
+      await store.setLogoutKeep(true);
+      await store.setLogoutKeep(false);
+      expect(await store.hasLogoutKeep(), isFalse);
+
+      await store.write(_tok());
+      await store.setLogoutKeep(true);
+      await store.clear();
+      expect(await store.hasLogoutKeep(), isFalse);
+
+      await store.setLogoutKeep(true);
+      await store.clearWithoutPrompt();
+      expect(await store.hasLogoutKeep(), isFalse);
+    });
+  });
+
   group('寫入期間登出（clear）不得把憑證寫回', () {
     test('改保護等級寫到一半時 clear：結束後磁碟上沒有任何憑證', () async {
       await store.write(_tok());

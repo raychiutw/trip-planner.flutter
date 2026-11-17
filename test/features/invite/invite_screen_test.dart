@@ -20,8 +20,11 @@ import 'package:tripline/theme/app_theme.dart';
 class _MockCollabRepo extends Mock implements CollabRepository {}
 
 class _FakeAuthNotifier extends AuthNotifier {
-  /// logout 被呼叫的次數（登出一律撤銷並清除，ADR-0019）。
+  /// logout 被呼叫的次數。
   static int logoutCalls = 0;
+
+  /// 最後一次 logout 是否要求撤銷並清除（切換帳號不保留給下一個人，ADR-0020）。
+  static bool? lastClear;
 
   _FakeAuthNotifier(this._user);
 
@@ -31,8 +34,9 @@ class _FakeAuthNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => _user;
 
   @override
-  Future<void> logout() async {
+  Future<void> logout({bool clear = false}) async {
     logoutCalls++;
+    lastClear = clear;
     state = const AsyncData(null);
   }
 }
@@ -373,12 +377,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     _FakeAuthNotifier.logoutCalls = 0;
+    _FakeAuthNotifier.lastClear = null;
     await tester.tap(switchButton);
     await tester.pumpAndSettle();
 
     expect(find.text('login /invite?token=raw-token'), findsOneWidget);
-    // 切換帳號是換人：先登出（登出一律撤銷並清除）。
+    // 切換帳號是換人：先登出並撤銷清除，開啟生物辨識登入者也不保留。
     expect(_FakeAuthNotifier.logoutCalls, 1);
+    expect(_FakeAuthNotifier.lastClear, isTrue);
   });
 
   testWidgets('大字級帳號不符時保留兩個信箱資訊並安全切換帳號', (tester) async {

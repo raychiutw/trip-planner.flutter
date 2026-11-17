@@ -122,8 +122,9 @@ void main() {
     ),
   ).called(1);
 
-  group('登出一律撤銷並清除', () {
-    for (final biometric in [true, false]) {
+  // 開啟者登出改為保留（ADR-0020），見 logout_keeps_biometric_test.dart。
+  group('未開啟生物辨識登入者登出撤銷並清除', () {
+    for (final biometric in [false]) {
       final label = biometric ? '開啟' : '未開啟';
       test('$label生物辨識登入：撤銷伺服器端憑證，清掉憑證與 DPoP 金鑰', () async {
         if (biometric) await store.setProtection(TokenProtection.biometric);
@@ -139,7 +140,7 @@ void main() {
       });
     }
 
-    for (final biometric in [true, false]) {
+    for (final biometric in [false]) {
       final label = biometric ? '開啟' : '未開啟';
       test('$label生物辨識登入且撤銷失敗（離線）：本機仍清除，回到未登入', () async {
         if (biometric) await store.setProtection(TokenProtection.biometric);
