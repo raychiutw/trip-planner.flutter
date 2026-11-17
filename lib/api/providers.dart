@@ -301,17 +301,21 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 
   /// 登出。開啟生物辨識登入者（憑證受生物辨識保護）保留憑證與 DPoP 金鑰、不撤銷，
-  /// 之後在歡迎頁按「登入」用生物辨識解鎖（ADR-0020）。其餘情況與 [clear] 為 true
-  /// （切換帳號）先嘗試伺服器端撤銷，再清掉本機憑證、DPoP 金鑰與離線快取（ADR-0019）；
-  /// 撤銷失敗（離線、伺服器錯誤）不能擋住本機登出。
-  Future<void> logout({bool clear = false}) async {
-    if (!clear &&
-        state.value != null &&
+  /// 之後在歡迎頁按「登入」用生物辨識解鎖（ADR-0020）；其餘情況同 [logoutAndRevoke]。
+  Future<void> logout() async {
+    if (state.value != null &&
         ref.read(oauthTokenStoreProvider).protection ==
             TokenProtection.biometric &&
         await _keepForBiometricLogin()) {
       return;
     }
+    await logoutAndRevoke();
+  }
+
+  /// 登出並撤銷：不論有沒有開啟生物辨識登入，都先嘗試伺服器端撤銷，再清掉本機憑證、
+  /// DPoP 金鑰與離線快取（ADR-0019）。給換人的情境（邀請頁切換帳號）用，不把憑證
+  /// 留給下一個人。撤銷失敗（離線、伺服器錯誤）不能擋住本機登出。
+  Future<void> logoutAndRevoke() async {
     await _tryRevoke();
     await _clearLocalAuth();
   }

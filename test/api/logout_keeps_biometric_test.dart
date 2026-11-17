@@ -345,12 +345,12 @@ void main() {
     });
   });
 
-  test('切換帳號（clear: true）：開啟者也撤銷並清除', () async {
+  test('logoutAndRevoke（切換帳號）：開啟者也撤銷並清除', () async {
     await store.setProtection(TokenProtection.biometric);
     final c = container();
     await c.read(authStateProvider.future);
 
-    await c.read(authStateProvider.notifier).logout(clear: true);
+    await c.read(authStateProvider.notifier).logoutAndRevoke();
 
     verify(
       () => oauthRepo.revokeToken(
