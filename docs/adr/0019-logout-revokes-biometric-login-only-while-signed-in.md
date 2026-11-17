@@ -1,6 +1,8 @@
 ---
-status: proposed
+status: accepted, partially superseded by ADR-0020
 ---
+
+> 註（2026-11-17）：「登出一律撤銷並清除」與「生物辨識登入只在登入期間有效」已由 [ADR-0020](0020-biometric-logout-keeps-credentials-login-unlocks.md) 取代：開啟生物辨識登入者登出時保留憑證。其餘決定照舊。
 
 # 登出即撤銷；生物辨識登入只在登入期間有效
 
