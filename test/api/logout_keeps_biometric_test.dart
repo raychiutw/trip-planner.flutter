@@ -47,6 +47,15 @@ class _CountingStore extends InMemoryOAuthTokenStore {
   /// 生物特徵變更：下一次受保護讀取時系統回報項目失效，儲存層自行清掉並回 null。
   bool invalidateNextRead = false;
 
+  /// 登出保留標記寫不進去（Keychain／Keystore 錯誤）。
+  bool failLogoutKeepWrite = false;
+
+  @override
+  Future<void> setLogoutKeep(bool kept) async {
+    if (kept && failLogoutKeepWrite) throw Exception('vault write failed');
+    return super.setLogoutKeep(kept);
+  }
+
   @override
   Future<OAuthTokens?> read() async {
     reads++;
@@ -171,6 +180,26 @@ void main() {
       expect(await keys.load(), isNotNull, reason: '金鑰要跟憑證一起留下');
       expect(store.protection, TokenProtection.biometric, reason: '仍只接受生物辨識');
       expect((await store.read())?.refreshToken, 'RT2', reason: '憑證要留下');
+    });
+
+    test('保留標記寫不進去：改走撤銷並清除，不留下冷啟動會自動解鎖的憑證', () async {
+      store.failLogoutKeepWrite = true;
+      final c = container();
+      await c.read(authStateProvider.future);
+
+      await c.read(authStateProvider.notifier).logout();
+
+      expect(c.read(authStateProvider).value, isNull);
+      verify(
+        () => oauthRepo.revokeToken(
+          token: any(named: 'token'),
+          clientId: any(named: 'clientId'),
+          tokenTypeHint: any(named: 'tokenTypeHint'),
+        ),
+      ).called(1);
+      expect(await store.read(), isNull, reason: '憑證要清掉');
+      expect(await keys.load(), isNull, reason: '金鑰要清掉');
+      expect(c.read(authLockedProvider), isFalse);
     });
 
     test('登出後 API 取 token 不讀受保護憑證（不跳生物辨識）', () async {
