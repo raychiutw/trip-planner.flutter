@@ -29,6 +29,11 @@ abstract interface class ProofKeyStore {
   /// [ProofKeyUnsupportedException]。
   Future<ProofKey> create();
 
+  /// 換成一把已經產生好的軟體金鑰（先清掉舊的）。登入時手機上還留著憑證，
+  /// 新金鑰要等換 code 成功才落地（ADR-0020）。硬體實作不能匯入，丟
+  /// [ProofKeyUnsupportedException]。
+  Future<void> install(SoftwareProofKey key);
+
   Future<void> delete();
 }
 
@@ -41,6 +46,9 @@ class InMemoryProofKeyStore implements ProofKeyStore {
 
   @override
   Future<ProofKey> create() async => _key = SoftwareProofKey.generate();
+
+  @override
+  Future<void> install(SoftwareProofKey key) async => _key = key;
 
   @override
   Future<void> delete() async => _key = null;
@@ -72,8 +80,14 @@ class SoftwareProofKeyStore implements ProofKeyStore {
 
   @override
   Future<ProofKey> create() async {
-    await delete();
     final key = SoftwareProofKey.generate();
+    await install(key);
+    return key;
+  }
+
+  @override
+  Future<void> install(SoftwareProofKey key) async {
+    await delete();
     _cache = key;
     try {
       await _vault.write(
@@ -84,7 +98,6 @@ class SoftwareProofKeyStore implements ProofKeyStore {
     } on Exception {
       // 存不進去：只留記憶體。
     }
-    return key;
   }
 
   @override
@@ -113,6 +126,12 @@ class FallbackProofKeyStore implements ProofKeyStore {
     } on ProofKeyUnsupportedException {
       return software.create();
     }
+  }
+
+  @override
+  Future<void> install(SoftwareProofKey key) async {
+    await hardware.delete();
+    await software.install(key);
   }
 
   @override

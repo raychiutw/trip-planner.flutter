@@ -1,5 +1,5 @@
 // Android：flutter_secure_storage 的生物辨識驗證只在儲存實例初始化時做一次，
-// 同一個行程內之後的讀取不會再驗證，所以「開啟 → 登出保留 → 用指紋登入」
+// 同一個行程內之後的讀取不會再驗證，所以「開啟 → 登出（保留憑證） → 用指紋登入」
 // 第二次讀取會直接成功。以假的平台通道模擬外掛（bioInits = 外掛自己跳驗證的次數），
 // 驗證 vault 的把關：同一行程第二次以後的讀取先過 App 層的生物特徵把關。
 import 'package:flutter/foundation.dart';
@@ -72,7 +72,7 @@ void main() {
   SecureOAuthTokenStore storeWith(FlutterSecureVault v) =>
       SecureOAuthTokenStore(vault: v);
 
-  /// 開啟生物辨識登入（寫入會初始化外掛實例），之後丟掉記憶體快取＝登出保留。
+  /// 開啟生物辨識登入（寫入會初始化外掛實例），之後丟掉記憶體快取＝登出（保留憑證）。
   Future<SecureOAuthTokenStore> enabledAndLocked(FlutterSecureVault v) async {
     final s = storeWith(v);
     await s.write(_tok('R1'));
@@ -91,7 +91,7 @@ void main() {
   });
   tearDown(() => debugDefaultTargetPlatformOverride = null);
 
-  test('同一行程：開啟後登出保留再解鎖，讀取前一定過一次把關', () async {
+  test('同一行程：開啟後登出（保留憑證）再解鎖，讀取前一定過一次把關', () async {
     final s = await enabledAndLocked(vaultFor(TargetPlatform.android));
     expect(be.bioInits, 1, reason: '開啟時外掛初始化一次');
     expect(gateCalls, 0, reason: '開啟的寫入不需要把關');

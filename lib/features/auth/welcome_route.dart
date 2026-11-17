@@ -1,7 +1,9 @@
-/// 歡迎頁的登入邏輯（歡迎頁是唯一登入入口，ADR-0014／ADR-0019）。
+/// 歡迎頁的登入邏輯（歡迎頁是唯一登入入口，ADR-0014／ADR-0019／ADR-0020）。
 ///
-/// - 憑證被鎖，且裝置有生物辨識：登入鈕＝解鎖一次，
-///   成功由 router redirect 進 App；取消留在原頁。
+/// - 憑證被鎖（含開啟生物辨識登入者登出後保留的憑證），且裝置有生物辨識：登入鈕＝解鎖一次，
+///   成功由 router redirect 進 App。
+/// - 生物辨識取消或失敗：同一次按下接著開 web 登入頁，保留的憑證先不刪（ADR-0020）；
+///   web 登入完成時由憑證來源判斷同帳號換新、不同帳號先清掉。
 /// - 其餘：開系統瀏覽器登入，失敗在本頁顯示錯誤。
 /// - 冷啟動讀憑證時系統本身會跳一次驗證；取消就停在這裡，等使用者按登入鈕。
 /// - 解鎖時發現憑證已失效（已清掉）：接著開 web 登入頁，不必再按一次。
@@ -65,13 +67,14 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
   }
 
   Future<void> _unlock() async {
-    final invalid = await ref.read(authStateProvider.notifier).unlock();
+    await ref.read(authStateProvider.notifier).unlock();
     if (!mounted) return;
-    // 憑證已失效並清掉（refresh 被拒、生物特徵變更）：同一次按下直接開 web 登入頁。
-    if (invalid != null) return _browserLogin();
-    // 取消不是錯誤（unlock 回到未登入、沒有 error）。
-    final error = ref.read(authStateProvider).error;
-    if (error != null) showAppError(context, _message(error));
+    final auth = ref.read(authStateProvider);
+    final error = auth.error;
+    if (error != null) return showAppError(context, _message(error));
+    // 沒有登入（不是錯誤）：生物辨識取消或失敗（憑證仍保留），或憑證已失效並清掉
+    //（refresh 被拒、生物特徵變更）。兩者都在同一次按下開 web 登入頁（ADR-0020）。
+    if (auth.value == null) return _browserLogin();
   }
 
   Future<void> _browserLogin() async {

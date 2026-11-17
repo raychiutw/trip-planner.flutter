@@ -62,6 +62,16 @@ abstract class OAuthTokenStore {
   /// 舊版（0.41.x）「登出但保留憑證」留下的標記是否還在。只讀不寫：新版不再保留，
   /// 啟動時看到就把憑證刪掉（ADR-0019）；標記由 [clear] 一併刪除。讀它不會跳出驗證。
   Future<bool> hasLegacyKeptMarker();
+
+  /// 開啟生物辨識登入者主動登出、保留憑證的「登出後密封」標記（ADR-0020）。冷啟動看到
+  /// 就停在歡迎頁、不讀受保護憑證（不跳驗證），等使用者按「登入」才解鎖。
+  /// 與舊版保留標記用不同的鍵，啟動遷移不會誤刪；讀它不會跳出驗證。由 [clear] 一併刪除。
+  Future<bool> hasSealedAfterLogout();
+  Future<void> setSealedAfterLogout(bool kept);
+
+  /// 已存的憑證身分資訊（id_token 等，不含 refresh token）；沒有憑證回 null。
+  /// 只讀不受保護的部分，不會跳出驗證（ADR-0020：web 登入完成時據此判斷是不是同一帳號）。
+  Future<OAuthTokens?> peek();
 }
 
 /// Keychain／Keystore 的最小介面(測試以假的替換)。
@@ -203,7 +213,10 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   };
 
   /// 舊版「登出後保留」的帳號標記；新版只讀不寫，[clear] 會刪掉。
-  static const _keptKey = 'tripline_oauth_kept_account';
+  static const _legacyKeptKey = 'tripline_oauth_kept_account';
+
+  /// 新版「登出後密封」標記（ADR-0020）；刻意與 [_legacyKeptKey] 不同鍵，啟動遷移才分得開。
+  static const _sealedAfterLogoutKey = 'tripline_oauth_sealed_after_logout';
 
   final SecretVault _vault;
   TokenProtection _protection = TokenProtection.passcode;
@@ -331,8 +344,31 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<void> write(OAuthTokens tokens) async {
+    // 這次程式生命週期還沒讀過憑證（例如生物辨識取消後改用 web 登入，ADR-0020）：
+    // 先從 meta 取得保護等級與槽位，舊的 refresh token 才會被刪到、保護等級不會被改掉。
+    if (_cache == null) await _loadMeta();
     _cache = tokens.withoutAccessToken();
     await _persist(_cache!);
+  }
+
+  /// 只讀 meta（裝置密碼等級，不跳驗證）同步保護等級與目前槽位；沒有或壞掉就不動。
+  Future<void> _loadMeta() async {
+    final Map<String, dynamic> meta;
+    try {
+      final raw = await _vault.read(
+        _metaKey,
+        protection: TokenProtection.passcode,
+      );
+      if (raw == null || raw.isEmpty) return;
+      meta = jsonDecode(raw) as Map<String, dynamic>;
+    } on Exception {
+      return;
+    }
+    _protection = meta['protection'] == 'biometric'
+        ? TokenProtection.biometric
+        : TokenProtection.passcode;
+    _storedProtection = _protection;
+    _slot = meta['refresh_slot'] == 'b' ? _Slot.b : _Slot.a;
   }
 
   /// 落地；存不進去回 false（記憶體仍留著，下次開 app 重新登入）。
@@ -432,7 +468,11 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
     for (final key in _slotKeys.values) {
       await _vault.delete(key, protection: TokenProtection.passcode);
     }
-    await _vault.delete(_keptKey, protection: TokenProtection.passcode);
+    await _vault.delete(_legacyKeptKey, protection: TokenProtection.passcode);
+    await _vault.delete(
+      _sealedAfterLogoutKey,
+      protection: TokenProtection.passcode,
+    );
     if (!touchBiometric) return;
     for (final key in _slotKeys.values) {
       try {
@@ -465,9 +505,47 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<bool> hasLegacyKeptMarker() async {
-    final v = await _vault.read(_keptKey, protection: TokenProtection.passcode);
+    final v = await _vault.read(
+      _legacyKeptKey,
+      protection: TokenProtection.passcode,
+    );
     return v != null && v.isNotEmpty;
   }
+
+  @override
+  Future<OAuthTokens?> peek() async {
+    final raw = await _vault.read(
+      _metaKey,
+      protection: TokenProtection.passcode,
+    );
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final meta = jsonDecode(raw) as Map<String, dynamic>;
+      return OAuthTokens.fromJson({...meta}..remove('refresh_token'));
+    } on Exception {
+      return null; // 壞掉的資料視為沒有憑證
+    }
+  }
+
+  @override
+  Future<bool> hasSealedAfterLogout() async =>
+      await _vault.read(
+        _sealedAfterLogoutKey,
+        protection: TokenProtection.passcode,
+      ) ==
+      '1';
+
+  @override
+  Future<void> setSealedAfterLogout(bool kept) => kept
+      ? _vault.write(
+          _sealedAfterLogoutKey,
+          '1',
+          protection: TokenProtection.passcode,
+        )
+      : _vault.delete(
+          _sealedAfterLogoutKey,
+          protection: TokenProtection.passcode,
+        );
 
   /// iOS errSecItemNotFound／Android KeyPermanentlyInvalidated 這類「項目已不可用」。
   static bool _isInvalidated(Object e) {
@@ -485,6 +563,8 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
 
   /// 模擬舊版留下的「登出後保留」標記（[clear] 會清掉）。
   bool legacyKeptMarker = false;
+
+  bool _sealedAfterLogout = false;
 
   @override
   TokenProtection get protection => _protection;
@@ -506,9 +586,20 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   @override
   Future<void> lock() async => _locked = true;
 
+  /// 與正式版一樣：剛寫入的憑證留在記憶體，之後讀取不必再驗證。
   @override
-  Future<void> write(OAuthTokens tokens) async =>
-      _tokens = tokens.withoutAccessToken();
+  Future<void> write(OAuthTokens tokens) async {
+    _tokens = tokens.withoutAccessToken();
+    _locked = false;
+  }
+
+  @override
+  Future<OAuthTokens?> peek() async {
+    final tokens = _tokens;
+    return tokens == null
+        ? null
+        : OAuthTokens.fromJson({...tokens.toJson()}..remove('refresh_token'));
+  }
 
   @override
   Future<bool> setProtection(TokenProtection protection) async {
@@ -520,6 +611,7 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   Future<void> clear() async {
     _tokens = null;
     legacyKeptMarker = false;
+    _sealedAfterLogout = false;
     _locked = false;
     _protection = TokenProtection.passcode;
   }
@@ -529,4 +621,11 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<bool> hasLegacyKeptMarker() async => legacyKeptMarker;
+
+  @override
+  Future<bool> hasSealedAfterLogout() async => _sealedAfterLogout;
+
+  @override
+  Future<void> setSealedAfterLogout(bool kept) async =>
+      _sealedAfterLogout = kept;
 }

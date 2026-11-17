@@ -103,7 +103,7 @@ void main() {
     });
     tearDown(() => debugDefaultTargetPlatformOverride = null);
 
-    test('開啟後登出保留再解鎖：把關被呼叫一次（且只接受生物特徵）', () async {
+    test('開啟後登出（保留憑證）再解鎖：把關被呼叫一次（且只接受生物特徵）', () async {
       final bio = FakeBiometricAuthenticator();
       final store = createProductionTokenStore(bio);
       await store.write(_tok('R1'));

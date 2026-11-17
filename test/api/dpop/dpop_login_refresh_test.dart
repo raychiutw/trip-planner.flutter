@@ -40,6 +40,10 @@ class _Hardware implements ProofKeyStore {
   }
 
   @override
+  Future<void> install(SoftwareProofKey key) =>
+      throw const ProofKeyUnsupportedException();
+
+  @override
   Future<void> delete() async {
     deletes++;
     key = null;
@@ -52,6 +56,9 @@ class _LockedKeys implements ProofKeyStore {
   Future<ProofKey?> load() async => throw const ProofKeyLockedException();
   @override
   Future<ProofKey> create() async => throw const ProofKeyLockedException();
+  @override
+  Future<void> install(SoftwareProofKey key) async =>
+      throw const ProofKeyLockedException();
   @override
   Future<void> delete() async {}
 }
@@ -163,6 +170,50 @@ void main() {
       await expectLater(loginService(keys).login(), throwsA(anything));
 
       expect(await keys.load(), isNull);
+    });
+
+    test('手機上留著憑證時換 code 失敗：保留的憑證與金鑰照舊可用（ADR-0020）', () async {
+      await loginService(keys).login();
+      final kept = (await keys.load())!.publicJwk;
+      statusCode = 500;
+      reply = (_) => {'error': 'server_error'};
+
+      await expectLater(loginService(keys).login(), throwsA(anything));
+
+      expect((await keys.load())!.publicJwk, kept);
+      expect((await store.read())!.refreshToken, 'RT');
+      // 之後 refresh 仍用原本那把金鑰簽 proof。
+      statusCode = 200;
+      reply = (_) => tokenBody('DPoP');
+      sent.clear();
+      await store.write(
+        OAuthTokens(
+          accessToken: '',
+          refreshToken: 'RT',
+          tokenType: 'DPoP',
+          expiresAt: DateTime.fromMillisecondsSinceEpoch(0),
+        ),
+      );
+      final fresh = StoredBearerTokenSource(
+        store: store,
+        repository: repo,
+        clientId: 'cid',
+        proofKeys: keys,
+      );
+      expect(await fresh.accessToken(), 'AT');
+      expect(_header(sent.single.headers['DPoP'] as String)['jwk'], kept);
+    });
+
+    test('手機上留著憑證時換 code 成功：改用這次兌換用的金鑰', () async {
+      await loginService(keys).login();
+      final kept = (await keys.load())!.publicJwk;
+      sent.clear();
+
+      await loginService(keys).login();
+
+      final used = _header(sent.single.headers['DPoP'] as String)['jwk'];
+      expect(used, isNot(kept));
+      expect((await keys.load())!.publicJwk, used);
     });
 
     test('回 Bearer：金鑰用不到，立刻刪掉，不留孤兒', () async {
@@ -386,6 +437,21 @@ void main() {
       expect((await fb.load())!.kind, 'software');
     });
 
+    test('install：刪掉硬體金鑰，改用裝進來的軟體金鑰', () async {
+      final hw = _Hardware();
+      final fb = FallbackProofKeyStore(
+        hardware: hw,
+        software: InMemoryProofKeyStore(),
+      );
+      await fb.create();
+      final key = SoftwareProofKey.generate();
+
+      await fb.install(key);
+
+      expect(await hw.load(), isNull);
+      expect((await fb.load())!.publicJwk, key.publicJwk);
+    });
+
     test('delete 兩邊都刪', () async {
       final hw = _Hardware();
       final sw = InMemoryProofKeyStore();
@@ -423,6 +489,18 @@ void main() {
 
       await b.delete();
       expect(await SoftwareProofKeyStore(vault: vault).load(), isNull);
+    });
+
+    test('install 的金鑰也落地：重建 store 讀得回同一把', () async {
+      final vault = MemoryVault();
+      final key = SoftwareProofKey.generate();
+
+      await SoftwareProofKeyStore(vault: vault).install(key);
+
+      expect(
+        (await SoftwareProofKeyStore(vault: vault).load())!.publicJwk,
+        key.publicJwk,
+      );
     });
   });
 

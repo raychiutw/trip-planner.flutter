@@ -43,6 +43,11 @@ class HardwareProofKeyStore implements ProofKeyStore {
     }
   }
 
+  /// 私鑰只能在硬體內產生，不能匯入。
+  @override
+  Future<void> install(SoftwareProofKey key) =>
+      throw const ProofKeyUnsupportedException();
+
   @override
   Future<void> delete() async {
     try {

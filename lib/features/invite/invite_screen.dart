@@ -115,7 +115,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       message: '切換帳號會先登出並清除這支手機上目前帳號的登入（含 Face ID 登入），再前往登入。',
     );
     if (!ok || !mounted) return;
-    await ref.read(authStateProvider.notifier).logout();
+    await ref.read(authStateProvider.notifier).logoutAndRevoke();
     if (!mounted) return;
     context.go(_loginLocation);
   }

@@ -12,6 +12,7 @@ import '../api_client.dart' show BearerTokenSource, DpopKeyProvider;
 import '../api_error.dart';
 import '../dpop/proof_key.dart';
 import '../dpop/proof_key_store.dart';
+import 'id_token.dart';
 import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 
@@ -39,6 +40,9 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   /// access token 只活在記憶體;store 只留 refresh token(ADR-0014)。
   OAuthTokens? _memory;
 
+  /// 登出後密封期間（ADR-0020）：不碰 store，免得登出狀態下的 API 呼叫跳出生物辨識。
+  bool _sealed = false;
+
   final _signedOut = StreamController<void>.broadcast();
 
   /// refresh token 被後端拒絕(撤銷、過期、重放)而清掉憑證時通知,
@@ -46,10 +50,47 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   Stream<void> get signedOut => _signedOut.stream;
 
   /// 登入完成後交給來源:access token 進記憶體,其餘落地。
+  ///
+  /// 手機上還留著憑證（開啟者登出後保留、或生物辨識取消後改用 web 登入，ADR-0020）：
+  /// 同一帳號直接換成新的；不同帳號先清掉前一個人的憑證（DPoP 金鑰已由這次登入換新），
+  /// 新帳號不沿用前一個人的生物辨識登入。
   Future<void> adopt(OAuthTokens tokens) async {
+    _sealed = false;
     _memory = tokens;
+    if (!await _holdsSameAccount(tokens)) await _store.clearWithoutPrompt();
     await _store.write(tokens);
   }
+
+  /// 手機上沒有憑證、或是同一帳號（id_token 的 sub 相同）。認不出來一律當成不同帳號。
+  Future<bool> _holdsSameAccount(OAuthTokens tokens) async {
+    final OAuthTokens? previous;
+    try {
+      previous = await _store.peek();
+    } catch (_) {
+      return false;
+    }
+    if (previous == null) return true;
+    final before = _subject(previous);
+    return before != null && before == _subject(tokens);
+  }
+
+  static String? _subject(OAuthTokens tokens) {
+    final idToken = tokens.idToken;
+    if (idToken == null) return null;
+    final sub = decodeIdTokenClaims(idToken)['sub'];
+    return sub is String && sub.isNotEmpty ? sub : null;
+  }
+
+  /// 登出但保留憑證與 DPoP 金鑰（兩者一起留）：丟掉記憶體中的 access token 並密封，
+  /// 直到 [unseal]（生物辨識解鎖成功）或重新登入（[adopt]）。
+  Future<void> seal() async {
+    _sealed = true;
+    _memory = null;
+    await _store.lock();
+  }
+
+  /// 受保護的憑證已讀出來：恢復正常取用。
+  void unseal() => _sealed = false;
 
   Future<bool> _stillHolds(String refreshToken) async {
     try {
@@ -75,6 +116,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
 
   /// 清掉本機登入憑證、記憶體中的 access token 與 DPoP 金鑰（登出、帳號刪除）。
   Future<void> clear() async {
+    _sealed = false;
     _memory = null;
     try {
       await _store.clear();
@@ -85,6 +127,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
 
   /// 同 [clear]，但保證不跳出驗證（見 [OAuthTokenStore.clearWithoutPrompt]）。
   Future<void> clearWithoutPrompt() async {
+    _sealed = false;
     _memory = null;
     try {
       await _store.clearWithoutPrompt();
@@ -112,6 +155,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
 
   @override
   Future<String?> accessToken() async {
+    if (_sealed) return null;
     final OAuthTokens? stored;
     try {
       stored = await _store.read();
@@ -137,6 +181,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       _inFlight ??= _doRefresh().whenComplete(() => _inFlight = null);
 
   Future<OAuthTokens?> _doRefresh() async {
+    if (_sealed) return null;
     final OAuthTokens? old;
     try {
       old = await _store.read();
@@ -180,7 +225,8 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       return null;
     }
 
-    // 登出（憑證已被清掉）發生在 refresh 進行中：不能把憑證寫回去讓它復活。
+    // 登出（憑證已被清掉或密封）發生在 refresh 進行中：不能把憑證寫回去讓它復活。
+    if (_sealed) return null;
     try {
       if (await _store.read() == null) return null;
     } on TokenStoreLockedException {

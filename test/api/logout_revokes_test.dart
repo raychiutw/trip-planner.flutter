@@ -122,45 +122,38 @@ void main() {
     ),
   ).called(1);
 
-  group('登出一律撤銷並清除', () {
-    for (final biometric in [true, false]) {
-      final label = biometric ? '開啟' : '未開啟';
-      test('$label生物辨識登入：撤銷伺服器端憑證，清掉憑證與 DPoP 金鑰', () async {
-        if (biometric) await store.setProtection(TokenProtection.biometric);
-        final c = container();
-        expect(await c.read(authStateProvider.future), isNotNull);
+  // 開啟者登出改為保留（ADR-0020），見 logout_keeps_biometric_test.dart。
+  group('未開啟生物辨識登入者登出撤銷並清除', () {
+    test('撤銷伺服器端憑證，清掉憑證與 DPoP 金鑰', () async {
+      final c = container();
+      expect(await c.read(authStateProvider.future), isNotNull);
 
-        await c.read(authStateProvider.notifier).logout();
+      await c.read(authStateProvider.notifier).logout();
 
-        expect(c.read(authStateProvider).value, isNull);
-        verifyRevokedOnce();
-        expect(await store.read(), isNull, reason: '憑證要清掉');
-        expect(await keys.load(), isNull, reason: '金鑰要跟憑證一起清掉');
-      });
-    }
+      expect(c.read(authStateProvider).value, isNull);
+      verifyRevokedOnce();
+      expect(await store.read(), isNull, reason: '憑證要清掉');
+      expect(await keys.load(), isNull, reason: '金鑰要跟憑證一起清掉');
+    });
 
-    for (final biometric in [true, false]) {
-      final label = biometric ? '開啟' : '未開啟';
-      test('$label生物辨識登入且撤銷失敗（離線）：本機仍清除，回到未登入', () async {
-        if (biometric) await store.setProtection(TokenProtection.biometric);
-        when(
-          () => oauthRepo.revokeToken(
-            token: any(named: 'token'),
-            clientId: any(named: 'clientId'),
-            tokenTypeHint: any(named: 'tokenTypeHint'),
-          ),
-        ).thenThrow(Exception('offline'));
-        final c = container();
-        expect(await c.read(authStateProvider.future), isNotNull);
+    test('撤銷失敗（離線）：本機仍清除，回到未登入', () async {
+      when(
+        () => oauthRepo.revokeToken(
+          token: any(named: 'token'),
+          clientId: any(named: 'clientId'),
+          tokenTypeHint: any(named: 'tokenTypeHint'),
+        ),
+      ).thenThrow(Exception('offline'));
+      final c = container();
+      expect(await c.read(authStateProvider.future), isNotNull);
 
-        await c.read(authStateProvider.notifier).logout();
+      await c.read(authStateProvider.notifier).logout();
 
-        expect(c.read(authStateProvider).value, isNull);
-        expect(c.read(authStateProvider).hasError, isFalse);
-        expect(await store.read(), isNull);
-        expect(await keys.load(), isNull);
-      });
-    }
+      expect(c.read(authStateProvider).value, isNull);
+      expect(c.read(authStateProvider).hasError, isFalse);
+      expect(await store.read(), isNull);
+      expect(await keys.load(), isNull);
+    });
   });
 
   group('啟動遷移：舊版登出後保留的憑證', () {
