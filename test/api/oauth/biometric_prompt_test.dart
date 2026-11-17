@@ -221,10 +221,12 @@ void main() {
       expect(vault.refreshKeys, hasLength(1));
     });
 
-    // (d3) 冷啟動遇保留標記、沒先 read 就 adopt：_protection／_slot 都是預設值。
+    // (d3) 冷啟動沒先 read 就 adopt（生物辨識取消後同一帳號改用 web 登入，ADR-0020）：
+    // 從 meta 取得保護等級與槽位，沿用生物辨識保護，舊項目不殘留。
+    // 不同帳號由 StoredBearerTokenSource 先清除，不會走到這裡。
     for (final seeded in ['a', 'b', null]) {
       test('未 read 就 adopt（既有 biometric 憑證在槽位 ${seeded ?? '無'}）：只剩一個槽位、'
-          '與 meta 等級一致、無 biometric 殘留', () async {
+          '與 meta 等級一致、沿用原保護等級', () async {
         if (seeded != null) {
           final key = seeded == 'a'
               ? 'tripline_oauth_refresh'
@@ -243,9 +245,11 @@ void main() {
         expect(vault.refreshKeys, hasLength(1));
         final key = vault.refreshKeys.single;
         expect(vault.data[key], 'NEW');
-        expect(meta()['protection'], 'passcode');
-        expect(vault.level[key], TokenProtection.passcode);
-        expect(vault.level.values, isNot(contains(TokenProtection.biometric)));
+        final expected = seeded == null
+            ? TokenProtection.passcode
+            : TokenProtection.biometric;
+        expect(meta()['protection'], expected.name);
+        expect(vault.level[key], expected);
         final r = SecureOAuthTokenStore(vault: vault);
         expect((await r.read())!.refreshToken, 'NEW');
       });

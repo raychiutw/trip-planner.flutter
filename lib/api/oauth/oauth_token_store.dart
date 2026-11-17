@@ -344,8 +344,31 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
 
   @override
   Future<void> write(OAuthTokens tokens) async {
+    // 這次程式生命週期還沒讀過憑證（例如生物辨識取消後改用 web 登入，ADR-0020）：
+    // 先從 meta 取得保護等級與槽位，舊的 refresh token 才會被刪到、保護等級不會被改掉。
+    if (_cache == null) await _loadMeta();
     _cache = tokens.withoutAccessToken();
     await _persist(_cache!);
+  }
+
+  /// 只讀 meta（裝置密碼等級，不跳驗證）同步保護等級與目前槽位；沒有或壞掉就不動。
+  Future<void> _loadMeta() async {
+    final Map<String, dynamic> meta;
+    try {
+      final raw = await _vault.read(
+        _metaKey,
+        protection: TokenProtection.passcode,
+      );
+      if (raw == null || raw.isEmpty) return;
+      meta = jsonDecode(raw) as Map<String, dynamic>;
+    } on Exception {
+      return;
+    }
+    _protection = meta['protection'] == 'biometric'
+        ? TokenProtection.biometric
+        : TokenProtection.passcode;
+    _storedProtection = _protection;
+    _slot = meta['refresh_slot'] == 'b' ? _Slot.b : _Slot.a;
   }
 
   /// 落地；存不進去回 false（記憶體仍留著，下次開 app 重新登入）。

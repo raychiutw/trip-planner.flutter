@@ -306,6 +306,20 @@ void main() {
       return c;
     }
 
+    test('同一帳號登入：保留的憑證換成新的，生物辨識登入維持開啟、保留標記清掉', () async {
+      final c = await keptThenCancelled();
+      final previousKey = await keys.load();
+      webReturns(_tokens(refresh: 'RT-new'));
+
+      await c.read(authStateProvider.notifier).signInWithBrowser();
+
+      expect(c.read(authStateProvider).value?.id, 'u1');
+      expect((await store.read())?.refreshToken, 'RT-new', reason: '舊的不殘留');
+      expect(store.protection, TokenProtection.biometric);
+      expect(await store.hasLogoutKeep(), isFalse);
+      expect(await keys.load(), isNot(same(previousKey)), reason: '金鑰隨新憑證換新');
+    });
+
     test('不同帳號登入：前一個人的憑證、金鑰與保留標記清掉，新帳號不沿用生物辨識保護', () async {
       final c = await keptThenCancelled();
       final previousKey = await keys.load();

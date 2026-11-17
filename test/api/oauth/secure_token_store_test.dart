@@ -326,6 +326,52 @@ void main() {
     });
   });
 
+  group('保留的憑證被同一帳號的 web 登入換新（冷啟動沒讀過受保護憑證，#651）', () {
+    late SecureOAuthTokenStore cold;
+
+    setUp(() async {
+      await store.write(_tok(refresh: 'OLD'));
+      await store.setProtection(TokenProtection.biometric);
+      await store.setLogoutKeep(true);
+      // 重開 App：新的 store 實例，生物辨識取消所以從沒讀過受保護的憑證。
+      cold = SecureOAuthTokenStore(vault: vault);
+      vault.reads.clear();
+    });
+
+    test('舊的 refresh token 不殘留，只剩新的', () async {
+      await cold.write(_tok(refresh: 'NEW'));
+
+      expect(_refreshOnDisk(vault), 'NEW');
+    });
+
+    test('沿用生物辨識保護（同一人的生物辨識登入維持開啟），且寫入不讀受保護的項目', () async {
+      await cold.write(_tok(refresh: 'NEW'));
+
+      expect(cold.protection, TokenProtection.biometric);
+      final meta =
+          jsonDecode(vault.data['tripline_oauth_tokens']!)
+              as Map<String, dynamic>;
+      expect(meta['protection'], 'biometric');
+      expect(
+        vault.writes.where((w) => _isRefreshKey(w.$1)).last.$2,
+        TokenProtection.biometric,
+      );
+      expect(
+        vault.reads.where((r) => r.$2 == TokenProtection.biometric),
+        isEmpty,
+        reason: '不得跳出生物辨識',
+      );
+    });
+
+    test('peek 只讀不受保護的身分資訊：不含 refresh token、不跳驗證', () async {
+      final peeked = await cold.peek();
+
+      expect(peeked?.idToken, 'ID');
+      expect(peeked?.refreshToken, isNull);
+      expect(vault.reads.map((r) => r.$2).toSet(), {TokenProtection.passcode});
+    });
+  });
+
   group('寫入期間登出（clear）不得把憑證寫回', () {
     test('改保護等級寫到一半時 clear：結束後磁碟上沒有任何憑證', () async {
       await store.write(_tok());
