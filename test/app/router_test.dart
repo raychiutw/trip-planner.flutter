@@ -1524,7 +1524,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(r.browserLogins(), 1, reason: '憑證失效：同一次按下開 web 登入頁');
-      expect(await r.store.hasLogoutKeep(), isFalse);
+      expect(await r.store.hasSealedAfterLogout(), isFalse);
       expect(await r.store.read(), isNull, reason: '保留的憑證已清除');
       expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
     });
@@ -1549,7 +1549,7 @@ void main() {
       expect(r.browserLogins(), 1, reason: '取消就開 web 登入頁');
       expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
-      expect(await r.store.hasLogoutKeep(), isTrue, reason: '保留的憑證先不刪');
+      expect(await r.store.hasSealedAfterLogout(), isTrue, reason: '保留的憑證先不刪');
       expect((await r.store.read())?.refreshToken, isNotNull);
     });
 

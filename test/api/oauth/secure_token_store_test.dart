@@ -284,46 +284,49 @@ void main() {
     });
   });
 
-  group('登出保留標記（ADR-0020）與舊版保留標記分開', () {
+  group('登出後密封標記（ADR-0020）與舊版保留標記分開', () {
     const keptKey = 'tripline_oauth_kept_account';
 
-    test('寫入登出保留：讀得到，但不是舊版標記（啟動遷移不會誤刪）', () async {
-      await store.setLogoutKeep(true);
+    test('寫入登出後密封標記：讀得到，但不是舊版標記（啟動遷移不會誤刪）', () async {
+      await store.setSealedAfterLogout(true);
 
-      expect(await store.hasLogoutKeep(), isTrue);
+      expect(await store.hasSealedAfterLogout(), isTrue);
       expect(await store.hasLegacyKeptMarker(), isFalse);
       expect(vault.data.containsKey(keptKey), isFalse);
     });
 
-    test('舊版標記不算登出保留', () async {
+    test('舊版標記不算登出後密封', () async {
       vault.data[keptKey] = 'ray@example.com';
 
-      expect(await store.hasLogoutKeep(), isFalse);
+      expect(await store.hasSealedAfterLogout(), isFalse);
     });
 
     test('只用裝置密碼等級讀寫（不觸發生物辨識）', () async {
-      await store.setLogoutKeep(true);
+      await store.setSealedAfterLogout(true);
       vault.reads.clear();
 
-      await store.hasLogoutKeep();
+      await store.hasSealedAfterLogout();
 
       expect(vault.reads.map((r) => r.$2).toSet(), {TokenProtection.passcode});
     });
 
-    test('setLogoutKeep(false)、clear()、clearWithoutPrompt() 都會刪掉', () async {
-      await store.setLogoutKeep(true);
-      await store.setLogoutKeep(false);
-      expect(await store.hasLogoutKeep(), isFalse);
+    test(
+      'setSealedAfterLogout(false)、clear()、clearWithoutPrompt() 都會刪掉',
+      () async {
+        await store.setSealedAfterLogout(true);
+        await store.setSealedAfterLogout(false);
+        expect(await store.hasSealedAfterLogout(), isFalse);
 
-      await store.write(_tok());
-      await store.setLogoutKeep(true);
-      await store.clear();
-      expect(await store.hasLogoutKeep(), isFalse);
+        await store.write(_tok());
+        await store.setSealedAfterLogout(true);
+        await store.clear();
+        expect(await store.hasSealedAfterLogout(), isFalse);
 
-      await store.setLogoutKeep(true);
-      await store.clearWithoutPrompt();
-      expect(await store.hasLogoutKeep(), isFalse);
-    });
+        await store.setSealedAfterLogout(true);
+        await store.clearWithoutPrompt();
+        expect(await store.hasSealedAfterLogout(), isFalse);
+      },
+    );
   });
 
   group('保留的憑證被同一帳號的 web 登入換新（冷啟動沒讀過受保護憑證，#651）', () {
@@ -332,7 +335,7 @@ void main() {
     setUp(() async {
       await store.write(_tok(refresh: 'OLD'));
       await store.setProtection(TokenProtection.biometric);
-      await store.setLogoutKeep(true);
+      await store.setSealedAfterLogout(true);
       // 重開 App：新的 store 實例，生物辨識取消所以從沒讀過受保護的憑證。
       cold = SecureOAuthTokenStore(vault: vault);
       vault.reads.clear();

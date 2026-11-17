@@ -88,10 +88,10 @@ Future<bool> _hasLegacyKeptMarker(Ref ref) async {
   }
 }
 
-/// 開啟生物辨識登入者登出時留下的「登出保留」標記（ADR-0020）；讀不到視為沒有。
-Future<bool> _hasLogoutKeep(Ref ref) async {
+/// 開啟生物辨識登入者登出時留下的「登出後密封」標記（ADR-0020）；讀不到視為沒有。
+Future<bool> _hasSealedAfterLogout(Ref ref) async {
   try {
-    return await ref.read(oauthTokenStoreProvider).hasLogoutKeep();
+    return await ref.read(oauthTokenStoreProvider).hasSealedAfterLogout();
   } catch (_) {
     return false;
   }
@@ -177,7 +177,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     }
     // 主動登出但保留憑證（ADR-0020）：冷啟動不讀（會跳生物辨識），停在歡迎頁等使用者
     // 按「登入」。標成「還沒解開」，登入鈕據此走解鎖。
-    if (!explicit && await _hasLogoutKeep(ref)) {
+    if (!explicit && await _hasSealedAfterLogout(ref)) {
       await ref.read(bearerTokenSourceProvider).seal();
       ref.read(authLockedProvider.notifier).set(true);
       return null;
@@ -192,8 +192,8 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       return null;
     }
     ref.read(authLockedProvider.notifier).set(false);
-    // 使用者主動登入或解鎖成功：不再是「登出保留」，下次冷啟動照常還原。
-    if (explicit) await _endLogoutKeep();
+    // 使用者主動登入或解鎖成功：不再是「登出後密封」，下次冷啟動照常還原。
+    if (explicit) await _endSealedAfterLogout();
     if (tokens == null) {
       // 剛才還鎖著（憑證在）卻讀出空的：受保護讀取時系統回報項目失效（生物特徵變更），
       // 儲存層已自行清掉。
@@ -316,11 +316,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     await _clearLocalAuth();
   }
 
-  /// 登出保留：先留標記（冷啟動據此不讀受保護憑證），再封存憑證、清離線快取。
+  /// 登出後密封：先留標記（冷啟動據此不讀受保護憑證），再密封憑證、清離線快取。
   /// 標記寫不進去就回 false，改走撤銷並清除，不留下冷啟動會自動解鎖的憑證。
   Future<bool> _keepForBiometricLogin() async {
     try {
-      await ref.read(oauthTokenStoreProvider).setLogoutKeep(true);
+      await ref.read(oauthTokenStoreProvider).setSealedAfterLogout(true);
     } catch (_) {
       return false;
     }
@@ -335,10 +335,10 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return true;
   }
 
-  Future<void> _endLogoutKeep() async {
+  Future<void> _endSealedAfterLogout() async {
     ref.read(bearerTokenSourceProvider).unseal();
     try {
-      await ref.read(oauthTokenStoreProvider).setLogoutKeep(false);
+      await ref.read(oauthTokenStoreProvider).setSealedAfterLogout(false);
     } catch (_) {}
   }
 

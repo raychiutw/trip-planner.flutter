@@ -40,7 +40,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   /// access token 只活在記憶體;store 只留 refresh token(ADR-0014)。
   OAuthTokens? _memory;
 
-  /// 登出保留之後（ADR-0020）：不碰 store，免得登出狀態下的 API 呼叫跳出生物辨識。
+  /// 登出後密封期間（ADR-0020）：不碰 store，免得登出狀態下的 API 呼叫跳出生物辨識。
   bool _sealed = false;
 
   final _signedOut = StreamController<void>.broadcast();
@@ -81,7 +81,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
     return sub is String && sub.isNotEmpty ? sub : null;
   }
 
-  /// 登出但保留憑證與 DPoP 金鑰（兩者一起留）：丟掉記憶體中的 access token 並封存，
+  /// 登出但保留憑證與 DPoP 金鑰（兩者一起留）：丟掉記憶體中的 access token 並密封，
   /// 直到 [unseal]（生物辨識解鎖成功）或重新登入（[adopt]）。
   Future<void> seal() async {
     _sealed = true;
@@ -225,7 +225,7 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
       return null;
     }
 
-    // 登出（憑證已被清掉或封存）發生在 refresh 進行中：不能把憑證寫回去讓它復活。
+    // 登出（憑證已被清掉或密封）發生在 refresh 進行中：不能把憑證寫回去讓它復活。
     if (_sealed) return null;
     try {
       if (await _store.read() == null) return null;

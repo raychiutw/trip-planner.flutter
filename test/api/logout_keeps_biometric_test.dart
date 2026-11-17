@@ -46,13 +46,13 @@ class _CountingStore extends InMemoryOAuthTokenStore {
   /// 生物特徵變更：下一次受保護讀取時系統回報項目失效，儲存層自行清掉並回 null。
   bool invalidateNextRead = false;
 
-  /// 登出保留標記寫不進去（Keychain／Keystore 錯誤）。
-  bool failLogoutKeepWrite = false;
+  /// 登出後密封標記寫不進去（Keychain／Keystore 錯誤）。
+  bool failSealedMarkerWrite = false;
 
   @override
-  Future<void> setLogoutKeep(bool kept) async {
-    if (kept && failLogoutKeepWrite) throw Exception('vault write failed');
-    return super.setLogoutKeep(kept);
+  Future<void> setSealedAfterLogout(bool kept) async {
+    if (kept && failSealedMarkerWrite) throw Exception('vault write failed');
+    return super.setSealedAfterLogout(kept);
   }
 
   @override
@@ -182,7 +182,7 @@ void main() {
     });
 
     test('保留標記寫不進去：改走撤銷並清除，不留下冷啟動會自動解鎖的憑證', () async {
-      store.failLogoutKeepWrite = true;
+      store.failSealedMarkerWrite = true;
       final c = container();
       await c.read(authStateProvider.future);
 
@@ -247,7 +247,7 @@ void main() {
         expect(c.read(authStateProvider).value, isNull);
         expect(await store.read(), isNull, reason: '保留的憑證要清掉');
         expect(await keys.load(), isNull, reason: '金鑰與憑證一起清掉');
-        expect(await store.hasLogoutKeep(), isFalse);
+        expect(await store.hasSealedAfterLogout(), isFalse);
         expect(store.protection, TokenProtection.passcode);
         expect(c.read(authLockedProvider), isFalse, reason: '不再走解鎖');
       }
@@ -297,7 +297,7 @@ void main() {
         expect(c.read(authLockedProvider), isTrue);
       });
 
-      test('0.42.0 的舊版保留遷移不得誤刪登出保留的憑證與金鑰', () async {
+      test('0.42.0 的舊版保留遷移不得誤刪登出後密封的憑證與金鑰', () async {
         await logoutThenRestart();
         final c = container();
 
@@ -384,7 +384,7 @@ void main() {
       store.unlockSucceeds = false;
       await c.read(authStateProvider.notifier).unlock();
       expect(c.read(authStateProvider).value, isNull);
-      expect(await store.hasLogoutKeep(), isTrue, reason: '取消後保留的憑證先不刪');
+      expect(await store.hasSealedAfterLogout(), isTrue, reason: '取消後保留的憑證先不刪');
       return c;
     }
 
@@ -398,7 +398,7 @@ void main() {
       expect(c.read(authStateProvider).value?.id, 'u1');
       expect((await store.read())?.refreshToken, 'RT-new', reason: '舊的不殘留');
       expect(store.protection, TokenProtection.biometric);
-      expect(await store.hasLogoutKeep(), isFalse);
+      expect(await store.hasSealedAfterLogout(), isFalse);
       expect(await keys.load(), isNot(same(previousKey)), reason: '金鑰隨新憑證換新');
     });
 
@@ -417,7 +417,7 @@ void main() {
         TokenProtection.passcode,
         reason: '不得沿用前一個人的生物辨識登入',
       );
-      expect(await store.hasLogoutKeep(), isFalse);
+      expect(await store.hasSealedAfterLogout(), isFalse);
       expect(
         await keys.load(),
         isNot(same(previousKey)),
