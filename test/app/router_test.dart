@@ -1504,6 +1504,31 @@ void main() {
       expect(r.bio.authenticateCalls, 0, reason: '不重複驗證');
     });
 
+    testWidgets('開啟者登出後按登入：解鎖通過但 refresh 被拒 → 清除保留的憑證並直接開 web 登入頁', (
+      tester,
+    ) async {
+      final r = await coldStart(
+        tester,
+        prompts: [true, true],
+        loginError: OAuthLoginException(
+          '使用者取消登入',
+          userMessage: '已取消登入',
+          cancelled: true,
+        ),
+      );
+      await r.container.read(authStateProvider.notifier).logout();
+      await tester.pumpAndSettle();
+      r.oauth.rejectRefresh = true;
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+      await tester.pumpAndSettle();
+
+      expect(r.browserLogins(), 1, reason: '憑證失效：同一次按下開 web 登入頁');
+      expect(await r.store.hasLogoutKeep(), isFalse);
+      expect(await r.store.read(), isNull, reason: '保留的憑證已清除');
+      expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
+    });
+
     testWidgets('開啟者登出後按登入、生物辨識取消：開 web 登入頁，保留的憑證仍在', (tester) async {
       final r = await coldStart(
         tester,

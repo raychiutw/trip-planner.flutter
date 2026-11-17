@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/dpop/proof_key_store.dart';
 import 'package:tripline/api/oauth/oauth_config.dart';
@@ -12,6 +13,7 @@ import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
+import 'package:tripline/api/oauth/stored_bearer_token_source.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/models/oauth_tokens.dart';
 import 'package:tripline/models/user.dart';
@@ -42,9 +44,17 @@ class _WebLogin implements AuthorizationLauncher {
 class _CountingStore extends InMemoryOAuthTokenStore {
   int reads = 0;
 
+  /// 生物特徵變更：下一次受保護讀取時系統回報項目失效，儲存層自行清掉並回 null。
+  bool invalidateNextRead = false;
+
   @override
-  Future<OAuthTokens?> read() {
+  Future<OAuthTokens?> read() async {
     reads++;
+    if (invalidateNextRead) {
+      invalidateNextRead = false;
+      await clear();
+      return null;
+    }
     return super.read();
   }
 }
@@ -195,6 +205,51 @@ void main() {
       expect(store.reads, greaterThan(0), reason: '要經過受保護讀取（生物辨識）');
       expect(refreshes, before + 1, reason: '通過即 refresh');
       expect(c.read(authLockedProvider), isFalse);
+    });
+
+    group('按登入時憑證已失效：清除並回報失效（歡迎頁據此開 web 登入頁）', () {
+      Future<ProviderContainer> loggedOut() async {
+        final c = container();
+        await c.read(authStateProvider.future);
+        await c.read(authStateProvider.notifier).logout();
+        return c;
+      }
+
+      Future<void> expectCleared(ProviderContainer c) async {
+        expect(c.read(authStateProvider).value, isNull);
+        expect(await store.read(), isNull, reason: '保留的憑證要清掉');
+        expect(await keys.load(), isNull, reason: '金鑰與憑證一起清掉');
+        expect(await store.hasLogoutKeep(), isFalse);
+        expect(store.protection, TokenProtection.passcode);
+      }
+
+      test('refresh 被拒（過期、被 web 撤銷）', () async {
+        final c = await loggedOut();
+        when(
+          () => oauthRepo.refresh(
+            refreshToken: any(named: 'refreshToken'),
+            clientId: any(named: 'clientId'),
+            proofKey: any(named: 'proofKey'),
+          ),
+        ).thenThrow(
+          const ApiError(status: 400, code: 'invalid_grant', message: 'x'),
+        );
+
+        final invalid = await c.read(authStateProvider.notifier).unlock();
+
+        expect(invalid, InvalidReason.rejected);
+        await expectCleared(c);
+      });
+
+      test('生物特徵變更使金鑰失效', () async {
+        final c = await loggedOut();
+        store.invalidateNextRead = true;
+
+        final invalid = await c.read(authStateProvider.notifier).unlock();
+
+        expect(invalid, InvalidReason.keyLost);
+        await expectCleared(c);
+      });
     });
 
     group('主動登出後冷啟動', () {
