@@ -4,6 +4,7 @@
 library;
 
 import '../../models/oauth_tokens.dart';
+import '../dpop/proof_key.dart';
 import '../dpop/proof_key_store.dart';
 import 'oauth_config.dart';
 import 'oauth_protocol.dart';
@@ -105,8 +106,14 @@ class OAuthLoginService {
     final code = params['code']!;
 
     // 每次登入一把新金鑰（ADR-0015）；伺服器沒綁定就用不到，立刻刪掉。
+    // 手機上還留著憑證（金鑰與憑證同生同滅）：換 code 成功前不能動它的金鑰
+    //（ADR-0020「保留的憑證不先刪」），先用只在記憶體的軟體金鑰兌換，成功才替換；
+    // 失敗只丟掉這把新的。硬體金鑰無法先產生不落地，這種情況這次登入改用軟體金鑰。
     final keys = _proofKeys;
-    final key = await keys?.create();
+    final keepExisting = keys != null && await _holdsKey(keys);
+    final ProofKey? key = keepExisting
+        ? SoftwareProofKey.generate()
+        : await keys?.create();
     final OAuthTokens tokens;
     try {
       tokens = await _repo.exchangeCode(
@@ -117,10 +124,14 @@ class OAuthLoginService {
         proofKey: key,
       );
     } on Object {
-      await keys?.delete();
+      if (!keepExisting) await keys?.delete();
       rethrow;
     }
-    if (!tokens.isDpop) await keys?.delete();
+    if (!tokens.isDpop) {
+      await keys?.delete();
+    } else if (keepExisting) {
+      await keys.install(key! as SoftwareProofKey);
+    }
     await _source.adopt(tokens);
     // 旗標只是「請在手機上開啟」的請求，不含憑證；只認 enable。
     return OAuthLoginResult(
@@ -129,6 +140,15 @@ class OAuthLoginService {
           params[OAuthProtocol.biometricIntentParam] ==
           OAuthProtocol.intentEnable,
     );
+  }
+
+  /// 已經有金鑰（暫時讀不到也算有）。
+  static Future<bool> _holdsKey(ProofKeyStore keys) async {
+    try {
+      return await keys.load() != null;
+    } on ProofKeyLockedException {
+      return true;
+    }
   }
 
   /// 開系統瀏覽器等 callback；只認 state 相符的（防止別的網頁偽造回跳，CSRF），
