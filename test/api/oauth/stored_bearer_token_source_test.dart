@@ -31,6 +31,9 @@ class _WriteFailStore implements OAuthTokenStore {
 
   @override
   Future<void> setLogoutKeep(bool kept) async {}
+
+  @override
+  Future<OAuthTokens?> peek() async => _tokens;
   @override
   Future<void> clear() async {
     cleared = true;

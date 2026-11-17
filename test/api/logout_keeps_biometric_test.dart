@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/dpop/proof_key_store.dart';
 import 'package:tripline/api/oauth/oauth_config.dart';
+import 'package:tripline/api/oauth/oauth_login_service.dart';
 import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/oauth/oauth_repository.dart';
 import 'package:tripline/api/oauth/oauth_token_store.dart';
@@ -18,6 +19,24 @@ import 'package:tripline/models/user.dart';
 class _MockOAuthRepo extends Mock implements OAuthRepository {}
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
+
+/// web 登入頁：直接回帶授權碼的 callback（使用者在瀏覽器完成登入）。
+class _WebLogin implements AuthorizationLauncher {
+  int calls = 0;
+
+  @override
+  Future<Uri> authorize(
+    Uri authorizeUrl, {
+    required String callbackHost,
+    required String callbackPath,
+  }) async {
+    calls++;
+    return Uri.https(callbackHost, callbackPath, {
+      'code': 'CODE',
+      'state': authorizeUrl.queryParameters['state']!,
+    });
+  }
+}
 
 /// 記錄讀取次數：讀受生物辨識保護的憑證會跳出系統驗證。
 class _CountingStore extends InMemoryOAuthTokenStore {
@@ -30,19 +49,23 @@ class _CountingStore extends InMemoryOAuthTokenStore {
   }
 }
 
-String _idToken() {
+String _idToken({String sub = 'u1', String email = 'ray@example.com'}) {
   String enc(Map<String, Object?> m) =>
       base64Url.encode(utf8.encode(jsonEncode(m))).replaceAll('=', '');
   final exp =
       DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
       1000;
-  return '${enc({'alg': 'none'})}.${enc({'sub': 'u1', 'email': 'ray@example.com', 'aud': OAuthConfig.clientId, 'exp': exp})}.sig';
+  return '${enc({'alg': 'none'})}.${enc({'sub': sub, 'email': email, 'aud': OAuthConfig.clientId, 'exp': exp})}.sig';
 }
 
-OAuthTokens _tokens({String refresh = 'RT'}) => OAuthTokens(
+OAuthTokens _tokens({
+  String refresh = 'RT',
+  String sub = 'u1',
+  String email = 'ray@example.com',
+}) => OAuthTokens(
   accessToken: 'AT',
   refreshToken: refresh,
-  idToken: _idToken(),
+  idToken: _idToken(sub: sub, email: email),
   tokenType: 'DPoP',
   expiresAt: DateTime.now().add(const Duration(minutes: 15)),
 );
@@ -52,10 +75,12 @@ void main() {
   late InMemoryProofKeyStore keys;
   late _MockOAuthRepo oauthRepo;
   late _MockAuthRepo authRepo;
+  late _WebLogin web;
   var refreshes = 0;
 
   setUp(() async {
     refreshes = 0;
+    web = _WebLogin();
     store = _CountingStore();
     await store.write(_tokens());
     keys = InMemoryProofKeyStore();
@@ -78,6 +103,20 @@ void main() {
       refreshes++;
       return _tokens(refresh: 'RT${refreshes + 1}');
     });
+    when(
+      () => oauthRepo.buildAuthorizeUrl(
+        clientId: any(named: 'clientId'),
+        redirectUri: any(named: 'redirectUri'),
+        codeChallenge: any(named: 'codeChallenge'),
+        state: any(named: 'state'),
+        biometricHint: any(named: 'biometricHint'),
+        theme: any(named: 'theme'),
+      ),
+    ).thenAnswer(
+      (i) => Uri.https('api.example', '/api/oauth/authorize', {
+        'state': i.namedArguments[#state] as String,
+      }),
+    );
     authRepo = _MockAuthRepo();
     when(
       () => authRepo.currentUser(),
@@ -91,6 +130,8 @@ void main() {
         proofKeyStoreProvider.overrideWithValue(keys),
         oauthRepositoryProvider.overrideWithValue(oauthRepo),
         authRepositoryProvider.overrideWithValue(authRepo),
+        authorizationLauncherProvider.overrideWithValue(web),
+        webThemeProvider.overrideWithValue(() => 'light'),
       ],
     );
     addTearDown(c.dispose);
@@ -238,5 +279,54 @@ void main() {
     ).called(1);
     expect(await store.read(), isNull);
     expect(await keys.load(), isNull);
+  });
+
+  group('保留憑證後改用 web 登入（生物辨識取消或失敗，#651）', () {
+    /// web 登入頁換發的新憑證（授權碼交換的結果）。
+    void webReturns(OAuthTokens tokens) => when(
+      () => oauthRepo.exchangeCode(
+        code: any(named: 'code'),
+        codeVerifier: any(named: 'codeVerifier'),
+        clientId: any(named: 'clientId'),
+        redirectUri: any(named: 'redirectUri'),
+        proofKey: any(named: 'proofKey'),
+      ),
+    ).thenAnswer((_) async => tokens);
+
+    /// u1 開啟生物辨識登入後登出（保留），按登入時生物辨識取消。
+    Future<ProviderContainer> keptThenCancelled() async {
+      await store.setProtection(TokenProtection.biometric);
+      final c = container();
+      await c.read(authStateProvider.future);
+      await c.read(authStateProvider.notifier).logout();
+      store.unlockSucceeds = false;
+      await c.read(authStateProvider.notifier).unlock();
+      expect(c.read(authStateProvider).value, isNull);
+      expect(await store.hasLogoutKeep(), isTrue, reason: '取消後保留的憑證先不刪');
+      return c;
+    }
+
+    test('不同帳號登入：前一個人的憑證、金鑰與保留標記清掉，新帳號不沿用生物辨識保護', () async {
+      final c = await keptThenCancelled();
+      final previousKey = await keys.load();
+      webReturns(_tokens(refresh: 'RT-u2', sub: 'u2', email: 'b@example.com'));
+
+      await c.read(authStateProvider.notifier).signInWithBrowser();
+
+      expect(web.calls, 1);
+      expect(c.read(authStateProvider).value?.id, 'u2');
+      expect((await store.read())?.refreshToken, 'RT-u2');
+      expect(
+        store.protection,
+        TokenProtection.passcode,
+        reason: '不得沿用前一個人的生物辨識登入',
+      );
+      expect(await store.hasLogoutKeep(), isFalse);
+      expect(
+        await keys.load(),
+        isNot(same(previousKey)),
+        reason: '前一個人的金鑰不得留下',
+      );
+    });
   });
 }

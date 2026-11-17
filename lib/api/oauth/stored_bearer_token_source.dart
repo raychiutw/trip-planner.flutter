@@ -12,6 +12,7 @@ import '../api_client.dart' show BearerTokenSource, DpopKeyProvider;
 import '../api_error.dart';
 import '../dpop/proof_key.dart';
 import '../dpop/proof_key_store.dart';
+import 'id_token.dart';
 import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 
@@ -49,10 +50,35 @@ class StoredBearerTokenSource implements BearerTokenSource, DpopKeyProvider {
   Stream<void> get signedOut => _signedOut.stream;
 
   /// 登入完成後交給來源:access token 進記憶體,其餘落地。
+  ///
+  /// 手機上還留著憑證（開啟者登出後保留、或生物辨識取消後改用 web 登入，ADR-0020）：
+  /// 同一帳號直接換成新的；不同帳號先清掉前一個人的憑證（DPoP 金鑰已由這次登入換新），
+  /// 新帳號不沿用前一個人的生物辨識登入。
   Future<void> adopt(OAuthTokens tokens) async {
     _sealed = false;
     _memory = tokens;
+    if (!await _holdsSameAccount(tokens)) await _store.clearWithoutPrompt();
     await _store.write(tokens);
+  }
+
+  /// 手機上沒有憑證、或是同一帳號（id_token 的 sub 相同）。認不出來一律當成不同帳號。
+  Future<bool> _holdsSameAccount(OAuthTokens tokens) async {
+    final OAuthTokens? previous;
+    try {
+      previous = await _store.peek();
+    } catch (_) {
+      return false;
+    }
+    if (previous == null) return true;
+    final before = _subject(previous);
+    return before != null && before == _subject(tokens);
+  }
+
+  static String? _subject(OAuthTokens tokens) {
+    final idToken = tokens.idToken;
+    if (idToken == null) return null;
+    final sub = decodeIdTokenClaims(idToken)['sub'];
+    return sub is String && sub.isNotEmpty ? sub : null;
   }
 
   /// 登出但保留憑證與 DPoP 金鑰（兩者一起留）：丟掉記憶體中的 access token 並封存，

@@ -68,6 +68,10 @@ abstract class OAuthTokenStore {
   /// 與舊版保留標記用不同的鍵，啟動遷移不會誤刪；讀它不會跳出驗證。由 [clear] 一併刪除。
   Future<bool> hasLogoutKeep();
   Future<void> setLogoutKeep(bool kept);
+
+  /// 已存的憑證身分資訊（id_token 等，不含 refresh token）；沒有憑證回 null。
+  /// 只讀不受保護的部分，不會跳出驗證（ADR-0020：web 登入完成時據此判斷是不是同一帳號）。
+  Future<OAuthTokens?> peek();
 }
 
 /// Keychain／Keystore 的最小介面(測試以假的替換)。
@@ -480,6 +484,21 @@ class SecureOAuthTokenStore implements OAuthTokenStore {
   }
 
   @override
+  Future<OAuthTokens?> peek() async {
+    final raw = await _vault.read(
+      _metaKey,
+      protection: TokenProtection.passcode,
+    );
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final meta = jsonDecode(raw) as Map<String, dynamic>;
+      return OAuthTokens.fromJson({...meta}..remove('refresh_token'));
+    } on Exception {
+      return null; // 壞掉的資料視為沒有憑證
+    }
+  }
+
+  @override
   Future<bool> hasLogoutKeep() async =>
       await _vault.read(_logoutKeepKey, protection: TokenProtection.passcode) ==
       '1';
@@ -528,9 +547,20 @@ class InMemoryOAuthTokenStore implements OAuthTokenStore {
   @override
   Future<void> lock() async => _locked = true;
 
+  /// 與正式版一樣：剛寫入的憑證留在記憶體，之後讀取不必再驗證。
   @override
-  Future<void> write(OAuthTokens tokens) async =>
-      _tokens = tokens.withoutAccessToken();
+  Future<void> write(OAuthTokens tokens) async {
+    _tokens = tokens.withoutAccessToken();
+    _locked = false;
+  }
+
+  @override
+  Future<OAuthTokens?> peek() async {
+    final tokens = _tokens;
+    return tokens == null
+        ? null
+        : OAuthTokens.fromJson({...tokens.toJson()}..remove('refresh_token'));
+  }
 
   @override
   Future<bool> setProtection(TokenProtection protection) async {
