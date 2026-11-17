@@ -67,14 +67,13 @@ class _WelcomeRouteState extends ConsumerState<WelcomeRoute> {
   }
 
   Future<void> _unlock() async {
-    final invalid = await ref.read(authStateProvider.notifier).unlock();
+    await ref.read(authStateProvider.notifier).unlock();
     if (!mounted) return;
-    // 憑證已失效並清掉（refresh 被拒、生物特徵變更）：同一次按下直接開 web 登入頁。
-    if (invalid != null) return _browserLogin();
     final auth = ref.read(authStateProvider);
     final error = auth.error;
     if (error != null) return showAppError(context, _message(error));
-    // 生物辨識取消或失敗（回到未登入、沒有 error）：不是錯誤，改開 web 登入頁（ADR-0020）。
+    // 沒有登入（不是錯誤）：生物辨識取消或失敗（憑證仍保留），或憑證已失效並清掉
+    //（refresh 被拒、生物特徵變更）。兩者都在同一次按下開 web 登入頁（ADR-0020）。
     if (auth.value == null) return _browserLogin();
   }
 
